@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 /** Tax categories and marginal brackets defined by the approved payroll specification. */
 class TaxCalculator
 {
+    private ?array $categoriesCache = null;
+
     public function calculate(float $annualTaxableBase): array
     {
         // The taxable base is deliberately not rounded or rounded down.
@@ -41,14 +43,18 @@ class TaxCalculator
 
     private function categories(): array
     {
+        if ($this->categoriesCache !== null) {
+            return $this->categoriesCache;
+        }
+
         if (!DB::getSchemaBuilder()->hasTable('tax_categories') || !DB::getSchemaBuilder()->hasTable('tax_brackets')) {
-            return $this->defaults();
+            return $this->categoriesCache = $this->defaults();
         }
 
         $rows = DB::table('tax_categories')->orderBy('sort_order')->get();
-        if ($rows->isEmpty()) return $this->defaults();
+        if ($rows->isEmpty()) return $this->categoriesCache = $this->defaults();
 
-        return $rows->map(function ($category) {
+        return $this->categoriesCache = $rows->map(function ($category) {
             $brackets = DB::table('tax_brackets')->where('tax_category_id', $category->id)->orderBy('from_amount')->get()
                 ->map(fn ($bracket) => [
                     'from' => (float) $bracket->from_amount,

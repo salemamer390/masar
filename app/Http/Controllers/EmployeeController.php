@@ -142,7 +142,8 @@ class EmployeeController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
-            'net_salary' => ['nullable', 'numeric', 'min:0.01'],
+            'salary_source' => ['nullable', 'in:gross,net'],
+            'salary_value' => ['nullable', 'numeric', 'min:0.01'],
             'department_id' => ['nullable', 'exists:departments,id'],
             'job_id' => ['nullable', 'exists:jobs,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
@@ -156,7 +157,7 @@ class EmployeeController extends Controller
         $this->validateSalarySource($request, true);
         [$grossSalary, $calculatedNet] = $this->resolveEmployeeSalary($request);
         $validated['gross_salary'] = $grossSalary;
-        unset($validated['net_salary']);
+        unset($validated['salary_source'], $validated['salary_value']);
 
         $names = explode(' ', trim($validated['full_name']));
         $validated['first_name'] = $names[0] ?? '';
@@ -201,7 +202,8 @@ class EmployeeController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
-            'net_salary' => ['nullable', 'numeric', 'min:0.01'],
+            'salary_source' => ['nullable', 'in:gross,net'],
+            'salary_value' => ['nullable', 'numeric', 'min:0.01'],
             'gender' => ['nullable', 'string', 'max:30'],
             'birth_date' => ['nullable', 'date'],
             'address' => ['nullable', 'string', 'max:500'],
@@ -237,12 +239,12 @@ class EmployeeController extends Controller
             'profile.military_status' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $salaryChanged = array_key_exists('gross_salary', $validated) || array_key_exists('net_salary', $validated);
+        $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
         if ($salaryChanged) {
             $this->validateSalarySource($request, false, $employee);
             [$grossSalary, $calculatedNet] = $this->resolveEmployeeSalary($request);
             $validated['gross_salary'] = $grossSalary;
-            unset($validated['net_salary']);
+            unset($validated['salary_source'], $validated['salary_value']);
         }
 
         $profileData = $validated['profile'] ?? [];
@@ -286,69 +288,70 @@ class EmployeeController extends Controller
 
     private function validateSalarySource(Request $request, bool $required, ?Employee $existing = null): void
     {
-        $gross = $request->input('gross_salary');
-        $net = $request->input('net_salary');
         $mode = $request->input('salary_source');
-        $hasGross = $gross !== null && $gross !== '';
-        $hasNet = $net !== null && $net !== '';
+        $value = $request->input('salary_value');
+        $gross = $request->input('gross_salary');
 
-        if ($required && !$hasGross && !$hasNet) {
+        $hasValue = $value !== null && $value !== '' && is_numeric($value) && (float) $value > 0;
+        $hasGross = $gross !== null && $gross !== '' && is_numeric($gross) && (float) $gross > 0;
+
+        // salary_source + salary_value are the authoritative form inputs.
+        // Visible Net is preview-only; it is never persisted to employees.
+        if (!$mode && $hasValue) {
+            $mode = 'gross';
+        }
+
+        if ($required && !$hasValue && !$hasGross) {
             throw ValidationException::withMessages([
                 'gross_salary' => 'يجب إدخال الراتب الإجمالي أو الراتب الصافي.',
-                'net_salary' => 'يجب إدخال الراتب الإجمالي أو الراتب الصافي.',
             ]);
         }
 
-        if (!$mode && $hasGross && !$hasNet) $mode = 'gross';
-        if (!$mode && $hasNet && !$hasGross) $mode = 'net';
-        if (!$mode && $hasGross && $hasNet) {
-            throw ValidationException::withMessages([
-                'gross_salary' => 'حدد الراتب الذي أدخلته؛ الحقل الآخر يُحسب تلقائيًا.',
-                'net_salary' => 'حدد الراتب الذي أدخلته؛ الحقل الآخر يُحسب تلقائيًا.',
-            ]);
+        if (!$mode) {
+            // Backward compatibility for older forms that only submitted gross_salary.
+            if ($hasGross) {
+                $mode = 'gross';
+            } else {
+                throw ValidationException::withMessages([
+                    'gross_salary' => 'يجب إدخال الراتب الإجمالي أو الراتب الصافي.',
+                ]);
+            }
         }
-        if ($mode && !in_array($mode, ['gross', 'net'], true)) {
+
+        if (!in_array($mode, ['gross', 'net'], true)) {
             throw ValidationException::withMessages(['salary_source' => 'مصدر الراتب غير صالح.']);
         }
-        if ($mode === 'gross' && !$hasGross) {
-            throw ValidationException::withMessages(['gross_salary' => 'الراتب الإجمالي المدخل مطلوب.']);
-        }
-        if ($mode === 'net' && !$hasNet) {
-            throw ValidationException::withMessages(['net_salary' => 'الراتب الصافي المدخل مطلوب.']);
+
+        if ($hasValue) {
+            return;
         }
 
-        if ($mode === 'gross' && $hasGross && $hasNet) {
-            $expected = $this->payrollCalculator->calculate('gross', (float)$gross)['net'];
-            if (abs((float)$net - (float)$expected) > 0.01) {
-                throw ValidationException::withMessages(['net_salary' => 'الراتب الصافي لا يطابق الإجمالي المحسوب. اترك النظام يحسبه تلقائيًا.']);
-            }
+        if ($mode === 'gross' && $hasGross) {
+            return;
         }
-        if ($mode === 'net' && $hasGross && $hasNet) {
-            $expected = $this->payrollCalculator->calculate('net', (float)$net)['gross'];
-            if (abs((float)$gross - (float)$expected) > 0.01) {
-                throw ValidationException::withMessages(['gross_salary' => 'الراتب الإجمالي لا يطابق الـGross-Up المحسوب. اترك النظام يحسبه تلقائيًا.']);
-            }
-        }
+
+        throw ValidationException::withMessages([
+            $mode === 'net' ? 'salary_value' : 'gross_salary' => 'قيمة الراتب المطلوبة غير موجودة.',
+        ]);
     }
 
     private function resolveEmployeeSalary(Request $request): array
     {
         $mode = $request->input('salary_source');
-        $gross = $request->input('gross_salary');
-        $net = $request->input('net_salary');
+        $value = $request->input('salary_value');
 
-        if ($mode === 'net' && $net !== null && $net !== '') {
-            $result = $this->payrollCalculator->calculate('net', (float)$net);
-            return [(float)$result['gross'], (float)$result['net']];
+        if ($value === null || $value === '') {
+            // Compatibility fallback for old requests.
+            $value = $request->input($mode === 'net' ? 'net_salary' : 'gross_salary');
         }
 
-        if ($gross !== null && $gross !== '') {
-            $result = $this->payrollCalculator->calculate('gross', (float)$gross);
-            return [(float)$result['gross'], (float)$result['net']];
+        if ($mode === 'net') {
+            $result = $this->payrollCalculator->calculate('net', (float) $value);
+            return [(float) $result['gross'], (float) $result['net']];
         }
 
-        $result = $this->payrollCalculator->calculate('net', (float)$net);
-        return [(float)$result['gross'], (float)$result['net']];
+        $result = $this->payrollCalculator->calculate('gross', (float) $value);
+        return [(float) $result['gross'], (float) $result['net']];
     }
 
     private function createSalaryStructureFromEmployee(Employee $employee): void

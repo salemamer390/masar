@@ -111,7 +111,7 @@
       </div>
       <form action="{{ route('employees.store') }}" method="POST" id="addEmployeeForm">
         @csrf
-        <input type="hidden" name="salary_source" id="new_employee_salary_source" value="">
+        <input type="hidden" name="salary_source" id="new_employee_salary_source" value=""><input type="hidden" name="salary_value" id="new_employee_salary_value" value="">
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">الاسم الكامل <span class="text-danger">*</span></label>
@@ -150,14 +150,14 @@
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">الراتب الإجمالي (Gross) <span class="text-danger">*</span></label>
-              <input type="number" name="gross_salary" id="new_employee_gross" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 28118.56">
-              
+              <label class="form-label">الراتب الإجمالي (Gross)</label>
+              <input type="number" id="new_employee_gross" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 28118.56">
+              <div class="form-text">أدخل الإجمالي ليُحسب الصافي فورًا.</div>
             </div>
             <div class="col-6">
               <label class="form-label">الراتب الصافي (Net)</label>
-              <input type="number" name="net_salary" id="new_employee_net" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 22000">
-              
+              <input type="number" id="new_employee_net" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 22000">
+              <div class="form-text">أو أدخل الصافي ليُحسب الإجمالي فورًا. يُحفظ الإجمالي فقط.</div>
             </div>
           </div>
           <div class="row g-2 mb-3">
@@ -195,47 +195,60 @@
     if (!grossInput || !netInput || !sourceInput || !form) return;
 
     const endpoint = @json(route('employees.salary-preview.get'));
-    let timer = null;
     let sequence = 0;
+    let lastSource = null;
+    let requestController = null;
 
     async function sync(source) {
         const input = source === 'gross' ? grossInput : netInput;
+        const otherInput = source === 'gross' ? netInput : grossInput;
         const value = input.value.trim();
         sourceInput.value = source;
+        if (value && Number(value) > 0) {
+            document.getElementById('new_employee_salary_value').value = value;
+        } else {
+            document.getElementById('new_employee_salary_value').value = '';
+        }
 
-        if (timer) clearTimeout(timer);
-        if (!value || Number(value) <= 0) return;
+        if (requestController) requestController.abort();
+        if (!value || Number(value) <= 0) {
+            otherInput.value = '';
+            lastSource = null;
+            return;
+        }
 
+        lastSource = source;
         const current = ++sequence;
-        timer = setTimeout(async function () {
-            try {
-                const url = endpoint + '?salary_source=' + encodeURIComponent(source) + '&salary_value=' + encodeURIComponent(value);
-                const response = await fetch(url, {
-                    method: 'GET',
-                    credentials: 'same-origin',
-                    cache: 'no-store',
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                });
-
-                if (!response.ok || current !== sequence) return;
-                const result = await response.json();
-                if (source === 'gross') {
-                    netInput.value = Number(result.net).toFixed(2);
-                } else {
-                    grossInput.value = Number(result.gross).toFixed(2);
-                }
-            } catch (error) {
-                console.error('Salary preview failed', error);
-            }
-        }, 120);
+        requestController = new AbortController();
+        try {
+            const url = endpoint + '?salary_source=' + encodeURIComponent(source) + '&salary_value=' + encodeURIComponent(value);
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: requestController.signal
+            });
+            if (!response.ok || current !== sequence) return;
+            const result = await response.json();
+            otherInput.value = Number(source === 'gross' ? result.net : result.gross).toFixed(2);
+        } catch (error) {
+            if (error.name !== 'AbortError') console.error('Salary preview failed', error);
+        }
     }
 
     grossInput.addEventListener('input', () => sync('gross'));
-    grossInput.addEventListener('change', () => sync('gross'));
-    grossInput.addEventListener('blur', () => sync('gross'));
     netInput.addEventListener('input', () => sync('net'));
+    grossInput.addEventListener('change', () => sync('gross'));
     netInput.addEventListener('change', () => sync('net'));
-    netInput.addEventListener('blur', () => sync('net'));
+
+    form.addEventListener('submit', function () {
+        const active = lastSource;
+        if (active) {
+            sourceInput.value = active;
+            document.getElementById('new_employee_salary_value').value = active === 'gross' ? grossInput.value : netInput.value;
+        }
+    });
 })();
 </script>
 @endpush

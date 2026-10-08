@@ -410,13 +410,13 @@
 @if(auth()->user()?->hasPermission('employees.edit'))
 <div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}">@csrf @method('PUT')
 <div class="modal-header"><h5 class="modal-title">تعديل ملف الموظف: {{ $employee->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-<input type="hidden" name="salary_source" id="employee_edit_salary_source" value="">
+<input type="hidden" name="salary_source" id="employee_edit_salary_source" value=""><input type="hidden" name="salary_value" id="employee_edit_salary_value" value="">
 <div class="modal-body">
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الشخصية</h3><span>مصدرها جدول الموظفين وتفاصيل الملف.</span></div></div><div class="p-3 row g-3">
 <div class="col-md-4"><label class="form-label">الاسم الكامل</label><input name="full_name" class="form-control" value="{{ old('full_name',$employee->full_name) }}" required></div><div class="col-md-3"><label class="form-label">الاسم الأول</label><input name="first_name" class="form-control" value="{{ old('first_name',$employee->first_name) }}"></div><div class="col-md-3"><label class="form-label">الاسم الأوسط</label><input name="middle_name" class="form-control" value="{{ old('middle_name',$employee->middle_name) }}"></div><div class="col-md-2"><label class="form-label">اسم العائلة</label><input name="last_name" class="form-control" value="{{ old('last_name',$employee->last_name) }}"></div>
 <div class="col-md-3"><label class="form-label">الرقم القومي</label><input name="national_id" class="form-control" value="{{ old('national_id',$employee->national_id) }}"></div><div class="col-md-3"><label class="form-label">الجنسية</label><input name="profile[nationality]" class="form-control" value="{{ old('profile.nationality',$profile?->nationality) }}"></div><div class="col-md-3"><label class="form-label">النوع</label><input name="gender" class="form-control" value="{{ old('gender',$employee->gender) }}"></div><div class="col-md-3"><label class="form-label">تاريخ الميلاد</label><input name="birth_date" type="date" class="form-control" value="{{ old('birth_date',$employee->birth_date?->format('Y-m-d')) }}"></div>
 <div class="col-md-3"><label class="form-label">الهاتف</label><input name="phone" class="form-control" value="{{ old('phone',$employee->phone) }}"></div><div class="col-md-3"><label class="form-label">بريد العمل</label><input name="email" type="email" class="form-control" value="{{ old('email',$employee->email) }}"></div>
-<div class="col-md-3"><label class="form-label">الراتب الإجمالي (Gross)</label><input name="gross_salary" id="employee_edit_gross" type="number" step="0.01" min="0.01" class="form-control employee-salary-input" value="{{ old('gross_salary',$employee->gross_salary) }}"></div><div class="col-md-3"><label class="form-label">الراتب الصافي (Net)</label><input name="net_salary" id="employee_edit_net" type="number" step="0.01" min="0.01" class="form-control employee-salary-input" value="{{ old('net_salary',$currentSalary?->net_salary) }}"></div><div class="col-md-3"><label class="form-label">البريد الشخصي</label><input name="profile[personal_email]" type="email" class="form-control" value="{{ old('profile.personal_email',$profile?->personal_email) }}"></div><div class="col-md-3"><label class="form-label">الحالة الاجتماعية</label><input name="marital_status" class="form-control" value="{{ old('marital_status',$employee->marital_status) }}"></div>
+<div class="col-md-3"><label class="form-label">الراتب الإجمالي (Gross)</label><input id="employee_edit_gross" type="number" step="0.01" min="0.01" class="form-control employee-salary-input" value="{{ old('gross_salary',$employee->gross_salary) }}"></div><div class="col-md-3"><label class="form-label">الراتب الصافي (Net)</label><input id="employee_edit_net" type="number" step="0.01" min="0.01" class="form-control employee-salary-input" value="{{ old('net_salary',$currentSalary?->net_salary) }}"></div><div class="col-md-3"><label class="form-label">البريد الشخصي</label><input name="profile[personal_email]" type="email" class="form-control" value="{{ old('profile.personal_email',$profile?->personal_email) }}"></div><div class="col-md-3"><label class="form-label">الحالة الاجتماعية</label><input name="marital_status" class="form-control" value="{{ old('marital_status',$employee->marital_status) }}"></div>
 <div class="col-md-6"><label class="form-label">العنوان</label><input name="address" class="form-control" value="{{ old('address',$employee->address) }}"></div><div class="col-md-3"><label class="form-label">المؤهل</label><input name="qualification" class="form-control" value="{{ old('qualification',$employee->qualification) }}"></div><div class="col-md-3"><label class="form-label">الموقف العسكري</label><input name="profile[military_status]" class="form-control" value="{{ old('profile.military_status',$profile?->military_status) }}"></div>
 </div></div>
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الوظيفية والعقد</h3><span>تُحفظ العلاقات بالمعرّفات وتظهر بالاسم.</span></div></div><div class="p-3 row g-3">
@@ -436,37 +436,49 @@
     const gross=document.getElementById('employee_edit_gross');
     const net=document.getElementById('employee_edit_net');
     const mode=document.getElementById('employee_edit_salary_source');
-    if(!gross || !net || !mode) return;
+    const salaryValue=document.getElementById('employee_edit_salary_value');
+    const form=gross?.closest('form');
+    if(!gross || !net || !mode || !salaryValue || !form) return;
 
     const endpoint='{{ route('employees.salary-preview.get') }}';
-    let timer=null;
     let sequence=0;
+    let lastSource=null;
+    let requestController=null;
 
-    function sync(source){
+    async function sync(source){
         const input=source==='gross'?gross:net;
+        const otherInput=source==='gross'?net:gross;
         const value=input.value.trim();
         mode.value=source;
-        if(timer) clearTimeout(timer);
-        if(!value || Number(value)<=0) return;
+        salaryValue.value=value;
+        if(requestController) requestController.abort();
+        if(!value || Number(value)<=0){
+            otherInput.value='';
+            lastSource=null;
+            return;
+        }
+        lastSource=source;
         const current=++sequence;
-        timer=setTimeout(async()=>{
-            try{
-                const url=endpoint+'?salary_source='+encodeURIComponent(source)+'&salary_value='+encodeURIComponent(value);
-                const r=await fetch(url,{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});
-                if(!r.ok || current!==sequence) return;
-                const x=await r.json();
-                if(source==='gross') net.value=Number(x.net).toFixed(2);
-                else gross.value=Number(x.gross).toFixed(2);
-            }catch(e){ console.error('Salary preview failed',e); }
-        },120);
+        requestController=new AbortController();
+        try{
+            const url=endpoint+'?salary_source='+encodeURIComponent(source)+'&salary_value='+encodeURIComponent(value);
+            const r=await fetch(url,{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'},signal:requestController.signal});
+            if(!r.ok || current!==sequence) return;
+            const x=await r.json();
+            otherInput.value=Number(source==='gross'?x.net:x.gross).toFixed(2);
+        }catch(e){ if(e.name!=='AbortError') console.error('Salary preview failed',e); }
     }
 
     gross.addEventListener('input',()=>sync('gross'));
-    gross.addEventListener('change',()=>sync('gross'));
-    gross.addEventListener('blur',()=>sync('gross'));
     net.addEventListener('input',()=>sync('net'));
+    gross.addEventListener('change',()=>sync('gross'));
     net.addEventListener('change',()=>sync('net'));
-    net.addEventListener('blur',()=>sync('net'));
+    form.addEventListener('submit',()=>{
+        if(lastSource){
+            mode.value=lastSource;
+            salaryValue.value=lastSource==='gross'?gross.value:net.value;
+        }
+    });
 })();
 </script>
 @endpush

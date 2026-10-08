@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 
 class PayrollSettingsService
 {
+    /** @var array<string, float> */
+    private array $numberCache = [];
+
+    /** @var array<string, string> */
+    private array $ruleCache = [];
+
+    private ?array $allowanceDistributionCache = null;
+
     /**
      * Read numeric payroll calculation setting.
      */
@@ -16,17 +24,20 @@ class PayrollSettingsService
         string $key,
         float $default = 0.0
     ): float {
+        $cacheKey = $group.'.'.$key;
+        if (array_key_exists($cacheKey, $this->numberCache)) {
+            return $this->numberCache[$cacheKey];
+        }
+
         $value = DB::table('payroll_calculation_settings')
             ->where('setting_group', $group)
             ->where('setting_key', $key)
             ->where('is_active', 1)
             ->value('setting_value');
 
-        if ($value === null || $value === '') {
-            return $default;
-        }
-
-        return (float) $value;
+        return $this->numberCache[$cacheKey] = ($value === null || $value === '')
+            ? $default
+            : (float) $value;
     }
 
     /**
@@ -37,17 +48,20 @@ class PayrollSettingsService
         string $key,
         string $default = ''
     ): string {
+        $cacheKey = $group.'.'.$key;
+        if (array_key_exists($cacheKey, $this->ruleCache)) {
+            return $this->ruleCache[$cacheKey];
+        }
+
         $value = DB::table('payroll_calculation_rules')
             ->where('rule_group', $group)
             ->where('rule_key', $key)
             ->where('is_active', 1)
             ->value('rule_value');
 
-        if ($value === null || $value === '') {
-            return $default;
-        }
-
-        return (string) $value;
+        return $this->ruleCache[$cacheKey] = ($value === null || $value === '')
+            ? $default
+            : (string) $value;
     }
 
     /*
@@ -289,7 +303,11 @@ class PayrollSettingsService
 
     public function allowanceDistribution(): array
     {
-        return DB::table('payroll_allowance_settings')
+        if ($this->allowanceDistributionCache !== null) {
+            return $this->allowanceDistributionCache;
+        }
+
+        return $this->allowanceDistributionCache = DB::table('payroll_allowance_settings')
             ->where('is_active', 1)
             ->orderBy('sort_order')
             ->get([
