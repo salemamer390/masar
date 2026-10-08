@@ -1,0 +1,189 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Attendance;
+use App\Models\Employee;
+use App\Models\InsuranceRecord;
+use App\Models\Leave;
+use App\Models\PayrollRecord;
+use App\Models\Salary;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class ReportController extends Controller
+{
+    public function index()
+    {
+        return view('reports.index');
+    }
+
+    public function show(string $type)
+    {
+        $data = $this->getReportData($type);
+        return view('reports.show', array_merge(['type' => $type], $data));
+    }
+
+    public function export(string $type): StreamedResponse
+    {
+        $data = $this->getReportData($type);
+        $title = $data['title'] ?? 'report';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$type}_report.csv\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        return response()->stream(function () use ($data) {
+            $handle = fopen('php://output', 'w');
+            // Add UTF-8 BOM for proper Excel Arabic display
+            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            if (!empty($data['columns'])) {
+                fputcsv($handle, $data['columns']);
+            }
+
+            foreach ($data['rows'] as $row) {
+                fputcsv($handle, $row);
+            }
+
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    private function getReportData(string $type): array
+    {
+        switch ($type) {
+            case 'employees':
+                $items = Employee::with(['department', 'job', 'status'])->get();
+                return [
+                    'title' => 'تقرير الموظفين',
+                    'subtitle' => 'بيانات الموظفين والحالات والأقسام',
+                    'columns' => ['الكود', 'الاسم', 'الوظيفة', 'القسم', 'تاريخ التعيين', 'الحالة'],
+                    'rows' => $items->map(fn($e) => [
+                        $e->employee_code,
+                        $e->full_name,
+                        $e->job?->title ?? '—',
+                        $e->department?->name ?? '—',
+                        $e->hire_date?->format('d/m/Y') ?? '—',
+                        $e->status?->name ?? 'نشط',
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'attendance':
+                $items = Attendance::with(['employee.department', 'employee.job'])->latest('attendance_date')->take(50)->get();
+                return [
+                    'title' => 'تقرير الحضور والانصراف',
+                    'subtitle' => 'التأخير والغياب وساعات العمل',
+                    'columns' => ['الموظف', 'التاريخ', 'الحضور', 'الانصراف', 'التأخير', 'الحالة'],
+                    'rows' => $items->map(fn($a) => [
+                        $a->employee?->full_name ?? '—',
+                        $a->attendance_date->format('d/m/Y'),
+                        $a->check_in ?? '—',
+                        $a->check_out ?? '—',
+                        $a->formatted_late,
+                        $a->status,
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'salaries':
+                $items = Salary::with(['employee.department', 'employee.job', 'paymentMethod'])->where('status', 'Active')->get();
+                return [
+                    'title' => 'تقرير الرواتب',
+                    'subtitle' => 'الصافي المتفق عليه وGross والتأمينات والضريبة وتكلفة الموظف',
+                    'columns' => ['الموظف', 'الوظيفة', 'القسم', 'Net المتفق عليه', 'الأجر الأساسي', 'البدلات', 'Gross', 'تأمين الموظف', 'الضريبة', 'Net النهائي', 'تكلفة الموظف'],
+                    'rows' => $items->map(fn($s) => [
+                        $s->employee?->full_name ?? '—',
+                        $s->employee?->job?->title ?? '—',
+                        $s->employee?->department?->name ?? '—',
+                        format_money($s->salary_input),
+                        format_money($s->basic_salary),
+                        format_money($s->allowances),
+                        format_money($s->gross_salary),
+                        format_money($s->employee_insurance),
+                        format_money($s->income_tax),
+                        format_money($s->net_salary),
+                        format_money($s->employee_cost),
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'leaves':
+                $items = Leave::with(['employee.department', 'leaveType'])->latest('start_date')->take(50)->get();
+                return [
+                    'title' => 'تقرير الإجازات',
+                    'subtitle' => 'الأرصدة والطلبات والحالات',
+                    'columns' => ['الموظف', 'نوع الإجازة', 'من', 'إلى', 'الأيام', 'الحالة'],
+                    'rows' => $items->map(fn($l) => [
+                        $l->employee?->full_name ?? '—',
+                        $l->leaveType?->name ?? 'سنوية',
+                        $l->start_date->format('d/m/Y'),
+                        $l->end_date->format('d/m/Y'),
+                        $l->days,
+                        $l->status,
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'insurance':
+                $items = InsuranceRecord::with(['employee.department', 'employee.job'])->get();
+                return [
+                    'title' => 'تقرير التأمينات',
+                    'subtitle' => 'حالة التسجيل وأكواد المهن',
+                    'columns' => ['الموظف', 'رقم التأمين', 'كود المهنة', 'تاريخ التسجيل', 'الحالة'],
+                    'rows' => $items->map(fn($i) => [
+                        $i->employee?->full_name ?? '—',
+                        $i->insurance_number ?? '—',
+                        $i->job_code ?? '—',
+                        $i->insurance_start_date?->format('d/m/Y') ?? '—',
+                        $i->status,
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'payroll':
+                $items = PayrollRecord::with(['employee.department', 'employee.job'])
+                    ->whereIn('status', ['Approved', 'Locked'])->latest('payroll_month')->get();
+                return [
+                    'title' => 'Monthly Payroll Report',
+                    'subtitle' => 'Approved and locked payroll records only.',
+                    'columns' => ['Month', 'Employee', 'Department', 'Gross', 'Net', 'Employer Cost', 'Status'],
+                    'rows' => $items->map(fn ($record) => [
+                        $record->payroll_month?->format('Y-m'), $record->employee?->full_name ?? '—',
+                        $record->employee?->department?->name ?? '—', format_money($record->gross_salary),
+                        format_money($record->net_salary), format_money($record->employee_cost), $record->status,
+                    ]),
+                    'items' => $items,
+                ];
+
+            case 'summary':
+            default:
+                $totalEmployees = Employee::count();
+                $activeEmployees = Employee::count();
+                $totalSalaries = Salary::where('status', 'Active')->sum('net_salary');
+                $totalLeaves = Leave::count();
+                return [
+                    'title' => 'التقرير الإداري الشامل',
+                    'subtitle' => 'ملخص مؤشرات شؤون العاملين',
+                    'columns' => ['المؤشر', 'القيمة'],
+                    'rows' => collect([
+                        ['إجمالي الموظفين', $totalEmployees],
+                        ['الموظفون النشطون', $activeEmployees],
+                        ['إجمالي فاتورة الرواتب', format_money($totalSalaries) . ' ج.م'],
+                        ['إجمالي طلبات الإجازات', $totalLeaves],
+                    ]),
+                    'items' => collect([
+                        ['metric' => 'إجمالي الموظفين', 'value' => $totalEmployees],
+                        ['metric' => 'الموظفون النشطون', 'value' => $activeEmployees],
+                        ['metric' => 'إجمالي فاتورة الرواتب', 'value' => format_money($totalSalaries) . ' ج.م'],
+                        ['metric' => 'إجمالي طلبات الإجازات', 'value' => $totalLeaves],
+                    ]),
+                ];
+        }
+    }
+}

@@ -1,0 +1,3 @@
+
+ERROR:
+SQLSTATE[HY000] [1045] Access denied for user 'amer'@'localhost' (using password: YES)

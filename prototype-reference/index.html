@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Broman HR System — Prototype</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-icon"><i class="bi bi-buildings-fill"></i></div>
+      <div>
+        <div class="brand-title">Broman HR System</div>
+        <small>إدارة الموارد البشرية</small>
+      </div>
+    </div>
+
+    <div class="side-section">الرئيسية</div>
+    <button class="nav-item active" data-page="dashboard"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></button>
+
+    <div class="side-section">إدارة الموظفين</div>
+    <button class="nav-item" data-page="employees"><i class="bi bi-people-fill"></i><span>الموظفون</span></button>
+    <button class="nav-item" data-page="jobs"><i class="bi bi-briefcase-fill"></i><span>البيانات الوظيفية</span></button>
+    <button class="nav-item" data-page="attendance"><i class="bi bi-clock-history"></i><span>الحضور والانصراف</span></button>
+    <button class="nav-item" data-page="leaves"><i class="bi bi-calendar2-check-fill"></i><span>الإجازات</span></button>
+    <button class="nav-item" data-page="documents"><i class="bi bi-folder-fill"></i><span>مسوغات التعيين</span></button>
+
+    <div class="side-section">الرواتب والتأمينات</div>
+    <button class="nav-item" data-page="salaries"><i class="bi bi-cash-stack"></i><span>هيكل الرواتب</span></button>
+    <button class="nav-item" data-page="monthly"><i class="bi bi-calendar3"></i><span>الرواتب الشهرية</span></button>
+    <button class="nav-item" data-page="insurance"><i class="bi bi-shield-check"></i><span>التأمينات</span></button>
+
+    <div class="side-section">الإدارة</div>
+    <button class="nav-item" data-page="discipline"><i class="bi bi-exclamation-octagon-fill"></i><span>الجزاءات والمخالفات</span></button>
+    <button class="nav-item" data-page="movements"><i class="bi bi-arrow-left-right"></i><span>الحركات الوظيفية</span></button>
+    <button class="nav-item" data-page="master"><i class="bi bi-sliders2"></i><span>القوائم الأساسية</span></button>
+<button class="nav-item" data-page="reports"><i class="bi bi-bar-chart-fill"></i><span>التقارير</span></button>
+
+    <div class="sidebar-bottom">
+      <div class="system-status"><span></span> النظام يعمل بشكل طبيعي</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="top-left">
+        <button class="icon-btn d-lg-none" id="menuBtn"><i class="bi bi-list"></i></button>
+        <div class="search-box"><i class="bi bi-search"></i><input placeholder="بحث في النظام..." id="globalSearch"></div>
+      </div>
+      <div class="top-right">
+        <button class="icon-btn"><i class="bi bi-moon"></i></button>
+        <button class="icon-btn position-relative"><i class="bi bi-bell"></i><span class="notification-dot"></span></button>
+        <div class="user-menu">
+          <div class="user-avatar">H</div>
+          <div class="user-text"><strong>Hassan Alkhaiat</strong><small>مدير النظام</small></div>
+          <i class="bi bi-chevron-down"></i>
+        </div>
+      </div>
+    </header>
+
+    <section class="content">
+      <div id="page-dashboard" class="page active">
+        <div class="page-head">
+          <div>
+            <h1>لوحة التحكم</h1>
+            <p>نظرة عامة على بيانات الموظفين وشؤون العاملين والرواتب.</p>
+          </div>
+          <button class="btn btn-primary" onclick="showToast('تم تحديث بيانات لوحة التحكم')"><i class="bi bi-arrow-repeat"></i> تحديث</button>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-icon blue"><i class="bi bi-people-fill"></i></div><div><span>إجمالي الموظفين</span><b>125</b><small>+8 هذا الشهر</small></div></div>
+          <div class="stat-card"><div class="stat-icon green"><i class="bi bi-person-check-fill"></i></div><div><span>موظفون نشطون</span><b>118</b><small>94.4% من الإجمالي</small></div></div>
+          <div class="stat-card"><div class="stat-icon orange"><i class="bi bi-cash-coin"></i></div><div><span>إجمالي الرواتب</span><b>850,000</b><small>جنيه شهريًا</small></div></div>
+          <div class="stat-card"><div class="stat-icon purple"><i class="bi bi-calendar2-check-fill"></i></div><div><span>طلبات الإجازات</span><b>12</b><small>4 تحتاج اعتماد</small></div></div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <div class="panel-head"><div><h3>هيكل النظام</h3><span>العلاقات الرئيسية بين وحدات شؤون العاملين</span></div></div>
+            <div class="module-flow">
+              <div class="flow-card blue"><i class="bi bi-people-fill"></i><b>الموظفون</b><small>البيانات الأساسية</small></div>
+              <i class="bi bi-arrow-left flow-arrow"></i>
+              <div class="flow-card green"><i class="bi bi-briefcase-fill"></i><b>البيانات الوظيفية</b><small>القسم والوظيفة والعقد</small></div>
+              <i class="bi bi-arrow-left flow-arrow"></i>
+              <div class="flow-card orange"><i class="bi bi-cash-stack"></i><b>هيكل الرواتب</b><small>الأجر والاستحقاقات</small></div>
+              <i class="bi bi-arrow-left flow-arrow"></i>
+              <div class="flow-card purple"><i class="bi bi-calendar3"></i><b>الرواتب الشهرية</b><small>الحساب والتسوية</small></div>
+            </div>
+            <div class="module-row">
+              <button onclick="openPage('attendance')"><i class="bi bi-clock"></i> الحضور والانصراف</button>
+              <button onclick="openPage('leaves')"><i class="bi bi-calendar-check"></i> الإجازات</button>
+              <button onclick="openPage('insurance')"><i class="bi bi-shield-check"></i> التأمينات</button>
+              <button onclick="openPage('documents')"><i class="bi bi-folder"></i> المسوغات</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div><h3>إجراءات سريعة</h3><span>الوصول المباشر للعمليات المتكررة</span></div></div>
+            <div class="quick-grid">
+              <button onclick="openPage('employees')"><i class="bi bi-person-plus-fill"></i><span>إضافة موظف</span></button>
+              <button onclick="openPage('attendance')"><i class="bi bi-fingerprint"></i><span>تسجيل حضور</span></button>
+              <button onclick="openPage('leaves')"><i class="bi bi-calendar-plus"></i><span>طلب إجازة</span></button>
+              <button onclick="openPage('monthly')"><i class="bi bi-receipt"></i><span>تشغيل الرواتب</span></button>
+              <button onclick="openPage('documents')"><i class="bi bi-file-earmark-plus"></i><span>مسوغ جديد</span></button>
+              <button onclick="openPage('master')"><i class="bi bi-gear-fill"></i><span>إعداد القوائم</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel mt-4">
+          <div class="panel-head"><div><h3>آخر الأنشطة</h3><span>آخر العمليات المسجلة في النظام</span></div><button class="link-btn">عرض الكل</button></div>
+          <div class="activity-list">
+            <div><span class="activity-icon green"><i class="bi bi-person-plus"></i></span><div><b>إضافة موظف جديد</b><small>تمت إضافة موظف إلى قسم التسويق</small></div><time>منذ 10 دقائق</time></div>
+            <div><span class="activity-icon blue"><i class="bi bi-calendar-check"></i></span><div><b>اعتماد إجازة</b><small>تم اعتماد طلب إجازة لمدة 3 أيام</small></div><time>منذ 35 دقيقة</time></div>
+            <div><span class="activity-icon orange"><i class="bi bi-cash-stack"></i></span><div><b>تحديث هيكل راتب</b><small>تم تعديل راتب أحد الموظفين</small></div><time>منذ ساعة</time></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-employees" class="page">
+        <div class="page-head"><div><h1>الموظفون</h1><p>إدارة ملف الموظف والبيانات الأساسية.</p></div><button class="btn btn-primary"><i class="bi bi-plus-lg"></i> إضافة موظف</button></div>
+        <div class="filter-bar"><div class="search-table"><i class="bi bi-search"></i><input placeholder="بحث باسم الموظف أو الكود..."></div><select><option>كل الأقسام</option><option>التسويق</option><option>الموارد البشرية</option><option>التصميم</option></select><select><option>كل الحالات</option><option>نشط</option><option>إجازة</option></select></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الكود</th><th>الموظف</th><th>الوظيفة</th><th>القسم</th><th>الحالة</th><th>تاريخ التعيين</th><th></th></tr></thead><tbody>
+          <tr><td>#001</td><td><div class="employee-cell"><span>AS</span><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></div></td><td>HR Manager</td><td>الموارد البشرية</td><td><span class="badge-soft success">نشط</span></td><td>29/07/2026</td><td><button class="table-action"><i class="bi bi-three-dots"></i></button></td></tr>
+          <tr><td>#002</td><td><div class="employee-cell"><span>ZM</span><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></div></td><td>Content Creator</td><td>التسويق</td><td><span class="badge-soft success">نشط</span></td><td>16/08/2026</td><td><button class="table-action"><i class="bi bi-three-dots"></i></button></td></tr>
+          <tr><td>#003</td><td><div class="employee-cell"><span>SA</span><b class="employee-link" onclick="openProfile('003')">Mohamed Salah</b></div></td><td>Graphic Designer</td><td>التصميم</td><td><span class="badge-soft warning">إجازة</span></td><td>23/08/2026</td><td><button class="table-action"><i class="bi bi-three-dots"></i></button></td></tr>
+          <tr><td>#004</td><td><div class="employee-cell"><span>AK</span><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></div></td><td>Senior Media Buyer</td><td>التسويق</td><td><span class="badge-soft success">نشط</span></td><td>01/08/2026</td><td><button class="table-action"><i class="bi bi-three-dots"></i></button></td></tr>
+        </tbody></table></div>
+      </div>
+
+
+      <div id="page-profile" class="page">
+        <div class="profile-head">
+          <button class="back-btn" onclick="openPage('employees')"><i class="bi bi-arrow-right"></i> العودة للموظفين</button>
+          <div class="profile-main">
+            <div class="profile-avatar" id="profileAvatar">AS</div>
+            <div>
+              <h1 id="profileName">Amer Salem</h1>
+              <p id="profileJob">HR Manager — الموارد البشرية</p>
+              <div class="profile-tags"><span class="badge-soft success">نشط</span><span id="profileCode">كود الموظف #001</span></div>
+            </div>
+          </div>
+          <div class="profile-actions"><button class="btn btn-outline-primary"><i class="bi bi-pencil"></i> تعديل</button><button class="btn btn-primary"><i class="bi bi-printer"></i> طباعة الملف</button></div>
+        </div>
+
+        <div class="profile-tabs">
+          <button class="profile-tab active" data-tab="overview">نظرة عامة</button>
+          <button class="profile-tab" data-tab="job">البيانات الوظيفية</button>
+          <button class="profile-tab" data-tab="salary">الراتب</button>
+          <button class="profile-tab" data-tab="attendanceProfile">الحضور</button>
+          <button class="profile-tab" data-tab="leavesProfile">الإجازات</button>
+          <button class="profile-tab" data-tab="documentsProfile">المسوغات</button>
+          <button class="profile-tab" data-tab="insuranceProfile">التأمينات</button>
+          <button class="profile-tab" data-tab="disciplineProfile">الجزاءات</button>
+          <button class="profile-tab" data-tab="movementsProfile">الحركات</button>
+        </div>
+
+        <div class="profile-content">
+          <div class="profile-tab-content active" id="tab-overview">
+            <div class="profile-grid">
+              <div class="panel profile-panel"><div class="panel-head"><div><h3>البيانات الشخصية</h3><span>المعلومات الأساسية للموظف</span></div></div><div class="details-grid">
+                <div><label>الاسم الكامل</label><b id="pFullName">Amer Salem</b></div><div><label>الرقم القومي</label><b>29801011234567</b></div>
+                <div><label>تاريخ الميلاد</label><b>01/01/1998</b></div><div><label>الحالة الاجتماعية</label><b>متزوج</b></div>
+                <div><label>رقم الهاتف</label><b>01000000000</b></div><div><label>البريد الإلكتروني</label><b>amer@bromanhr.com</b></div>
+                <div><label>العنوان</label><b>القاهرة — مصر</b></div><div><label>المؤهل</label><b>بكالوريوس</b></div>
+              </div></div>
+              <div class="panel profile-panel"><div class="panel-head"><div><h3>ملخص الموظف</h3><span>بيانات مرتبطة بكل وحدات النظام</span></div></div>
+                <div class="profile-summary">
+                  <div><i class="bi bi-briefcase"></i><span>الوظيفة</span><b id="pJob">HR Manager</b></div>
+                  <div><i class="bi bi-diagram-3"></i><span>القسم</span><b>الموارد البشرية</b></div>
+                  <div><i class="bi bi-calendar-event"></i><span>تاريخ التعيين</span><b id="pStart">29/07/2026</b></div>
+                  <div><i class="bi bi-cash-stack"></i><span>صافي الراتب</span><b id="pSalary">20,000 ج.م</b></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="tab-job"><div class="profile-grid">
+            <div class="panel profile-panel"><div class="panel-head"><h3>البيانات الوظيفية</h3></div><div class="details-grid">
+              <div><label>الكود الوظيفي</label><b>#001</b></div><div><label>المسمى الوظيفي</label><b id="jobTitleDetail">HR Manager</b></div>
+              <div><label>القسم</label><b>الموارد البشرية</b></div><div><label>الفرع</label><b>المقر الرئيسي</b></div>
+              <div><label>نوع العقد</label><b>دوام كامل</b></div><div><label>مدة العقد</label><b>سنة</b></div>
+              <div><label>تاريخ بداية العقد</label><b>29/07/2026</b></div><div><label>تاريخ نهاية العقد</label><b>28/07/2027</b></div>
+            </div></div>
+            <div class="panel profile-panel"><div class="panel-head"><h3>التسلسل الوظيفي</h3></div><div class="timeline">
+              <div><b>29/07/2026</b><span>تعيين — HR Manager</span></div><div><b>01/08/2026</b><span>اعتماد هيكل الراتب</span></div><div><b>02/09/2026</b><span>تثبيت الموظف على القسم</span></div>
+            </div></div>
+          </div></div>
+
+          <div class="profile-tab-content" id="tab-salary"><div class="panel profile-panel"><div class="panel-head"><h3>هيكل راتب الموظف</h3></div><div class="salary-detail-grid">
+            <div><span>صافي الراتب</span><strong id="salaryNet">20,000 ج.م</strong></div><div><span>الأجر الأساسي</span><strong>14,000 ج.م</strong></div><div><span>البدلات</span><strong>6,000 ج.م</strong></div><div><span>طريقة الصرف</span><strong>تحويل بنكي</strong></div>
+          </div><div class="table-responsive mt-3"><table class="table"><thead><tr><th>الشهر</th><th>صافي الراتب</th><th>الحالة</th></tr></thead><tbody><tr><td>سبتمبر 2026</td><td>20,000</td><td><span class="badge-soft success">تم الصرف</span></td></tr><tr><td>أكتوبر 2026</td><td>20,000</td><td><span class="badge-soft warning">قيد الإعداد</span></td></tr></tbody></table></div></div></div>
+
+          <div class="profile-tab-content" id="tab-attendanceProfile"><div class="panel profile-panel"><div class="panel-head"><h3>سجل الحضور والانصراف</h3></div><table class="table"><thead><tr><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>الحالة</th></tr></thead><tbody><tr><td>02/10/2026</td><td>09:56</td><td>18:02</td><td>00:00</td><td><span class="badge-soft success">حاضر</span></td></tr><tr><td>01/10/2026</td><td>10:03</td><td>18:00</td><td>00:03</td><td><span class="badge-soft warning">متأخر</span></td></tr><tr><td>30/09/2026</td><td>09:52</td><td>18:05</td><td>00:00</td><td><span class="badge-soft success">حاضر</span></td></tr></tbody></table></div></div>
+
+
+          <div class="profile-tab-content" id="tab-leavesProfile">
+            <div class="profile-section-head">
+              <div><h2>إجازات الموظف</h2><p>جميع طلبات وإجازات الموظف مرتبطة مباشرة بملفه.</p></div>
+              <button class="btn btn-primary" onclick="addEmployeeLeave()"><i class="bi bi-plus-lg"></i> طلب إجازة</button>
+            </div>
+            <div class="profile-mini-stats">
+              <div><span>الرصيد السنوي</span><b id="leaveBalance">21 يوم</b></div>
+              <div><span>مستخدم</span><b id="leaveUsed">3 أيام</b></div>
+              <div><span>طلبات قيد الاعتماد</span><b id="leavePending">1</b></div>
+              <div><span>آخر إجازة</span><b id="lastLeave">15/09/2026</b></div>
+            </div>
+            <div class="panel profile-panel"><div class="panel-head"><div><h3>سجل الإجازات</h3><span>الطلبات المعتمدة والمعلقة والمرفوضة</span></div></div>
+              <div class="table-responsive"><table class="table align-middle"><thead><tr><th>النوع</th><th>من</th><th>إلى</th><th>الأيام</th><th>السبب</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="employeeLeavesRows"></tbody></table></div>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="tab-documentsProfile">
+            <div class="documents-page-head">
+              <div>
+                <div class="documents-title"><i class="bi bi-file-earmark-text"></i><div><h2>مسوغات التعيين</h2><p>إدارة المستندات المطلوبة لتعيين الموظف، يمكنك رفع وتعديل وحذف أي مستند.</p></div></div>
+              </div>
+              <button class="btn btn-primary" onclick="addDocument()"><i class="bi bi-plus-lg"></i> إضافة مسوغ جديد</button>
+            </div>
+
+            <div class="documents-toolbar">
+              <div class="search-table"><i class="bi bi-search"></i><input id="documentSearch" placeholder="بحث عن مسوغ..." oninput="filterDocuments()"></div>
+              <select id="documentStatusFilter" onchange="filterDocuments()"><option value="all">كل الحالات</option><option value="complete">مكتمل</option><option value="missing">مطلوب</option><option value="review">قيد المراجعة</option></select>
+              <button class="filter-reset" onclick="resetDocumentFilters()"><i class="bi bi-arrow-counterclockwise"></i> إعادة ضبط</button>
+            </div>
+
+            <div id="employeeDocuments" class="documents-card-grid"></div>
+          </div>
+
+          <div class="profile-tab-content" id="tab-insuranceProfile"><div class="panel profile-panel"><div class="panel-head"><h3>التأمينات</h3></div><div class="details-grid"><div><label>الحالة التأمينية</label><b>مسجل</b></div><div><label>رقم التأمين</label><b>123456789</b></div><div><label>كود المهنة</label><b>121101</b></div><div><label>تاريخ التسجيل</label><b>01/08/2026</b></div></div></div></div>
+
+
+          <div class="profile-tab-content" id="tab-disciplineProfile">
+            <div class="profile-section-head">
+              <div><h2>جزاءات ومخالفات الموظف</h2><p>كل الإجراءات التأديبية المسجلة على الموظف تظهر هنا.</p></div>
+              <button class="btn btn-primary" onclick="addEmployeePenalty()"><i class="bi bi-plus-lg"></i> تسجيل مخالفة</button>
+            </div>
+            <div class="profile-mini-stats">
+              <div><span>إجمالي الحالات</span><b id="penaltyTotal">2</b></div>
+              <div><span>مغلقة</span><b id="penaltyClosed">1</b></div>
+              <div><span>قيد المتابعة</span><b id="penaltyOpen">1</b></div>
+              <div><span>آخر إجراء</span><b id="lastPenalty">21/09/2026</b></div>
+            </div>
+            <div class="panel profile-panel"><div class="panel-head"><div><h3>السجل التأديبي</h3><span>المخالفات والتنبيهات والجزاءات</span></div></div>
+              <div class="table-responsive"><table class="table align-middle"><thead><tr><th>نوع الإجراء</th><th>التاريخ</th><th>السبب</th><th>التفاصيل</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="employeePenaltyRows"></tbody></table></div>
+            </div>
+          </div>
+
+          <div class="profile-tab-content" id="tab-movementsProfile"><div class="panel profile-panel"><div class="panel-head"><h3>الحركات الوظيفية</h3></div><table class="table"><thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>من</th><th>إلى</th></tr></thead><tbody><tr><td>29/07/2026</td><td>تعيين</td><td>—</td><td>HR Manager</td></tr><tr><td>02/09/2026</td><td>تثبيت قسم</td><td>—</td><td>الموارد البشرية</td></tr></tbody></table></div></div>
+        </div>
+      </div>
+
+      <div id="page-attendance" class="page"><div class="page-head"><div><h1>سجلات الحضور والانصراف</h1><p>متابعة الحضور، الانصراف، التأخير والانصراف المبكر.</p></div><button class="btn btn-primary"><i class="bi bi-plus-lg"></i> تسجيل حضور</button></div>
+        <div class="stat-grid compact"><div class="stat-card"><div class="stat-icon green"><i class="bi bi-person-check"></i></div><div><span>حاضر اليوم</span><b>108</b></div></div><div class="stat-card"><div class="stat-icon red"><i class="bi bi-person-x"></i></div><div><span>غياب</span><b>7</b></div></div><div class="stat-card"><div class="stat-icon orange"><i class="bi bi-hourglass-split"></i></div><div><span>متأخر</span><b>10</b></div></div><div class="stat-card"><div class="stat-icon blue"><i class="bi bi-clock"></i></div><div><span>متوسط الحضور</span><b>09:52</b></div></div></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
+        <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>02/10/2026</td><td>09:56</td><td>18:02</td><td>00:00</td><td><span class="badge-soft success">حاضر</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+        <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>02/10/2026</td><td>10:14</td><td>18:01</td><td>00:14</td><td><span class="badge-soft warning">متأخر</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+        <tr><td><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></td><td>02/10/2026</td><td>09:48</td><td>18:05</td><td>00:00</td><td><span class="badge-soft success">حاضر</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-salaries" class="page"><div class="page-head"><div><h1>هيكل الرواتب</h1><p>تعريف الراتب الأساسي والمتغير والبدلات والاستحقاقات.</p></div><button class="btn btn-primary"><i class="bi bi-plus-lg"></i> إضافة هيكل</button></div>
+        <div class="salary-layout"><div class="salary-card"><span>صافي الراتب</span><strong>20,000 <small>ج.م</small></strong><div class="salary-line"><span>الأساسي</span><b>14,000</b></div><div class="salary-line"><span>بدلات</span><b>6,000</b></div></div><div class="salary-card"><span>صافي الراتب</span><strong>30,000 <small>ج.م</small></strong><div class="salary-line"><span>الأساسي</span><b>21,000</b></div><div class="salary-line"><span>بدلات</span><b>9,000</b></div></div><div class="salary-card"><span>صافي الراتب</span><strong>15,000 <small>ج.م</small></strong><div class="salary-line"><span>الأساسي</span><b>10,500</b></div><div class="salary-line"><span>بدلات</span><b>4,500</b></div></div></div>
+      </div>
+
+      <div id="page-master" class="page">
+        <div class="page-head"><div><h1>القوائم الأساسية</h1><p>بيانات مركزية تستخدمها كل وحدات النظام والقوائم المنسدلة.</p></div><button class="btn btn-primary" onclick="showToast('تمت إضافة القائمة بنجاح')"><i class="bi bi-plus-lg"></i> إضافة عنصر</button></div>
+        <div class="master-layout">
+          <div class="master-sidebar">
+            <div class="master-menu-title">مصادر البيانات</div>
+            <button class="master-menu active" data-master="departments">الأقسام <span>8</span></button>
+            <button class="master-menu" data-master="jobs">الوظائف <span>22</span></button>
+            <button class="master-menu" data-master="branches">الفروع <span>4</span></button>
+            <button class="master-menu" data-master="employment">أنواع التوظيف <span>5</span></button>
+            <button class="master-menu" data-master="leavetypes">أنواع الإجازات <span>7</span></button>
+            <button class="master-menu" data-master="statuses">حالات الموظفين <span>5</span></button>
+            <button class="master-menu" data-master="penalties">أنواع الجزاءات <span>6</span></button>
+            <button class="master-menu" data-master="movements">أنواع الحركات <span>6</span></button>
+            <button class="master-menu" data-master="payment">طرق صرف الراتب <span>3</span></button>
+          </div>
+          <div class="panel master-data-panel">
+            <div class="panel-head"><div><h3 id="masterTitle">الأقسام</h3><span id="masterDesc">الأقسام التنظيمية المستخدمة في بيانات الموظفين</span></div><div class="search-table master-search"><i class="bi bi-search"></i><input placeholder="بحث في القائمة..."></div></div>
+            <div id="masterRows" class="master-rows">
+              <div class="master-row"><b>الموارد البشرية</b><span>HR-01</span><em>نشط</em></div>
+              <div class="master-row"><b>التسويق</b><span>MKT-02</span><em>نشط</em></div>
+              <div class="master-row"><b>التصميم</b><span>DES-03</span><em>نشط</em></div>
+              <div class="master-row"><b>المبيعات</b><span>SAL-04</span><em>نشط</em></div>
+              <div class="master-row"><b>الإدارة</b><span>ADM-05</span><em>نشط</em></div>
+              <div class="master-row"><b>خدمة العملاء</b><span>CS-06</span><em>نشط</em></div>
+              <div class="master-row"><b>الحسابات</b><span>ACC-07</span><em>نشط</em></div>
+              <div class="master-row"><b>تكنولوجيا المعلومات</b><span>IT-08</span><em>نشط</em></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <div id="page-jobs" class="page">
+        <div class="page-head"><div><h1>البيانات الوظيفية</h1><p>إدارة الوظائف والأقسام والفروع والعقود والبيانات التنظيمية للموظفين.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج إضافة بيانات وظيفية')"><i class="bi bi-plus-lg"></i> إضافة بيان وظيفي</button></div>
+        <div class="stat-grid compact">
+          <div class="stat-card"><div class="stat-icon blue"><i class="bi bi-briefcase"></i></div><div><span>الوظائف</span><b>22</b></div></div>
+          <div class="stat-card"><div class="stat-icon green"><i class="bi bi-diagram-3"></i></div><div><span>الأقسام</span><b>8</b></div></div>
+          <div class="stat-card"><div class="stat-icon orange"><i class="bi bi-building"></i></div><div><span>الفروع</span><b>4</b></div></div>
+          <div class="stat-card"><div class="stat-icon purple"><i class="bi bi-file-earmark-text"></i></div><div><span>العقود النشطة</span><b>118</b></div></div>
+        </div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>الوظيفة</th><th>القسم</th><th>الفرع</th><th>نوع العقد</th><th>بداية العقد</th><th>نهاية العقد</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>HR Manager</td><td>الموارد البشرية</td><td>المقر الرئيسي</td><td>دوام كامل</td><td>29/07/2026</td><td>28/07/2027</td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>Content Creator</td><td>التسويق</td><td>المقر الرئيسي</td><td>دوام كامل</td><td>16/08/2026</td><td>15/08/2027</td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></td><td>Senior Media Buyer</td><td>التسويق</td><td>المقر الرئيسي</td><td>دوام كامل</td><td>01/08/2026</td><td>31/07/2027</td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-leaves" class="page">
+        <div class="page-head"><div><h1>الإجازات</h1><p>طلبات الإجازات والأرصدة والاعتمادات.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج طلب إجازة')"><i class="bi bi-plus-lg"></i> طلب إجازة</button></div>
+        <div class="stat-grid compact"><div class="stat-card"><div class="stat-icon orange"><i class="bi bi-hourglass-split"></i></div><div><span>طلبات قيد الاعتماد</span><b>4</b></div></div><div class="stat-card"><div class="stat-icon green"><i class="bi bi-check2-circle"></i></div><div><span>معتمدة هذا الشهر</span><b>18</b></div></div><div class="stat-card"><div class="stat-icon blue"><i class="bi bi-calendar2"></i></div><div><span>أيام الإجازات</span><b>37</b></div></div><div class="stat-card"><div class="stat-icon purple"><i class="bi bi-people"></i></div><div><span>موظفون في إجازة</span><b>5</b></div></div></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>نوع الإجازة</th><th>من</th><th>إلى</th><th>الأيام</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>سنوية</td><td>15/10/2026</td><td>17/10/2026</td><td>3</td><td><span class="badge-soft warning">قيد الاعتماد</span></td><td><button class="btn btn-sm btn-outline-primary" onclick="showToast('تم اعتماد الطلب')">اعتماد</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>عارضة</td><td>25/09/2026</td><td>25/09/2026</td><td>1</td><td><span class="badge-soft success">معتمدة</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-documents" class="page">
+        <div class="page-head"><div><h1>مسوغات التعيين</h1><p>متابعة المستندات المطلوبة لكل موظف وحالة اكتمال الملف.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج إضافة مسوغ')"><i class="bi bi-upload"></i> إضافة مسوغ</button></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>المستند</th><th>تاريخ الرفع</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>صورة بطاقة الرقم القومي</td><td>29/07/2026</td><td><span class="badge-soft success">مكتمل</span></td><td><button class="btn btn-sm btn-outline-primary">عرض</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>عقد العمل</td><td>16/08/2026</td><td><span class="badge-soft success">مكتمل</span></td><td><button class="btn btn-sm btn-outline-primary">عرض</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('003')">Mohamed Salah</b></td><td>شهادة الحالة الجنائية</td><td>—</td><td><span class="badge-soft danger">ناقص</span></td><td><button class="btn btn-sm btn-outline-primary">رفع</button></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-monthly" class="page">
+        <div class="page-head"><div><h1>الرواتب الشهرية</h1><p>تجهيز واعتماد وصرف الرواتب الشهرية.</p></div><button class="btn btn-primary" onclick="showToast('تم تشغيل مسودة رواتب أكتوبر 2026')"><i class="bi bi-play-fill"></i> تشغيل الرواتب</button></div>
+        <div class="stat-grid compact"><div class="stat-card"><div class="stat-icon blue"><i class="bi bi-people"></i></div><div><span>الموظفون</span><b>118</b></div></div><div class="stat-card"><div class="stat-icon green"><i class="bi bi-check2-circle"></i></div><div><span>تمت المراجعة</span><b>104</b></div></div><div class="stat-card"><div class="stat-icon orange"><i class="bi bi-hourglass"></i></div><div><span>قيد المراجعة</span><b>14</b></div></div><div class="stat-card"><div class="stat-icon purple"><i class="bi bi-cash-stack"></i></div><div><span>إجمالي الصافي</span><b>850,000</b></div></div></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>الشهر</th><th>الصافي</th><th>الخصومات</th><th>الحوافز</th><th>الحالة</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>أكتوبر 2026</td><td>20,000</td><td>0</td><td>0</td><td><span class="badge-soft warning">قيد الإعداد</span></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>أكتوبر 2026</td><td>15,000</td><td>500</td><td>1,000</td><td><span class="badge-soft warning">قيد الإعداد</span></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></td><td>أكتوبر 2026</td><td>30,000</td><td>0</td><td>2,000</td><td><span class="badge-soft warning">قيد الإعداد</span></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-insurance" class="page">
+        <div class="page-head"><div><h1>التأمينات</h1><p>ملفات التأمين وأكواد المهن وحالة التسجيل.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج تسجيل تأمين')"><i class="bi bi-plus-lg"></i> تسجيل موظف</button></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>الحالة</th><th>رقم التأمين</th><th>كود المهنة</th><th>تاريخ التسجيل</th><th>الإجراء</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td><span class="badge-soft success">مسجل</span></td><td>123456789</td><td>121101</td><td>01/08/2026</td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td><span class="badge-soft success">مسجل</span></td><td>123456790</td><td>264101</td><td>20/08/2026</td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></td><td><span class="badge-soft warning">قيد التسجيل</span></td><td>—</td><td>243105</td><td>—</td><td><button class="btn btn-sm btn-outline-primary">استكمال</button></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-discipline" class="page">
+        <div class="page-head"><div><h1>الجزاءات والمخالفات</h1><p>تسجيل ومراجعة المخالفات والإجراءات التأديبية.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج تسجيل مخالفة')"><i class="bi bi-plus-lg"></i> تسجيل مخالفة</button></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>نوع الجزاء</th><th>التاريخ</th><th>السبب</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('003')">Mohamed Salah</b></td><td>تنبيه شفهي</td><td>13/09/2026</td><td>تأخير متكرر</td><td><span class="badge-soft success">مغلق</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>لفت نظر</td><td>21/09/2026</td><td>مخالفة سياسة داخلية</td><td><span class="badge-soft warning">قيد المتابعة</span></td><td><button class="btn btn-sm btn-outline-primary">تفاصيل</button></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-movements" class="page">
+        <div class="page-head"><div><h1>الحركات الوظيفية</h1><p>تعيين ونقل وترقية وتعديل بيانات الموظفين.</p></div><button class="btn btn-primary" onclick="showToast('تم فتح نموذج حركة وظيفية')"><i class="bi bi-plus-lg"></i> حركة جديدة</button></div>
+        <div class="panel table-panel"><table class="table align-middle"><thead><tr><th>الموظف</th><th>نوع الحركة</th><th>من</th><th>إلى</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>
+          <tr><td><b class="employee-link" onclick="openProfile('001')">Amer Salem</b></td><td>تعيين</td><td>—</td><td>HR Manager</td><td>29/07/2026</td><td><span class="badge-soft success">منفذة</span></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('002')">Ziyad Mahmoud</b></td><td>تعديل قسم</td><td>—</td><td>التسويق</td><td>16/08/2026</td><td><span class="badge-soft success">منفذة</span></td></tr>
+          <tr><td><b class="employee-link" onclick="openProfile('004')">Amani Karam</b></td><td>تعديل راتب</td><td>28,000</td><td>30,000</td><td>01/09/2026</td><td><span class="badge-soft success">منفذة</span></td></tr>
+        </tbody></table></div>
+      </div>
+
+      <div id="page-reports" class="page">
+        <div class="page-head"><div><h1>التقارير</h1><p>تقارير تشغيلية وإدارية مبنية على بيانات النظام.</p></div><button class="btn btn-primary" onclick="showToast('تم تحديث التقارير')"><i class="bi bi-arrow-repeat"></i> تحديث</button></div>
+        <div class="report-grid">
+          <button class="report-card" onclick="showToast('تم تجهيز تقرير الموظفين')"><i class="bi bi-people"></i><b>تقرير الموظفين</b><span>بيانات الموظفين والحالات والأقسام</span></button>
+          <button class="report-card" onclick="showToast('تم تجهيز تقرير الحضور')"><i class="bi bi-clock"></i><b>تقرير الحضور والانصراف</b><span>التأخير والغياب وساعات العمل</span></button>
+          <button class="report-card" onclick="showToast('تم تجهيز تقرير الرواتب')"><i class="bi bi-cash-stack"></i><b>تقرير الرواتب</b><span>الصافي والبدلات والخصومات</span></button>
+          <button class="report-card" onclick="showToast('تم تجهيز تقرير الإجازات')"><i class="bi bi-calendar2-check"></i><b>تقرير الإجازات</b><span>الأرصدة والطلبات والحالات</span></button>
+          <button class="report-card" onclick="showToast('تم تجهيز تقرير التأمينات')"><i class="bi bi-shield-check"></i><b>تقرير التأمينات</b><span>حالة التسجيل وأكواد المهن</span></button>
+          <button class="report-card" onclick="showToast('تم تجهيز التقرير الإداري')"><i class="bi bi-bar-chart"></i><b>التقرير الإداري الشامل</b><span>ملخص مؤشرات شؤون العاملين</span></button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal fade" id="documentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="documentModalTitle">إدارة المسوغ</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="documentId">
+        <div class="mb-3">
+          <label class="form-label">اسم المسوغ</label>
+          <input class="form-control" id="documentName" placeholder="مثال: صورة بطاقة الرقم القومي">
+        </div>
+        <div class="document-preview-box" id="documentPreviewBox">
+          <div class="document-placeholder"><i class="bi bi-file-earmark-image"></i><span>لا توجد صورة مرفوعة</span></div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <label class="btn btn-outline-primary mb-0">
+            <i class="bi bi-upload"></i> رفع صورة
+            <input type="file" id="documentFile" accept="image/*" hidden>
+          </label>
+          <button type="button" class="btn btn-outline-secondary" onclick="replaceDocumentImage()"><i class="bi bi-arrow-repeat"></i> تغيير الصورة</button>
+          <button type="button" class="btn btn-outline-danger" onclick="deleteDocumentImage()"><i class="bi bi-trash"></i> حذف الصورة</button>
+          <button type="button" class="btn btn-outline-dark" onclick="previewDocumentImage()"><i class="bi bi-eye"></i> معاينة</button>
+        </div>
+        <div class="small text-muted mt-2">الصور التجريبية تُحفظ محليًا داخل المتصفح في هذا الـPrototype.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+        <button class="btn btn-primary" onclick="saveDocument()"><i class="bi bi-check-lg"></i> حفظ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal fade" id="leaveModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">إضافة طلب إجازة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label">نوع الإجازة</label><select id="leaveTypeInput" class="form-select mb-3"><option>سنوية</option><option>عارضة</option><option>مرضية</option><option>بدون أجر</option><option>مأمورية</option></select>
+        <div class="row g-2"><div class="col-6"><label class="form-label">من</label><input id="leaveStartInput" type="date" class="form-control"></div><div class="col-6"><label class="form-label">إلى</label><input id="leaveEndInput" type="date" class="form-control"></div></div>
+        <label class="form-label mt-3">السبب</label><textarea id="leaveReasonInput" class="form-control" rows="3" placeholder="سبب الإجازة..."></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" onclick="saveEmployeeLeave()">حفظ الطلب</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="penaltyModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">تسجيل مخالفة / جزاء</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label">نوع الإجراء</label><select id="penaltyTypeInput" class="form-select mb-3"><option>تنبيه شفهي</option><option>إنذار كتابي</option><option>لفت نظر</option><option>خصم يوم</option><option>خصم من الراتب</option><option>إيقاف</option></select>
+        <label class="form-label">التاريخ</label><input id="penaltyDateInput" type="date" class="form-control mb-3">
+        <label class="form-label">السبب</label><input id="penaltyReasonInput" class="form-control mb-3" placeholder="سبب المخالفة">
+        <label class="form-label">التفاصيل</label><textarea id="penaltyDetailsInput" class="form-control" rows="3"></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" onclick="saveEmployeePenalty()">حفظ الإجراء</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="genericActionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="genericActionTitle">إجراء</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label class="form-label">البيان</label>
+        <input class="form-control" id="genericActionInput" placeholder="اكتب القيمة...">
+      </div>
+      <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" onclick="confirmGenericAction()">حفظ</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 start-0 p-3"><div id="liveToast" class="toast" role="alert"><div class="toast-body"><i class="bi bi-check-circle-fill text-success"></i> <span id="toastText"></span></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

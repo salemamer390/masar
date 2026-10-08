@@ -1,0 +1,22 @@
+<aside class="sidebar" id="sidebar">
+  <div class="brand"><div class="brand-icon"><i class="bi bi-diamond-fill"></i></div><div><div class="brand-title">تزامن</div><small>لتقنية المعلومات</small></div></div>
+  <div class="side-section">الرئيسية</div>
+  @if(auth()->user()?->hasPermission('dashboard.view') && auth()->user()?->role?->name !== 'employee')<a href="{{ route('dashboard') }}" class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>@endif
+  <div class="side-section">إدارة الموظفين</div>
+  @if(auth()->user()?->hasPermission('employees.view'))<a href="{{ route('employees.index') }}" class="nav-item {{ request()->routeIs('employees.*') ? 'active' : '' }}"><i class="bi bi-people-fill"></i><span>الموظفون</span></a><a href="{{ route('jobs.index') }}" class="nav-item {{ request()->routeIs('jobs.*') ? 'active' : '' }}"><i class="bi bi-briefcase-fill"></i><span>البيانات الوظيفية والعقود</span></a>@endif
+  @if(auth()->user()?->hasPermission('attendance.view'))<a href="{{ route('attendance.index') }}" class="nav-item {{ request()->routeIs('attendance.*') ? 'active' : '' }}"><i class="bi bi-clock-history"></i><span>الحضور والانصراف</span></a>@endif
+  @if(auth()->user()?->hasPermission('leaves.view'))<a href="{{ route('leaves.index') }}" class="nav-item {{ request()->routeIs('leaves.*') ? 'active' : '' }}"><i class="bi bi-calendar2-check-fill"></i><span>الإجازات</span></a>@endif
+  @if(auth()->user()?->hasPermission('requests.view'))<a href="{{ route('requests.index') }}" class="nav-item {{ request()->routeIs('requests.*') ? 'active' : '' }}"><i class="bi bi-file-earmark-text-fill"></i><span>الطلبات</span></a>@endif
+  <div class="side-section">الرواتب والتأمينات</div>
+  @if(auth()->user()?->hasPermission('salary.view'))<a href="{{ route('salaries.index') }}" class="nav-item {{ request()->routeIs('salaries.*') ? 'active' : '' }}"><i class="bi bi-cash-stack"></i><span>هياكل الرواتب</span></a>@endif
+  @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.index') }}" class="nav-item {{ request()->routeIs('payroll.index') ? 'active' : '' }}"><i class="bi bi-calendar3"></i><span>دورة الرواتب</span></a>@endif
+  @if(auth()->user()?->hasPermission('insurance.view'))<a href="{{ route('insurance.index') }}" class="nav-item {{ request()->routeIs('insurance.*') ? 'active' : '' }}"><i class="bi bi-shield-check"></i><span>التأمينات</span></a>@endif
+  <div class="side-section">الإدارة والتقارير</div>
+  @if(auth()->user()?->hasPermission('penalties.view'))<a href="{{ route('discipline.index') }}" class="nav-item {{ request()->routeIs('discipline.*') ? 'active' : '' }}"><i class="bi bi-exclamation-octagon-fill"></i><span>الجزاءات والمخالفات</span></a>@endif
+  @if(auth()->user()?->hasPermission('movements.view'))<a href="{{ route('movements.index') }}" class="nav-item {{ request()->routeIs('movements.*') ? 'active' : '' }}"><i class="bi bi-arrow-left-right"></i><span>الحركات الوظيفية</span></a>@endif
+  @if(auth()->user()?->hasPermission('roles.view'))<a href="{{ route('master.index') }}" class="nav-item {{ request()->routeIs('master.*') ? 'active' : '' }}"><i class="bi bi-sliders2"></i><span>القوائم الأساسية</span></a>@endif
+  @if(auth()->user()?->hasPermission('reports.view'))<a href="{{ route('reports.index') }}" class="nav-item {{ request()->routeIs('reports.*') ? 'active' : '' }}"><i class="bi bi-bar-chart-fill"></i><span>التقارير</span></a>@endif
+  @if(auth()->user()?->hasPermission('payroll.settings'))<a href="{{ route('payroll.settings.index') }}" class="nav-item {{ request()->routeIs('payroll.settings.*') ? 'active' : '' }}"><i class="bi bi-gear-fill"></i><span>الإعدادات</span></a>@endif
+  @if(auth()->user()?->isSuperAdmin())<div class="side-section">إدارة النظام</div><a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'active' : '' }}"><i class="bi bi-person-gear"></i><span>المستخدمون</span></a><a href="{{ route('roles.index') }}" class="nav-item {{ request()->routeIs('roles.*') ? 'active' : '' }}"><i class="bi bi-shield-lock"></i><span>الأدوار والصلاحيات</span></a>@endif
+  <div class="sidebar-bottom"><div class="system-status"><span></span> النظام يعمل بشكل طبيعي</div></div>
+</aside>

@@ -1,0 +1,2259 @@
+
+==========================================================================================
+DATABASE AUDIT
+==========================================================================================
+Database : masar
+Host     : 127.0.0.1
+Mode     : READ ONLY
+Time     : 2026-10-08 00:47:10
+
+==========================================================================================
+1. DATABASE INFORMATION
+==========================================================================================
+Charset | utf8mb4
+Collation | utf8mb4_unicode_ci
+
+==========================================================================================
+2. TABLE INVENTORY
+==========================================================================================
+Total tables: 60
+
+TABLE | ENGINE | ROWS | CREATED | UPDATED
+activity_logs | InnoDB | 52 | 2026-10-08 01:31:59 | NULL
+attendance | InnoDB | 2 | 2026-10-08 01:31:59 | NULL
+banks | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+branches | InnoDB | 5 | 2026-10-08 01:31:59 | NULL
+departments | InnoDB | 12 | 2026-10-08 01:31:59 | NULL
+documents | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+document_expiry_notifications | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+document_types | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+employees | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+employee_allowances | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+employee_bank_accounts | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+employee_emergency_contacts | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+employee_profile_details | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+employee_statuses | InnoDB | 5 | 2026-10-08 01:31:59 | NULL
+employee_tax_years | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+employment_types | InnoDB | 5 | 2026-10-08 01:31:59 | NULL
+hr_holidays | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+hr_operational_settings | InnoDB | 10 | 2026-10-08 01:31:59 | NULL
+hr_requests | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+insurance_job_codes | InnoDB | 5 | 2026-10-08 01:31:59 | NULL
+insurance_records | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+insurance_record_history | InnoDB | 2 | 2026-10-08 01:31:59 | NULL
+insurance_settings | InnoDB | 8 | 2026-10-08 01:31:59 | NULL
+jobs | InnoDB | 11 | 2026-10-08 01:31:59 | NULL
+leaves | InnoDB | 4 | 2026-10-08 01:31:59 | NULL
+leave_types | InnoDB | 11 | 2026-10-08 01:31:59 | NULL
+migrations | InnoDB | 36 | 2026-10-08 01:31:59 | NULL
+movement_records | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+movement_types | InnoDB | 12 | 2026-10-08 01:31:59 | NULL
+notifications | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+overtime_records | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+payment_methods | InnoDB | 6 | 2026-10-08 01:31:59 | NULL
+payroll_allowance_settings | InnoDB | 4 | 2026-10-08 01:31:59 | NULL
+payroll_calculation_rules | InnoDB | 4 | 2026-10-08 01:31:59 | NULL
+payroll_calculation_settings | InnoDB | 17 | 2026-10-08 01:31:59 | NULL
+payroll_calculation_snapshots | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+payroll_deductions | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+payroll_earnings | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+payroll_items | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+payroll_records | InnoDB | 10 | 2026-10-08 01:31:59 | NULL
+payroll_runs | InnoDB | 2 | 2026-10-08 01:31:59 | NULL
+payroll_settings | InnoDB | 20 | 2026-10-08 01:31:59 | NULL
+payroll_setting_changes | InnoDB | 9 | 2026-10-08 01:31:59 | NULL
+payroll_snapshots | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+penalties | InnoDB | 3 | 2026-10-08 01:31:59 | NULL
+penalty_types | InnoDB | 10 | 2026-10-08 01:31:59 | NULL
+permissions | InnoDB | 55 | 2026-10-08 01:31:59 | NULL
+request_types | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+roles | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+role_permissions | InnoDB | 168 | 2026-10-08 01:31:59 | NULL
+salaries | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+salary_history | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+sessions | InnoDB | 8 | 2026-10-08 01:31:59 | 2026-10-08 01:38:16
+system_settings | InnoDB | 7 | 2026-10-08 01:31:59 | NULL
+tax_brackets | InnoDB | 22 | 2026-10-08 01:31:59 | NULL
+tax_categories | InnoDB | 6 | 2026-10-08 01:31:59 | NULL
+tax_reconciliations | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+tax_settings | InnoDB | 3 | 2026-10-08 01:31:59 | NULL
+tax_year_settings | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+users | InnoDB | 0 | 2026-10-08 01:31:59 | NULL
+
+==========================================================================================
+3. TABLE STRUCTURE
+==========================================================================================
+
+----------------------------------------------------------------------
+TABLE: activity_logs
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | user_id | bigint(20) unsigned | YES | NULL | MUL | 
+3 | action | varchar(100) | NO | NULL | MUL | 
+4 | module | varchar(100) | YES | NULL | MUL | 
+5 | model_type | varchar(200) | YES | NULL |  | 
+6 | model_id | bigint(20) unsigned | YES | NULL |  | 
+7 | description | text | YES | NULL |  | 
+8 | old_values | longtext | YES | NULL |  | 
+9 | new_values | longtext | YES | NULL |  | 
+10 | ip_address | varchar(45) | YES | NULL |  | 
+11 | created_at | timestamp | YES | current_timestamp() |  | 
+12 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: attendance
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | attendance_date | date | NO | NULL |  | 
+4 | check_in | time | YES | NULL |  | 
+5 | check_out | time | YES | NULL |  | 
+6 | status | varchar(50) | NO | 'Present' |  | 
+7 | source | varchar(50) | NO | 'manual' |  | 
+8 | approval_status | varchar(30) | NO | 'Draft' | MUL | 
+9 | late_minutes | int(10) unsigned | NO | 0 |  | 
+10 | overtime_minutes | int(10) unsigned | NO | 0 |  | 
+11 | notes | varchar(500) | YES | NULL |  | 
+12 | created_at | timestamp | YES | current_timestamp() |  | 
+13 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+14 | scheduled_check_in | time | YES | NULL |  | 
+15 | scheduled_check_out | time | YES | NULL |  | 
+16 | worked_minutes | int(10) unsigned | NO | 0 |  | 
+17 | absence_minutes | int(10) unsigned | NO | 0 |  | 
+18 | attendance_source | varchar(50) | YES | NULL |  | 
+19 | approved_by | bigint(20) unsigned | YES | NULL | MUL | 
+20 | approved_at | timestamp | YES | NULL |  | 
+21 | early_leave_minutes | int(10) unsigned | NO | 0 |  | 
+22 | worked_hours | decimal(5,2) | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: banks
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL | UNI | 
+3 | is_active | tinyint(1) | NO | 1 |  | 
+4 | created_at | timestamp | YES | current_timestamp() |  | 
+5 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: branches
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL | UNI | 
+3 | address | varchar(255) | YES | NULL |  | 
+4 | is_active | tinyint(1) | NO | 1 |  | 
+5 | created_at | timestamp | YES | current_timestamp() |  | 
+6 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: departments
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL | UNI | 
+3 | is_active | tinyint(1) | NO | 1 |  | 
+4 | created_at | timestamp | YES | current_timestamp() |  | 
+5 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: documents
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | document_name | varchar(200) | NO | NULL |  | 
+4 | document_type | varchar(100) | YES | NULL |  | 
+5 | file_name | varchar(255) | YES | NULL |  | 
+6 | file_path | varchar(500) | YES | NULL |  | 
+7 | mime_type | varchar(100) | YES | NULL |  | 
+8 | file_size | bigint(20) unsigned | YES | NULL |  | 
+9 | status | varchar(50) | NO | 'Required' |  | 
+10 | issue_date | date | YES | NULL |  | 
+11 | expiry_date | date | YES | NULL |  | 
+12 | uploaded_at | timestamp | YES | NULL |  | 
+13 | uploaded_by | bigint(20) unsigned | YES | NULL |  | 
+14 | notes | varchar(500) | YES | NULL |  | 
+15 | created_at | timestamp | YES | current_timestamp() |  | 
+16 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+17 | document_type_id | bigint(20) unsigned | YES | NULL |  | 
+18 | is_required | tinyint(1) | NO | 0 |  | 
+19 | version_number | int(10) unsigned | NO | 1 |  | 
+20 | replaced_document_id | bigint(20) unsigned | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: document_expiry_notifications
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | document_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | threshold_days | tinyint(3) unsigned | NO | NULL |  | 
+4 | sent_at | timestamp | NO | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: document_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL | UNI | 
+3 | is_required | tinyint(1) | NO | 0 |  | 
+4 | has_expiry | tinyint(1) | NO | 0 |  | 
+5 | is_active | tinyint(1) | NO | 1 |  | 
+6 | sort_order | int(10) unsigned | NO | 0 |  | 
+7 | created_at | timestamp | YES | current_timestamp() |  | 
+8 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: employees
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_code | varchar(50) | NO | NULL | UNI | 
+3 | first_name | varchar(100) | NO | NULL |  | 
+4 | middle_name | varchar(100) | YES | NULL |  | 
+5 | last_name | varchar(100) | YES | NULL |  | 
+6 | full_name | varchar(255) | NO | NULL |  | 
+7 | nationality | varchar(100) | YES | NULL |  | 
+8 | national_id | varchar(50) | YES | NULL | UNI | 
+9 | phone | varchar(50) | YES | NULL |  | 
+10 | email | varchar(190) | YES | NULL |  | 
+11 | gender | varchar(30) | YES | NULL |  | 
+12 | birth_date | date | YES | NULL |  | 
+13 | address | varchar(500) | YES | NULL |  | 
+14 | marital_status | varchar(50) | YES | NULL |  | 
+15 | qualification | varchar(150) | YES | NULL |  | 
+16 | department_id | bigint(20) unsigned | YES | NULL | MUL | 
+17 | job_id | bigint(20) unsigned | YES | NULL | MUL | 
+18 | branch_id | bigint(20) unsigned | YES | NULL | MUL | 
+19 | employment_type_id | bigint(20) unsigned | YES | NULL | MUL | 
+20 | status_id | bigint(20) unsigned | YES | NULL | MUL | 
+21 | hire_date | date | YES | NULL |  | 
+22 | contract_start_date | date | YES | NULL |  | 
+23 | contract_end_date | date | YES | NULL |  | 
+24 | contract_duration | varchar(100) | YES | NULL |  | 
+25 | manager_employee_id | bigint(20) unsigned | YES | NULL | MUL | 
+26 | direct_manager_name | varchar(255) | YES | NULL |  | 
+27 | notes | text | YES | NULL |  | 
+28 | created_at | timestamp | YES | current_timestamp() |  | 
+29 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+30 | work_location | varchar(255) | YES | NULL |  | 
+31 | work_pattern | varchar(50) | YES | NULL |  | 
+32 | weekly_work_days | varchar(255) | YES | NULL |  | 
+33 | daily_work_hours | decimal(5,2) | YES | NULL |  | 
+34 | working_hours_text | varchar(100) | YES | NULL |  | 
+35 | contract_type | varchar(100) | YES | NULL |  | 
+36 | probation_period | varchar(100) | YES | NULL |  | 
+37 | annual_leave_days | decimal(6,2) | YES | NULL |  | 
+38 | contract_attachment_status | varchar(100) | YES | NULL |  | 
+39 | attached_documents | varchar(500) | YES | NULL |  | 
+40 | additional_conditions | text | YES | NULL |  | 
+41 | currency | varchar(10) | YES | NULL |  | 
+42 | employment_data_source | varchar(100) | YES | NULL |  | 
+43 | hire_date_source | varchar(100) | YES | NULL |  | 
+44 | contract_start_date_source | varchar(100) | YES | NULL |  | 
+45 | contract_end_date_source | varchar(100) | YES | NULL |  | 
+46 | employee_photo | varchar(500) | YES | NULL |  | 
+47 | personal_email | varchar(190) | YES | NULL |  | 
+48 | emergency_contact_name | varchar(255) | YES | NULL |  | 
+49 | emergency_contact_phone | varchar(50) | YES | NULL |  | 
+50 | emergency_contact_relation | varchar(100) | YES | NULL |  | 
+51 | national_id_issue_date | date | YES | NULL |  | 
+52 | national_id_expiry_date | date | YES | NULL |  | 
+53 | national_id_place | varchar(255) | YES | NULL |  | 
+54 | military_status | varchar(100) | YES | NULL |  | 
+55 | bank_name | varchar(150) | YES | NULL |  | 
+56 | bank_account_number | varchar(100) | YES | NULL |  | 
+57 | iban | varchar(100) | YES | NULL |  | 
+58 | payment_method_id | bigint(20) unsigned | YES | NULL |  | 
+59 | termination_date | date | YES | NULL |  | 
+60 | shift_start | time | YES | NULL |  | 
+61 | shift_end | time | YES | NULL |  | 
+62 | manual_annual_balance | decimal(6,2) | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: employee_allowances
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | allowance_type | varchar(100) | NO | NULL | MUL | 
+4 | amount | decimal(12,2) | NO | 0.00 |  | 
+5 | percentage | decimal(8,4) | YES | NULL |  | 
+6 | effective_from | date | NO | NULL |  | 
+7 | effective_to | date | YES | NULL |  | 
+8 | is_active | tinyint(1) | NO | 1 |  | 
+9 | notes | varchar(500) | YES | NULL |  | 
+10 | created_at | timestamp | YES | current_timestamp() |  | 
+11 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: employee_bank_accounts
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | bank_id | bigint(20) unsigned | YES | NULL | MUL | 
+4 | account_holder_name | varchar(255) | YES | NULL |  | 
+5 | account_number | varchar(100) | YES | NULL |  | 
+6 | iban | varchar(100) | YES | NULL |  | 
+7 | is_primary | tinyint(1) | NO | 1 |  | 
+8 | effective_from | date | YES | NULL | MUL | 
+9 | effective_to | date | YES | NULL | MUL | 
+10 | status | varchar(30) | NO | 'Active' | MUL | 
+11 | is_active | tinyint(1) | NO | 1 |  | 
+12 | notes | varchar(500) | YES | NULL |  | 
+13 | created_at | timestamp | YES | current_timestamp() |  | 
+14 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: employee_emergency_contacts
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | name | varchar(255) | NO | NULL |  | 
+4 | phone | varchar(50) | NO | NULL |  | 
+5 | relationship | varchar(100) | NO | NULL |  | 
+6 | is_primary | tinyint(1) | NO | 0 |  | 
+7 | created_at | timestamp | YES | NULL |  | 
+8 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: employee_profile_details
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | UNI | 
+3 | nationality | varchar(100) | YES | NULL |  | 
+4 | personal_email | varchar(190) | YES | NULL |  | 
+5 | work_pattern | varchar(50) | YES | NULL |  | 
+6 | weekly_work_days | varchar(100) | YES | NULL |  | 
+7 | daily_work_hours | decimal(5,2) | YES | NULL |  | 
+8 | working_hours_text | varchar(100) | YES | NULL |  | 
+9 | contract_type | varchar(100) | YES | NULL |  | 
+10 | probation_period | varchar(100) | YES | NULL |  | 
+11 | annual_leave_days | decimal(6,2) | YES | NULL |  | 
+12 | contract_attachment_status | varchar(50) | YES | NULL |  | 
+13 | additional_conditions | text | YES | NULL |  | 
+14 | currency | varchar(10) | YES | NULL |  | 
+15 | national_id_issue_date | date | YES | NULL |  | 
+16 | national_id_expiry_date | date | YES | NULL |  | 
+17 | national_id_place | varchar(150) | YES | NULL |  | 
+18 | military_status | varchar(100) | YES | NULL |  | 
+19 | created_at | timestamp | YES | NULL |  | 
+20 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: employee_statuses
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+
+----------------------------------------------------------------------
+TABLE: employee_tax_years
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | tax_year | smallint(5) unsigned | NO | NULL |  | 
+4 | annual_gross | decimal(14,2) | NO | 0.00 |  | 
+5 | annual_employee_insurance | decimal(14,2) | NO | 0.00 |  | 
+6 | deductible_contributions | decimal(14,2) | NO | 0.00 |  | 
+7 | exempt_profit_share | decimal(14,2) | NO | 0.00 |  | 
+8 | personal_exemption | decimal(14,2) | NO | 20000.00 |  | 
+9 | taxable_income | decimal(14,2) | NO | 0.00 |  | 
+10 | tax_category | varchar(30) | YES | NULL |  | 
+11 | annual_tax | decimal(14,2) | NO | 0.00 |  | 
+12 | monthly_tax_paid | decimal(14,2) | NO | 0.00 |  | 
+13 | tax_difference | decimal(14,2) | NO | 0.00 |  | 
+14 | status | varchar(30) | NO | 'Open' | MUL | 
+15 | created_at | timestamp | YES | current_timestamp() |  | 
+16 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: employment_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+
+----------------------------------------------------------------------
+TABLE: hr_holidays
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | holiday_date | date | NO | NULL | UNI | 
+3 | name | varchar(255) | NO | NULL |  | 
+4 | created_at | timestamp | YES | NULL |  | 
+5 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: hr_operational_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | setting_key | varchar(255) | NO | NULL | UNI | 
+3 | setting_value | varchar(255) | NO | NULL |  | 
+4 | label | varchar(255) | NO | NULL |  | 
+5 | created_at | timestamp | YES | NULL |  | 
+6 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: hr_requests
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | request_type | varchar(40) | NO | NULL | MUL | 
+4 | title | varchar(200) | NO | NULL |  | 
+5 | details | text | YES | NULL |  | 
+6 | payload | longtext | YES | NULL |  | 
+7 | status | varchar(30) | NO | 'Pending' | MUL | 
+8 | created_by | bigint(20) unsigned | YES | NULL | MUL | 
+9 | reviewed_by | bigint(20) unsigned | YES | NULL | MUL | 
+10 | reviewed_at | timestamp | YES | NULL |  | 
+11 | rejection_reason | text | YES | NULL |  | 
+12 | created_at | timestamp | YES | NULL |  | 
+13 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: insurance_job_codes
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | code | varchar(50) | NO | NULL | UNI | 
+3 | title | varchar(255) | NO | NULL |  | 
+4 | is_active | tinyint(1) | NO | 1 |  | 
+5 | created_at | timestamp | YES | current_timestamp() |  | 
+6 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: insurance_records
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | insurance_number | varchar(100) | YES | NULL |  | 
+4 | job_code | varchar(50) | YES | NULL |  | 
+5 | insurance_start_date | date | YES | NULL |  | 
+6 | insurance_end_date | date | YES | NULL |  | 
+7 | insured_salary | decimal(12,2) | YES | NULL |  | 
+8 | status | varchar(50) | NO | 'Active' |  | 
+9 | notes | varchar(500) | YES | NULL |  | 
+10 | created_at | timestamp | YES | current_timestamp() |  | 
+11 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+12 | insurance_job_code_id | bigint(20) unsigned | YES | NULL |  | 
+13 | insurance_status | varchar(50) | YES | NULL |  | 
+14 | registration_date | date | YES | NULL |  | 
+15 | termination_date | date | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: insurance_record_history
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | insurance_record_id | bigint(20) unsigned | YES | NULL | MUL | 
+3 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | effective_from | date | NO | NULL | MUL | 
+5 | effective_to | date | YES | NULL | MUL | 
+6 | snapshot | longtext | NO | NULL |  | 
+7 | changed_by | bigint(20) unsigned | YES | NULL | MUL | 
+8 | created_at | timestamp | YES | NULL |  | 
+9 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: insurance_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | setting_key | varchar(255) | NO | NULL | UNI | 
+3 | setting_value | decimal(14,6) | YES | NULL |  | 
+4 | label | varchar(255) | YES | NULL |  | 
+5 | created_at | timestamp | YES | NULL |  | 
+6 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: jobs
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | title | varchar(150) | NO | NULL | UNI | 
+3 | job_code | varchar(50) | YES | NULL |  | 
+4 | is_active | tinyint(1) | NO | 1 |  | 
+5 | created_at | timestamp | YES | current_timestamp() |  | 
+6 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: leaves
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | leave_type_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | start_date | date | NO | NULL |  | 
+5 | end_date | date | NO | NULL |  | 
+6 | days | decimal(8,2) | NO | NULL |  | 
+7 | reason | varchar(500) | YES | NULL |  | 
+8 | status | varchar(50) | NO | 'Pending' |  | 
+9 | manager_approved_by | bigint(20) unsigned | YES | NULL | MUL | 
+10 | manager_approved_at | timestamp | YES | NULL |  | 
+11 | approved_by | bigint(20) unsigned | YES | NULL | MUL | 
+12 | approved_at | timestamp | YES | NULL |  | 
+13 | rejection_reason | varchar(500) | YES | NULL |  | 
+14 | notes | varchar(500) | YES | NULL |  | 
+15 | created_at | timestamp | YES | current_timestamp() |  | 
+16 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: leave_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+3 | default_days | decimal(8,2) | YES | NULL |  | 
+4 | is_active | tinyint(1) | NO | 1 |  | 
+5 | deducts_annual_balance | tinyint(1) | NO | 1 |  | 
+6 | is_paid | tinyint(1) | NO | 1 |  | 
+
+----------------------------------------------------------------------
+TABLE: migrations
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | int(10) unsigned | NO | NULL | PRI | auto_increment
+2 | migration | varchar(255) | NO | NULL |  | 
+3 | batch | int(11) | NO | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: movement_records
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | movement_type_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | movement_date | date | NO | NULL | MUL | 
+5 | old_department_id | bigint(20) unsigned | YES | NULL | MUL | 
+6 | new_department_id | bigint(20) unsigned | YES | NULL | MUL | 
+7 | old_job_id | bigint(20) unsigned | YES | NULL | MUL | 
+8 | new_job_id | bigint(20) unsigned | YES | NULL | MUL | 
+9 | old_salary | decimal(12,2) | YES | NULL |  | 
+10 | new_salary | decimal(12,2) | YES | NULL |  | 
+11 | reason | varchar(500) | YES | NULL |  | 
+12 | old_values | longtext | YES | NULL |  | 
+13 | new_values | longtext | YES | NULL |  | 
+14 | notes | varchar(500) | YES | NULL |  | 
+15 | attachment_path | varchar(255) | YES | NULL |  | 
+16 | created_by | bigint(20) unsigned | YES | NULL | MUL | 
+17 | created_at | timestamp | YES | current_timestamp() |  | 
+18 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+19 | old_branch_id | bigint(20) unsigned | YES | NULL |  | 
+20 | new_branch_id | bigint(20) unsigned | YES | NULL |  | 
+21 | old_manager_id | bigint(20) unsigned | YES | NULL |  | 
+22 | new_manager_id | bigint(20) unsigned | YES | NULL |  | 
+23 | old_contract_type | varchar(100) | YES | NULL |  | 
+24 | new_contract_type | varchar(100) | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: movement_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+
+----------------------------------------------------------------------
+TABLE: notifications
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | char(36) | NO | NULL | PRI | 
+2 | type | varchar(255) | NO | NULL |  | 
+3 | notifiable_type | varchar(255) | NO | NULL | MUL | 
+4 | notifiable_id | bigint(20) unsigned | NO | NULL |  | 
+5 | data | text | NO | NULL |  | 
+6 | read_at | timestamp | YES | NULL |  | 
+7 | created_at | timestamp | YES | NULL |  | 
+8 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: overtime_records
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | payroll_record_id | bigint(20) unsigned | YES | NULL | MUL | 
+4 | overtime_date | date | NO | NULL | MUL | 
+5 | overtime_type | varchar(50) | NO | NULL |  | 
+6 | hours | decimal(10,2) | NO | 0.00 |  | 
+7 | days | decimal(10,2) | NO | 0.00 |  | 
+8 | rate_multiplier | decimal(8,4) | NO | 1.0000 |  | 
+9 | hourly_base | decimal(12,2) | NO | 0.00 |  | 
+10 | amount | decimal(12,2) | NO | 0.00 |  | 
+11 | status | varchar(50) | NO | 'Pending' |  | 
+12 | approved_by | bigint(20) unsigned | YES | NULL |  | 
+13 | approved_at | timestamp | YES | NULL |  | 
+14 | notes | varchar(500) | YES | NULL |  | 
+15 | created_at | timestamp | YES | current_timestamp() |  | 
+16 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: payment_methods
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+
+----------------------------------------------------------------------
+TABLE: payroll_allowance_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | allowance_key | varchar(100) | NO | NULL | UNI | 
+3 | allowance_name | varchar(255) | NO | NULL |  | 
+4 | percentage | decimal(10,4) | NO | 0.0000 |  | 
+5 | calculation_basis | varchar(50) | NO | 'allowance_pool' |  | 
+6 | is_active | tinyint(1) | NO | 1 | MUL | 
+7 | sort_order | int(11) | NO | 0 |  | 
+8 | effective_from | date | YES | NULL |  | 
+9 | effective_to | date | YES | NULL |  | 
+10 | created_at | timestamp | YES | current_timestamp() |  | 
+11 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: payroll_calculation_rules
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | rule_group | varchar(100) | NO | NULL | MUL | 
+3 | rule_key | varchar(150) | NO | NULL |  | 
+4 | rule_value | varchar(255) | NO | NULL |  | 
+5 | label | varchar(255) | YES | NULL |  | 
+6 | description | text | YES | NULL |  | 
+7 | is_editable | tinyint(1) | NO | 1 |  | 
+8 | is_active | tinyint(1) | NO | 1 |  | 
+9 | effective_from | date | YES | NULL |  | 
+10 | effective_to | date | YES | NULL |  | 
+11 | created_at | timestamp | YES | current_timestamp() |  | 
+12 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: payroll_calculation_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | setting_group | varchar(100) | NO | NULL | MUL | 
+3 | setting_key | varchar(150) | NO | NULL |  | 
+4 | setting_value | decimal(18,6) | YES | NULL |  | 
+5 | value_type | varchar(30) | NO | 'number' |  | 
+6 | unit | varchar(30) | YES | NULL |  | 
+7 | label | varchar(255) | YES | NULL |  | 
+8 | description | text | YES | NULL |  | 
+9 | is_editable | tinyint(1) | NO | 1 |  | 
+10 | is_active | tinyint(1) | NO | 1 | MUL | 
+11 | effective_from | date | YES | NULL |  | 
+12 | effective_to | date | YES | NULL |  | 
+13 | created_at | timestamp | YES | current_timestamp() |  | 
+14 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: payroll_calculation_snapshots
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_record_id | bigint(20) unsigned | YES | NULL | MUL | 
+3 | payroll_run_id | bigint(20) unsigned | YES | NULL | MUL | 
+4 | employee_id | bigint(20) unsigned | YES | NULL | MUL | 
+5 | payroll_month | date | YES | NULL | MUL | 
+6 | settings_json | longtext | NO | NULL |  | 
+7 | created_at | timestamp | YES | current_timestamp() |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_deductions
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_record_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | type | varchar(50) | NO | NULL |  | 
+4 | amount | decimal(12,2) | NO | NULL |  | 
+5 | reason | varchar(255) | YES | NULL |  | 
+6 | created_at | timestamp | YES | NULL |  | 
+7 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_earnings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_record_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | earning_type | varchar(100) | NO | NULL |  | 
+5 | amount | decimal(12,2) | NO | 0.00 |  | 
+6 | taxable | tinyint(1) | NO | 1 |  | 
+7 | insurance_subject | tinyint(1) | NO | 1 |  | 
+8 | notes | varchar(500) | YES | NULL |  | 
+9 | created_at | timestamp | YES | current_timestamp() |  | 
+10 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: payroll_items
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_run_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | payroll_record_id | bigint(20) unsigned | YES | NULL |  | 
+5 | calculation_snapshot | longtext | YES | NULL |  | 
+6 | created_at | timestamp | YES | NULL |  | 
+7 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_records
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_run_id | bigint(20) unsigned | YES | NULL | MUL | 
+3 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | salary_id | bigint(20) unsigned | YES | NULL | MUL | 
+5 | agreed_net_salary | decimal(12,2) | NO | 0.00 |  | 
+6 | tax_deductible_contributions | decimal(12,2) | NO | 0.00 |  | 
+7 | taxable_annual | decimal(12,2) | NO | 0.00 |  | 
+8 | annual_tax | decimal(12,2) | NO | 0.00 |  | 
+9 | tax_category | varchar(30) | YES | NULL |  | 
+10 | payroll_month | date | NO | NULL |  | 
+11 | basic_salary | decimal(12,2) | NO | 0.00 |  | 
+12 | allowances | decimal(12,2) | NO | 0.00 |  | 
+13 | housing_allowance | decimal(12,2) | NO | 0.00 |  | 
+14 | transportation_allowance | decimal(12,2) | NO | 0.00 |  | 
+15 | meal_allowance | decimal(12,2) | NO | 0.00 |  | 
+16 | overtime_amount | decimal(12,2) | NO | 0.00 |  | 
+17 | deductions | decimal(12,2) | NO | 0.00 |  | 
+18 | absence_deduction | decimal(12,2) | NO | 0.00 |  | 
+19 | net_salary | decimal(12,2) | NO | 0.00 |  | 
+20 | status | varchar(50) | NO | 'Draft' |  | 
+21 | paid_at | timestamp | YES | NULL |  | 
+22 | notes | varchar(500) | YES | NULL |  | 
+23 | created_at | timestamp | YES | current_timestamp() |  | 
+24 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+25 | gross_salary | decimal(12,2) | NO | 0.00 |  | 
+26 | insurance_wage | decimal(12,2) | NO | 0.00 |  | 
+27 | employee_insurance | decimal(12,2) | NO | 0.00 |  | 
+28 | income_tax | decimal(12,2) | NO | 0.00 |  | 
+29 | martyrs_fund | decimal(12,2) | NO | 0.00 |  | 
+30 | employer_insurance | decimal(12,2) | NO | 0.00 |  | 
+31 | employee_cost | decimal(12,2) | NO | 0.00 |  | 
+32 | fixed_deductions | decimal(12,2) | NO | 0.00 |  | 
+33 | attendance_deduction | decimal(12,2) | NO | 0.00 |  | 
+34 | clothing_allowance | decimal(12,2) | NO | 0.00 |  | 
+35 | incentives | decimal(12,2) | NO | 0.00 |  | 
+36 | commission | decimal(12,2) | NO | 0.00 |  | 
+37 | profit_share | decimal(12,2) | NO | 0.00 |  | 
+38 | other_earnings | decimal(12,2) | NO | 0.00 |  | 
+39 | day_overtime_hours | decimal(10,2) | NO | 0.00 |  | 
+40 | day_overtime_value | decimal(12,2) | NO | 0.00 |  | 
+41 | night_overtime_hours | decimal(10,2) | NO | 0.00 |  | 
+42 | night_overtime_value | decimal(12,2) | NO | 0.00 |  | 
+43 | official_holiday_days | decimal(10,2) | NO | 0.00 |  | 
+44 | official_holiday_value | decimal(12,2) | NO | 0.00 |  | 
+45 | weekly_holiday_days | decimal(10,2) | NO | 0.00 |  | 
+46 | weekly_holiday_value | decimal(12,2) | NO | 0.00 |  | 
+47 | total_overtime | decimal(12,2) | NO | 0.00 |  | 
+48 | total_earnings | decimal(12,2) | NO | 0.00 |  | 
+49 | annual_gross | decimal(14,2) | NO | 0.00 |  | 
+50 | annual_employee_insurance | decimal(14,2) | NO | 0.00 |  | 
+51 | personal_exemption | decimal(12,2) | NO | 20000.00 |  | 
+52 | profit_share_tax_adjustment | decimal(12,2) | NO | 0.00 |  | 
+53 | taxable_income | decimal(14,2) | NO | 0.00 |  | 
+54 | monthly_tax | decimal(12,2) | NO | 0.00 |  | 
+55 | penalties | decimal(12,2) | NO | 0.00 |  | 
+56 | advances | decimal(12,2) | NO | 0.00 |  | 
+57 | other_deductions | decimal(12,2) | NO | 0.00 |  | 
+58 | calculation_snapshot | longtext | YES | NULL |  | 
+59 | profit_share_tax_exempt | tinyint(1) | NO | 0 |  | 
+60 | tax_exempt_profit_share | decimal(12,2) | NO | 0.00 |  | 
+61 | manual_insurance_wage | decimal(12,2) | NO | 0.00 |  | 
+62 | manual_insurance_override | tinyint(1) | NO | 0 |  | 
+63 | weekly_rest_days | decimal(10,2) | NO | 0.00 |  | 
+64 | day_overtime_amount | decimal(12,2) | NO | 0.00 |  | 
+65 | night_overtime_amount | decimal(12,2) | NO | 0.00 |  | 
+66 | official_holiday_amount | decimal(12,2) | NO | 0.00 |  | 
+67 | weekly_rest_amount | decimal(12,2) | NO | 0.00 |  | 
+68 | penalty_deduction | decimal(12,2) | NO | 0.00 |  | 
+69 | advance_deduction | decimal(12,2) | NO | 0.00 |  | 
+70 | other_deduction | decimal(12,2) | NO | 0.00 |  | 
+71 | manual_deduction | decimal(12,2) | NO | 0.00 |  | 
+72 | calculated_monthly_tax | decimal(14,6) | NO | 0.000000 |  | 
+73 | tax_paid_to_date | decimal(14,2) | NO | 0.00 |  | 
+74 | tax_remaining | decimal(14,2) | NO | 0.00 |  | 
+75 | approved_at | timestamp | YES | NULL |  | 
+76 | approved_by | bigint(20) unsigned | YES | NULL |  | 
+77 | is_locked | tinyint(1) | NO | 0 |  | 
+78 | year_to_date_tax | decimal(14,2) | NO | 0.00 |  | 
+79 | year_to_date_gross | decimal(14,2) | NO | 0.00 |  | 
+80 | year_to_date_insurance | decimal(14,2) | NO | 0.00 |  | 
+81 | absence_days | decimal(8,2) | NO | 0.00 |  | 
+82 | penalty_days | decimal(8,2) | NO | 0.00 |  | 
+83 | ot_day_hours | decimal(8,2) | NO | 0.00 |  | 
+84 | ot_night_hours | decimal(8,2) | NO | 0.00 |  | 
+85 | ot_day_amount | decimal(14,2) | NO | 0.00 |  | 
+86 | ot_night_amount | decimal(14,2) | NO | 0.00 |  | 
+87 | bonus | decimal(14,2) | NO | 0.00 |  | 
+88 | loans | decimal(14,2) | NO | 0.00 |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_runs
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_month | date | NO | NULL | UNI | 
+3 | status | varchar(30) | NO | 'draft' |  | 
+4 | created_by | bigint(20) unsigned | YES | NULL |  | 
+5 | approved_by | bigint(20) unsigned | YES | NULL |  | 
+6 | approved_at | timestamp | YES | NULL |  | 
+7 | settings_snapshot | longtext | YES | NULL |  | 
+8 | created_at | timestamp | YES | NULL |  | 
+9 | updated_at | timestamp | YES | NULL |  | 
+10 | locked_at | timestamp | YES | NULL |  | 
+11 | locked_by | bigint(20) unsigned | YES | NULL |  | 
+12 | finalized_at | timestamp | YES | NULL |  | 
+13 | finalized_by | bigint(20) unsigned | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | key | varchar(255) | NO | NULL | UNI | 
+3 | value | varchar(255) | NO | NULL |  | 
+4 | label | varchar(255) | YES | NULL |  | 
+5 | created_at | timestamp | YES | NULL |  | 
+6 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_setting_changes
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | effective_from | date | NO | NULL | MUL | 
+3 | before_snapshot | longtext | NO | NULL |  | 
+4 | after_snapshot | longtext | NO | NULL |  | 
+5 | changed_by | bigint(20) unsigned | YES | NULL | MUL | 
+6 | ip_address | varchar(45) | YES | NULL |  | 
+7 | created_at | timestamp | YES | NULL |  | 
+8 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: payroll_snapshots
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | payroll_record_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | payroll_month | date | NO | NULL | MUL | 
+5 | snapshot_type | varchar(50) | NO | 'approval' |  | 
+6 | snapshot_data | longtext | NO | NULL |  | 
+7 | created_by | bigint(20) unsigned | YES | NULL |  | 
+8 | created_at | timestamp | YES | current_timestamp() |  | 
+
+----------------------------------------------------------------------
+TABLE: penalties
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | penalty_type_id | bigint(20) unsigned | NO | NULL | MUL | 
+4 | penalty_date | date | NO | NULL |  | 
+5 | title | varchar(200) | NO | NULL |  | 
+6 | reason | text | YES | NULL |  | 
+7 | action | varchar(500) | YES | NULL |  | 
+8 | amount | decimal(12,2) | NO | 0.00 |  | 
+9 | status | varchar(50) | NO | 'Open' |  | 
+10 | issued_by | bigint(20) unsigned | YES | NULL | MUL | 
+11 | closed_at | timestamp | YES | NULL |  | 
+12 | notes | varchar(500) | YES | NULL |  | 
+13 | created_at | timestamp | YES | current_timestamp() |  | 
+14 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+15 | deduction_days | decimal(5,2) | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: penalty_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+3 | is_active | tinyint(1) | NO | 1 |  | 
+4 | default_deduction_days | decimal(5,2) | NO | 0.00 |  | 
+
+----------------------------------------------------------------------
+TABLE: permissions
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL | UNI | 
+3 | display_name | varchar(200) | NO | NULL |  | 
+4 | module | varchar(100) | NO | NULL |  | 
+5 | action | varchar(50) | NO | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: request_types
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | code | varchar(80) | NO | NULL | UNI | 
+3 | display_name | varchar(150) | NO | NULL |  | 
+4 | source_key | varchar(80) | NO | NULL | MUL | 
+5 | icon | varchar(100) | NO | 'bi-clipboard-check' |  | 
+6 | icon_color | varchar(20) | NO | '#64748B' |  | 
+7 | icon_background | varchar(20) | NO | '#F1F5F9' |  | 
+8 | metadata | longtext | YES | NULL |  | 
+9 | is_active | tinyint(1) | NO | 1 | MUL | 
+10 | sort_order | smallint(5) unsigned | NO | 0 |  | 
+11 | created_at | timestamp | YES | NULL |  | 
+12 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: roles
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(100) | NO | NULL | UNI | 
+3 | display_name | varchar(150) | NO | NULL |  | 
+4 | description | varchar(255) | YES | NULL |  | 
+5 | created_at | timestamp | YES | current_timestamp() |  | 
+6 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: role_permissions
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | role_id | bigint(20) unsigned | NO | NULL | PRI | 
+2 | permission_id | bigint(20) unsigned | NO | NULL | PRI | 
+
+----------------------------------------------------------------------
+TABLE: salaries
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | effective_from | date | NO | NULL |  | 
+4 | basic_salary | decimal(12,2) | NO | 0.00 |  | 
+5 | allowances | decimal(12,2) | NO | 0.00 |  | 
+6 | allowance_limit_pct | decimal(5,2) | NO | 25.00 |  | 
+7 | allowance_limit | decimal(12,2) | NO | 0.00 |  | 
+8 | allowance_remaining | decimal(12,2) | NO | 0.00 |  | 
+9 | housing_allowance | decimal(12,2) | NO | 0.00 |  | 
+10 | transportation_allowance | decimal(12,2) | NO | 0.00 |  | 
+11 | meal_allowance | decimal(12,2) | NO | 0.00 |  | 
+12 | other_allowances | decimal(12,2) | NO | 0.00 |  | 
+13 | deductions | decimal(12,2) | NO | 0.00 |  | 
+14 | net_salary | decimal(12,2) | NO | 0.00 |  | 
+15 | gross_salary | decimal(12,2) | NO | 0.00 |  | 
+16 | status | varchar(50) | NO | 'Active' |  | 
+17 | payment_method_id | bigint(20) unsigned | YES | NULL | MUL | 
+18 | notes | varchar(500) | YES | NULL |  | 
+19 | created_at | timestamp | YES | current_timestamp() |  | 
+20 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+21 | salary_type | varchar(20) | NO | 'net' |  | 
+22 | salary_input | decimal(12,2) | NO | 0.00 |  | 
+23 | fixed_deductions | decimal(12,2) | NO | 0.00 |  | 
+24 | insurance_wage | decimal(12,2) | YES | NULL |  | 
+25 | applied_insurance_wage | decimal(12,2) | YES | NULL |  | 
+26 | employee_insurance | decimal(12,2) | NO | 0.00 |  | 
+27 | income_tax | decimal(12,2) | NO | 0.00 |  | 
+28 | taxable_annual | decimal(12,2) | NO | 0.00 |  | 
+29 | martyrs_fund | decimal(12,2) | NO | 0.00 |  | 
+30 | total_deductions | decimal(12,2) | NO | 0.00 |  | 
+31 | employer_insurance | decimal(12,2) | NO | 0.00 |  | 
+32 | employee_cost | decimal(12,2) | NO | 0.00 |  | 
+33 | tax_deductible_contributions | decimal(12,2) | NO | 0.00 |  | 
+34 | annual_tax | decimal(12,2) | NO | 0.00 |  | 
+35 | tax_category | varchar(30) | YES | NULL |  | 
+36 | no_insurance | tinyint(1) | NO | 0 |  | 
+37 | excluded_allowance_pct | decimal(5,2) | NO | 30.00 |  | 
+38 | personal_exemption | decimal(12,2) | NO | 20000.00 |  | 
+39 | tax_treatment | varchar(30) | NO | 'egyptian' |  | 
+40 | clothing_allowance | decimal(12,2) | NO | 0.00 |  | 
+41 | monthly_tax | decimal(12,2) | NO | 0.00 |  | 
+42 | calculation_snapshot | longtext | YES | NULL |  | 
+43 | incentives | decimal(12,2) | NO | 0.00 |  | 
+44 | commission | decimal(12,2) | NO | 0.00 |  | 
+45 | profit_share | decimal(12,2) | NO | 0.00 |  | 
+46 | other_earnings | decimal(12,2) | NO | 0.00 |  | 
+47 | profit_share_tax_exempt | tinyint(1) | NO | 0 |  | 
+48 | manual_insurance_wage | decimal(12,2) | NO | 0.00 |  | 
+49 | manual_deduction | decimal(12,2) | NO | 0.00 |  | 
+
+----------------------------------------------------------------------
+TABLE: salary_history
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | salary_id | bigint(20) unsigned | YES | NULL |  | 
+4 | effective_from | date | NO | NULL | MUL | 
+5 | effective_to | date | YES | NULL |  | 
+6 | salary_type | varchar(20) | NO | 'net' |  | 
+7 | salary_input | decimal(12,2) | NO | 0.00 |  | 
+8 | basic_salary | decimal(12,2) | NO | 0.00 |  | 
+9 | allowance_limit_pct | decimal(5,2) | NO | 25.00 |  | 
+10 | allowance_limit | decimal(12,2) | NO | 0.00 |  | 
+11 | housing_allowance | decimal(12,2) | NO | 0.00 |  | 
+12 | transportation_allowance | decimal(12,2) | NO | 0.00 |  | 
+13 | meal_allowance | decimal(12,2) | NO | 0.00 |  | 
+14 | clothing_allowance | decimal(12,2) | NO | 0.00 |  | 
+15 | other_allowances | decimal(12,2) | NO | 0.00 |  | 
+16 | gross_salary | decimal(12,2) | NO | 0.00 |  | 
+17 | insurance_wage | decimal(12,2) | YES | NULL |  | 
+18 | employee_insurance | decimal(12,2) | NO | 0.00 |  | 
+19 | income_tax | decimal(12,2) | NO | 0.00 |  | 
+20 | martyrs_fund | decimal(12,2) | NO | 0.00 |  | 
+21 | net_salary | decimal(12,2) | NO | 0.00 |  | 
+22 | employer_insurance | decimal(12,2) | NO | 0.00 |  | 
+23 | employee_cost | decimal(12,2) | NO | 0.00 |  | 
+24 | status | varchar(50) | NO | 'Active' |  | 
+25 | calculation_snapshot | longtext | YES | NULL |  | 
+26 | created_by | bigint(20) unsigned | YES | NULL |  | 
+27 | created_at | timestamp | YES | current_timestamp() |  | 
+28 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: sessions
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | varchar(255) | NO | NULL | PRI | 
+2 | user_id | bigint(20) unsigned | YES | NULL | MUL | 
+3 | ip_address | varchar(45) | YES | NULL |  | 
+4 | user_agent | text | YES | NULL |  | 
+5 | payload | longtext | NO | NULL |  | 
+6 | last_activity | int(11) | NO | NULL | MUL | 
+
+----------------------------------------------------------------------
+TABLE: system_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | setting_key | varchar(255) | NO | NULL | UNI | 
+3 | setting_value | text | YES | NULL |  | 
+4 | setting_group | varchar(100) | NO | 'general' |  | 
+5 | label | varchar(255) | YES | NULL |  | 
+6 | is_public | tinyint(1) | NO | 0 |  | 
+7 | created_at | timestamp | YES | current_timestamp() |  | 
+8 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: tax_brackets
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | tax_category_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | from_amount | decimal(14,2) | NO | 0.00 |  | 
+4 | to_amount | decimal(14,2) | YES | NULL |  | 
+5 | rate | decimal(8,6) | NO | 0.000000 |  | 
+6 | sort_order | int(10) unsigned | NO | 0 |  | 
+7 | created_at | timestamp | YES | NULL |  | 
+8 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: tax_categories
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | category_key | varchar(255) | NO | NULL | UNI | 
+3 | label | varchar(255) | NO | NULL |  | 
+4 | min_income | decimal(14,2) | NO | 0.00 |  | 
+5 | max_income | decimal(14,2) | YES | NULL |  | 
+6 | sort_order | int(10) unsigned | NO | 0 |  | 
+7 | created_at | timestamp | YES | NULL |  | 
+8 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: tax_reconciliations
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | employee_id | bigint(20) unsigned | NO | NULL | MUL | 
+3 | tax_year | smallint(5) unsigned | NO | NULL |  | 
+4 | actual_annual_tax | decimal(14,2) | NO | 0.00 |  | 
+5 | monthly_tax_paid | decimal(14,2) | NO | 0.00 |  | 
+6 | tax_difference | decimal(14,2) | NO | 0.00 |  | 
+7 | status | varchar(30) | NO | 'pending' |  | 
+8 | notes | text | YES | NULL |  | 
+9 | created_at | timestamp | YES | NULL |  | 
+10 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: tax_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | setting_key | varchar(255) | NO | NULL | UNI | 
+3 | setting_value | decimal(14,4) | YES | NULL |  | 
+4 | label | varchar(255) | YES | NULL |  | 
+5 | created_at | timestamp | YES | NULL |  | 
+6 | updated_at | timestamp | YES | NULL |  | 
+
+----------------------------------------------------------------------
+TABLE: tax_year_settings
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | tax_year | smallint(5) unsigned | NO | NULL | UNI | 
+3 | personal_exemption | decimal(14,2) | NO | 20000.00 |  | 
+4 | tax_deductible_contributions | decimal(14,2) | NO | 0.00 |  | 
+5 | profit_share_tax_exempt | tinyint(1) | NO | 0 |  | 
+6 | monthly_tax_rounding | varchar(30) | NO | 'none' |  | 
+7 | is_active | tinyint(1) | NO | 1 |  | 
+8 | notes | varchar(500) | YES | NULL |  | 
+9 | created_at | timestamp | YES | current_timestamp() |  | 
+10 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+
+----------------------------------------------------------------------
+TABLE: users
+----------------------------------------------------------------------
+# | COLUMN | TYPE | NULL | DEFAULT | KEY | EXTRA
+1 | id | bigint(20) unsigned | NO | NULL | PRI | auto_increment
+2 | name | varchar(150) | NO | NULL |  | 
+3 | email | varchar(190) | NO | NULL | UNI | 
+4 | password | varchar(255) | NO | NULL |  | 
+5 | role_id | bigint(20) unsigned | NO | NULL | MUL | 
+6 | employee_id | bigint(20) unsigned | YES | NULL | MUL | 
+7 | is_active | tinyint(1) | NO | 1 |  | 
+8 | last_login_at | timestamp | YES | NULL |  | 
+9 | created_at | timestamp | YES | current_timestamp() |  | 
+10 | updated_at | timestamp | YES | current_timestamp() |  | on update current_timestamp()
+11 | remember_token | varchar(100) | YES | NULL |  | 
+
+==========================================================================================
+4. INDEXES / UNIQUE / PRIMARY KEYS
+==========================================================================================
+
+TABLE | INDEX | INDEX | TYPE
+activity_logs | activity_logs_module_index | NO | BTREE
+    - module
+
+TABLE | INDEX | INDEX | TYPE
+activity_logs | idx_activity_logs_action | NO | BTREE
+    - action
+
+TABLE | INDEX | INDEX | TYPE
+activity_logs | idx_activity_logs_user | NO | BTREE
+    - user_id
+
+TABLE | INDEX | UNIQUE | TYPE
+activity_logs | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+attendance | attendance_approval_status_index | NO | BTREE
+    - approval_status
+
+TABLE | INDEX | INDEX | TYPE
+attendance | attendance_approved_by_foreign | NO | BTREE
+    - approved_by
+
+TABLE | INDEX | UNIQUE | TYPE
+attendance | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+attendance | uq_attendance_employee_date | YES | BTREE
+    - employee_id
+    - attendance_date
+
+TABLE | INDEX | UNIQUE | TYPE
+banks | banks_name_unique | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+banks | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+branches | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+branches | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+departments | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+departments | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+documents | fk_documents_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+documents | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+document_expiry_notifications | document_expiry_notifications_document_id_threshold_days_unique | YES | BTREE
+    - document_id
+    - threshold_days
+
+TABLE | INDEX | UNIQUE | TYPE
+document_expiry_notifications | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+document_types | document_types_name_unique | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+document_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+employees | employee_code | YES | BTREE
+    - employee_code
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_branch | NO | BTREE
+    - branch_id
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_department | NO | BTREE
+    - department_id
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_employment_type | NO | BTREE
+    - employment_type_id
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_job | NO | BTREE
+    - job_id
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_manager | NO | BTREE
+    - manager_employee_id
+
+TABLE | INDEX | INDEX | TYPE
+employees | fk_employees_status | NO | BTREE
+    - status_id
+
+TABLE | INDEX | UNIQUE | TYPE
+employees | national_id | YES | BTREE
+    - national_id
+
+TABLE | INDEX | UNIQUE | TYPE
+employees | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+employee_allowances | employee_allowances_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+employee_allowances | employee_allowances_type_idx | NO | BTREE
+    - allowance_type
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_allowances | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+employee_bank_accounts | employee_bank_accounts_bank_idx | NO | BTREE
+    - bank_id
+
+TABLE | INDEX | INDEX | TYPE
+employee_bank_accounts | employee_bank_accounts_effective_from_index | NO | BTREE
+    - effective_from
+
+TABLE | INDEX | INDEX | TYPE
+employee_bank_accounts | employee_bank_accounts_effective_to_index | NO | BTREE
+    - effective_to
+
+TABLE | INDEX | INDEX | TYPE
+employee_bank_accounts | employee_bank_accounts_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+employee_bank_accounts | employee_bank_accounts_status_index | NO | BTREE
+    - status
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_bank_accounts | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+employee_emergency_contacts | employee_emergency_contacts_employee_id_is_primary_index | NO | BTREE
+    - employee_id
+    - is_primary
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_emergency_contacts | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_profile_details | employee_profile_details_employee_id_unique | YES | BTREE
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_profile_details | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_statuses | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_statuses | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+employee_tax_years | employee_tax_year_status_idx | NO | BTREE
+    - status
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_tax_years | employee_tax_year_unique | YES | BTREE
+    - employee_id
+    - tax_year
+
+TABLE | INDEX | UNIQUE | TYPE
+employee_tax_years | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+employment_types | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+employment_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+hr_holidays | hr_holidays_holiday_date_unique | YES | BTREE
+    - holiday_date
+
+TABLE | INDEX | UNIQUE | TYPE
+hr_holidays | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+hr_operational_settings | hr_operational_settings_setting_key_unique | YES | BTREE
+    - setting_key
+
+TABLE | INDEX | UNIQUE | TYPE
+hr_operational_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_created_by_foreign | NO | BTREE
+    - created_by
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_employee_id_foreign | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_request_type_index | NO | BTREE
+    - request_type
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_request_type_status_created_at_index | NO | BTREE
+    - request_type
+    - status
+    - created_at
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_reviewed_by_foreign | NO | BTREE
+    - reviewed_by
+
+TABLE | INDEX | INDEX | TYPE
+hr_requests | hr_requests_status_index | NO | BTREE
+    - status
+
+TABLE | INDEX | UNIQUE | TYPE
+hr_requests | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_job_codes | insurance_job_codes_code_unique | YES | BTREE
+    - code
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_job_codes | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+insurance_records | fk_insurance_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_records | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+insurance_record_history | insurance_record_history_changed_by_foreign | NO | BTREE
+    - changed_by
+
+TABLE | INDEX | INDEX | TYPE
+insurance_record_history | insurance_record_history_effective_from_index | NO | BTREE
+    - effective_from
+
+TABLE | INDEX | INDEX | TYPE
+insurance_record_history | insurance_record_history_effective_to_index | NO | BTREE
+    - effective_to
+
+TABLE | INDEX | INDEX | TYPE
+insurance_record_history | insurance_record_history_employee_id_effective_from_index | NO | BTREE
+    - employee_id
+    - effective_from
+
+TABLE | INDEX | INDEX | TYPE
+insurance_record_history | insurance_record_history_insurance_record_id_foreign | NO | BTREE
+    - insurance_record_id
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_record_history | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_settings | insurance_settings_setting_key_unique | YES | BTREE
+    - setting_key
+
+TABLE | INDEX | UNIQUE | TYPE
+insurance_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+jobs | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+jobs | title | YES | BTREE
+    - title
+
+TABLE | INDEX | INDEX | TYPE
+leaves | fk_leaves_approver | NO | BTREE
+    - approved_by
+
+TABLE | INDEX | INDEX | TYPE
+leaves | fk_leaves_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+leaves | fk_leaves_type | NO | BTREE
+    - leave_type_id
+
+TABLE | INDEX | INDEX | TYPE
+leaves | leaves_manager_approved_by_foreign | NO | BTREE
+    - manager_approved_by
+
+TABLE | INDEX | UNIQUE | TYPE
+leaves | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+leave_types | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+leave_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+migrations | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_creator | NO | BTREE
+    - created_by
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_new_department | NO | BTREE
+    - new_department_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_new_job | NO | BTREE
+    - new_job_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_old_department | NO | BTREE
+    - old_department_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_old_job | NO | BTREE
+    - old_job_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | fk_movements_type | NO | BTREE
+    - movement_type_id
+
+TABLE | INDEX | INDEX | TYPE
+movement_records | movement_records_movement_date_index | NO | BTREE
+    - movement_date
+
+TABLE | INDEX | UNIQUE | TYPE
+movement_records | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+movement_types | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+movement_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+notifications | notifications_notifiable_type_notifiable_id_index | NO | BTREE
+    - notifiable_type
+    - notifiable_id
+
+TABLE | INDEX | INDEX | TYPE
+notifications | notifications_notifiable_type_notifiable_id_read_at_index | NO | BTREE
+    - notifiable_type
+    - notifiable_id
+    - read_at
+
+TABLE | INDEX | UNIQUE | TYPE
+notifications | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+overtime_records | overtime_date_idx | NO | BTREE
+    - overtime_date
+
+TABLE | INDEX | INDEX | TYPE
+overtime_records | overtime_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+overtime_records | overtime_payroll_idx | NO | BTREE
+    - payroll_record_id
+
+TABLE | INDEX | UNIQUE | TYPE
+overtime_records | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payment_methods | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+payment_methods | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_allowance_settings | idx_allowance_active | NO | BTREE
+    - is_active
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_allowance_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_allowance_settings | uq_allowance_key | YES | BTREE
+    - allowance_key
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_rules | idx_payroll_rules_group | NO | BTREE
+    - rule_group
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_calculation_rules | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_calculation_rules | uq_payroll_calculation_rule | YES | BTREE
+    - rule_group
+    - rule_key
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_settings | idx_payroll_calculation_active | NO | BTREE
+    - is_active
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_settings | idx_payroll_calculation_group | NO | BTREE
+    - setting_group
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_calculation_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_calculation_settings | uq_payroll_calculation_setting | YES | BTREE
+    - setting_group
+    - setting_key
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_snapshots | idx_snapshot_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_snapshots | idx_snapshot_month | NO | BTREE
+    - payroll_month
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_snapshots | idx_snapshot_payroll_record | NO | BTREE
+    - payroll_record_id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_calculation_snapshots | idx_snapshot_payroll_run | NO | BTREE
+    - payroll_run_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_calculation_snapshots | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_deductions | payroll_deductions_payroll_record_id_foreign | NO | BTREE
+    - payroll_record_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_deductions | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_earnings | payroll_earnings_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_earnings | payroll_earnings_record_idx | NO | BTREE
+    - payroll_record_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_earnings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_items | payroll_items_employee_id_foreign | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_items | payroll_items_payroll_run_id_employee_id_unique | YES | BTREE
+    - payroll_run_id
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_items | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_records | fk_payroll_salary | NO | BTREE
+    - salary_id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_records | payroll_records_payroll_run_id_employee_id_index | NO | BTREE
+    - payroll_run_id
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_records | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_records | uq_payroll_employee_month | YES | BTREE
+    - employee_id
+    - payroll_month
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_runs | payroll_runs_payroll_month_unique | YES | BTREE
+    - payroll_month
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_runs | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_settings | payroll_settings_key_unique | YES | BTREE
+    - key
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_setting_changes | payroll_setting_changes_changed_by_foreign | NO | BTREE
+    - changed_by
+
+TABLE | INDEX | INDEX | TYPE
+payroll_setting_changes | payroll_setting_changes_effective_from_index | NO | BTREE
+    - effective_from
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_setting_changes | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_snapshots | payroll_snapshots_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+payroll_snapshots | payroll_snapshots_month_idx | NO | BTREE
+    - payroll_month
+
+TABLE | INDEX | INDEX | TYPE
+payroll_snapshots | payroll_snapshots_record_idx | NO | BTREE
+    - payroll_record_id
+
+TABLE | INDEX | UNIQUE | TYPE
+payroll_snapshots | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+penalties | fk_penalties_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+penalties | fk_penalties_issuer | NO | BTREE
+    - issued_by
+
+TABLE | INDEX | INDEX | TYPE
+penalties | fk_penalties_type | NO | BTREE
+    - penalty_type_id
+
+TABLE | INDEX | UNIQUE | TYPE
+penalties | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+penalty_types | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+penalty_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+permissions | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+permissions | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+request_types | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+request_types | request_types_code_unique | YES | BTREE
+    - code
+
+TABLE | INDEX | INDEX | TYPE
+request_types | request_types_is_active_index | NO | BTREE
+    - is_active
+
+TABLE | INDEX | INDEX | TYPE
+request_types | request_types_source_key_index | NO | BTREE
+    - source_key
+
+TABLE | INDEX | UNIQUE | TYPE
+roles | name | YES | BTREE
+    - name
+
+TABLE | INDEX | UNIQUE | TYPE
+roles | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+role_permissions | fk_role_permissions_permission | NO | BTREE
+    - permission_id
+
+TABLE | INDEX | UNIQUE | TYPE
+role_permissions | PRIMARY | YES | BTREE
+    - role_id
+    - permission_id
+
+TABLE | INDEX | INDEX | TYPE
+salaries | fk_salaries_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+salaries | fk_salaries_payment_method | NO | BTREE
+    - payment_method_id
+
+TABLE | INDEX | UNIQUE | TYPE
+salaries | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+salary_history | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+salary_history | salary_history_effective_from_idx | NO | BTREE
+    - effective_from
+
+TABLE | INDEX | INDEX | TYPE
+salary_history | salary_history_employee_idx | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | UNIQUE | TYPE
+sessions | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+sessions | sessions_last_activity_index | NO | BTREE
+    - last_activity
+
+TABLE | INDEX | INDEX | TYPE
+sessions | sessions_user_id_index | NO | BTREE
+    - user_id
+
+TABLE | INDEX | UNIQUE | TYPE
+system_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+system_settings | system_settings_key_unique | YES | BTREE
+    - setting_key
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_brackets | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | INDEX | TYPE
+tax_brackets | tax_brackets_tax_category_id_foreign | NO | BTREE
+    - tax_category_id
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_categories | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_categories | tax_categories_category_key_unique | YES | BTREE
+    - category_key
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_reconciliations | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_reconciliations | tax_reconciliations_employee_id_tax_year_unique | YES | BTREE
+    - employee_id
+    - tax_year
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_settings | tax_settings_setting_key_unique | YES | BTREE
+    - setting_key
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_year_settings | PRIMARY | YES | BTREE
+    - id
+
+TABLE | INDEX | UNIQUE | TYPE
+tax_year_settings | tax_year_settings_year_unique | YES | BTREE
+    - tax_year
+
+TABLE | INDEX | UNIQUE | TYPE
+users | email | YES | BTREE
+    - email
+
+TABLE | INDEX | INDEX | TYPE
+users | fk_users_employee | NO | BTREE
+    - employee_id
+
+TABLE | INDEX | INDEX | TYPE
+users | fk_users_role | NO | BTREE
+    - role_id
+
+TABLE | INDEX | UNIQUE | TYPE
+users | PRIMARY | YES | BTREE
+    - id
+
+==========================================================================================
+5. FOREIGN KEY RELATIONSHIPS
+==========================================================================================
+CONSTRAINT | TABLE | COLUMN | REFERENCES | REFERENCED COLUMN
+fk_activity_logs_user | activity_logs | user_id | users | id
+attendance_approved_by_foreign | attendance | approved_by | users | id
+fk_attendance_employee | attendance | employee_id | employees | id
+fk_documents_employee | documents | employee_id | employees | id
+document_expiry_notifications_document_id_foreign | document_expiry_notifications | document_id | documents | id
+fk_employees_branch | employees | branch_id | branches | id
+fk_employees_department | employees | department_id | departments | id
+fk_employees_employment_type | employees | employment_type_id | employment_types | id
+fk_employees_job | employees | job_id | jobs | id
+fk_employees_manager | employees | manager_employee_id | employees | id
+fk_employees_status | employees | status_id | employee_statuses | id
+employee_emergency_contacts_employee_id_foreign | employee_emergency_contacts | employee_id | employees | id
+employee_profile_details_employee_id_foreign | employee_profile_details | employee_id | employees | id
+hr_requests_created_by_foreign | hr_requests | created_by | users | id
+hr_requests_employee_id_foreign | hr_requests | employee_id | employees | id
+hr_requests_reviewed_by_foreign | hr_requests | reviewed_by | users | id
+fk_insurance_employee | insurance_records | employee_id | employees | id
+insurance_record_history_changed_by_foreign | insurance_record_history | changed_by | users | id
+insurance_record_history_employee_id_foreign | insurance_record_history | employee_id | employees | id
+insurance_record_history_insurance_record_id_foreign | insurance_record_history | insurance_record_id | insurance_records | id
+fk_leaves_approver | leaves | approved_by | users | id
+fk_leaves_employee | leaves | employee_id | employees | id
+fk_leaves_type | leaves | leave_type_id | leave_types | id
+leaves_manager_approved_by_foreign | leaves | manager_approved_by | users | id
+fk_movements_creator | movement_records | created_by | users | id
+fk_movements_employee | movement_records | employee_id | employees | id
+fk_movements_new_department | movement_records | new_department_id | departments | id
+fk_movements_new_job | movement_records | new_job_id | jobs | id
+fk_movements_old_department | movement_records | old_department_id | departments | id
+fk_movements_old_job | movement_records | old_job_id | jobs | id
+fk_movements_type | movement_records | movement_type_id | movement_types | id
+payroll_deductions_payroll_record_id_foreign | payroll_deductions | payroll_record_id | payroll_records | id
+payroll_items_employee_id_foreign | payroll_items | employee_id | employees | id
+payroll_items_payroll_run_id_foreign | payroll_items | payroll_run_id | payroll_runs | id
+fk_payroll_employee | payroll_records | employee_id | employees | id
+fk_payroll_salary | payroll_records | salary_id | salaries | id
+payroll_records_payroll_run_id_foreign | payroll_records | payroll_run_id | payroll_runs | id
+payroll_setting_changes_changed_by_foreign | payroll_setting_changes | changed_by | users | id
+fk_penalties_employee | penalties | employee_id | employees | id
+fk_penalties_issuer | penalties | issued_by | users | id
+fk_penalties_type | penalties | penalty_type_id | penalty_types | id
+fk_role_permissions_permission | role_permissions | permission_id | permissions | id
+fk_role_permissions_role | role_permissions | role_id | roles | id
+fk_salaries_employee | salaries | employee_id | employees | id
+fk_salaries_payment_method | salaries | payment_method_id | payment_methods | id
+tax_brackets_tax_category_id_foreign | tax_brackets | tax_category_id | tax_categories | id
+tax_reconciliations_employee_id_foreign | tax_reconciliations | employee_id | employees | id
+fk_users_employee | users | employee_id | employees | id
+fk_users_role | users | role_id | roles | id
+
+==========================================================================================
+6. RECORD COUNTS
+==========================================================================================
+activity_logs                                 : 52
+attendance                                    : 2
+banks                                         : 0
+branches                                      : 5
+departments                                   : 12
+documents                                     : 1
+document_expiry_notifications                 : 0
+document_types                                : 0
+employees                                     : 7
+employee_allowances                           : 0
+employee_bank_accounts                        : 0
+employee_emergency_contacts                   : 0
+employee_profile_details                      : 7
+employee_statuses                             : 5
+employee_tax_years                            : 0
+employment_types                              : 5
+hr_holidays                                   : 0
+hr_operational_settings                       : 10
+hr_requests                                   : 0
+insurance_job_codes                           : 5
+insurance_records                             : 7
+insurance_record_history                      : 2
+insurance_settings                            : 8
+jobs                                          : 11
+leaves                                        : 4
+leave_types                                   : 11
+migrations                                    : 36
+movement_records                              : 0
+movement_types                                : 12
+notifications                                 : 0
+overtime_records                              : 0
+payment_methods                               : 6
+payroll_allowance_settings                    : 4
+payroll_calculation_rules                     : 4
+payroll_calculation_settings                  : 17
+payroll_calculation_snapshots                 : 0
+payroll_deductions                            : 0
+payroll_earnings                              : 0
+payroll_items                                 : 0
+payroll_records                               : 10
+payroll_runs                                  : 2
+payroll_settings                              : 20
+payroll_setting_changes                       : 9
+payroll_snapshots                             : 0
+penalties                                     : 3
+penalty_types                                 : 10
+permissions                                   : 55
+request_types                                 : 1
+roles                                         : 7
+role_permissions                              : 168
+salaries                                      : 7
+salary_history                                : 0
+sessions                                      : 8
+system_settings                               : 7
+tax_brackets                                  : 22
+tax_categories                                : 6
+tax_reconciliations                           : 0
+tax_settings                                  : 3
+tax_year_settings                             : 1
+users                                         : 1
+
+==========================================================================================
+7. EMPLOYEES AUDIT
+==========================================================================================
+Employees total: 7
+
+----------------------------------------------------------------------
+Employee master data
+----------------------------------------------------------------------
+
+Employee 101 - عامر سالم جمعه
+id | 5 | department_id | 11 | job_id | 9 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2026-07-29 | contract_start | 2026-07-29 | contract_end | 2027-07-28
+
+Employee 102 - نجية محمود السيد
+id | 6 | department_id | 12 | job_id | 11 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2026-08-23 | contract_start | 2026-08-20 | contract_end | 2027-08-19
+
+Employee 103 - زياد محمود فرغلي
+id | 2 | department_id | 10 | job_id | 3 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2026-08-16 | contract_start | 2026-08-16 | contract_end | 2027-08-15
+
+Employee 104 - سيف الدين مجدي
+id | 3 | department_id | 10 | job_id | 4 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2026-08-23 | contract_start | 2026-08-23 | contract_end | 2027-08-22
+
+Employee 105 - عبدالرحمن طارق احمد
+id | 4 | department_id | 10 | job_id | 6 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2026-08-23 | contract_start | 2026-08-23 | contract_end | 2027-08-22
+
+Employee 106 - اماني كرم علي قاسم
+id | 7 | department_id | 10 | job_id | 10 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2027-08-23 | contract_start | 2026-08-23 | contract_end | 2027-08-22
+
+Employee 107 - محمد صلاح عسكر
+id | 8 | department_id | 10 | job_id | 4 | branch_id | 5
+status_id | 1 | employment_type_id | 1 | manager_employee_id | NULL
+hire_date | 2028-09-01 | contract_start | 2026-09-01 | contract_end | 2027-08-31
+
+----------------------------------------------------------------------
+Duplicate employee codes
+----------------------------------------------------------------------
+OK - No duplicate employee codes.
+
+----------------------------------------------------------------------
+Duplicate National IDs
+----------------------------------------------------------------------
+OK - No duplicate national IDs.
+
+----------------------------------------------------------------------
+Employees with missing department
+----------------------------------------------------------------------
+OK
+
+----------------------------------------------------------------------
+Employees with missing job
+----------------------------------------------------------------------
+OK
+
+----------------------------------------------------------------------
+Employees with missing status
+----------------------------------------------------------------------
+OK
+
+==========================================================================================
+8. HR REQUESTS AUDIT
+==========================================================================================
+Total HR Requests: 0
+
+----------------------------------------------------------------------
+Requests by type
+----------------------------------------------------------------------
+No HR requests yet.
+
+----------------------------------------------------------------------
+Requests by status
+----------------------------------------------------------------------
+No statuses found.
+
+----------------------------------------------------------------------
+Requests with invalid employee
+----------------------------------------------------------------------
+OK
+
+==========================================================================================
+9. LEAVES AUDIT
+==========================================================================================
+Total leaves: 4
+
+----------------------------------------------------------------------
+Leaves by status
+----------------------------------------------------------------------
+Pending | 1
+Manager Approved | 1
+Rejected | 1
+Approved | 1
+
+----------------------------------------------------------------------
+Leaves with invalid employees
+----------------------------------------------------------------------
+OK
+
+==========================================================================================
+10. INSURANCE AUDIT
+==========================================================================================
+Insurance records: 7
+
+----------------------------------------------------------------------
+Insurance records
+----------------------------------------------------------------------
+101 | عامر سالم جمعه | job_code=242302 | job_code_id=3 | insurance_no=NULL | insured_salary=NULL | status=Active
+102 | نجية محمود السيد | job_code=911203 | job_code_id=4 | insurance_no=NULL | insured_salary=NULL | status=Active
+103 | زياد محمود فرغلي | job_code=264101 | job_code_id=2 | insurance_no=NULL | insured_salary=NULL | status=Active
+104 | سيف الدين مجدي | job_code=216601 | job_code_id=5 | insurance_no=NULL | insured_salary=NULL | status=Active
+105 | عبدالرحمن طارق احمد | job_code=243105 | job_code_id=1 | insurance_no=NULL | insured_salary=NULL | status=Active
+106 | اماني كرم علي قاسم | job_code=243105 | job_code_id=1 | insurance_no=NULL | insured_salary=NULL | status=Active
+107 | محمد صلاح عسكر | job_code=216601 | job_code_id=5 | insurance_no=NULL | insured_salary=NULL | status=Active
+
+----------------------------------------------------------------------
+Insurance records with missing employees
+----------------------------------------------------------------------
+OK
+
+==========================================================================================
+11. SALARY / PAYROLL TABLES
+==========================================================================================
+salaries                       : 7 records
+salary_structures              : NOT FOUND
+payrolls                       : NOT FOUND
+payroll_runs                   : 2 records
+
+==========================================================================================
+12. ROLES / PERMISSIONS
+==========================================================================================
+roles                          : 7 records
+permissions                    : 55 records
+role_has_permissions           : NOT FOUND
+model_has_roles                : NOT FOUND
+model_has_permissions          : NOT FOUND
+
+==========================================================================================
+13. NULLABILITY AUDIT
+==========================================================================================
+Checking important tables for heavily NULL columns...
+
+----------------------------------------------------------------------
+TABLE: employees
+----------------------------------------------------------------------
+gender | NULL=7/7 | 100%
+birth_date | NULL=7/7 | 100%
+marital_status | NULL=7/7 | 100%
+qualification | NULL=7/7 | 100%
+manager_employee_id | NULL=7/7 | 100%
+attached_documents | NULL=6/7 | 85.7%
+additional_conditions | NULL=7/7 | 100%
+employee_photo | NULL=7/7 | 100%
+personal_email | NULL=7/7 | 100%
+emergency_contact_name | NULL=7/7 | 100%
+emergency_contact_phone | NULL=7/7 | 100%
+emergency_contact_relation | NULL=7/7 | 100%
+national_id_issue_date | NULL=7/7 | 100%
+national_id_expiry_date | NULL=7/7 | 100%
+national_id_place | NULL=7/7 | 100%
+military_status | NULL=7/7 | 100%
+bank_name | NULL=7/7 | 100%
+bank_account_number | NULL=7/7 | 100%
+iban | NULL=7/7 | 100%
+payment_method_id | NULL=7/7 | 100%
+termination_date | NULL=7/7 | 100%
+shift_start | NULL=7/7 | 100%
+shift_end | NULL=7/7 | 100%
+manual_annual_balance | NULL=7/7 | 100%
+
+----------------------------------------------------------------------
+TABLE: hr_requests
+----------------------------------------------------------------------
+
+----------------------------------------------------------------------
+TABLE: leaves
+----------------------------------------------------------------------
+reason | NULL=3/4 | 75%
+manager_approved_by | NULL=2/4 | 50%
+manager_approved_at | NULL=2/4 | 50%
+approved_by | NULL=2/4 | 50%
+approved_at | NULL=2/4 | 50%
+rejection_reason | NULL=3/4 | 75%
+notes | NULL=4/4 | 100%
+
+----------------------------------------------------------------------
+TABLE: insurance_records
+----------------------------------------------------------------------
+insurance_number | NULL=7/7 | 100%
+insurance_start_date | NULL=7/7 | 100%
+insurance_end_date | NULL=7/7 | 100%
+insured_salary | NULL=7/7 | 100%
+notes | NULL=7/7 | 100%
+registration_date | NULL=7/7 | 100%
+termination_date | NULL=7/7 | 100%
+
+==========================================================================================
+14. EMPTY REFERENCE / MASTER TABLES
+==========================================================================================
+branches                            : 5
+departments                         : 12
+jobs                                : 11
+employee_statuses                   : 5
+employment_types                    : 5
+payment_methods                     : 6
+insurance_job_codes                 : 5
+leave_types                         : 11
+
+==========================================================================================
+15. ORPHAN / BROKEN REFERENCES
+==========================================================================================
+employees.department_id                       : 0  [OK]
+employees.job_id                              : 0  [OK]
+employees.status_id                           : 0  [OK]
+employees.branch_id                           : 0  [OK]
+insurance_records.employee_id                 : 0  [OK]
+hr_requests.employee_id                       : 0  [OK]
+leaves.employee_id                            : 0  [OK]
+
+==========================================================================================
+16. MIGRATION STATUS
+==========================================================================================
+Migration records: 36
+21 | 2026_10_08_000000_create_request_types_table
+20 | 2026_10_07_121000_add_hr_request_permissions
+20 | 2026_10_07_120000_create_hr_requests_table
+19 | 2026_10_07_031000_add_remember_token_to_users
+18 | 2026_10_07_030000_add_document_governance_and_dashboard_calendar
+17 | 2026_10_07_021000_add_hr_operational_settings_and_employee_shift_fields
+16 | 2026_10_07_020000_align_payroll_and_hr_rules_with_approved_specification
+15 | 2026_10_07_010000_backfill_imported_employee_profile_details
+14 | 2026_10_07_009000_reassign_employee_codes_and_create_profile_details
+13 | 2026_10_07_008000_normalize_employee_codes_from_101
+12 | 2026_10_07_007000_complete_employee_bank_account_columns
+11 | 2026_10_07_006000_correct_imported_contract_dates_and_create_notifications_table
+10 | 2026_10_07_005000_add_payroll_approval_and_lock_permissions
+9 | 2026_10_07_004000_link_records_to_payroll_runs
+8 | 2026_10_07_003000_create_insurance_record_history
+7 | 2026_10_07_002000_add_manager_approval_to_leaves
+6 | 2026_10_07_001000_add_approval_fields_to_attendance
+5 | 2026_10_07_000000_add_snapshots_to_movement_records
+4 | 2026_10_06_225000_create_employee_contact_and_bank_tables
+3 | 2026_10_06_224000_add_change_snapshots_to_activity_logs
+
+==========================================================================================
+17. AUDIT COMPLETE
+==========================================================================================
+The database was inspected in READ-ONLY mode.
+NO INSERT / UPDATE / DELETE / ALTER operations were executed.
+
+Use the output above to identify:
+1. Missing tables
+2. Missing relationships
+3. Broken references
+4. Duplicate data
+5. Missing indexes / unique constraints
+6. Weak nullable fields
+7. Payroll structure issues
+8. Request-system issues
+9. Insurance inconsistencies
+10. Master-data problems
+
+END OF AUDIT

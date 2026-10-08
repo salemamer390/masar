@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+/vendor/
+/node_modules/
+/storage/framework/
+/storage/logs/
+/storage/app/imports/
+/bootstrap/cache/*.php
+*.log
+*.tmp

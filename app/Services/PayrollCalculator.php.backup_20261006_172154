@@ -1,0 +1,212 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Salary;
+
+class PayrollCalculator
+{
+    public const MIN_INSURANCE = 2700.0;
+    public const MAX_INSURANCE = 16700.0;
+    public const EMPLOYEE_RATE = 0.11;
+    public const EMPLOYER_RATE = 0.1875;
+    public const MARTYRS_RATE = 0.0005;
+    public const PERSONAL_EXEMPTION = 20000.0;
+    public const ALLOWANCE_LIMIT_PCT = 25.0;
+    public const DEFAULT_EXCLUDED_PCT = 30.0;
+
+    public function __construct(private ?TaxCalculator $taxCalculator = null)
+    {
+        $this->taxCalculator ??= new TaxCalculator();
+    }
+
+    /**
+     * المصدر الموحد لحساب الراتب. الضريبة منفصلة في TaxCalculator.
+     */
+    public function calculate(
+        string $salaryType,
+        float $salaryInput,
+        ?float $manualInsuranceWage = null,
+        bool $noInsurance = false,
+        float $excludedAllowancePct = self::DEFAULT_EXCLUDED_PCT,
+        float $personalExemption = self::PERSONAL_EXEMPTION,
+        string $taxTreatment = 'egyptian',
+        float $extraDeductions = 0.0
+    ): array {
+        $personalExemption = self::PERSONAL_EXEMPTION;
+        $extraDeductions = max(0, round($extraDeductions, 2));
+
+        if ($salaryType === 'net') {
+            $lo = max(0.01, $salaryInput);
+            $hi = max($salaryInput * 2, $salaryInput + 50000);
+            for ($i = 0; $i < 100; $i++) {
+                if ($this->grossResult($hi, $manualInsuranceWage, $noInsurance, $excludedAllowancePct, $personalExemption, $taxTreatment, $extraDeductions)['net'] >= $salaryInput) break;
+                $hi *= 1.5;
+            }
+            for ($i = 0; $i < 100; $i++) {
+                $mid = ($lo + $hi) / 2;
+                $net = $this->grossResult($mid, $manualInsuranceWage, $noInsurance, $excludedAllowancePct, $personalExemption, $taxTreatment, $extraDeductions)['net'];
+                if ($net < $salaryInput) $lo = $mid; else $hi = $mid;
+            }
+            return $this->closestGross(($lo + $hi) / 2, $salaryInput, $manualInsuranceWage, $noInsurance, $excludedAllowancePct, $personalExemption, $taxTreatment, $extraDeductions);
+        }
+
+        return $this->grossResult($salaryInput, $manualInsuranceWage, $noInsurance, $excludedAllowancePct, $personalExemption, $taxTreatment, $extraDeductions);
+    }
+
+    private function closestGross(float $approx, float $target, ?float $manual, bool $noInsurance, float $pct, float $exemption, string $treatment, float $extraDeductions): array
+    {
+        $best = null;
+        $bestDiff = INF;
+        for ($i = -3; $i <= 3; $i++) {
+            $gross = round($approx, 2) + $i / 100;
+            if ($gross <= 0) continue;
+            $result = $this->grossResult($gross, $manual, $noInsurance, $pct, $exemption, $treatment, $extraDeductions);
+            $diff = abs($result['net'] - $target);
+            if ($diff < $bestDiff - 0.0001) {
+                $best = $result;
+                $bestDiff = $diff;
+            }
+        }
+        return $best ?? $this->grossResult(max(0.01, round($approx, 2)), $manual, $noInsurance, $pct, $exemption, $treatment, $extraDeductions);
+    }
+
+    public function grossResult(
+        float $gross,
+        ?float $manualInsuranceWage,
+        bool $noInsurance,
+        float $excludedAllowancePct,
+        float $personalExemption = self::PERSONAL_EXEMPTION,
+        string $taxTreatment = 'egyptian',
+        float $extraDeductions = 0.0
+    ): array {
+        $personalExemption = self::PERSONAL_EXEMPTION;
+        $insuranceWage = $this->insuranceWage($gross, $manualInsuranceWage, $noInsurance, $excludedAllowancePct);
+        $employeeInsurance = $noInsurance ? 0.0 : round($insuranceWage * self::EMPLOYEE_RATE, 2);
+
+        // الضريبة سنوية ثم الشهرية = السنوية ÷ 12 بدون تقريب قبل الوصول للنتيجة النهائية.
+        $tax = $this->taxCalculator->calculate($gross * 12 - $employeeInsurance * 12 - $personalExemption);
+        $taxableBase = $tax['base'];
+        $annualTax = $tax['annual_tax'];
+        $monthlyTax = $tax['monthly_tax'];
+
+        $martyrs = round($gross * self::MARTYRS_RATE, 2);
+        $extraDeductions = max(0, round($extraDeductions, 2));
+        $statutoryDeductions = round($employeeInsurance + $monthlyTax + $martyrs, 2);
+        $totalDeductions = round($statutoryDeductions + $extraDeductions, 2);
+        $net = round($gross - $totalDeductions, 2);
+        $employerInsurance = $noInsurance ? 0.0 : round($insuranceWage * self::EMPLOYER_RATE, 2);
+
+        return [
+            'gross' => round($gross, 2),
+            'insurance_wage' => round($insuranceWage, 2),
+            'employee_insurance' => $employeeInsurance,
+            'taxable_annual' => round($taxableBase, 2),
+            'tax_category' => $tax['category'],
+            'tax_category_up_to' => $tax['category_up_to'],
+            'annual_tax' => $annualTax,
+            'income_tax' => $monthlyTax,
+            'martyrs_fund' => $martyrs,
+            'extra_deductions' => $extraDeductions,
+            'statutory_deductions' => $statutoryDeductions,
+            'total_deductions' => $totalDeductions,
+            'net' => $net,
+            'employer_insurance' => $employerInsurance,
+            'employee_cost' => round($gross + $employerInsurance, 2),
+        ];
+    }
+
+    private function insuranceWage(float $gross, ?float $manualInsuranceWage, bool $noInsurance, float $pct): float
+    {
+        if ($noInsurance) return 0.0;
+        if ($manualInsuranceWage !== null && $manualInsuranceWage > 0) {
+            return min(self::MAX_INSURANCE, max(self::MIN_INSURANCE, $manualInsuranceWage));
+        }
+        $wage = $pct > 0 ? $gross / (1 + ($pct / 100)) : $gross;
+        return min(self::MAX_INSURANCE, max(self::MIN_INSURANCE, $wage));
+    }
+
+    /**
+     * يحسب هيكل الراتب كاملاً: Gross، الأساسي، البدلات، التأمين، الضريبة والاستقطاعات.
+     */
+    public function structure(array $in): array
+    {
+        $salaryType = ($in['salary_type'] ?? 'net') === 'gross' ? 'gross' : 'net';
+        $salaryInput = (float)($in['salary_input'] ?? 0);
+        $manual = (isset($in['insurance_wage']) && $in['insurance_wage'] !== '') ? (float)$in['insurance_wage'] : null;
+        $noInsurance = (bool)($in['no_insurance'] ?? false);
+        $pct = (float)($in['excluded_allowance_pct'] ?? self::DEFAULT_EXCLUDED_PCT);
+        $treatment = (string)($in['tax_treatment'] ?? 'egyptian');
+
+        $allowances = round(
+            (float)($in['housing_allowance'] ?? 0) +
+            (float)($in['transportation_allowance'] ?? 0) +
+            (float)($in['meal_allowance'] ?? 0) +
+            (float)($in['clothing_allowance'] ?? 0),
+            2
+        );
+        $allowanceLimit = round($salaryInput * self::ALLOWANCE_LIMIT_PCT / 100, 2);
+        $fixed = round((float)($in['fixed_deductions'] ?? 0), 2);
+
+        $calc = $this->calculate(
+            $salaryType,
+            $salaryInput,
+            $manual,
+            $noInsurance,
+            $pct,
+            self::PERSONAL_EXEMPTION,
+            $treatment,
+            $fixed
+        );
+
+        return array_merge($calc, [
+            'allowance_limit_pct' => self::ALLOWANCE_LIMIT_PCT,
+            'allowance_limit' => $allowanceLimit,
+            'allowances' => $allowances,
+            'allowance_remaining' => round($allowanceLimit - $allowances, 2),
+            'basic_salary' => round(max(0, $calc['gross'] - $allowances), 2),
+            'fixed_deductions' => $fixed,
+            'total_deductions' => $calc['total_deductions'],
+            'net_after_fixed' => $calc['net'],
+        ]);
+    }
+
+    public function structureForSalary(Salary $salary): array
+    {
+        return $this->structure([
+            'salary_type' => $salary->salary_type ?: 'net',
+            'salary_input' => (float)$salary->salary_input,
+            'insurance_wage' => $salary->insurance_wage,
+            'no_insurance' => (bool)$salary->no_insurance,
+            'excluded_allowance_pct' => $salary->excluded_allowance_pct ?? self::DEFAULT_EXCLUDED_PCT,
+            'personal_exemption' => self::PERSONAL_EXEMPTION,
+            'tax_treatment' => $salary->tax_treatment ?: 'egyptian',
+            'housing_allowance' => $salary->housing_allowance,
+            'transportation_allowance' => $salary->transportation_allowance,
+            'meal_allowance' => $salary->meal_allowance,
+            'clothing_allowance' => $salary->clothing_allowance,
+            'fixed_deductions' => $salary->fixed_deductions,
+        ]);
+    }
+
+    public function persistFields(array $s): array
+    {
+        return [
+            'basic_salary' => $s['basic_salary'],
+            'allowances' => $s['allowances'],
+            'allowance_limit_pct' => $s['allowance_limit_pct'],
+            'allowance_limit' => $s['allowance_limit'],
+            'allowance_remaining' => $s['allowance_remaining'],
+            'gross_salary' => $s['gross'],
+            'net_salary' => $s['net_after_fixed'],
+            'applied_insurance_wage' => $s['insurance_wage'],
+            'employee_insurance' => $s['employee_insurance'],
+            'income_tax' => $s['income_tax'],
+            'taxable_annual' => $s['taxable_annual'],
+            'martyrs_fund' => $s['martyrs_fund'],
+            'total_deductions' => $s['total_deductions'],
+            'employer_insurance' => $s['employer_insurance'],
+            'employee_cost' => $s['employee_cost'],
+        ];
+    }
+}

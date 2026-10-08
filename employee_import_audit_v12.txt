@@ -1,0 +1,597 @@
+============================================================
+ TAZAMUN HR - EMPLOYEE IMPORT AUDIT V12
+ READ-ONLY / NO DATABASE MODIFICATIONS
+============================================================
+
+[CONFIG]
+Host     : 127.0.0.1
+Port     : 3306
+Database : tazamun_hr
+Username : root
+Password : (empty)
+
+[OK] Database connection successful.
+
+
+------------------------------------------------------------
+ 1. DATABASE INFORMATION
+------------------------------------------------------------
+{"database_name":"tazamun_hr","mysql_version":"10.4.32-MariaDB"}
+
+------------------------------------------------------------
+ 2. EMPLOYEE RELATED TABLES
+------------------------------------------------------------
+employees                      : EXISTS
+departments                    : EXISTS
+jobs                           : EXISTS
+branches                       : EXISTS
+employment_types               : EXISTS
+employee_statuses              : EXISTS
+payment_methods                : EXISTS
+salaries                       : EXISTS
+salary_history                 : EXISTS
+employee_allowances            : EXISTS
+insurance_records              : EXISTS
+employee_bank_accounts         : EXISTS
+payroll_records                : EXISTS
+payroll_earnings               : EXISTS
+payroll_deductions             : EXISTS
+overtime_records               : EXISTS
+documents                      : EXISTS
+document_types                 : EXISTS
+movement_records               : EXISTS
+
+------------------------------------------------------------
+ 3. EMPLOYEES TABLE STRUCTURE
+------------------------------------------------------------
+id                               | bigint(20) unsigned       | NULL=NO  | KEY=PRI  | DEFAULT=NULL
+employee_code                    | varchar(50)               | NULL=NO  | KEY=UNI  | DEFAULT=NULL
+first_name                       | varchar(100)              | NULL=NO  | KEY=     | DEFAULT=NULL
+middle_name                      | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+last_name                        | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+full_name                        | varchar(255)              | NULL=NO  | KEY=     | DEFAULT=NULL
+nationality                      | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+national_id                      | varchar(50)               | NULL=YES | KEY=UNI  | DEFAULT=NULL
+phone                            | varchar(50)               | NULL=YES | KEY=     | DEFAULT=NULL
+email                            | varchar(190)              | NULL=YES | KEY=     | DEFAULT=NULL
+gender                           | varchar(30)               | NULL=YES | KEY=     | DEFAULT=NULL
+birth_date                       | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+address                          | varchar(500)              | NULL=YES | KEY=     | DEFAULT=NULL
+marital_status                   | varchar(50)               | NULL=YES | KEY=     | DEFAULT=NULL
+qualification                    | varchar(150)              | NULL=YES | KEY=     | DEFAULT=NULL
+department_id                    | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+job_id                           | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+branch_id                        | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+employment_type_id               | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+status_id                        | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+hire_date                        | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+contract_start_date              | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+contract_end_date                | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+contract_duration                | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+manager_employee_id              | bigint(20) unsigned       | NULL=YES | KEY=MUL  | DEFAULT=NULL
+direct_manager_name              | varchar(255)              | NULL=YES | KEY=     | DEFAULT=NULL
+notes                            | text                      | NULL=YES | KEY=     | DEFAULT=NULL
+created_at                       | timestamp                 | NULL=YES | KEY=     | DEFAULT=current_timestamp()
+updated_at                       | timestamp                 | NULL=YES | KEY=     | DEFAULT=current_timestamp()
+work_location                    | varchar(255)              | NULL=YES | KEY=     | DEFAULT=NULL
+work_pattern                     | varchar(50)               | NULL=YES | KEY=     | DEFAULT=NULL
+weekly_work_days                 | varchar(255)              | NULL=YES | KEY=     | DEFAULT=NULL
+daily_work_hours                 | decimal(5,2)              | NULL=YES | KEY=     | DEFAULT=NULL
+working_hours_text               | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+contract_type                    | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+probation_period                 | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+annual_leave_days                | decimal(6,2)              | NULL=YES | KEY=     | DEFAULT=NULL
+contract_attachment_status       | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+attached_documents               | varchar(500)              | NULL=YES | KEY=     | DEFAULT=NULL
+additional_conditions            | text                      | NULL=YES | KEY=     | DEFAULT=NULL
+currency                         | varchar(10)               | NULL=YES | KEY=     | DEFAULT=NULL
+employment_data_source           | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+hire_date_source                 | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+contract_start_date_source       | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+contract_end_date_source         | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+employee_photo                   | varchar(500)              | NULL=YES | KEY=     | DEFAULT=NULL
+personal_email                   | varchar(190)              | NULL=YES | KEY=     | DEFAULT=NULL
+emergency_contact_name           | varchar(255)              | NULL=YES | KEY=     | DEFAULT=NULL
+emergency_contact_phone          | varchar(50)               | NULL=YES | KEY=     | DEFAULT=NULL
+emergency_contact_relation       | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+national_id_issue_date           | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+national_id_expiry_date          | date                      | NULL=YES | KEY=     | DEFAULT=NULL
+national_id_place                | varchar(255)              | NULL=YES | KEY=     | DEFAULT=NULL
+military_status                  | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+bank_name                        | varchar(150)              | NULL=YES | KEY=     | DEFAULT=NULL
+bank_account_number              | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+iban                             | varchar(100)              | NULL=YES | KEY=     | DEFAULT=NULL
+payment_method_id                | bigint(20) unsigned       | NULL=YES | KEY=     | DEFAULT=NULL
+
+------------------------------------------------------------
+ 4. EMPLOYEE FOREIGN KEYS
+------------------------------------------------------------
+job_id -> jobs.id [fk_employees_job]
+status_id -> employee_statuses.id [fk_employees_status]
+branch_id -> branches.id [fk_employees_branch]
+employment_type_id -> employment_types.id [fk_employees_employment_type]
+manager_employee_id -> employees.id [fk_employees_manager]
+department_id -> departments.id [fk_employees_department]
+
+------------------------------------------------------------
+ 5. CURRENT EMPLOYEES
+------------------------------------------------------------
+Total employees: 7
+
+{"id":2,"employee_code":"101","full_name":"زياد محمود فرغلي","nationality":"مصري","national_id":"29904260101078","phone":"01045710481","email":"zeyad.m.farghaly99@gmail.com","department_id":10,"job_id":3,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2026-08-16","contract_start_date":"2026-08-16","contract_end_date":"2027-08-15","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":3,"employee_code":"102","full_name":"سيف الدين مجدي","nationality":"مصري","national_id":"29903050100536","phone":"01115857752","email":"seifmagdy1999@gmail.com","department_id":10,"job_id":4,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2026-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":4,"employee_code":"103","full_name":"عبدالرحمن طارق احمد","nationality":"مصري","national_id":"30410170101918","phone":"01021628695","email":"abdulrhman.ttarek20@gmail.com","department_id":10,"job_id":6,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2026-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":5,"employee_code":"104","full_name":"عامر سالم جمعه","nationality":"مصري","national_id":"29310172403555","phone":"01001028549","email":"amer.salem2130@gmail.com","department_id":11,"job_id":9,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2026-07-29","contract_start_date":"2026-07-29","contract_end_date":"2027-07-28","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":6,"employee_code":"105","full_name":"نجية محمود السيد","nationality":"مصري","national_id":"27902071202548","phone":"01016074925","email":null,"department_id":12,"job_id":11,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2026-08-23","contract_start_date":"2026-08-20","contract_end_date":"2027-08-19","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":7,"employee_code":"106","full_name":"اماني كرم علي قاسم","nationality":"مصري","national_id":"29703222700523","phone":"01067107176","email":"Amanykaram54@gmail.com","department_id":10,"job_id":10,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2027-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22","work_location":"مصر","work_pattern":"عن بعد","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+{"id":8,"employee_code":"107","full_name":"محمد صلاح عسكر","nationality":"مصري","national_id":"30009021301673","phone":"01011264098","email":"mosalah168200@gmail.com","department_id":10,"job_id":4,"branch_id":5,"employment_type_id":1,"status_id":1,"hire_date":"2028-09-01","contract_start_date":"2026-09-01","contract_end_date":"2027-08-31","work_location":"مصر","work_pattern":"حضوري","weekly_work_days":"الاحد الي الخميس","daily_work_hours":"8.00","currency":"EGP"}
+
+------------------------------------------------------------
+ 6. DUPLICATE DETECTION
+------------------------------------------------------------
+
+Duplicate employee_code:
+NONE
+
+Duplicate national_id:
+NONE
+
+Duplicate email:
+NONE
+
+------------------------------------------------------------
+ 7. MASTER DATA - departments
+------------------------------------------------------------
+{"id":1,"name":"Human Resources","is_active":1}
+{"id":2,"name":"Marketing","is_active":1}
+{"id":3,"name":"Design","is_active":1}
+{"id":4,"name":"Sales","is_active":1}
+{"id":5,"name":"Administration","is_active":1}
+{"id":6,"name":"Customer Service","is_active":1}
+{"id":7,"name":"Accounts","is_active":1}
+{"id":8,"name":"IT","is_active":1}
+{"id":9,"name":"Cleaning","is_active":1}
+{"id":10,"name":"تسويق","is_active":1}
+{"id":11,"name":"الموارد البشرية","is_active":1}
+{"id":12,"name":"النظافة","is_active":1}
+
+------------------------------------------------------------
+ 7. MASTER DATA - jobs
+------------------------------------------------------------
+{"id":1,"title":"HR Manager","is_active":1}
+{"id":2,"title":"Senior Media Buyer","is_active":1}
+{"id":3,"title":"Content Creator","is_active":1}
+{"id":4,"title":"Graphic Designer","is_active":1}
+{"id":5,"title":"Video Editor","is_active":1}
+{"id":6,"title":"Marketing Specialist","is_active":1}
+{"id":7,"title":"Social Media Specialist","is_active":1}
+{"id":8,"title":"Account Manager","is_active":1}
+{"id":9,"title":"HR","is_active":1}
+{"id":10,"title":"Media Buyer","is_active":1}
+{"id":11,"title":"Office Girl","is_active":1}
+
+------------------------------------------------------------
+ 7. MASTER DATA - branches
+------------------------------------------------------------
+{"id":1,"name":"Head Office","is_active":1}
+{"id":2,"name":"Nasr City","is_active":1}
+{"id":3,"name":"New Cairo","is_active":1}
+{"id":4,"name":"Sheikh Zayed","is_active":1}
+{"id":5,"name":"مصر","is_active":1}
+
+------------------------------------------------------------
+ 7. MASTER DATA - employment_types
+------------------------------------------------------------
+{"id":1,"name":"Full Time"}
+{"id":2,"name":"Part Time"}
+{"id":3,"name":"Fixed Contract"}
+{"id":4,"name":"Internship"}
+{"id":5,"name":"Freelance"}
+
+------------------------------------------------------------
+ 7. MASTER DATA - employee_statuses
+------------------------------------------------------------
+{"id":1,"name":"Active"}
+{"id":2,"name":"Leave"}
+{"id":3,"name":"Suspended"}
+{"id":4,"name":"Terminated"}
+{"id":5,"name":"Pending"}
+
+------------------------------------------------------------
+ 7. MASTER DATA - payment_methods
+------------------------------------------------------------
+{"id":1,"name":"Bank"}
+{"id":2,"name":"Cash"}
+{"id":3,"name":"Wallet"}
+{"id":4,"name":"تحويل بنكي"}
+{"id":5,"name":"نقدي"}
+{"id":6,"name":"تحويل محفظة"}
+
+------------------------------------------------------------
+ 7. MASTER DATA - document_types
+------------------------------------------------------------
+No records found.
+
+------------------------------------------------------------
+ 8. REQUIRED MASTER DATA MAPPING
+------------------------------------------------------------
+
+TABLE: departments
+
+تسويق:
+{"id":10,"name":"تسويق","is_active":1,"created_at":"2026-10-07 01:12:45","updated_at":"2026-10-07 01:12:45"}
+
+الموارد البشرية:
+{"id":11,"name":"الموارد البشرية","is_active":1,"created_at":"2026-10-07 01:12:46","updated_at":"2026-10-07 01:12:46"}
+
+النظافة:
+{"id":12,"name":"النظافة","is_active":1,"created_at":"2026-10-07 01:12:47","updated_at":"2026-10-07 01:12:47"}
+
+TABLE: jobs
+
+Content Creator:
+{"id":3,"title":"Content Creator","job_code":"264101","is_active":1,"created_at":"2026-10-06 16:35:55","updated_at":"2026-10-06 16:35:55"}
+
+Graphic Designer:
+{"id":4,"title":"Graphic Designer","job_code":null,"is_active":1,"created_at":"2026-10-06 16:35:55","updated_at":"2026-10-06 16:35:55"}
+
+Marketing Specialist:
+{"id":6,"title":"Marketing Specialist","job_code":null,"is_active":1,"created_at":"2026-10-06 16:35:55","updated_at":"2026-10-06 16:35:55"}
+
+HR:
+{"id":9,"title":"HR","job_code":null,"is_active":1,"created_at":"2026-10-06 16:56:50","updated_at":"2026-10-06 16:56:50"}
+
+Office Girl:
+{"id":11,"title":"Office Girl","job_code":null,"is_active":1,"created_at":"2026-10-06 16:56:50","updated_at":"2026-10-06 16:56:50"}
+
+Media Buyer:
+{"id":10,"title":"Media Buyer","job_code":null,"is_active":1,"created_at":"2026-10-06 16:56:50","updated_at":"2026-10-06 16:56:50"}
+
+TABLE: employment_types
+
+Full Time:
+{"id":1,"name":"Full Time"}
+
+كامل:
+NOT FOUND
+
+Full-Time:
+NOT FOUND
+
+------------------------------------------------------------
+ 9. TARGET EMPLOYEE MATCHING
+------------------------------------------------------------
+
+TARGET: زياد محمود فرغلي
+{"id":2,"employee_code":"101","full_name":"زياد محمود فرغلي","national_id":"29904260101078","email":"zeyad.m.farghaly99@gmail.com","department_id":10,"job_id":3,"hire_date":"2026-08-16","contract_start_date":"2026-08-16","contract_end_date":"2027-08-15"}
+
+TARGET: سيف الدين مجدي
+{"id":3,"employee_code":"102","full_name":"سيف الدين مجدي","national_id":"29903050100536","email":"seifmagdy1999@gmail.com","department_id":10,"job_id":4,"hire_date":"2026-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22"}
+
+TARGET: عبدالرحمن طارق احمد
+{"id":4,"employee_code":"103","full_name":"عبدالرحمن طارق احمد","national_id":"30410170101918","email":"abdulrhman.ttarek20@gmail.com","department_id":10,"job_id":6,"hire_date":"2026-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22"}
+
+TARGET: عامر سالم جمعه
+{"id":5,"employee_code":"104","full_name":"عامر سالم جمعه","national_id":"29310172403555","email":"amer.salem2130@gmail.com","department_id":11,"job_id":9,"hire_date":"2026-07-29","contract_start_date":"2026-07-29","contract_end_date":"2027-07-28"}
+
+TARGET: نجية محمود السيد
+{"id":6,"employee_code":"105","full_name":"نجية محمود السيد","national_id":"27902071202548","email":null,"department_id":12,"job_id":11,"hire_date":"2026-08-23","contract_start_date":"2026-08-20","contract_end_date":"2027-08-19"}
+
+TARGET: اماني كرم علي قاسم
+{"id":7,"employee_code":"106","full_name":"اماني كرم علي قاسم","national_id":"29703222700523","email":"Amanykaram54@gmail.com","department_id":10,"job_id":10,"hire_date":"2027-08-23","contract_start_date":"2026-08-23","contract_end_date":"2027-08-22"}
+
+TARGET: محمد صلاح عسكر
+{"id":8,"employee_code":"107","full_name":"محمد صلاح عسكر","national_id":"30009021301673","email":"mosalah168200@gmail.com","department_id":10,"job_id":4,"hire_date":"2028-09-01","contract_start_date":"2026-09-01","contract_end_date":"2027-08-31"}
+
+------------------------------------------------------------
+ 10. SALARY TABLE - salaries
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+employee_id                        | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+effective_from                     | date                      | NULL=NO  | KEY=    
+basic_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+allowances                         | decimal(12,2)             | NULL=NO  | KEY=    
+allowance_limit_pct                | decimal(5,2)              | NULL=NO  | KEY=    
+allowance_limit                    | decimal(12,2)             | NULL=NO  | KEY=    
+allowance_remaining                | decimal(12,2)             | NULL=NO  | KEY=    
+housing_allowance                  | decimal(12,2)             | NULL=NO  | KEY=    
+transportation_allowance           | decimal(12,2)             | NULL=NO  | KEY=    
+meal_allowance                     | decimal(12,2)             | NULL=NO  | KEY=    
+other_allowances                   | decimal(12,2)             | NULL=NO  | KEY=    
+deductions                         | decimal(12,2)             | NULL=NO  | KEY=    
+net_salary                         | decimal(12,2)             | NULL=NO  | KEY=    
+gross_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+status                             | varchar(50)               | NULL=NO  | KEY=    
+payment_method_id                  | bigint(20) unsigned       | NULL=YES | KEY=MUL 
+notes                              | varchar(500)              | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+salary_type                        | varchar(20)               | NULL=NO  | KEY=    
+salary_input                       | decimal(12,2)             | NULL=NO  | KEY=    
+fixed_deductions                   | decimal(12,2)             | NULL=NO  | KEY=    
+insurance_wage                     | decimal(12,2)             | NULL=YES | KEY=    
+applied_insurance_wage             | decimal(12,2)             | NULL=YES | KEY=    
+employee_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+income_tax                         | decimal(12,2)             | NULL=NO  | KEY=    
+taxable_annual                     | decimal(12,2)             | NULL=NO  | KEY=    
+martyrs_fund                       | decimal(12,2)             | NULL=NO  | KEY=    
+total_deductions                   | decimal(12,2)             | NULL=NO  | KEY=    
+employer_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+employee_cost                      | decimal(12,2)             | NULL=NO  | KEY=    
+tax_deductible_contributions       | decimal(12,2)             | NULL=NO  | KEY=    
+annual_tax                         | decimal(12,2)             | NULL=NO  | KEY=    
+tax_category                       | varchar(30)               | NULL=YES | KEY=    
+no_insurance                       | tinyint(1)                | NULL=NO  | KEY=    
+excluded_allowance_pct             | decimal(5,2)              | NULL=NO  | KEY=    
+personal_exemption                 | decimal(12,2)             | NULL=NO  | KEY=    
+tax_treatment                      | varchar(30)               | NULL=NO  | KEY=    
+clothing_allowance                 | decimal(12,2)             | NULL=NO  | KEY=    
+monthly_tax                        | decimal(12,2)             | NULL=NO  | KEY=    
+calculation_snapshot               | longtext                  | NULL=YES | KEY=    
+incentives                         | decimal(12,2)             | NULL=NO  | KEY=    
+commission                         | decimal(12,2)             | NULL=NO  | KEY=    
+profit_share                       | decimal(12,2)             | NULL=NO  | KEY=    
+other_earnings                     | decimal(12,2)             | NULL=NO  | KEY=    
+profit_share_tax_exempt            | tinyint(1)                | NULL=NO  | KEY=    
+manual_insurance_wage              | decimal(12,2)             | NULL=NO  | KEY=    
+manual_deduction                   | decimal(12,2)             | NULL=NO  | KEY=    
+
+------------------------------------------------------------
+ 10. SALARY TABLE - salary_history
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+employee_id                        | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+salary_id                          | bigint(20) unsigned       | NULL=YES | KEY=    
+effective_from                     | date                      | NULL=NO  | KEY=MUL 
+effective_to                       | date                      | NULL=YES | KEY=    
+salary_type                        | varchar(20)               | NULL=NO  | KEY=    
+salary_input                       | decimal(12,2)             | NULL=NO  | KEY=    
+basic_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+allowance_limit_pct                | decimal(5,2)              | NULL=NO  | KEY=    
+allowance_limit                    | decimal(12,2)             | NULL=NO  | KEY=    
+housing_allowance                  | decimal(12,2)             | NULL=NO  | KEY=    
+transportation_allowance           | decimal(12,2)             | NULL=NO  | KEY=    
+meal_allowance                     | decimal(12,2)             | NULL=NO  | KEY=    
+clothing_allowance                 | decimal(12,2)             | NULL=NO  | KEY=    
+other_allowances                   | decimal(12,2)             | NULL=NO  | KEY=    
+gross_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+insurance_wage                     | decimal(12,2)             | NULL=YES | KEY=    
+employee_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+income_tax                         | decimal(12,2)             | NULL=NO  | KEY=    
+martyrs_fund                       | decimal(12,2)             | NULL=NO  | KEY=    
+net_salary                         | decimal(12,2)             | NULL=NO  | KEY=    
+employer_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+employee_cost                      | decimal(12,2)             | NULL=NO  | KEY=    
+status                             | varchar(50)               | NULL=NO  | KEY=    
+calculation_snapshot               | longtext                  | NULL=YES | KEY=    
+created_by                         | bigint(20) unsigned       | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+
+------------------------------------------------------------
+ 10. SALARY TABLE - employee_allowances
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+employee_id                        | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+allowance_type                     | varchar(100)              | NULL=NO  | KEY=MUL 
+amount                             | decimal(12,2)             | NULL=NO  | KEY=    
+percentage                         | decimal(8,4)              | NULL=YES | KEY=    
+effective_from                     | date                      | NULL=NO  | KEY=    
+effective_to                       | date                      | NULL=YES | KEY=    
+is_active                          | tinyint(1)                | NULL=NO  | KEY=    
+notes                              | varchar(500)              | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+
+------------------------------------------------------------
+ 10. SALARY TABLE - payroll_records
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+payroll_run_id                     | bigint(20) unsigned       | NULL=YES | KEY=MUL 
+employee_id                        | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+salary_id                          | bigint(20) unsigned       | NULL=YES | KEY=MUL 
+agreed_net_salary                  | decimal(12,2)             | NULL=NO  | KEY=    
+tax_deductible_contributions       | decimal(12,2)             | NULL=NO  | KEY=    
+taxable_annual                     | decimal(12,2)             | NULL=NO  | KEY=    
+annual_tax                         | decimal(12,2)             | NULL=NO  | KEY=    
+tax_category                       | varchar(30)               | NULL=YES | KEY=    
+payroll_month                      | date                      | NULL=NO  | KEY=    
+basic_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+allowances                         | decimal(12,2)             | NULL=NO  | KEY=    
+housing_allowance                  | decimal(12,2)             | NULL=NO  | KEY=    
+transportation_allowance           | decimal(12,2)             | NULL=NO  | KEY=    
+meal_allowance                     | decimal(12,2)             | NULL=NO  | KEY=    
+overtime_amount                    | decimal(12,2)             | NULL=NO  | KEY=    
+deductions                         | decimal(12,2)             | NULL=NO  | KEY=    
+absence_deduction                  | decimal(12,2)             | NULL=NO  | KEY=    
+net_salary                         | decimal(12,2)             | NULL=NO  | KEY=    
+status                             | varchar(50)               | NULL=NO  | KEY=    
+paid_at                            | timestamp                 | NULL=YES | KEY=    
+notes                              | varchar(500)              | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+gross_salary                       | decimal(12,2)             | NULL=NO  | KEY=    
+insurance_wage                     | decimal(12,2)             | NULL=NO  | KEY=    
+employee_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+income_tax                         | decimal(12,2)             | NULL=NO  | KEY=    
+martyrs_fund                       | decimal(12,2)             | NULL=NO  | KEY=    
+employer_insurance                 | decimal(12,2)             | NULL=NO  | KEY=    
+employee_cost                      | decimal(12,2)             | NULL=NO  | KEY=    
+fixed_deductions                   | decimal(12,2)             | NULL=NO  | KEY=    
+attendance_deduction               | decimal(12,2)             | NULL=NO  | KEY=    
+clothing_allowance                 | decimal(12,2)             | NULL=NO  | KEY=    
+incentives                         | decimal(12,2)             | NULL=NO  | KEY=    
+commission                         | decimal(12,2)             | NULL=NO  | KEY=    
+profit_share                       | decimal(12,2)             | NULL=NO  | KEY=    
+other_earnings                     | decimal(12,2)             | NULL=NO  | KEY=    
+day_overtime_hours                 | decimal(10,2)             | NULL=NO  | KEY=    
+day_overtime_value                 | decimal(12,2)             | NULL=NO  | KEY=    
+night_overtime_hours               | decimal(10,2)             | NULL=NO  | KEY=    
+night_overtime_value               | decimal(12,2)             | NULL=NO  | KEY=    
+official_holiday_days              | decimal(10,2)             | NULL=NO  | KEY=    
+official_holiday_value             | decimal(12,2)             | NULL=NO  | KEY=    
+weekly_holiday_days                | decimal(10,2)             | NULL=NO  | KEY=    
+weekly_holiday_value               | decimal(12,2)             | NULL=NO  | KEY=    
+total_overtime                     | decimal(12,2)             | NULL=NO  | KEY=    
+total_earnings                     | decimal(12,2)             | NULL=NO  | KEY=    
+annual_gross                       | decimal(14,2)             | NULL=NO  | KEY=    
+annual_employee_insurance          | decimal(14,2)             | NULL=NO  | KEY=    
+personal_exemption                 | decimal(12,2)             | NULL=NO  | KEY=    
+profit_share_tax_adjustment        | decimal(12,2)             | NULL=NO  | KEY=    
+taxable_income                     | decimal(14,2)             | NULL=NO  | KEY=    
+monthly_tax                        | decimal(12,2)             | NULL=NO  | KEY=    
+penalties                          | decimal(12,2)             | NULL=NO  | KEY=    
+advances                           | decimal(12,2)             | NULL=NO  | KEY=    
+other_deductions                   | decimal(12,2)             | NULL=NO  | KEY=    
+calculation_snapshot               | longtext                  | NULL=YES | KEY=    
+profit_share_tax_exempt            | tinyint(1)                | NULL=NO  | KEY=    
+tax_exempt_profit_share            | decimal(12,2)             | NULL=NO  | KEY=    
+manual_insurance_wage              | decimal(12,2)             | NULL=NO  | KEY=    
+manual_insurance_override          | tinyint(1)                | NULL=NO  | KEY=    
+weekly_rest_days                   | decimal(10,2)             | NULL=NO  | KEY=    
+day_overtime_amount                | decimal(12,2)             | NULL=NO  | KEY=    
+night_overtime_amount              | decimal(12,2)             | NULL=NO  | KEY=    
+official_holiday_amount            | decimal(12,2)             | NULL=NO  | KEY=    
+weekly_rest_amount                 | decimal(12,2)             | NULL=NO  | KEY=    
+penalty_deduction                  | decimal(12,2)             | NULL=NO  | KEY=    
+advance_deduction                  | decimal(12,2)             | NULL=NO  | KEY=    
+other_deduction                    | decimal(12,2)             | NULL=NO  | KEY=    
+manual_deduction                   | decimal(12,2)             | NULL=NO  | KEY=    
+calculated_monthly_tax             | decimal(14,6)             | NULL=NO  | KEY=    
+tax_paid_to_date                   | decimal(14,2)             | NULL=NO  | KEY=    
+tax_remaining                      | decimal(14,2)             | NULL=NO  | KEY=    
+approved_at                        | timestamp                 | NULL=YES | KEY=    
+approved_by                        | bigint(20) unsigned       | NULL=YES | KEY=    
+is_locked                          | tinyint(1)                | NULL=NO  | KEY=    
+year_to_date_tax                   | decimal(14,2)             | NULL=NO  | KEY=    
+year_to_date_gross                 | decimal(14,2)             | NULL=NO  | KEY=    
+year_to_date_insurance             | decimal(14,2)             | NULL=NO  | KEY=    
+
+------------------------------------------------------------
+ 10. SALARY TABLE - payroll_earnings
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+payroll_record_id                  | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+employee_id                        | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+earning_type                       | varchar(100)              | NULL=NO  | KEY=    
+amount                             | decimal(12,2)             | NULL=NO  | KEY=    
+taxable                            | tinyint(1)                | NULL=NO  | KEY=    
+insurance_subject                  | tinyint(1)                | NULL=NO  | KEY=    
+notes                              | varchar(500)              | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+
+------------------------------------------------------------
+ 10. SALARY TABLE - payroll_deductions
+------------------------------------------------------------
+id                                 | bigint(20) unsigned       | NULL=NO  | KEY=PRI 
+payroll_record_id                  | bigint(20) unsigned       | NULL=NO  | KEY=MUL 
+type                               | varchar(50)               | NULL=NO  | KEY=    
+amount                             | decimal(12,2)             | NULL=NO  | KEY=    
+reason                             | varchar(255)              | NULL=YES | KEY=    
+created_at                         | timestamp                 | NULL=YES | KEY=    
+updated_at                         | timestamp                 | NULL=YES | KEY=    
+
+------------------------------------------------------------
+ 11. EXISTING SALARY DATA
+------------------------------------------------------------
+Salary records: 7
+{"id":2,"employee_id":2,"effective_from":"2026-08-16","basic_salary":"15085.33","allowances":"3789.00","housing_allowance":"3789.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"15000.00","gross_salary":"18874.33","salary_type":"net","salary_input":"15000.00","insurance_wage":null,"applied_insurance_wage":"14518.72","employee_insurance":"1597.06","income_tax":"2267.83","annual_tax":"0.00","martyrs_fund":"9.44","total_deductions":"3874.33","employer_insurance":"2722.26","employee_cost":"21596.59","status":"Active"}
+{"id":3,"employee_id":3,"effective_from":"2026-08-23","basic_salary":"15085.33","allowances":"3789.00","housing_allowance":"3789.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"15000.00","gross_salary":"18874.33","salary_type":"net","salary_input":"15000.00","insurance_wage":null,"applied_insurance_wage":"14518.72","employee_insurance":"1597.06","income_tax":"2267.83","annual_tax":"0.00","martyrs_fund":"9.44","total_deductions":"3874.33","employer_insurance":"2722.26","employee_cost":"21596.59","status":"Active"}
+{"id":4,"employee_id":4,"effective_from":"2026-08-23","basic_salary":"17326.24","allowances":"4332.00","housing_allowance":"4332.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"17000.00","gross_salary":"21658.24","salary_type":"net","salary_input":"17000.00","insurance_wage":null,"applied_insurance_wage":"16660.18","employee_insurance":"1832.62","income_tax":"2814.79","annual_tax":"0.00","martyrs_fund":"10.83","total_deductions":"4658.24","employer_insurance":"3123.78","employee_cost":"24782.02","status":"Active"}
+{"id":5,"employee_id":5,"effective_from":"2026-07-29","basic_salary":"20429.06","allowances":"5107.00","housing_allowance":"5107.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"20000.00","gross_salary":"25536.06","salary_type":"net","salary_input":"20000.00","insurance_wage":null,"applied_insurance_wage":"16700.00","employee_insurance":"1837.00","income_tax":"3686.29","annual_tax":"0.00","martyrs_fund":"12.77","total_deductions":"5536.06","employer_insurance":"3131.25","employee_cost":"28667.31","status":"Active"}
+{"id":6,"employee_id":6,"effective_from":"2026-08-23","basic_salary":"7409.00","allowances":"1900.00","housing_allowance":"1900.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"8000.00","gross_salary":"9309.00","salary_type":"net","salary_input":"8000.00","insurance_wage":null,"applied_insurance_wage":"7160.77","employee_insurance":"787.68","income_tax":"516.67","annual_tax":"0.00","martyrs_fund":"4.65","total_deductions":"1309.00","employer_insurance":"1342.64","employee_cost":"10651.64","status":"Active"}
+{"id":7,"employee_id":7,"effective_from":"2027-08-23","basic_salary":"30801.46","allowances":"7700.00","housing_allowance":"7700.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"30000.00","gross_salary":"38501.46","salary_type":"net","salary_input":"30000.00","insurance_wage":null,"applied_insurance_wage":"16700.00","employee_insurance":"1837.00","income_tax":"6645.21","annual_tax":"0.00","martyrs_fund":"19.25","total_deductions":"8501.46","employer_insurance":"3131.25","employee_cost":"41632.71","status":"Active"}
+{"id":8,"employee_id":8,"effective_from":"2028-09-01","basic_salary":"22494.41","allowances":"5624.00","housing_allowance":"5624.00","transportation_allowance":"0.00","meal_allowance":"0.00","clothing_allowance":"0.00","other_allowances":"0.00","net_salary":"22000.00","gross_salary":"28118.41","salary_type":"net","salary_input":"22000.00","insurance_wage":null,"applied_insurance_wage":"16700.00","employee_insurance":"1837.00","income_tax":"4267.35","annual_tax":"0.00","martyrs_fund":"14.06","total_deductions":"6118.41","employer_insurance":"3131.25","employee_cost":"31249.66","status":"Active"}
+
+------------------------------------------------------------
+ 12. EMPLOYEE ALLOWANCES
+------------------------------------------------------------
+Employee allowance records: 0
+
+------------------------------------------------------------
+ 13. insurance_records
+------------------------------------------------------------
+Records: 2
+Foreign Keys:
+employee_id -> employees.id
+
+------------------------------------------------------------
+ 13. employee_bank_accounts
+------------------------------------------------------------
+Records: 0
+Foreign Keys:
+NONE
+
+------------------------------------------------------------
+ 13. documents
+------------------------------------------------------------
+Records: 0
+Foreign Keys:
+employee_id -> employees.id
+
+------------------------------------------------------------
+ 14. EMPLOYEE INDEXES / UNIQUE CONSTRAINTS
+------------------------------------------------------------
+{"INDEX_NAME":"employee_code","NON_UNIQUE":0,"COLUMN_NAME":"employee_code","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_branch","NON_UNIQUE":1,"COLUMN_NAME":"branch_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_department","NON_UNIQUE":1,"COLUMN_NAME":"department_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_employment_type","NON_UNIQUE":1,"COLUMN_NAME":"employment_type_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_job","NON_UNIQUE":1,"COLUMN_NAME":"job_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_manager","NON_UNIQUE":1,"COLUMN_NAME":"manager_employee_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"fk_employees_status","NON_UNIQUE":1,"COLUMN_NAME":"status_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"national_id","NON_UNIQUE":0,"COLUMN_NAME":"national_id","SEQ_IN_INDEX":1}
+{"INDEX_NAME":"PRIMARY","NON_UNIQUE":0,"COLUMN_NAME":"id","SEQ_IN_INDEX":1}
+
+------------------------------------------------------------
+ 15. EMPLOYEE DATA QUALITY
+------------------------------------------------------------
+
+Missing employee code:
+NONE
+
+Missing full name:
+NONE
+
+Invalid contract dates:
+NONE
+
+Invalid hire date vs contract end:
+{"id":7,"employee_code":"106","full_name":"اماني كرم علي قاسم","hire_date":"2027-08-23","contract_end_date":"2027-08-22"}
+{"id":8,"employee_code":"107","full_name":"محمد صلاح عسكر","hire_date":"2028-09-01","contract_end_date":"2027-08-31"}
+
+------------------------------------------------------------
+ 16. TARGET DATA REVIEW FLAGS
+------------------------------------------------------------
+The following target-data values require human confirmation before import:
+
+1) أماني كرم علي قاسم
+   Hire date: 23/08/2027
+   Contract start: 23/08/2026
+
+2) محمد صلاح عسكر
+   Hire date: 01/09/2028
+   Contract start: 01/09/2026
+   Contract end: 30/08/2027
+
+3) نجية محمود السيد
+   Hire date: 23/08/2026
+   Contract start: 20/08/2026
+   This may be intentional; no automatic correction will be made.
+
+------------------------------------------------------------
+ 17. AUDIT COMPLETE
+------------------------------------------------------------
+READ-ONLY AUDIT COMPLETED.
+NO INSERT operations were performed.
+NO UPDATE operations were performed.
+NO DELETE operations were performed.
+NO CREATE TABLE operations were performed.
+NO ALTER TABLE operations were performed.
+
+Next step after reviewing this report:
+Create a separate employee import script based strictly on the audit results.
+
+============================================================
+ END OF AUDIT
+============================================================
