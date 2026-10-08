@@ -136,8 +136,12 @@ class EmployeeController extends Controller
 
     public function store(Request $request)
     {
+        $employeeCode = trim((string) $request->input('employee_code', ''));
+        $request->merge(['employee_code' => $employeeCode !== '' ? $employeeCode : null]);
+
         $validated = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
+            'employee_code' => ['nullable', 'string', 'max:50', 'unique:employees,employee_code'],
             'national_id' => ['nullable', 'string', 'max:50', 'unique:employees,national_id'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
@@ -148,6 +152,7 @@ class EmployeeController extends Controller
             'job_id' => ['nullable', 'exists:jobs,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'hire_date' => ['nullable', 'date'],
+            'contract_end_date' => ['nullable', 'date', 'after_or_equal:hire_date'],
         ], [
             'full_name.required' => 'اسم الموظف الكامل مطلوب.',
             'employee_code.unique' => 'كود الموظف مستخدم بالفعل.',
@@ -163,16 +168,27 @@ class EmployeeController extends Controller
         $validated['first_name'] = $names[0] ?? '';
         $validated['last_name'] = end($names) ?: '';
         $validated['status_id'] = $request->input('status_id', 1);
+        $hireDate = \Carbon\Carbon::parse($validated['hire_date'] ?? today())->toDateString();
+        $validated['hire_date'] = $hireDate;
+        $validated['contract_start_date'] = $hireDate;
+        $validated['contract_end_date'] = $request->filled('contract_end_date')
+            ? \Carbon\Carbon::parse($validated['contract_end_date'])->toDateString()
+            : \Carbon\Carbon::parse($hireDate)->addYear()->toDateString();
 
         $employee = DB::transaction(function () use ($validated) {
-            // Codes are generated server-side, beginning at 101, and never change afterwards.
-            $lastCode = Employee::query()
-                ->lockForUpdate()
-                ->whereRaw("employee_code REGEXP '^[0-9]+$'")
-                ->selectRaw('MAX(CAST(employee_code AS UNSIGNED)) as max_code')
-                ->value('max_code');
+            $enteredCode = trim((string) ($validated['employee_code'] ?? ''));
+            if ($enteredCode === '') {
+                // If no code is supplied, generate the next numeric code safely.
+                $lastCode = Employee::query()
+                    ->lockForUpdate()
+                    ->whereRaw("employee_code REGEXP '^[0-9]+$'")
+                    ->selectRaw('MAX(CAST(employee_code AS UNSIGNED)) as max_code')
+                    ->value('max_code');
 
-            $validated['employee_code'] = (string) max(101, ((int) $lastCode) + 1);
+                $validated['employee_code'] = (string) max(101, ((int) $lastCode) + 1);
+            } else {
+                $validated['employee_code'] = $enteredCode;
+            }
 
             $employee = Employee::create($validated);
             // Keep every employee compatible with the full profile screen,
@@ -252,6 +268,14 @@ class EmployeeController extends Controller
 
         $profileData = $validated['profile'] ?? [];
         unset($validated['profile']);
+        if ($request->filled('hire_date')) {
+            $hireDate = \Carbon\Carbon::parse($validated['hire_date'])->toDateString();
+            $validated['hire_date'] = $hireDate;
+            $validated['contract_start_date'] = $hireDate;
+            if (! $request->filled('contract_end_date')) {
+                $validated['contract_end_date'] = \Carbon\Carbon::parse($hireDate)->addYear()->toDateString();
+            }
+        }
         if (blank($validated['first_name'] ?? null)) {
             $nameParts = preg_split('/\s+/u', trim($validated['full_name']));
             $validated['first_name'] = $nameParts[0] ?? null;

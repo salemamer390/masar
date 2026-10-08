@@ -51,7 +51,7 @@ class DashboardDetailController extends Controller
             $payroll = $this->dashboard->payroll($user, $selectedMonth);
             $items = $payroll['run'] ? PayrollRecord::with('employee')->where('payroll_run_id', $payroll['run']->id)->whereIn('employee_id', $this->dashboard->employeesFor($user)->select('id'))->when($search, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', "%{$search}%")))->paginate(15)->withQueryString() : collect();
         } elseif ($type === 'documents-expiring') {
-            $items = $this->dashboard->expiringDocuments($user)->filter(fn ($doc) => !$search || str_contains(mb_strtolower(($doc->employee?->full_name ?? '').' '.($doc->type?->name ?? $doc->document_name)), mb_strtolower($search)))->values();
+            $items = $this->dashboard->expiringDocuments($user)->filter(fn ($item) => !$search || str_contains(mb_strtolower(($item['employee']?->full_name ?? '').' '.($item['label'] ?? '')), mb_strtolower($search)))->values();
             $items = new \Illuminate\Pagination\LengthAwarePaginator($items->forPage((int) $request->query('page', 1), 15)->values(), $items->count(), 15, (int) $request->query('page', 1), ['path' => $request->url(), 'query' => $request->query()]);
         } elseif ($type === 'documents-incomplete') {
             $items = collect($this->dashboard->documentCompleteness($user)['employees'])->filter(fn ($item) => $item['complete'] < $item['required'])->filter(fn ($item) => !$search || str_contains(mb_strtolower($item['employee']->full_name), mb_strtolower($search)))->values();

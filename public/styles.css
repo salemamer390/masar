@@ -136,5 +136,11 @@ button,.btn{transition:all .18s ease}
 
 .employee-salary-row{display:grid;grid-template-columns:1fr 1.2fr 1.2fr 1.1fr 1.1fr 1.1fr auto;gap:12px;align-items:center;padding:14px 16px;border:1px solid #edf1f5;border-radius:12px;margin-bottom:10px;background:#fff;transition:.15s}.employee-salary-row:hover{box-shadow:0 4px 16px rgba(0,0,0,.05);transform:translateY(-1px)}.employee-salary-row small{display:block;color:var(--muted);font-size:10px;margin-bottom:3px}.employee-salary-row b{font-size:12px}@media(max-width:900px){.employee-salary-row{grid-template-columns:1fr 1fr 1fr}.employee-salary-row>div:last-child{grid-column:1/-1}}
 
+/* Employee master form: the form owns the modal body, so it needs its own scroll container. */
+#employeeMasterModal .modal-dialog{height:calc(100% - 3.5rem)}
+#employeeMasterModal .modal-content{height:100%;overflow:hidden}
+#employeeMasterModal .employee-master-form{display:flex;flex-direction:column;min-height:0;height:100%}
+#employeeMasterModal .modal-body{overflow-y:auto;min-height:0}
+
 /* Salary Structure - truly compact cards */
 .salary-card-compact{min-height:0;padding:18px}.salary-card-key-metrics{margin-top:4px}.salary-card-key-metrics>div{padding:9px 10px}.salary-card-cost{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:11px 12px;background:#f8fafc;border:1px solid #edf1f5;border-radius:10px}.salary-card-cost span{font-size:10px;color:var(--muted)}.salary-card-cost strong{font-size:13px;color:#26364d}.salary-card-compact .salary-card-footer{margin-top:10px}.salary-card-compact .d-flex{margin-top:10px!important}

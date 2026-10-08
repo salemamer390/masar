@@ -420,7 +420,7 @@
 </div>
 
 @if(auth()->user()?->hasPermission('employees.edit'))
-<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}">@csrf @method('PUT')
+<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}" class="employee-master-form">@csrf @method('PUT')
 <div class="modal-header"><h5 class="modal-title">تعديل ملف الموظف: {{ $employee->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <input type="hidden" name="salary_source" id="employee_edit_salary_source" value=""><input type="hidden" name="salary_value" id="employee_edit_salary_value" value="">
 <div class="modal-body">
@@ -433,8 +433,8 @@
 </div></div>
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الوظيفية والعقد</h3><span>تُحفظ العلاقات بالمعرّفات وتظهر بالاسم.</span></div></div><div class="p-3 row g-3">
 <div class="col-md-3"><label class="form-label">القسم</label><select name="department_id" class="form-select"><option value="">—</option>@foreach($departments as $item)<option value="{{ $item->id }}" @selected(old('department_id',$employee->department_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">الوظيفة</label><select name="job_id" class="form-select"><option value="">—</option>@foreach($jobs as $item)<option value="{{ $item->id }}" @selected(old('job_id',$employee->job_id)==$item->id)>{{ $item->title }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">الفرع / مقر العمل</label><select name="branch_id" class="form-select"><option value="">—</option>@foreach($branches as $item)<option value="{{ $item->id }}" @selected(old('branch_id',$employee->branch_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">نوع التوظيف</label><select name="employment_type_id" class="form-select"><option value="">—</option>@foreach($employmentTypes as $item)<option value="{{ $item->id }}" @selected(old('employment_type_id',$employee->employment_type_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div>
-<div class="col-md-3"><label class="form-label">الحالة</label><select name="status_id" class="form-select"><option value="">—</option>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected(old('status_id',$employee->status_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">المدير المباشر</label><select name="manager_employee_id" class="form-select"><option value="">—</option>@foreach($managers as $item)<option value="{{ $item->id }}" @selected(old('manager_employee_id',$employee->manager_employee_id)==$item->id)>{{ $item->full_name }} (#{{ $item->employee_code }})</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">تاريخ التعيين</label><input type="date" name="hire_date" class="form-control" value="{{ old('hire_date',$employee->hire_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">نوع العقد</label><input name="profile[contract_type]" class="form-control" value="{{ old('profile.contract_type',$profile?->contract_type) }}"></div>
-<div class="col-md-3"><label class="form-label">بداية العقد</label><input type="date" name="contract_start_date" class="form-control" value="{{ old('contract_start_date',$employee->contract_start_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">نهاية العقد</label><input type="date" name="contract_end_date" class="form-control" value="{{ old('contract_end_date',$employee->contract_end_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">مدة العقد</label><input name="contract_duration" class="form-control" value="{{ old('contract_duration',$employee->contract_duration) }}"></div><div class="col-md-3"><label class="form-label">فترة التجربة</label><input name="profile[probation_period]" class="form-control" value="{{ old('profile.probation_period',$profile?->probation_period) }}"></div>
+<div class="col-md-3"><label class="form-label">الحالة</label><select name="status_id" class="form-select"><option value="">—</option>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected(old('status_id',$employee->status_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">المدير المباشر</label><select name="manager_employee_id" class="form-select"><option value="">—</option>@foreach($managers as $item)<option value="{{ $item->id }}" @selected(old('manager_employee_id',$employee->manager_employee_id)==$item->id)>{{ $item->full_name }} (#{{ $item->employee_code }})</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">تاريخ التعيين</label><input id="employee_hire_date" type="date" name="hire_date" class="form-control" value="{{ old('hire_date',$employee->hire_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">نوع العقد</label><input name="profile[contract_type]" class="form-control" value="{{ old('profile.contract_type',$profile?->contract_type) }}"></div>
+<div class="col-md-3"><label class="form-label">بداية العقد</label><input id="employee_contract_start_date" type="date" name="contract_start_date" class="form-control" value="{{ old('contract_start_date',$employee->contract_start_date?->format('Y-m-d')) }}" readonly></div><div class="col-md-3"><label class="form-label">نهاية العقد</label><input id="employee_contract_end_date" type="date" name="contract_end_date" class="form-control" value="{{ old('contract_end_date',$employee->contract_end_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">مدة العقد</label><input name="contract_duration" class="form-control" value="{{ old('contract_duration',$employee->contract_duration) }}" placeholder="سنة"></div><div class="col-md-3"><label class="form-label">فترة التجربة</label><input name="profile[probation_period]" class="form-control" value="{{ old('profile.probation_period',$profile?->probation_period) }}"></div>
 <div class="col-md-3"><label class="form-label">نمط العمل</label><input name="profile[work_pattern]" class="form-control" value="{{ old('profile.work_pattern',$profile?->work_pattern) }}"></div><div class="col-md-3"><label class="form-label">أيام العمل</label><input name="profile[weekly_work_days]" class="form-control" value="{{ old('profile.weekly_work_days',$profile?->weekly_work_days) }}"></div><div class="col-md-3"><label class="form-label">ساعات العمل يوميًا</label><input name="profile[daily_work_hours]" type="number" step="0.01" min="0" max="24" class="form-control" value="{{ old('profile.daily_work_hours',format_number($profile?->daily_work_hours)) }}"></div><div class="col-md-3"><label class="form-label">مواعيد العمل</label><input name="profile[working_hours_text]" class="form-control" value="{{ old('profile.working_hours_text',$profile?->working_hours_text) }}"></div>
 <div class="col-md-3"><label class="form-label">الإجازة السنوية</label><input name="profile[annual_leave_days]" type="number" step="0.01" min="0" class="form-control" value="{{ old('profile.annual_leave_days',format_number($profile?->annual_leave_days)) }}"></div><div class="col-md-3"><label class="form-label">حالة إرفاق العقد</label><input name="profile[contract_attachment_status]" class="form-control" value="{{ old('profile.contract_attachment_status',$profile?->contract_attachment_status) }}"></div><div class="col-md-3"><label class="form-label">العملة</label><input name="profile[currency]" class="form-control" value="{{ old('profile.currency',$profile?->currency) }}"></div>
 </div></div>
@@ -445,6 +445,26 @@
 @push('scripts')
 <script>
 (function(){
+    const hireDate=document.getElementById('employee_hire_date');
+    const contractStart=document.getElementById('employee_contract_start_date');
+    const contractEnd=document.getElementById('employee_contract_end_date');
+    let contractEndEdited=false;
+    function oneYearAfter(value){
+        if(!value) return '';
+        const date=new Date(value+'T00:00:00');
+        date.setFullYear(date.getFullYear()+1);
+        return date.toISOString().slice(0,10);
+    }
+    if(hireDate?.value){
+        if(!contractStart.value) contractStart.value=hireDate.value;
+        if(!contractEnd.value) contractEnd.value=oneYearAfter(hireDate.value);
+    }
+    contractEnd?.addEventListener('input',()=>{ contractEndEdited=true; });
+    hireDate?.addEventListener('change',()=>{
+        contractStart.value=hireDate.value;
+        if(!contractEndEdited) contractEnd.value=oneYearAfter(hireDate.value);
+    });
+
     const gross=document.getElementById('employee_edit_gross');
     const net=document.getElementById('employee_edit_net');
     const mode=document.getElementById('employee_edit_salary_source');

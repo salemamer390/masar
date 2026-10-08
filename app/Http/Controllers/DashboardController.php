@@ -60,7 +60,7 @@ class DashboardController extends Controller
 
         $attentionItems = [];
         if ($pendingRequests->isNotEmpty()) $attentionItems[] = ['key' => 'requests', 'title' => 'طلبات بانتظار القرار', 'count' => $pendingRequestsCount, 'description' => 'طلبات تحتاج مراجعة أو اعتمادًا.', 'icon' => 'calendar-event-fill', 'tone' => 'warning', 'url' => $requestsIndexUrl];
-        if ($expiringDocuments->isNotEmpty()) $attentionItems[] = ['key' => 'documents-expiring', 'title' => 'مستندات تنتهي قريبًا', 'count' => $expiringDocuments->count(), 'description' => 'تنتهي خلال 30 يومًا.', 'icon' => 'file-earmark-excel-fill', 'tone' => 'danger', 'url' => route('documents.index')];
+        if ($expiringDocuments->isNotEmpty()) $attentionItems[] = ['key' => 'documents-expiring', 'title' => 'مستندات أو عقود تنتهي قريبًا', 'count' => $expiringDocuments->count(), 'description' => 'تنتهي خلال 30 يومًا أو أقل.', 'icon' => 'file-earmark-excel-fill', 'tone' => 'danger', 'url' => route('documents.index')];
         if ($documents && $documents['incomplete']) $attentionItems[] = ['key' => 'documents-incomplete', 'title' => 'ملفات موظفين غير مكتملة', 'count' => $documents['incomplete'], 'description' => 'ينقصها مستند مطلوب واحد أو أكثر.', 'icon' => 'folder-x', 'tone' => 'warning', 'url' => route('employees.index')];
 
         $visibleModules = array_keys(array_filter(['employees' => $can('employees.view'), 'attendance' => $can('attendance.view'), 'leaves' => $can('leaves.view'), 'documents' => $can('documents.view'), 'payroll' => $can('payroll.view'), 'movements' => $can('movements.view')]));

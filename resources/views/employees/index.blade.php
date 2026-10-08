@@ -70,9 +70,23 @@
           <td>{{ $employee->department?->name ?? '—' }}</td>
           <td>
             @php($employeeStatus = $employee->status?->name ?? 'Active')
+            @if(auth()->user()?->hasPermission('employees.edit'))
+            <div class="dropdown">
+              <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave', 'Pending' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}
+              </button>
+              <ul class="dropdown-menu shadow-sm border-0 p-2">
+                @foreach($statuses as $status)
+                  @php($statusTone = match($status->name) { 'Leave', 'Pending' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' })
+                  <li><form method="POST" action="{{ route('employees.update', $employee) }}" onsubmit="return confirm('تأكيد تغيير حالة الموظف إلى: {{ $status->name }}؟')">@csrf @method('PUT')<input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_id" value="{{ $status->id }}"><button class="dropdown-item rounded-2 d-flex align-items-center gap-2" @disabled($employee->status_id == $status->id)><span class="badge-soft {{ $statusTone }}">{{ match($status->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $status->name } }}</span>@if($employee->status_id == $status->id)<i class="bi bi-check-lg ms-auto"></i>@endif</button></form></li>
+                @endforeach
+              </ul>
+            </div>
+            @else
             <span class="badge-soft {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}">
               {{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}
             </span>
+            @endif
           </td>
           <td>{{ $employee->hire_date?->format('d/m/Y') ?? '—' }}</td>
           <td>
@@ -123,8 +137,8 @@
           <div class="row g-2 mb-3">
             <div class="col-6">
               <label class="form-label">كود الموظف</label>
-              <input type="text" class="form-control" value="يُولَّد تلقائيًا بدءًا من 101" disabled>
-              <div class="form-text">كود ثابت لا يمكن تعديله بعد إنشاء الملف.</div>
+              <input type="text" name="employee_code" class="form-control" value="{{ old('employee_code') }}" placeholder="اختياري، مثل 101">
+              <div class="form-text">اختياري: أدخل كودًا خاصًا، أو اتركه فارغًا ليُولّده النظام تلقائيًا.</div>
             </div>
             <div class="col-6">
               <label class="form-label">الرقم القومي</label>
@@ -173,9 +187,16 @@
               <input type="email" name="email" class="form-control" placeholder="name@company.com">
             </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">تاريخ التعيين</label>
-            <input type="date" name="hire_date" class="form-control" value="{{ date('Y-m-d') }}">
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">تاريخ التعيين / بداية العقد</label>
+              <input id="new_employee_hire_date" type="date" name="hire_date" class="form-control" value="{{ old('hire_date', date('Y-m-d')) }}">
+            </div>
+            <div class="col-6">
+              <label class="form-label">تاريخ نهاية العقد</label>
+              <input id="new_employee_contract_end_date" type="date" name="contract_end_date" class="form-control" value="{{ old('contract_end_date', now()->addYear()->format('Y-m-d')) }}">
+              <div class="form-text">يُضبط تلقائيًا لسنة ويمكن تعديله.</div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -191,6 +212,22 @@
 @push('scripts')
 <script>
 (function () {
+    const hireDateInput = document.getElementById('new_employee_hire_date');
+    const contractEndInput = document.getElementById('new_employee_contract_end_date');
+    let contractEndEdited = false;
+    function oneYearAfter(value) {
+        if (!value) return '';
+        const date = new Date(value + 'T00:00:00');
+        date.setFullYear(date.getFullYear() + 1);
+        return date.toISOString().slice(0, 10);
+    }
+    contractEndInput?.addEventListener('input', () => { contractEndEdited = true; });
+    hireDateInput?.addEventListener('change', () => {
+        if (!contractEndEdited) contractEndInput.value = oneYearAfter(hireDateInput.value);
+        contractEndInput.min = hireDateInput.value;
+    });
+    if (hireDateInput && contractEndInput) contractEndInput.min = hireDateInput.value;
+
     const grossInput = document.getElementById('new_employee_gross');
     const netInput = document.getElementById('new_employee_net');
     const sourceInput = document.getElementById('new_employee_salary_source');

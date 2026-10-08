@@ -91,14 +91,33 @@ class DashboardDataService
         // Only the newest expiry per employee/type is actionable; obsolete copies are ignored.
         $latest = Document::query()->selectRaw('employee_id, COALESCE(document_type_id, 0) type_key, MAX(expiry_date) expiry_date')
             ->whereNotNull('expiry_date')->groupBy('employee_id', DB::raw('COALESCE(document_type_id, 0)'));
-        return Document::with(['employee', 'type'])->joinSub($latest, 'latest_docs', function ($join) {
+        $documents = Document::with(['employee', 'type'])->joinSub($latest, 'latest_docs', function ($join) {
                 $join->on('documents.employee_id', '=', 'latest_docs.employee_id')
                     ->on('documents.expiry_date', '=', 'latest_docs.expiry_date')
                     ->whereRaw('COALESCE(documents.document_type_id, 0) = latest_docs.type_key');
             })
             ->whereBetween('documents.expiry_date', [today(), today()->copy()->addDays($days)])
             ->whereIn('documents.employee_id', $this->employeesFor($user)->select('id'))
-            ->orderBy('documents.expiry_date')->get(['documents.*']);
+            ->orderBy('documents.expiry_date')->get(['documents.*'])
+            ->map(fn (Document $document) => [
+                'employee' => $document->employee,
+                'label' => $document->type?->name ?? $document->document_name,
+                'expiry_date' => $document->expiry_date,
+                'kind' => 'document',
+            ]);
+
+        $contracts = $this->activeEmployeesFor($user)
+            ->whereNotNull('contract_end_date')
+            ->whereBetween('contract_end_date', [today(), today()->copy()->addDays($days)])
+            ->get(['id', 'full_name', 'employee_code', 'contract_end_date'])
+            ->map(fn (Employee $employee) => [
+                'employee' => $employee,
+                'label' => 'عقد العمل',
+                'expiry_date' => $employee->contract_end_date,
+                'kind' => 'contract',
+            ]);
+
+        return $documents->concat($contracts)->sortBy('expiry_date')->values();
     }
 
     public function documentCompleteness(User $user): array
