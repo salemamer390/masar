@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\PaymentMethod;
+use App\Models\Department;
 use App\Models\Salary;
 use App\Services\PayrollCalculator;
 use App\Services\PayrollSettingsService;
@@ -24,12 +25,20 @@ class SalaryController extends Controller
         if ($request->filled('employee_id')) {
             $salariesQuery->where('employee_id', (int) $request->input('employee_id'));
         }
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $salariesQuery->whereHas('employee', fn ($q) => $q->where('full_name', 'like', "%{$search}%")->orWhere('employee_code', 'like', "%{$search}%"));
+        }
+        if ($request->filled('department_id')) {
+            $salariesQuery->whereHas('employee', fn ($q) => $q->where('department_id', (int) $request->input('department_id')));
+        }
         $salaries = $salariesQuery
             ->orderBy('effective_from', 'desc')
             ->orderBy('id', 'desc')
             ->get();
 
         $employees = Employee::with(['department', 'job'])->orderBy('full_name')->get();
+        $departments = Department::where('is_active', 1)->orderBy('name')->get();
         $paymentMethods = PaymentMethod::orderBy('name')->get();
         $allowanceRate = $this->settings->allowanceRate();
         $payrollSettings = [
@@ -52,7 +61,7 @@ class SalaryController extends Controller
             $this->syncBreakdown($salary, $calculator, false);
         }
 
-        return view('salaries.index', compact('salaries', 'employees', 'paymentMethods', 'allowanceRate', 'payrollSettings', 'allowanceDistribution', 'selectedEmployee'));
+        return view('salaries.index', compact('salaries', 'employees', 'departments', 'paymentMethods', 'allowanceRate', 'payrollSettings', 'allowanceDistribution', 'selectedEmployee'));
     }
 
     public function store(Request $request, PayrollCalculator $calculator)

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title','هيكل الرواتب')
 @section('content')
-<div class="page-head">
+<div class="page-head salary-page-head">
   <div><h1>هيكل الرواتب</h1><p>هيكل الراتب هو المصدر الثابت للراتب؛ المسير الشهري يأخذ منه القيم الثابتة ثم يضيف المدخلات الشهرية المعتمدة. المدخل الأساسي هو الراتب الإجمالي. النظام يوزع البدلات ويحسِب التأمين والضريبة والصافي وفق المواصفة المعتمدة.</p></div>
   <div class="d-flex gap-2 flex-wrap">
     @if(auth()->user()?->hasPermission('roles.view'))
@@ -15,6 +15,12 @@
     @endif
   </div>
 </div>
+
+<form method="GET" action="{{ route('salaries.index') }}" class="filter-bar salary-filter-bar">
+  <div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو كود الموظف"></div>
+  <select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select>
+  <button class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button><a href="{{ route('salaries.index') }}" class="btn btn-light">مسح</a>
+</form>
 
 <div class="panel mb-3">
   <div class="panel-head"><div><h3>منهج الحساب</h3><span>القيم التالية ثابتة طبقاً لمنطق حاسبة الرواتب المعتمدة.</span></div></div>
@@ -41,7 +47,7 @@
   <div class="salary-card salary-card-compact" data-bs-toggle="modal" data-bs-target="#salaryDetails{{ $s->id }}" role="button" tabindex="0" aria-label="عرض تفاصيل راتب {{ $s->employee?->full_name }}">
     <div class="salary-card-head">
       <div class="salary-employee">
-        <div class="salary-avatar"><i class="bi bi-person"></i></div>
+        <div class="salary-avatar">@if($s->employee?->profile_photo_url)<img src="{{ $s->employee->profile_photo_url }}" alt="{{ $s->employee->full_name }}">@else{{ $s->employee?->initials }}@endif</div>
         <div>
           <strong>{{ $s->employee?->full_name }}</strong>
           <div class="small text-muted">{{ $s->employee?->job?->title ?? '—' }} · {{ $s->employee?->department?->name ?? '—' }}</div>
