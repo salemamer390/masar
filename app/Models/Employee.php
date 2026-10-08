@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 class Employee extends Model
 {
@@ -18,6 +19,7 @@ class Employee extends Model
         'national_id',
         'phone',
         'email',
+        'profile_photo_path',
         'gross_salary',
         'gender',
         'marital_status',
@@ -159,5 +161,10 @@ class Employee extends Model
             return mb_strtoupper(mb_substr($parts[0], 0, 1) . mb_substr($parts[1], 0, 1));
         }
         return mb_strtoupper(mb_substr($this->full_name, 0, 2));
+    }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path ? Storage::disk('public')->url($this->profile_photo_path) : null;
     }
 }

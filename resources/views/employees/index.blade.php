@@ -74,7 +74,7 @@
           <td>#{{ $employee->employee_code }}</td>
           <td>
             <div class="employee-cell">
-              <span>{{ $employee->initials }}</span>
+              <span class="employee-avatar">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else{{ $employee->initials }}@endif</span>
               <a href="{{ route('employees.show', $employee) }}" class="employee-link text-decoration-none fw-bold">
                 {{ $employee->full_name }}
               </a>

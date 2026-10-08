@@ -23,7 +23,7 @@
                 @foreach($documentGroups as $groupKey=>$groupLabel)
                     <div class="master-group-title">{{$groupLabel}}</div>
                     @forelse($items->where('category',$groupKey) as $item)
-                        <div class="master-row master-document-row">
+                        <div class="master-row master-document-row document-type-card">
                             <b>{{$item->name}}</b>
                             <span>{{$item->is_required?'مطلوب لكل موظف':'حسب الحاجة'}}</span>
                             <div class="d-flex align-items-center justify-content-end gap-2">

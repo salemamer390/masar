@@ -10,7 +10,7 @@
     </a>
 
     <div class="profile-person">
-        <div class="profile-avatar">{{ $employee->initials }}</div>
+        <div class="profile-avatar">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else{{ $employee->initials }}@endif</div>
         <div>
             <h1>{{ $employee->full_name }}</h1>
             <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
@@ -453,11 +453,12 @@
 </div>
 
 @if(auth()->user()?->hasPermission('employees.edit'))
-<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}" class="employee-master-form">@csrf @method('PUT')
+<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}" class="employee-master-form" enctype="multipart/form-data">@csrf @method('PUT')
 <div class="modal-header"><h5 class="modal-title">تعديل ملف الموظف: {{ $employee->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <input type="hidden" name="salary_source" id="employee_edit_salary_source" value=""><input type="hidden" name="salary_value" id="employee_edit_salary_value" value="">
 <div class="modal-body">
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الشخصية</h3><span>مصدرها جدول الموظفين وتفاصيل الملف.</span></div></div><div class="p-3 row g-3">
+<div class="col-md-3"><label class="form-label">الصورة الشخصية</label><input name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp" class="form-control"><small class="text-muted">صورة JPG أو PNG أو WEBP حتى 5 ميجابايت.</small></div>
 <div class="col-md-4"><label class="form-label">الاسم الكامل</label><input name="full_name" class="form-control" value="{{ old('full_name',$employee->full_name) }}" required></div><div class="col-md-3"><label class="form-label">الاسم الأول</label><input name="first_name" class="form-control" value="{{ old('first_name',$employee->first_name) }}"></div><div class="col-md-3"><label class="form-label">الاسم الأوسط</label><input name="middle_name" class="form-control" value="{{ old('middle_name',$employee->middle_name) }}"></div><div class="col-md-2"><label class="form-label">اسم العائلة</label><input name="last_name" class="form-control" value="{{ old('last_name',$employee->last_name) }}"></div>
 <div class="col-md-3"><label class="form-label">الرقم القومي</label><input name="national_id" class="form-control" value="{{ old('national_id',$employee->national_id) }}"></div><div class="col-md-3"><label class="form-label">الجنسية</label><input name="profile[nationality]" class="form-control" value="{{ old('profile.nationality',$profile?->nationality) }}"></div><div class="col-md-3"><label class="form-label">النوع</label><input name="gender" class="form-control" value="{{ old('gender',$employee->gender) }}"></div><div class="col-md-3"><label class="form-label">تاريخ الميلاد</label><input name="birth_date" type="date" class="form-control" value="{{ old('birth_date',$employee->birth_date?->format('Y-m-d')) }}"></div>
 <div class="col-md-3"><label class="form-label">الهاتف</label><input name="phone" class="form-control" value="{{ old('phone',$employee->phone) }}"></div><div class="col-md-3"><label class="form-label">بريد العمل</label><input name="email" type="email" class="form-control" value="{{ old('email',$employee->email) }}"></div>

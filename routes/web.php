@@ -107,6 +107,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [LeaveController::class, 'store'])
             ->middleware('permission:leaves.create')
             ->name('store');
+          Route::put('/{leave}', [LeaveController::class, 'update'])
+             ->middleware('permission:leaves.edit')
+             ->name('update');
         Route::patch('/{leave}/approve', [LeaveController::class, 'approve'])
             ->middleware('permission:leaves.approve')
             ->name('approve');

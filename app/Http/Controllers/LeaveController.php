@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
+use App\Models\Department;
 use App\Services\HrOperationalSettingsService;
 use App\Services\EmployeeLeaveStatusService;
 use App\Services\PayrollPeriodGuard;
@@ -25,15 +26,59 @@ class LeaveController extends Controller
     {
         $query = Leave::with(['employee.department', 'leaveType'])->orderByDesc('start_date');
         if ($request->filled('status')) $query->where('status', $request->status);
+        if ($request->filled('employee_id')) $query->where('employee_id', $request->employee_id);
+        if ($request->filled('department_id')) $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id));
+        if ($request->filled('leave_type_id')) $query->where('leave_type_id', $request->leave_type_id);
+        if ($request->filled('from_date')) $query->whereDate('end_date', '>=', $request->from_date);
+        if ($request->filled('to_date')) $query->whereDate('start_date', '<=', $request->to_date);
         $leaves = $query->paginate(20)->withQueryString();
         $pendingLeaves = Leave::whereIn('status', ['Pending', 'Manager Approved'])->count();
         $approvedThisMonth = Leave::where('status', 'Approved')->whereMonth('start_date', now()->month)->whereYear('start_date', now()->year)->count();
         $totalDays = Leave::where('status', 'Approved')->sum('days');
         $onLeaveToday = Leave::where('status', 'Approved')->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today())->count();
+        $rejectedThisMonth = Leave::where('status', 'Rejected')->whereMonth('updated_at', now()->month)->whereYear('updated_at', now()->year)->count();
         $leaveTypes = LeaveType::where('is_active', 1)->get();
         $employees = Employee::orderBy('full_name')->get();
+        $departments = Department::where('is_active', 1)->orderBy('name')->get();
 
-        return view('leaves.index', compact('leaves', 'pendingLeaves', 'approvedThisMonth', 'totalDays', 'onLeaveToday', 'leaveTypes', 'employees'));
+        return view('leaves.index', compact('leaves', 'pendingLeaves', 'approvedThisMonth', 'totalDays', 'onLeaveToday', 'rejectedThisMonth', 'leaveTypes', 'employees', 'departments'));
+    }
+
+    public function update(Request $request, Leave $leave, PayrollPeriodGuard $periodGuard)
+    {
+        $data = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'leave_type_id' => ['required', 'exists:leave_types,id'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'reason' => ['nullable', 'string', 'max:500'],
+            'status' => ['required', 'in:Pending,Manager Approved,Approved,Rejected'],
+            'rejection_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+        $start = Carbon::parse($data['start_date']);
+        $end = Carbon::parse($data['end_date']);
+        $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
+        $periodGuard->ensureRangeOpen($start, $end);
+        $overlap = Leave::where('id', '!=', $leave->id)->where('employee_id', $data['employee_id'])
+            ->whereNotIn('status', ['Rejected', 'Ù…Ø±ÙÙˆØ¶Ø©'])
+            ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
+        if ($overlap) return back()->withErrors(['leave' => 'يوجد طلب إجازة متداخل مع هذه المدة.'])->withInput();
+        $days = $this->workingDays($start, $end);
+        if ($days < 1) return back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل.'])->withInput();
+        $oldValues = $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']);
+        $leave->update([
+            'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
+            'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days,
+            'reason' => $data['reason'] ?? null, 'status' => $data['status'],
+            'rejection_reason' => $data['status'] === 'Rejected' ? ($data['rejection_reason'] ?? null) : null,
+            'approved_by' => in_array($data['status'], ['Approved', 'Rejected'], true) ? auth()->id() : null,
+            'approved_at' => in_array($data['status'], ['Approved', 'Rejected'], true) ? now() : null,
+            'manager_approved_by' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? auth()->id() : null,
+            'manager_approved_at' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? now() : null,
+        ]);
+        $this->leaveStatus->sync();
+        ActivityLog::record('leave_update', 'Leave request updated.', $leave, $oldValues, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']), 'leaves');
+        return back()->with('toast', 'تم تحديث طلب الإجازة بنجاح.');
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)
@@ -87,9 +132,9 @@ class LeaveController extends Controller
     public function destroy(Leave $leave, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
-        abort_if(in_array($leave->status, ['Approved', 'Manager Approved'], true), 422, 'لا يمكن حذف طلب إجازة معتمد أو قيد اعتماد الموارد البشرية.');
         $snapshot = $leave->toArray();
         $leave->delete();
+        $this->leaveStatus->sync();
         ActivityLog::record('leave_delete', 'Leave request deleted.', null, $snapshot, null, 'leaves');
         return back()->with('toast', 'تم حذف طلب الإجازة.');
     }

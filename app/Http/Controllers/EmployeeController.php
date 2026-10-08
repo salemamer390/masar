@@ -15,6 +15,7 @@ use App\Models\Salary;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Services\PayrollSettingsService;
@@ -161,6 +162,7 @@ class EmployeeController extends Controller
             'national_id' => ['nullable', 'string', 'max:50', 'unique:employees,national_id'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
+            'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
             'salary_source' => ['nullable', 'in:gross,net'],
             'salary_value' => ['nullable', 'numeric', 'min:0.01'],
@@ -213,6 +215,9 @@ class EmployeeController extends Controller
             $this->createSalaryStructureFromEmployee($employee);
             return $employee;
         });
+        if ($request->hasFile('profile_photo')) {
+            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+        }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
 
         if ($request->wantsJson()) {
@@ -236,6 +241,7 @@ class EmployeeController extends Controller
             'national_id' => ['nullable', 'string', 'max:50', 'unique:employees,national_id,'.$employee->id],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
+            'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
             'salary_source' => ['nullable', 'in:gross,net'],
             'salary_value' => ['nullable', 'numeric', 'min:0.01'],
@@ -284,6 +290,13 @@ class EmployeeController extends Controller
 
         $profileData = $validated['profile'] ?? [];
         unset($validated['profile']);
+        unset($validated['profile_photo']);
+        if ($request->hasFile('profile_photo')) {
+            if ($employee->profile_photo_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($employee->profile_photo_path);
+            }
+            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public');
+        }
         if ($request->filled('hire_date')) {
             $hireDate = \Carbon\Carbon::parse($validated['hire_date'])->toDateString();
             $validated['hire_date'] = $hireDate;
