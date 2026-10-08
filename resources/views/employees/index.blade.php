@@ -181,12 +181,12 @@
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">الراتب الإجمالي (Gross)</label>
+              <label class="form-label">الراتب الإجمالي</label>
               <input type="number" id="new_employee_gross" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 28118.56">
               <div class="form-text">أدخل الإجمالي ليُحسب الصافي فورًا.</div>
             </div>
             <div class="col-6">
-              <label class="form-label">الراتب الصافي (Net)</label>
+              <label class="form-label">الراتب الصافي</label>
               <input type="number" id="new_employee_net" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 22000">
               <div class="form-text">أو أدخل الصافي ليُحسب الإجمالي فورًا. يُحفظ الإجمالي فقط.</div>
             </div>

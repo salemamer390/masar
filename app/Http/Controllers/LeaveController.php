@@ -55,7 +55,7 @@ class LeaveController extends Controller
         if ($days < 1) return back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'])->withInput();
         $leave = Leave::create($data + ['start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days, 'status' => 'Pending']);
         ActivityLog::record('leave_create', 'Leave request created.', $leave, null, $leave->toArray(), 'leaves');
-        return back()->with('toast', 'Leave request created.');
+        return back()->with('toast', 'تم إنشاء طلب الإجازة بنجاح.');
     }
 
     public function approve(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
@@ -65,13 +65,13 @@ class LeaveController extends Controller
         if ($leave->status === 'Pending') {
             $leave->update(['status' => 'Manager Approved', 'manager_approved_by' => auth()->id(), 'manager_approved_at' => now()]);
             ActivityLog::record('leave_manager_approve', 'Leave request approved by manager.', $leave, $oldValues, $leave->only(['status', 'manager_approved_by', 'manager_approved_at']), 'leaves');
-            return back()->with('toast', 'Leave request moved to HR review.');
+            return back()->with('toast', 'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.');
         }
-        if ($leave->status !== 'Manager Approved') return back()->withErrors(['leave' => 'Leave request cannot be approved in its current state.']);
+        if ($leave->status !== 'Manager Approved') return back()->withErrors(['leave' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.']);
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
-        return back()->with('toast', 'Leave request approved.');
+        return back()->with('toast', 'تم اعتماد طلب الإجازة بنجاح.');
     }
 
     public function reject(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
@@ -81,17 +81,17 @@ class LeaveController extends Controller
         $oldValues = $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']);
         $leave->update(['status' => 'Rejected', 'approved_by' => auth()->id(), 'approved_at' => now(), 'rejection_reason' => $data['rejection_reason'] ?? null]);
         ActivityLog::record('leave_reject', 'Leave request rejected.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']), 'leaves');
-        return back()->with('toast', 'Leave request rejected.');
+        return back()->with('toast', 'تم رفض طلب الإجازة.');
     }
 
     public function destroy(Leave $leave, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
-        abort_if(in_array($leave->status, ['Approved', 'Manager Approved'], true), 422, 'Approved leave requests cannot be deleted.');
+        abort_if(in_array($leave->status, ['Approved', 'Manager Approved'], true), 422, 'لا يمكن حذف طلب إجازة معتمد أو قيد اعتماد الموارد البشرية.');
         $snapshot = $leave->toArray();
         $leave->delete();
         ActivityLog::record('leave_delete', 'Leave request deleted.', null, $snapshot, null, 'leaves');
-        return back()->with('toast', 'Leave request deleted.');
+        return back()->with('toast', 'تم حذف طلب الإجازة.');
     }
 
     private function workingDays(Carbon $start, Carbon $end): int

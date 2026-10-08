@@ -77,12 +77,47 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+  // Convert internal English values to Arabic at presentation time only.
+  // Stored codes remain unchanged because application logic relies on them.
+  const arabicUiLabels = {
+    'Active':'نشط', 'Inactive':'غير نشط', 'Pending':'قيد الانتظار',
+    'Manager Approved':'بانتظار اعتماد الموارد البشرية', 'Approved':'معتمد',
+    'Rejected':'مرفوض', 'Draft':'مسودة', 'Locked':'مقفل', 'Paid':'تم الصرف',
+    'Required':'مطلوب', 'Completed':'مكتمل', 'Under Review':'قيد المراجعة',
+    'Present':'حاضر', 'Late':'متأخر', 'Absent':'غائب', 'Leave':'إجازة',
+    'On Leave':'في إجازة', 'manual':'إدخال يدوي', 'device':'جهاز حضور',
+    'api':'تكامل نظامي', 'Gross':'الراتب الإجمالي', 'Net':'الراتب الصافي',
+    'Gross Salary':'الراتب الإجمالي', 'Payroll Payslip':'قسيمة راتب',
+    'Leave request created.':'تم إنشاء طلب الإجازة بنجاح.',
+    'Leave request moved to HR review.':'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.',
+    'Leave request approved.':'تم اعتماد طلب الإجازة بنجاح.',
+    'Leave request rejected.':'تم رفض طلب الإجازة.',
+    'Leave request deleted.':'تم حذف طلب الإجازة.',
+    'Insurance record saved.':'تم حفظ بيانات التأمين بنجاح.',
+    'Insurance record updated.':'تم تحديث بيانات التأمين بنجاح.',
+    'Payroll run generated in Draft status.':'تم إنشاء مسير الرواتب كمسودة.',
+    'Payroll run approved.':'تم اعتماد مسير الرواتب.',
+    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.'
+  };
+  function translateInterfaceText(root = document.body) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const source = node.nodeValue;
+      const compact = source.trim();
+      if (!arabicUiLabels[compact]) return;
+      node.nodeValue = source.replace(compact, arabicUiLabels[compact]);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
+
   // Global Toast function matching prototype
   function showToast(msg) {
     const textEl = document.getElementById('toastText');
     const toastEl = document.getElementById('liveToast');
     if (textEl && toastEl) {
-      textEl.textContent = msg;
+      textEl.textContent = arabicUiLabels[msg] || msg;
       const toast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 2500 });
       toast.show();
     }

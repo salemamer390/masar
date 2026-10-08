@@ -2,7 +2,7 @@
 @section('title','هيكل الرواتب')
 @section('content')
 <div class="page-head">
-  <div><h1>هيكل الرواتب</h1><p>هيكل الراتب هو المصدر الثابت للراتب؛ المسير الشهري يأخذ منه القيم الثابتة ثم يضيف المدخلات الشهرية المعتمدة. المدخل الأساسي هو الإجمالي (Gross). النظام يوزع البدلات ويحسِب التأمين والضريبة والصافي وفق المواصفة المعتمدة.</p></div>
+  <div><h1>هيكل الرواتب</h1><p>هيكل الراتب هو المصدر الثابت للراتب؛ المسير الشهري يأخذ منه القيم الثابتة ثم يضيف المدخلات الشهرية المعتمدة. المدخل الأساسي هو الراتب الإجمالي. النظام يوزع البدلات ويحسِب التأمين والضريبة والصافي وفق المواصفة المعتمدة.</p></div>
   <div class="d-flex gap-2 flex-wrap">
     @if(auth()->user()?->hasPermission('roles.view'))
     <a class="btn btn-light" href="{{ route('master.index',['type'=>'payment']) }}"><i class="bi bi-gear"></i> إعدادات طرق الصرف</a>
@@ -19,7 +19,7 @@
 <div class="panel mb-3">
   <div class="panel-head"><div><h3>منهج الحساب</h3><span>القيم التالية ثابتة طبقاً لمنطق حاسبة الرواتب المعتمدة.</span></div></div>
   <div class="salary-detail-grid">
-    <div><span>الراتب المدخل</span><strong>Net</strong></div>
+    <div><span>الراتب المدخل</span><strong>الراتب الصافي</strong></div>
     <div><span>نسبة البدلات من الأساسي</span><strong>{{ format_number($allowanceRate) }}%</strong></div>
     <div><span>حصة العامل</span><strong>{{ format_number($payrollSettings['employee_insurance_rate']) }}%</strong></div>
     <div><span>حصة صاحب العمل</span><strong>{{ format_number($payrollSettings['employer_insurance_rate']) }}%</strong></div>
@@ -52,11 +52,11 @@
 
     <div class="salary-main-number">
       {{ format_money($s->salary_input) }} <small>ج.م</small>
-      <span>{{ $s->salary_type === 'net' ? 'الأجر الصافي (Net)' : 'الإجمالي المعتمد' }}</span>
+      <span>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</span>
     </div>
 
     <div class="salary-compact-grid salary-card-key-metrics">
-      <div><span>Gross</span><b>{{ format_money($s->gross_salary) }}</b></div>
+      <div><span>الراتب الإجمالي</span><b>{{ format_money($s->gross_salary) }}</b></div>
       <div><span>إجمالي البدلات</span><b>{{ format_money($s->allowances) }}</b></div>
       <div><span>حصة العامل</span><b>{{ format_money($s->employee_insurance) }}</b></div>
       <div><span>الضريبة</span><b>{{ format_money($s->income_tax) }}</b></div>
@@ -91,8 +91,8 @@
     </div>
     <div class="modal-body">
       <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-cash-stack"></i><span>الراتب والبدلات</span></div><div class="salary-detail-grid">
-        <div><span>{{ $s->salary_type === 'net' ? 'الأجر الصافي (Net)' : 'الإجمالي المعتمد' }}</span><strong>{{ format_money($s->salary_input) }} ج.م</strong></div>
-        <div><span>Gross</span><strong>{{ format_money($s->gross_salary) }} ج.م</strong></div>
+        <div><span>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</span><strong>{{ format_money($s->salary_input) }} ج.م</strong></div>
+        <div><span>الراتب الإجمالي</span><strong>{{ format_money($s->gross_salary) }} ج.م</strong></div>
         <div><span>الأجر الأساسي</span><strong>{{ format_money($s->basic_salary) }} ج.م</strong></div>
         <div><span>إجمالي البدلات ({{ format_number($s->allowance_limit_pct) }}%)</span><strong>{{ format_money($s->allowance_limit) }} ج.م</strong></div>
         <div><span>بدل انتقال</span><strong>{{ format_money($s->transportation_allowance) }} ج.م</strong></div>
@@ -114,7 +114,7 @@
         <div><span>صندوق الشهداء {{ format_number($payrollSettings['martyrs_fund_rate']) }}%</span><strong>{{ format_money($s->martyrs_fund) }} ج.م</strong></div>
         <div><span>استقطاعات ثابتة</span><strong>{{ format_money($s->fixed_deductions) }} ج.م</strong></div>
         <div><span>إجمالي الاستقطاعات</span><strong>{{ format_money($s->total_deductions) }} ج.م</strong></div>
-        <div><span>Net النهائي</span><strong class="text-success">{{ format_money($s->net_salary) }} ج.م</strong></div>
+        <div><span>صافي الراتب النهائي</span><strong class="text-success">{{ format_money($s->net_salary) }} ج.م</strong></div>
       </div></div>
       <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-building"></i><span>تكلفة الشركة</span></div><div class="salary-cost-box"><div><span>حصة صاحب العمل</span><b>{{ format_money($s->employer_insurance) }} ج.م</b></div><div><span>إجمالي تكلفة الموظف</span><b>{{ format_money($s->employee_cost) }} ج.م</b></div></div></div>
       @if($s->notes)<div class="alert alert-light border mt-3 mb-0"><strong>ملاحظات:</strong> {{ $s->notes }}</div>@endif
@@ -129,13 +129,13 @@
 <input type="hidden" name="salary_type" value="gross">
 <div class="modal-header"><h5 class="modal-title">إضافة هيكل راتب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <div class="modal-body">
-  <div class="alert alert-primary mb-3"><b>الإجمالي (Gross) هو المدخل الأساسي.</b> الأساسي والبدلات الأربعة تُوزع تلقائياً من الإجمالي حسب إعدادات النظام.</div>
+  <div class="alert alert-primary mb-3"><b>الراتب الإجمالي هو المدخل الأساسي.</b> الأساسي والبدلات الأربعة تُوزع تلقائياً من الإجمالي حسب إعدادات النظام.</div>
   <div class="row g-3">
     <div class="col-md-6"><label class="form-label">الموظف</label><select name="employee_id" id="salary_employee_id" class="form-select" required><option value="">اختر الموظف</option>@foreach($employees as $e)<option value="{{ $e->id }}" data-gross="{{ $e->gross_salary ?? '' }}">{{ $e->full_name }} — {{ $e->job?->title ?? 'بدون وظيفة' }}</option>@endforeach</select></div>
     <div class="col-md-3"><label class="form-label">تاريخ السريان</label><input name="effective_from" type="date" class="form-control" value="{{ date('Y-m-d') }}" required></div>
     <div class="col-md-3"><label class="form-label">طريقة الصرف</label><select name="payment_method_id" class="form-select"><option value="">اختر</option>@foreach($paymentMethods as $m)<option value="{{ $m->id }}">{{ $m->name }}</option>@endforeach</select></div>
-    <div class="col-md-4"><label class="form-label">الإجمالي الشهري (Gross) — من ملف الموظف</label><input id="salary_input" name="salary_input" type="number" step="0.01" min="0.01" class="form-control calc-input" readonly required><div class="form-text">يُقرأ تلقائيًا من employees.gross_salary.</div></div>
-    <div class="col-md-4"><label class="form-label">Gross المحسوب</label><input id="gross_display" type="text" class="form-control" readonly value="—"></div>
+    <div class="col-md-4"><label class="form-label">الراتب الإجمالي الشهري — من ملف الموظف</label><input id="salary_input" name="salary_input" type="number" step="0.01" min="0.01" class="form-control calc-input" readonly required><div class="form-text">يُقرأ تلقائيًا من الراتب الإجمالي في ملف الموظف.</div></div>
+    <div class="col-md-4"><label class="form-label">الراتب الإجمالي المحسوب</label><input id="gross_display" type="text" class="form-control" readonly value="—"></div>
     <div class="col-md-4"><label class="form-label">الأجر الأساسي</label><input id="basic_display" type="text" class="form-control" readonly value="—"></div>
   </div>
 

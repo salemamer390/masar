@@ -47,19 +47,19 @@ class PayrollController extends Controller
     {
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $service->generate($month);
-        return back()->with('toast', 'Payroll run generated in Draft status.');
+        return back()->with('toast', 'تم إنشاء مسير الرواتب كمسودة.');
     }
 
     public function approveRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
         $service->approve($payrollRun);
-        return back()->with('toast', 'Payroll run approved.');
+        return back()->with('toast', 'تم اعتماد مسير الرواتب.');
     }
 
     public function lockRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
         $service->lock($payrollRun);
-        return back()->with('toast', 'Payroll run locked.');
+        return back()->with('toast', 'تم قفل مسير الرواتب نهائيًا.');
     }
 
     public function approve(PayrollRecord $payrollRecord)

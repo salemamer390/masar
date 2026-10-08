@@ -56,3 +56,22 @@ if (! function_exists('format_money')) {
         return number_format(round($number, 0, PHP_ROUND_HALF_UP), 0, '.', ',');
     }
 }
+
+if (! function_exists('arabic_label')) {
+    /** Translate internal system values for display without changing stored data. */
+    function arabic_label(mixed $value): string
+    {
+        $value = (string) ($value ?? '');
+
+        return [
+            'Active' => 'نشط', 'Inactive' => 'غير نشط', 'Pending' => 'قيد الانتظار',
+            'Manager Approved' => 'بانتظار اعتماد الموارد البشرية', 'Approved' => 'معتمد',
+            'Rejected' => 'مرفوض', 'Draft' => 'مسودة', 'Locked' => 'مقفل',
+            'Paid' => 'تم الصرف', 'Required' => 'مطلوب', 'Completed' => 'مكتمل',
+            'Under Review' => 'قيد المراجعة', 'Present' => 'حاضر', 'Late' => 'متأخر',
+            'Absent' => 'غائب', 'Leave' => 'إجازة', 'On Leave' => 'في إجازة',
+            'manual' => 'إدخال يدوي', 'device' => 'جهاز حضور', 'api' => 'تكامل نظامي',
+            'Gross' => 'الراتب الإجمالي', 'Net' => 'الراتب الصافي',
+        ][$value] ?? $value;
+    }
+}

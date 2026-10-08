@@ -29,7 +29,7 @@ class InsuranceController extends Controller
         });
         Salary::syncInsuredSalary((int) $record->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record created or updated.', $record, null, $record->toArray(), 'insurance');
-        return back()->with('toast', 'Insurance record saved.');
+        return back()->with('toast', 'تم حفظ بيانات التأمين بنجاح.');
     }
 
     public function update(Request $request, InsuranceRecord $insuranceRecord)
@@ -42,7 +42,7 @@ class InsuranceController extends Controller
         });
         Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record updated.', $insuranceRecord, $old, $insuranceRecord->fresh()->toArray(), 'insurance');
-        return back()->with('toast', 'Insurance record updated.');
+        return back()->with('toast', 'تم تحديث بيانات التأمين بنجاح.');
     }
 
     private function validateRecord(Request $request, bool $creating): array
