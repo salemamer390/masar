@@ -3,15 +3,20 @@
 namespace App\Services\Payroll;
 
 use Illuminate\Support\Facades\DB;
+use App\Services\PayrollSettingsService;
 
 class TaxEngine
 {
+    public function __construct(private ?PayrollSettingsService $settingsService = null)
+    {
+        $this->settingsService ??= new PayrollSettingsService();
+    }
+
     public function personalExemption(): float
     {
-        $value = DB::getSchemaBuilder()->hasTable('tax_settings')
-            ? DB::table('tax_settings')->where('setting_key', 'personal_exemption')->value('setting_value')
-            : null;
-        return $value !== null ? (float) $value : (float) config('payroll.tax.personal_exemption', 20000);
+        // TaxEngine operates on annual income, while the unified setting is
+        // deliberately stored as a monthly amount for PayrollCalculator.
+        return $this->settingsService->personalExemption() * 12;
     }
 
     public function settings(): array

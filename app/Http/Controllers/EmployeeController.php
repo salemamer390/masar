@@ -175,6 +175,9 @@ class EmployeeController extends Controller
             $validated['employee_code'] = (string) max(101, ((int) $lastCode) + 1);
 
             $employee = Employee::create($validated);
+            // Keep every employee compatible with the full profile screen,
+            // even when optional profile fields have not been entered yet.
+            $employee->profileDetail()->create([]);
             $this->createSalaryStructureFromEmployee($employee);
             return $employee;
         });
