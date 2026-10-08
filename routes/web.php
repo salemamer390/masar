@@ -262,6 +262,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/{type}', [MasterDataController::class, 'store'])
             ->middleware('permission:roles.edit')
             ->name('store');
+        Route::put('/documents/{documentType}', [MasterDataController::class, 'updateDocument'])
+            ->middleware('permission:roles.edit')
+            ->name('documents.update');
+        Route::delete('/documents/{documentType}', [MasterDataController::class, 'destroyDocument'])
+            ->middleware('permission:roles.edit')
+            ->name('documents.destroy');
     });
 
     // Reports

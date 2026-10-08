@@ -85,7 +85,7 @@ class MasterDataController extends Controller
             ],
             'documents' => [
                 'title' => 'أنواع المستندات',
-                'desc' => 'أنواع المستندات المطلوبة في ملف الموظف.',
+                'desc' => 'مستندات أساسية، ومستندات خاصة بالوظيفة، ومستندات خاصة بمكتب العمل.',
                 'model' => DocumentType::class,
                 'name_col' => 'name',
                 'code_col' => 'is_required',
@@ -149,6 +149,7 @@ class MasterDataController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'code' => ['nullable', 'string', 'max:50'],
+            'category' => $type === 'documents' ? ['required', 'in:basic,job,workplace'] : ['nullable'],
         ]);
 
         $currentMeta = $meta[$type];
@@ -165,6 +166,7 @@ class MasterDataController extends Controller
             $data['default_days'] = (float) $request->code;
         } elseif ($type === 'documents') {
             $data['is_required'] = $request->boolean('required');
+            $data['category'] = $request->input('category', 'basic');
             $data['is_active'] = true;
         }
 
@@ -180,5 +182,38 @@ class MasterDataController extends Controller
         }
 
         return redirect()->route('master.index', ['type' => $type])->with('toast', 'تمت إضافة العنصر بنجاح');
+    }
+
+    public function updateDocument(Request $request, DocumentType $documentType)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'category' => ['required', 'in:basic,job,workplace'],
+            'required' => ['nullable', 'boolean'],
+        ]);
+
+        $documentType->update([
+            'name' => $validated['name'],
+            'category' => $validated['category'],
+            'is_required' => $request->boolean('required'),
+        ]);
+
+        ActivityLog::record('document_type_update', "تم تعديل نوع المستند ({$documentType->name}).", $documentType);
+
+        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم تعديل نوع المستند بنجاح');
+    }
+
+    public function destroyDocument(DocumentType $documentType)
+    {
+        if ($documentType->documents()->exists()) {
+            return redirect()->route('master.index', ['type' => 'documents'])
+                ->with('error', 'لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.');
+        }
+
+        $name = $documentType->name;
+        $documentType->delete();
+        ActivityLog::record('document_type_delete', "تم حذف نوع المستند ({$name}).");
+
+        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم حذف نوع المستند بنجاح');
     }
 }

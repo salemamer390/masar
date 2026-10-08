@@ -95,6 +95,15 @@
         </div>
     </div>
 
+    <section class="panel profile-panel mt-3 profile-completion {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
+        <div class="panel-head"><div><h3><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-x-fill' }}"></i> اكتمال ملف الموظف</h3><span>{{ $profileCompletion['complete'] ? 'البيانات الأساسية والمستندات المطلوبة مكتملة.' : 'لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.' }}</span></div>@if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeMasterModal">استكمال البيانات</button>@endif</div>
+        @if($profileCompletion['complete'])
+            <div class="p-3 text-success small"><i class="bi bi-check-circle-fill"></i> الملف جاهز للتشغيل والمتابعة.</div>
+        @else
+            <div class="p-3 row g-3"><div class="col-md-6"><b class="d-block mb-2">بيانات ناقصة</b><div class="completion-list">@forelse($profileCompletion['missing_fields'] as $field)<span><i class="bi bi-dot"></i>{{ $field }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> البيانات الأساسية مكتملة</span>@endforelse</div></div><div class="col-md-6"><b class="d-block mb-2">مستندات مطلوبة ناقصة أو غير صالحة</b><div class="completion-list">@forelse($profileCompletion['missing_documents'] as $document)<span><i class="bi bi-dot"></i>{{ $document }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> المستندات المطلوبة مكتملة</span>@endforelse</div></div></div>
+        @endif
+    </section>
+
     <div class="profile-grid mt-3">
         <div class="panel profile-panel">
             <div class="panel-head"><h3>جهات اتصال الطوارئ</h3></div>
@@ -283,12 +292,30 @@
         @endif
     </div>
 
+    @php($registeredDocumentTypeIds = $employee->documents->pluck('document_type_id')->filter()->unique())
     <div class="documents-card-grid">
+        @foreach($requiredDocumentTypes->whereNotIn('id', $registeredDocumentTypeIds) as $documentType)
+            <div class="doc-card missing required-document-card">
+                <div class="doc-card-head">
+                    <span class="doc-number"><i class="bi bi-exclamation-circle"></i></span>
+                    <div class="doc-card-title"><button type="button" @if(auth()->user()?->hasPermission('documents.upload')) onclick='openRequiredDocument({{ $documentType->id }}, @json($documentType->name))' @endif>{{ $documentType->name }}</button></div>
+                </div>
+                <div class="doc-status"><span class="badge-soft danger">مطلوب لكل موظف</span></div>
+                <div class="doc-thumb"><div class="doc-thumb-placeholder"><i class="bi bi-cloud-arrow-up"></i><span>لم يتم رفع المستند</span></div></div>
+                <div class="doc-file">{{ ['basic'=>'مستند أساسي','job'=>'مستند خاص بالوظيفة','workplace'=>'مستند خاص بمكتب العمل'][$documentType->category] ?? 'مستند مطلوب' }}</div>
+                <div class="doc-meta">ارفعه لإكمال ملف الموظف</div>
+                <div class="doc-card-actions">
+                    @if(auth()->user()?->hasPermission('documents.upload'))
+                        <button class="btn btn-sm btn-primary" type="button" onclick='openRequiredDocument({{ $documentType->id }}, @json($documentType->name))'><i class="bi bi-upload"></i> رفع المستند</button>
+                    @endif
+                </div>
+            </div>
+        @endforeach
         @forelse($employee->documents as $d)
             <div class="doc-card {{ in_array($d->status,['مطلوب','Required']) ? 'missing' : '' }}">
                 <div class="doc-card-head">
                     <span class="doc-number">#{{ $d->id }}</span>
-                    <div class="doc-card-title"><button type="button" data-doc-name="{{ $d->id }}" @if($d->file_path) onclick="window.open('{{ route('documents.preview',$d) }}','_blank')" @elseif(auth()->user()?->hasPermission('documents.upload')) onclick="openDocument({{ $d->id }})" @endif>{{ $d->document_name }}</button></div>
+                    <div class="doc-card-title"><button type="button" data-doc-name="{{ $d->id }}" @if($d->file_path) onclick="window.open('{{ route('documents.preview',$d) }}','_blank')" @elseif(auth()->user()?->hasPermission('documents.upload')) onclick='openDocument({{ $d->id }}, @json($d->document_name), @json($d->document_type_id), @json($d->expiry_date?->format('Y-m-d')))' @endif>{{ $d->document_name }}</button></div>
                 </div>
                 <div class="doc-status"><span class="badge-soft {{ $d->status_badge_class }}">{{ $d->status }}</span></div>
                 <div class="doc-thumb">
@@ -319,12 +346,14 @@
                             </form>
                         @endif
                     @elseif(auth()->user()?->hasPermission('documents.upload'))
-                        <button class="btn btn-sm btn-primary" type="button" onclick="openDocument({{ $d->id }})">رفع</button>
+                        <button class="btn btn-sm btn-primary" type="button" onclick='openDocument({{ $d->id }}, @json($d->document_name), @json($d->document_type_id), @json($d->expiry_date?->format('Y-m-d')))'>رفع</button>
                     @endif
                 </div>
             </div>
         @empty
-            <div class="empty-page w-100"><div class="empty-icon"><i class="bi bi-folder-plus"></i></div><h2>لا توجد مسوغات</h2><p>أضف أول مسوغ لهذا الموظف.</p></div>
+            @if($requiredDocumentTypes->whereNotIn('id', $registeredDocumentTypeIds)->isEmpty())
+                <div class="empty-page w-100"><div class="empty-icon"><i class="bi bi-folder-plus"></i></div><h2>لا توجد مسوغات</h2><p>أضف أول مسوغ لهذا الموظف.</p></div>
+            @endif
         @endforelse
     </div>
 
@@ -340,9 +369,9 @@
                         <input id="documentName" name="document_name" class="form-control mb-3" required>
                         <input type="hidden" id="documentId" name="document_id">
                         <label class="form-label">نوع المستند</label>
-                        <select name="document_type_id" class="form-select mb-3"><option value="">غير محدد</option>@foreach($documentTypes as $documentType)<option value="{{ $documentType->id }}">{{ $documentType->name }} @if($documentType->is_required) (مطلوب) @endif</option>@endforeach</select>
+                        <select id="documentTypeId" name="document_type_id" class="form-select mb-3"><option value="">غير محدد</option>@foreach(['basic'=>'مستندات أساسية','job'=>'مستندات خاصة بالوظيفة','workplace'=>'مستندات خاصة بمكتب العمل'] as $categoryKey=>$categoryLabel)<optgroup label="{{ $categoryLabel }}">@foreach($documentTypes->where('category',$categoryKey) as $documentType)<option value="{{ $documentType->id }}">{{ $documentType->name }} @if($documentType->is_required) (مطلوب) @endif</option>@endforeach</optgroup>@endforeach</select>
                         <label class="form-label">تاريخ انتهاء الصلاحية</label>
-                        <input type="date" name="expiry_date" class="form-control mb-3">
+                        <input id="documentExpiryDate" type="date" name="expiry_date" class="form-control mb-3">
                         <label class="form-label">الملف</label>
                         <input name="document_file" type="file" class="form-control" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx">
                         <small class="text-muted">الحد الأقصى 10 ميجابايت.</small>
@@ -512,6 +541,25 @@
         }
     });
 })();
+
+window.openDocument = function (documentId, documentName = '', documentTypeId = '', expiryDate = '') {
+    const nameInput = document.getElementById('documentName');
+    const idInput = document.getElementById('documentId');
+    const typeInput = document.getElementById('documentTypeId');
+    const expiryInput = document.getElementById('documentExpiryDate');
+    const modalElement = document.getElementById('documentModal');
+    if (!modalElement) return;
+
+    nameInput.value = documentName || '';
+    idInput.value = documentId || '';
+    typeInput.value = documentTypeId || '';
+    expiryInput.value = expiryDate || '';
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+};
+
+window.openRequiredDocument = function (documentTypeId, documentName) {
+    window.openDocument('', documentName, documentTypeId, '');
+};
 </script>
 @endpush
 @endsection

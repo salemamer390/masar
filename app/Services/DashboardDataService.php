@@ -18,7 +18,10 @@ use Illuminate\Support\Facades\DB;
 /** A single source of truth for dashboard aggregates and drill-down queries. */
 class DashboardDataService
 {
-    public function __construct(private readonly HrOperationalSettingsService $settings) {}
+    public function __construct(
+        private readonly HrOperationalSettingsService $settings,
+        private readonly EmployeeProfileCompletionService $profileCompletion,
+    ) {}
 
     public function employeesFor(User $user): Builder
     {
@@ -39,11 +42,22 @@ class DashboardDataService
             ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date));
     }
 
+    /** Employees expected to have an attendance state today, including approved leave. */
+    public function attendanceEmployeesFor(User $user, ?Carbon $date = null): Builder
+    {
+        $date ??= today();
+
+        return $this->employeesFor($user)
+            ->whereHas('status', fn (Builder $q) => $q->whereIn('name', ['Active', 'نشط', 'Leave', 'إجازة']))
+            ->where(fn (Builder $q) => $q->whereNull('hire_date')->orWhereDate('hire_date', '<=', $date))
+            ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date));
+    }
+
     public function attendance(User $user, ?Carbon $date = null): array
     {
         $date ??= today();
         $holiday = DB::table('hr_holidays')->whereDate('holiday_date', $date)->exists();
-        $employees = $this->activeEmployeesFor($user, $date)->get(['id', 'full_name', 'employee_code', 'shift_start', 'shift_end']);
+        $employees = $this->attendanceEmployeesFor($user, $date)->get(['id', 'full_name', 'employee_code', 'shift_start', 'shift_end']);
         $records = Attendance::whereDate('attendance_date', $date)->whereIn('employee_id', $employees->pluck('id'))
             ->get()->keyBy('employee_id');
         $onLeave = Leave::where('status', 'Approved')->whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date)
@@ -122,14 +136,18 @@ class DashboardDataService
 
     public function documentCompleteness(User $user): array
     {
-        $required = DocumentType::where('is_required', true)->where('is_active', true)->pluck('id');
-        $employees = $this->activeEmployeesFor($user)->get(['id', 'full_name', 'employee_code']);
-        if ($required->isEmpty()) return ['required' => 0, 'complete' => 0, 'incomplete' => 0, 'employees' => collect()];
-        $valid = Document::whereIn('employee_id', $employees->pluck('id'))->whereIn('document_type_id', $required)
-            ->whereNotNull('file_path')->where(fn (Builder $q) => $q->whereNull('expiry_date')->orWhereDate('expiry_date', '>=', today()))
-            ->get()->groupBy('employee_id')->map(fn (Collection $docs) => $docs->pluck('document_type_id')->unique()->count());
-        $items = $employees->map(fn ($employee) => ['employee' => $employee, 'complete' => (int) ($valid[$employee->id] ?? 0), 'required' => $required->count()]);
-        return ['required' => $required->count(), 'complete' => $items->where('complete', $required->count())->count(), 'incomplete' => $items->where('complete', '<', $required->count())->count(), 'employees' => $items];
+        $requiredDocuments = $this->profileCompletion->requiredDocumentTypes();
+        $employees = $this->activeEmployeesFor($user)->with(['profileDetail', 'documents'])->get();
+        $items = $employees->map(function (Employee $employee) use ($requiredDocuments): array {
+            return ['employee' => $employee] + $this->profileCompletion->evaluate($employee, $requiredDocuments);
+        });
+
+        return [
+            'required' => $requiredDocuments->count(),
+            'complete' => $items->where('complete', true)->count(),
+            'incomplete' => $items->where('complete', false)->count(),
+            'employees' => $items,
+        ];
     }
 
     public function isWeeklyRest(Carbon $date): bool

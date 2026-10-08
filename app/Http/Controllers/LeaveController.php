@@ -7,13 +7,17 @@ use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Services\HrOperationalSettingsService;
+use App\Services\EmployeeLeaveStatusService;
 use App\Services\PayrollPeriodGuard;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class LeaveController extends Controller
 {
-    public function __construct(private readonly HrOperationalSettingsService $hrSettings)
+    public function __construct(
+        private readonly HrOperationalSettingsService $hrSettings,
+        private readonly EmployeeLeaveStatusService $leaveStatus,
+    )
     {
     }
 
@@ -65,6 +69,7 @@ class LeaveController extends Controller
         }
         if ($leave->status !== 'Manager Approved') return back()->withErrors(['leave' => 'Leave request cannot be approved in its current state.']);
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+        $this->leaveStatus->sync();
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
         return back()->with('toast', 'Leave request approved.');
     }

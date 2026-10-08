@@ -19,10 +19,15 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Services\PayrollSettingsService;
 use App\Services\PayrollCalculator;
+use App\Services\EmployeeProfileCompletionService;
 
 class EmployeeController extends Controller
 {
-    public function __construct(private readonly PayrollSettingsService $payrollSettings, private readonly PayrollCalculator $payrollCalculator)
+    public function __construct(
+        private readonly PayrollSettingsService $payrollSettings,
+        private readonly PayrollCalculator $payrollCalculator,
+        private readonly EmployeeProfileCompletionService $profileCompletion,
+    )
     {
     }
     public function index(Request $request)
@@ -126,6 +131,8 @@ class EmployeeController extends Controller
             'employer' => $this->payrollSettings->employerInsuranceRate() * 100,
         ];
         $documentTypes = DocumentType::where('is_active', true)->orderBy('name')->get();
+        $requiredDocumentTypes = $this->profileCompletion->applicableRequiredDocumentTypes($employee);
+        $profileCompletion = $this->profileCompletion->evaluate($employee, $requiredDocumentTypes);
 
         return view('employees.profile', compact(
             'employee',
@@ -139,7 +146,7 @@ class EmployeeController extends Controller
             'penaltyClosed',
             'penaltyOpen',
             'lastPenalty'
-            , 'banks', 'paymentMethods', 'departments', 'jobs', 'branches', 'employmentTypes', 'statuses', 'managers', 'payrollRates', 'documentTypes'
+            , 'banks', 'paymentMethods', 'departments', 'jobs', 'branches', 'employmentTypes', 'statuses', 'managers', 'payrollRates', 'documentTypes', 'requiredDocumentTypes', 'profileCompletion'
         ));
     }
 

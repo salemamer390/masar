@@ -29,6 +29,7 @@ class Employee extends Model
         'branch_id',
         'employment_type_id',
         'status_id',
+        'pre_leave_status_id',
         'hire_date',
         'contract_start_date',
         'contract_end_date',
