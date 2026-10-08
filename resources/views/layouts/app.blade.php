@@ -27,6 +27,17 @@
     @include('layouts.topbar')
 
     <section class="content">
+      @php
+        $persistentAlertMessage = $errors->any() ? $errors->first() : (session('error') ?? session('warning') ?? session('toast'));
+        $persistentAlertType = $errors->any() || session('error') ? 'danger' : (session('warning') ? 'warning' : 'success');
+      @endphp
+      @if($persistentAlertMessage)
+        <div class="global-alert global-alert-{{ $persistentAlertType }}" role="alert">
+          <i class="bi {{ $persistentAlertType === 'danger' ? 'bi-exclamation-triangle-fill' : ($persistentAlertType === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill') }}"></i>
+          <span>{{ $persistentAlertMessage }}</span>
+          <button type="button" class="global-alert-close" aria-label="إغلاق" onclick="this.closest('.global-alert')?.remove()"><i class="bi bi-x-lg"></i></button>
+        </div>
+      @endif
       @yield('content')
     </section>
   </main>
@@ -53,7 +64,7 @@
 </div>
 
 <!-- Toast Container -->
-<div class="toast-container position-fixed bottom-0 start-0 p-3" style="z-index: 9999;">
+<div class="toast-container global-toast-container position-fixed p-3">
   <div id="liveToast" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
     <div class="toast-body d-flex align-items-center gap-2">
       <i class="bi bi-check-circle-fill text-success fs-5"></i>
@@ -101,13 +112,13 @@
   // Trigger flash toasts from Laravel session
   @if(session('toast'))
     document.addEventListener('DOMContentLoaded', function() {
-      showToast("{{ session('toast') }}");
+      showToast(@json(session('toast')));
     });
   @endif
 
   @if($errors->any())
     document.addEventListener('DOMContentLoaded', function() {
-      showToast("{{ $errors->first() }}");
+      showToast(@json($errors->first()));
     });
   @endif
 </script>
