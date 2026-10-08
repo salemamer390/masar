@@ -14,9 +14,20 @@
   </button>
   @endif
 </div>
-<div class="stat-grid compact">
-  @foreach([['إجمالي الموظفين',$employeeSummary['total'],'blue','people-fill'],['موظفون نشطون',$employeeSummary['active'],'green','person-check-fill'],['الأقسام النشطة',$employeeSummary['departments'],'purple','diagram-3'],['عقود خلال 30 يومًا',$employeeSummary['contracts_due'],'orange','calendar-x']] as $stat)
-  <div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>بيانات مباشرة</small></div></div>
+@php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
+<div class="employee-kpi-grid">
+  @foreach([
+    ['إجمالي الموظفين', $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' نشط · '.$employeeSummary['inactive'].' غير نشط' : 'جميع الموظفين نشطون', 'blue', 'people-fill', route('employees.index')],
+    ['الموظفون النشطون', $employeeSummary['active'], 'من إجمالي '.$employeeSummary['total'].' موظف', 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],
+    ['عدد الأقسام', $employeeSummary['departments'], $employeeSummary['unassigned'] ? $employeeSummary['unassigned'].' موظف دون قسم' : 'الأقسام التي بها موظفون حاليًا', 'purple', 'diagram-3-fill', route('employees.index')],
+    ['عقود تنتهي قريبًا', $employeeSummary['contracts_due'], 'حتى '.today()->copy()->addDays(30)->format('d/m/Y'), 'orange', 'calendar2-x-fill', route('employees.index')],
+    ['غير مؤمن عليهم', $employeeSummary['uninsured'], 'موظفون بلا سجل تأمين', 'red', 'shield-x', route('insurance.index')],
+    ['في إجازة حاليًا', $employeeSummary['on_leave'], 'إجازات معتمدة تشمل اليوم', 'blue', 'calendar2-check-fill', route('leaves.index')],
+  ] as $stat)
+  <a href="{{ $stat[5] }}" class="employee-kpi {{ $stat[3] }}">
+    <span class="employee-kpi-icon"><i class="bi bi-{{ $stat[4] }}"></i></span>
+    <span><b>{{ $stat[0] }}</b><strong>{{ $stat[1] }}</strong><small>{{ $stat[2] }}</small></span>
+  </a>
   @endforeach
 </div>
 <form method="GET" action="{{ route('employees.index') }}" class="filter-bar">

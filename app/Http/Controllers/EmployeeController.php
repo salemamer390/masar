@@ -49,11 +49,20 @@ class EmployeeController extends Controller
         $employees = $query->paginate(25)->withQueryString();
         $departments = Department::where('is_active', 1)->get();
         $statuses = EmployeeStatus::all();
+        $totalEmployees = Employee::count();
+        $activeEmployees = Employee::whereHas('status', fn ($status) => $status->whereIn('name', ['Active', 'نشط']))->count();
         $employeeSummary = [
-            'total' => Employee::count(),
-            'active' => Employee::whereHas('status', fn ($status) => $status->whereIn('name', ['Active', 'نشط']))->count(),
-            'departments' => Department::where('is_active', true)->count(),
+            'total' => $totalEmployees,
+            'active' => $activeEmployees,
+            'inactive' => max(0, $totalEmployees - $activeEmployees),
+            'unassigned' => Employee::whereNull('department_id')->count(),
+            'departments' => Employee::whereNotNull('department_id')->distinct('department_id')->count('department_id'),
             'contracts_due' => Employee::whereBetween('contract_end_date', [today(), today()->copy()->addDays(30)])->count(),
+            'uninsured' => Employee::whereDoesntHave('insuranceRecord')->count(),
+            'on_leave' => Employee::whereHas('leaves', fn ($leave) => $leave
+                ->whereIn('status', ['Approved', 'معتمد'])
+                ->whereDate('start_date', '<=', today())
+                ->whereDate('end_date', '>=', today()))->count(),
         ];
 
         return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary'));
