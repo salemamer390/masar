@@ -47,7 +47,7 @@ class DashboardController extends Controller
         $recentMovements = $can('movements.view') ? MovementRecord::with(['employee', 'movementType'])->latest('movement_date')->limit(5)->get() : collect();
 
         $heroMetrics = [];
-        if ($can('employees.view')) $heroMetrics[] = ['key' => 'employees', 'label' => 'إجمالي الموظفين', 'value' => format_number($active), 'hint' => $newHires ? '+'.$newHires.' هذا الشهر' : 'الموظفون النشطون', 'icon' => 'people-fill', 'tone' => 'blue', 'url' => route('employees.index')];
+        if ($can('employees.view')) $heroMetrics[] = ['key' => 'employees', 'label' => 'الموظفون النشطون', 'value' => format_number($active), 'hint' => $newHires ? '+'.$newHires.' هذا الشهر' : 'الموظفون النشطون', 'icon' => 'people-fill', 'tone' => 'blue', 'url' => route('employees.index')];
         if ($attendance) {
             $heroMetrics[] = ['key' => 'present', 'label' => 'الحاضرون اليوم', 'value' => format_number($attendance['counts']['present']), 'hint' => 'من أصل '.format_number($attendance['counts']['scheduled']).' مجدولين', 'icon' => 'person-check-fill', 'tone' => 'green', 'url' => route('attendance.index', ['date' => $today->toDateString()])];
             $heroMetrics[] = ['key' => 'absent', 'label' => 'الغائبون اليوم', 'value' => format_number($attendance['counts']['absent']), 'hint' => $attendance['cutoffReached'] ? 'بعد وقت احتساب الغياب' : 'لم يحن وقت الاحتساب', 'icon' => 'person-x-fill', 'tone' => 'red', 'url' => route('attendance.index', ['date' => $today->toDateString()])];

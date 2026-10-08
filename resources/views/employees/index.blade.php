@@ -80,6 +80,9 @@
               <button class="table-action" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                 <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person me-2"></i> عرض الملف الكامل</a></li>
+                @if(auth()->user()?->hasPermission('employees.edit'))
+                <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'job']) }}#employment-status"><i class="bi bi-person-gear me-2"></i> تعديل حالة الموظف</a></li>
+                @endif
                 <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'documentsProfile']) }}"><i class="bi bi-folder me-2"></i> مسوغات التعيين</a></li>
                 <li><a class="dropdown-item py-2" href="{{ route('employees.print', $employee) }}" target="_blank"><i class="bi bi-printer me-2"></i> طباعة الملف</a></li>
               </ul>
