@@ -23,18 +23,15 @@
     <div><span>صندوق الشهداء</span><strong>{{ format_number($payrollSettings['martyrs_fund_rate']) }}%</strong></div>
     <div><span>الأجر التأميني</span><strong>{{ format_number($payrollSettings['insurance_minimum']) }} — {{ format_number($payrollSettings['insurance_maximum']) }}</strong></div>
     <div><span>الإعفاء الشخصي الشهري</span><strong>{{ format_number($payrollSettings['personal_exemption']) }}</strong></div>
-    <div><span>ضريبة المرتبات</span><strong>فئات الدخل السنوي</strong></div>
-    <div><span>تقريب الوعاء الضريبي</span><strong>لا يتم تقريب الوعاء</strong></div>
   </div>
 </div>
 
-<div class="panel mb-3">
-  <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
-    <div><strong>مصدر بيانات الرواتب</strong><div class="small text-muted mt-1">الموظف ← هيكل الراتب الساري ← سجل Payroll الشهري. تغيير الهيكل لا يعيد كتابة المسيرات المقفلة.</div></div>
-    @if($selectedEmployee)<a class="btn btn-sm btn-outline-secondary" href="{{ route('employees.show', ['employee' => $selectedEmployee->id, 'tab' => 'salary']) }}">فتح ملف الموظف</a>@endif
+@if($selectedEmployee)
+  <div class="alert alert-info py-2 mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <span>عرض هيكل الراتب الخاص بالموظف: <strong>{{ $selectedEmployee->full_name }}</strong></span>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ route('employees.show', ['employee' => $selectedEmployee->id, 'tab' => 'salary']) }}">فتح ملف الموظف</a>
   </div>
-</div>
-@if($selectedEmployee)<div class="alert alert-info py-2">عرض هيكل الراتب الخاص بالموظف: <strong>{{ $selectedEmployee->full_name }}</strong></div>@endif
+@endif
 
 <div class="salary-layout">
 @forelse($salaries as $s)
