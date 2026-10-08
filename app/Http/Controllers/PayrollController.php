@@ -32,8 +32,15 @@ class PayrollController extends Controller
         $totalEmployerInsurance = $records->sum('employer_insurance');
         $totalMartyrs = $records->sum('martyrs_fund');
         $runs = PayrollRun::withCount('records')->orderByDesc('payroll_month')->limit(12)->get();
+        $cardDetails = [
+            'employees' => Employee::orderBy('full_name')->get(['id','full_name','employee_code']),
+            'reviewed' => $records->whereIn('status', ['Ù…Ø¹ØªÙ…Ø¯Ø©', 'ØªÙ… Ø§Ù„ØµØ±Ù', 'Approved', 'Paid'])->values(),
+            'drafts' => $records->whereIn('status', ['Ù‚ÙŠØ¯ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'Draft'])->values(),
+            'net' => $records->sortByDesc('net_salary')->values(),
+            'cost' => $records->sortByDesc('employee_cost')->values(),
+        ];
 
-        return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month'));
+        return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails'));
     }
 
     public function generate(Request $request, PayrollRunService $service)

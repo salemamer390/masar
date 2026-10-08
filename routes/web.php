@@ -67,6 +67,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware('permission:employees.edit')
             ->name('update');
+        Route::patch('/{employee}/photo', [EmployeeController::class, 'updatePhoto'])
+            ->middleware('permission:employees.edit')
+            ->name('photo');
+        Route::delete('/{employee}/photo', [EmployeeController::class, 'deletePhoto'])
+            ->middleware('permission:employees.edit')
+            ->name('photo.delete');
         Route::get('/{employee}/print', [EmployeeController::class, 'print'])
             ->middleware('permission:employees.view')
             ->name('print');

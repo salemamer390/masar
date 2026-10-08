@@ -5,12 +5,12 @@
 @section('content')
 @php($profile = $employee->profileDetail)
 <div class="profile-head">
-    <a href="{{ route('employees.index') }}" class="back-btn">
+    <a href="{{ route('employees.index') }}" class="back-btn profile-back-btn">
         <i class="bi bi-arrow-right"></i> العودة للموظفين
     </a>
 
     <div class="profile-person">
-        <div class="profile-avatar">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else{{ $employee->initials }}@endif</div>
+        <button type="button" class="profile-avatar profile-avatar-button" data-bs-toggle="modal" data-bs-target="#profilePhotoModal" title="إدارة الصورة">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else{{ $employee->initials }}@endif</button>
         <div>
             <h1>{{ $employee->full_name }}</h1>
             <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
@@ -40,7 +40,6 @@
 <div class="profile-tabs">
     @foreach([
         ['overview','نظرة عامة','person'],
-        ['job','البيانات الوظيفية','briefcase'],
         ['salary','هيكل الراتب','cash-stack'],
         ['payroll','مسيرات الرواتب','receipt'],
         ['attendance','الحضور','clock'],
@@ -402,6 +401,9 @@
         </div>
     </div>
 
+@elseif($activeTab === 'requests')
+    <div class="panel profile-panel"><div class="panel-head"><div><h3>الطلبات</h3><span>طلبات الموظف المسجلة في النظام</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>الطلب</th><th>النوع</th><th>التاريخ</th><th>الحالة</th></tr></thead><tbody>@forelse($employee->hrRequests as $request)<tr><td>{{ $request->title }}</td><td>{{ $request->requestType?->name ?? '—' }}</td><td>{{ $request->created_at?->format('d/m/Y') }}</td><td><span class="badge-soft {{ $request->status_badge_class }}">{{ arabic_label($request->status) }}</span></td></tr>@empty<tr><td colspan="4" class="text-center py-5">لا توجد طلبات.</td></tr>@endforelse</tbody></table></div></div>
+
 @elseif($activeTab === 'discipline')
     <div class="panel profile-panel">
         <div class="panel-head"><div><h3>سجل الجزاءات والمخالفات</h3><span>الإجراءات: {{ $penaltyTotal }} · المفتوح: {{ $penaltyOpen }}</span></div></div>
@@ -414,6 +416,7 @@
                         <td>{{ $p->penalty_date?->format('d/m/Y') ?? '—' }}</td>
                         <td>{{ $p->penaltyType?->name ?? '—' }}</td>
                         <td>{{ $p->reason }}</td>
+                        <td>{{ format_number($p->deduction_days ?? $p->penaltyType?->default_deduction_days ?? 0) }}</td>
                         <td>{{ format_money($p->amount ?? 0) }}</td>
                         <td><span class="badge-soft {{ $p->status_badge_class }}">{{ $p->status }}</span></td>
                     </tr>
@@ -477,6 +480,7 @@
 @endif
 
 @push('scripts')
+<div class="modal fade" id="profilePhotoModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">@if($employee->profile_photo_url)<div class="modal-body text-center pb-0"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"></div>@endif @if(auth()->user()?->hasPermission('employees.edit'))<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data">@csrf @method('PATCH')<div class="modal-body"><label class="form-label">{{ $employee->profile_photo_url ? 'تغيير الصورة' : 'إضافة صورة شخصية' }}</label><input type="file" name="profile_photo" class="form-control" accept="image/jpeg,image/png,image/webp" required><small class="text-muted">JPG أو PNG أو WebP، حتى 5 ميجابايت.</small></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger">حذف الصورة</button>@endif<button class="btn btn-primary">حفظ الصورة</button></div></form>@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif @endif</div></div></div>
 <script>
 (function(){
     const hireDate=document.getElementById('employee_hire_date');
@@ -567,4 +571,11 @@ window.openRequiredDocument = function (documentTypeId, documentName) {
 };
 </script>
 @endpush
+<script>
+(function(){const cards=document.querySelectorAll('.profile-summary>div');if(cards[3]){const label=cards[3].querySelector('span');if(label)label.textContent='الراتب الصافي';}})();
+(function(){document.querySelectorAll('.table thead tr').forEach(tr=>{const text=tr.innerText;if(text.includes('المبلغ')&&!text.includes('الأيام')){const th=document.createElement('th');th.textContent='الأيام';const amount=[...tr.children].find(x=>x.innerText.includes('المبلغ'));tr.insertBefore(th,amount||tr.lastElementChild);}})})();
+(function(){document.querySelectorAll('.table tbody tr').forEach(row=>{const cells=row.children;if(cells.length===5&&row.closest('.profile-panel')?.innerText.includes('الإجازات')){const paid=document.createElement('td');paid.textContent='{{ $employee->leaves->first()?->leaveType?->is_paid ? "بأجر" : "بدون أجر" }}';row.insertBefore(paid,cells[1]);const deduction=document.createElement('td');deduction.textContent='0';row.insertBefore(deduction,row.lastElementChild);}})})();
+(function(){document.querySelectorAll('.profile-tabs a[href*="tab=job"]').forEach(el=>el.remove());const tabs=document.querySelector('.profile-tabs');if(tabs&&!tabs.querySelector('[href*="tab=requests"]')){const a=document.createElement('a');a.className='profile-tab';a.href='{{ route('employees.show',[$employee,'tab'=>'requests']) }}';a.innerHTML='<i class="bi bi-inbox"></i> الطلبات';tabs.appendChild(a);}})();
+(function(){const form=document.querySelector('#employeeMasterModal form');if(!form)return;const id=form.querySelector('[name="national_id"]'),birth=form.querySelector('[name="birth_date"]'),gender=form.querySelector('[name="gender"]');if(!id)return;id.addEventListener('input',()=>{const n=id.value.replace(/\D/g,'');if(n.length!==14||!birth||!gender)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const month=n.slice(3,5),day=n.slice(5,7);const d=new Date(year,Number(month)-1,Number(day));if(d.getFullYear()!==year||d.getMonth()+1!==Number(month)||d.getDate()!==Number(day))return;birth.value=year+'-'+month+'-'+day;gender.value=Number(n[12])%2?'ذكر':'أنثى';});})();
+</script>
 @endsection

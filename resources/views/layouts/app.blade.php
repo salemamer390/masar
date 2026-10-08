@@ -31,7 +31,7 @@
         $persistentAlertMessage = $errors->any() ? $errors->first() : (session('error') ?? session('warning') ?? session('toast'));
         $persistentAlertType = $errors->any() || session('error') ? 'danger' : (session('warning') ? 'warning' : 'success');
       @endphp
-      @if($persistentAlertMessage)
+      @if($persistentAlertMessage && !session('toast'))
         <div class="global-alert global-alert-{{ $persistentAlertType }}" role="alert">
           <i class="bi {{ $persistentAlertType === 'danger' ? 'bi-exclamation-triangle-fill' : ($persistentAlertType === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill') }}"></i>
           <span>{{ $persistentAlertMessage }}</span>

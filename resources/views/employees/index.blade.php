@@ -305,4 +305,5 @@
     });
 })();
 </script>
+document.querySelectorAll('input[name="national_id"]').forEach(id=>id.addEventListener('input',()=>{const f=id.closest('form');const n=id.value.replace(/\D/g,'');if(n.length!==14||!f)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const m=Number(n.slice(3,5)),d=Number(n.slice(5,7));const date=new Date(year,m-1,d);if(date.getFullYear()!==year||date.getMonth()+1!==m||date.getDate()!==d)return;const birth=f.querySelector('[name="birth_date"]'),gender=f.querySelector('[name="gender"]');if(birth)birth.value=year+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(gender)gender.value=Number(n[12])%2?'ذكر':'أنثى';}));
 @endpush

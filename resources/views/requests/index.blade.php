@@ -19,7 +19,7 @@
         ['طلبات معتمدة', $stats['approved'], 'green', 'check-circle'],
         ['طلبات مرفوضة', $stats['rejected'], 'red', 'x-circle'],
     ] as $stat)
-        <div class="stat-card">
+        <div class="stat-card clickable-card">
             <div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div>
             <div><span>{{ $stat[0] }}</span><b>{{ format_number($stat[1]) }}</b><small>حسب النطاق المسموح لك</small></div>
         </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Attendance;
 use App\Models\Employee;
+use App\Models\Department;
 use App\Services\PayrollPeriodGuard;
 use App\Services\HrOperationalSettingsService;
 use App\Services\DashboardDataService;
@@ -23,7 +24,10 @@ class AttendanceController extends Controller
     {
         $today = today();
         $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date');
-        if ($request->filled('date')) { $query->whereDate('attendance_date', $request->date); }
+        if ($request->filled('from_date')) { $query->whereDate('attendance_date', '>=', $request->from_date); }
+        if ($request->filled('to_date')) { $query->whereDate('attendance_date', '<=', $request->to_date); }
+        if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
+        if ($request->filled('department_id')) { $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id)); }
 
         $attendances = $query->paginate(25)->withQueryString();
         $todaySummary = $this->dashboard->attendance($request->user(), $today);
@@ -35,8 +39,9 @@ class AttendanceController extends Controller
         $average = (int) round($minutes->avg() ?? 0);
         $avgCheckIn = $minutes->isEmpty() ? '—' : sprintf('%02d:%02d', intdiv($average, 60), $average % 60);
         $employees = Employee::orderBy('full_name')->get();
+        $departments = Department::where('is_active', 1)->orderBy('name')->get();
 
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees'));
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)

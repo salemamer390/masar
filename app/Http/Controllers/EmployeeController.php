@@ -99,6 +99,7 @@ class EmployeeController extends Controller
             'movements.newDepartment',
             'movements.oldJob',
             'movements.newJob',
+            'hrRequests.requestType',
         ]);
 
         $activeTab = $request->query('tab', 'overview');
@@ -177,6 +178,7 @@ class EmployeeController extends Controller
             'national_id.unique' => 'الرقم القومي مسجل لموظف آخر.',
         ]);
 
+        $validated = $this->applyNationalIdData($validated);
         $this->validateSalarySource($request, true);
         [$grossSalary, $calculatedNet] = $this->resolveEmployeeSalary($request);
         $validated['gross_salary'] = $grossSalary;
@@ -211,7 +213,7 @@ class EmployeeController extends Controller
             $employee = Employee::create($validated);
             // Keep every employee compatible with the full profile screen,
             // even when optional profile fields have not been entered yet.
-            $employee->profileDetail()->create([]);
+            $employee->profileDetail()->create(['nationality' => 'مصري', 'currency' => 'EGP']);
             $this->createSalaryStructureFromEmployee($employee);
             return $employee;
         });
@@ -282,6 +284,7 @@ class EmployeeController extends Controller
 
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
         if ($salaryChanged) {
+            $validated = $this->applyNationalIdData($validated);
             $this->validateSalarySource($request, false, $employee);
             [$grossSalary, $calculatedNet] = $this->resolveEmployeeSalary($request);
             $validated['gross_salary'] = $grossSalary;
@@ -340,6 +343,46 @@ class EmployeeController extends Controller
         }
 
         return back()->with('toast', 'تم تحديث بيانات الموظف');
+    }
+
+    public function updatePhoto(Request $request, Employee $employee)
+    {
+        $request->validate(['profile_photo' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
+        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
+        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+        return back()->with('toast', 'تم تحديث صورة الموظف.');
+    }
+
+    public function deletePhoto(Employee $employee)
+    {
+        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
+        $employee->update(['profile_photo_path' => null]);
+        return back()->with('toast', 'تم حذف صورة الموظف.');
+    }
+
+    private function applyNationalIdData(array $validated): array
+    {
+        $nationalId = preg_replace('/\D+/', '', (string) ($validated['national_id'] ?? ''));
+        if ($nationalId === '') return $validated;
+        if (strlen($nationalId) !== 14 || !in_array($nationalId[0], ['2', '3'], true)) {
+            throw ValidationException::withMessages(['national_id' => 'الرقم القومي يجب أن يكون صحيحًا ومكونًا من 14 رقمًا.']);
+        }
+        $month = (int) substr($nationalId, 3, 2);
+        $day = (int) substr($nationalId, 5, 2);
+        $year = (int) substr($nationalId, 1, 2) + ($nationalId[0] === '3' ? 2000 : 1900);
+        if (!checkdate($month, $day, $year)) {
+            throw ValidationException::withMessages(['national_id' => 'تاريخ الميلاد داخل الرقم القومي غير صحيح.']);
+        }
+        $weights = [2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+        $sum = 0;
+        foreach ($weights as $index => $weight) $sum += ((int) $nationalId[$index]) * $weight;
+        if ((11 - ($sum % 11)) % 10 !== (int) $nationalId[13]) {
+            throw ValidationException::withMessages(['national_id' => 'الرقم القومي غير صالح. يرجى مراجعته.']);
+        }
+        $validated['national_id'] = $nationalId;
+        $validated['birth_date'] = sprintf('%04d-%02d-%02d', $year, $month, $day);
+        $validated['gender'] = ((int) $nationalId[12]) % 2 === 1 ? 'ذكر' : 'أنثى';
+        return $validated;
     }
 
     private function validateSalarySource(Request $request, bool $required, ?Employee $existing = null): void
