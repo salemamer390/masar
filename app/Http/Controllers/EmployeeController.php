@@ -347,7 +347,10 @@ class EmployeeController extends Controller
 
     public function updatePhoto(Request $request, Employee $employee)
     {
-        $request->validate(['profile_photo' => ['required', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
+        $request->validate(['profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
+        if (!$request->hasFile('profile_photo')) {
+            return back()->with('toast', 'لم يتم اختيار صورة جديدة.');
+        }
         if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
         $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
         return back()->with('toast', 'تم تحديث صورة الموظف.');
