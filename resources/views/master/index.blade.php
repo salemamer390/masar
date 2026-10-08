@@ -12,7 +12,9 @@
     <section class="panel master-data-panel">
         <div class="panel-head">
             <div><h3>{{$currentMeta['title']}}</h3><span>{{$currentMeta['desc']}}</span></div>
-            @if(auth()->user()?->hasPermission('roles.edit'))<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#masterModal"><i class="bi bi-plus-lg"></i> إضافة</button>@endif
+            <div class="d-flex gap-2">
+                @if(auth()->user()?->hasPermission('roles.edit'))<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#masterModal"><i class="bi bi-plus-lg"></i> إضافة</button>@endif
+            </div>
         </div>
         <div class="p-3"><div class="search-table master-search"><i class="bi bi-search"></i><input id="masterSearch" placeholder="بحث..."></div></div>
         <div class="master-rows" id="masterRows">

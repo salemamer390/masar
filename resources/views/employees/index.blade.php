@@ -8,11 +8,14 @@
     <h1>الموظفون</h1>
     <p>إدارة ملف الموظف والبيانات الأساسية.</p>
   </div>
-  @if(auth()->user()?->hasPermission('employees.create'))
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
-    <i class="bi bi-plus-lg"></i> إضافة موظف
-  </button>
-  @endif
+  <div class="d-flex gap-2 flex-wrap">
+    @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> إعدادات بيانات الموظفين</a>@endif
+    @if(auth()->user()?->hasPermission('employees.create'))
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
+      <i class="bi bi-plus-lg"></i> إضافة موظف
+    </button>
+    @endif
+  </div>
 </div>
 @php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
 <div class="employee-kpi-grid">

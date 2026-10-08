@@ -14,6 +14,7 @@ use App\Models\PaymentMethod;
 use App\Models\PenaltyType;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MasterDataController extends Controller
 {
@@ -147,9 +148,11 @@ class MasterDataController extends Controller
         }
 
         $request->validate([
-            'name' => ['required', 'string', 'max:150'],
+            'name' => array_merge(['required', 'string', 'max:150'], $type === 'documents' ? [Rule::unique('document_types', 'name')] : []),
             'code' => ['nullable', 'string', 'max:50'],
             'category' => $type === 'documents' ? ['required', 'in:basic,job,workplace'] : ['nullable'],
+        ], [
+            'name.unique' => 'نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا أو عدّل النوع الموجود.',
         ]);
 
         $currentMeta = $meta[$type];
@@ -187,9 +190,11 @@ class MasterDataController extends Controller
     public function updateDocument(Request $request, DocumentType $documentType)
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
+            'name' => ['required', 'string', 'max:150', Rule::unique('document_types', 'name')->ignore($documentType->id)],
             'category' => ['required', 'in:basic,job,workplace'],
             'required' => ['nullable', 'boolean'],
+        ], [
+            'name.unique' => 'نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا.',
         ]);
 
         $documentType->update([

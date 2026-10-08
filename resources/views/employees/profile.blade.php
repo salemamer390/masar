@@ -287,18 +287,22 @@
 @elseif($activeTab === 'documentsProfile')
     <div class="profile-section-head">
         <div><h2>مسوغات التعيين</h2><p>إدارة المستندات الخاصة بالموظف.</p></div>
-        @if(auth()->user()?->hasPermission('documents.upload'))
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#documentModal"><i class="bi bi-upload"></i> رفع مسوغ</button>
-        @endif
+        <div class="d-flex gap-2 flex-wrap">
+            @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'documents']) }}"><i class="bi bi-gear"></i> إعدادات أنواع المستندات</a>@endif
+            @if(auth()->user()?->hasPermission('documents.upload'))<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#documentModal"><i class="bi bi-upload"></i> رفع مسوغ</button>@endif
+        </div>
     </div>
 
-    @php($registeredDocumentTypeIds = $employee->documents->pluck('document_type_id')->filter()->unique())
+    @php($documentsByType = $employee->documents->filter(fn ($document) => $document->document_type_id)->keyBy('document_type_id'))
+    @php($requiredDocumentTypeIds = $requiredDocumentTypes->pluck('id'))
+    @php($pendingRequiredTypes = $requiredDocumentTypes->filter(fn ($type) => ! $documentsByType->get($type->id)?->file_path))
     <div class="documents-card-grid">
-        @foreach($requiredDocumentTypes->whereNotIn('id', $registeredDocumentTypeIds) as $documentType)
+        @foreach($pendingRequiredTypes as $documentType)
+            @php($pendingDocument = $documentsByType->get($documentType->id))
             <div class="doc-card missing required-document-card">
                 <div class="doc-card-head">
                     <span class="doc-number"><i class="bi bi-exclamation-circle"></i></span>
-                    <div class="doc-card-title"><button type="button" @if(auth()->user()?->hasPermission('documents.upload')) onclick='openRequiredDocument({{ $documentType->id }}, @json($documentType->name))' @endif>{{ $documentType->name }}</button></div>
+                    <div class="doc-card-title"><button type="button" @if(auth()->user()?->hasPermission('documents.upload')) onclick='@if($pendingDocument)openDocument({{ $pendingDocument->id }}, @json($pendingDocument->document_name), {{ $documentType->id }}, @json($pendingDocument->expiry_date?->format('Y-m-d')))@else openRequiredDocument({{ $documentType->id }}, @json($documentType->name)) @endif' @endif>{{ $documentType->name }}</button></div>
                 </div>
                 <div class="doc-status"><span class="badge-soft danger">مطلوب لكل موظف</span></div>
                 <div class="doc-thumb"><div class="doc-thumb-placeholder"><i class="bi bi-cloud-arrow-up"></i><span>لم يتم رفع المستند</span></div></div>
@@ -306,12 +310,12 @@
                 <div class="doc-meta">ارفعه لإكمال ملف الموظف</div>
                 <div class="doc-card-actions">
                     @if(auth()->user()?->hasPermission('documents.upload'))
-                        <button class="btn btn-sm btn-primary" type="button" onclick='openRequiredDocument({{ $documentType->id }}, @json($documentType->name))'><i class="bi bi-upload"></i> رفع المستند</button>
+                        <button class="btn btn-sm btn-primary" type="button" onclick='@if($pendingDocument)openDocument({{ $pendingDocument->id }}, @json($pendingDocument->document_name), {{ $documentType->id }}, @json($pendingDocument->expiry_date?->format('Y-m-d')))@else openRequiredDocument({{ $documentType->id }}, @json($documentType->name)) @endif'><i class="bi bi-upload"></i> رفع المستند</button>
                     @endif
                 </div>
             </div>
         @endforeach
-        @forelse($employee->documents as $d)
+        @forelse($employee->documents->reject(fn ($document) => $requiredDocumentTypeIds->contains($document->document_type_id) && ! $document->file_path) as $d)
             <div class="doc-card {{ in_array($d->status,['مطلوب','Required']) ? 'missing' : '' }}">
                 <div class="doc-card-head">
                     <span class="doc-number">#{{ $d->id }}</span>
@@ -320,7 +324,7 @@
                 <div class="doc-status"><span class="badge-soft {{ $d->status_badge_class }}">{{ $d->status }}</span></div>
                 <div class="doc-thumb">
                     @if($d->file_path && $d->isImage())
-                        <img src="{{ $d->file_url }}" alt="{{ $d->document_name }}">
+                        <img src="{{ route('documents.preview',$d) }}" alt="{{ $d->document_name }}">
                     @elseif($d->file_path)
                         <i class="bi {{ str_contains($d->mime_type ?? '', 'pdf') ? 'bi-file-earmark-pdf' : 'bi-file-earmark-text' }} fs-1 text-secondary"></i>
                     @else
@@ -351,7 +355,7 @@
                 </div>
             </div>
         @empty
-            @if($requiredDocumentTypes->whereNotIn('id', $registeredDocumentTypeIds)->isEmpty())
+            @if($pendingRequiredTypes->isEmpty())
                 <div class="empty-page w-100"><div class="empty-icon"><i class="bi bi-folder-plus"></i></div><h2>لا توجد مسوغات</h2><p>أضف أول مسوغ لهذا الموظف.</p></div>
             @endif
         @endforelse

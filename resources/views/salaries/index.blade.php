@@ -4,6 +4,9 @@
 <div class="page-head">
   <div><h1>هيكل الرواتب</h1><p>هيكل الراتب هو المصدر الثابت للراتب؛ المسير الشهري يأخذ منه القيم الثابتة ثم يضيف المدخلات الشهرية المعتمدة. المدخل الأساسي هو الإجمالي (Gross). النظام يوزع البدلات ويحسِب التأمين والضريبة والصافي وفق المواصفة المعتمدة.</p></div>
   <div class="d-flex gap-2 flex-wrap">
+    @if(auth()->user()?->hasPermission('roles.view'))
+    <a class="btn btn-light" href="{{ route('master.index',['type'=>'payment']) }}"><i class="bi bi-gear"></i> إعدادات طرق الصرف</a>
+    @endif
     @if(auth()->user()?->hasPermission('salary.edit'))
     <form method="POST" action="{{ route('salaries.recalculate') }}" onsubmit="return confirm('إعادة حساب وحفظ كل هياكل الرواتب السارية بمنطق الضريبة الحالي؟ لن تتأثر المسيرات المعتمدة أو المصروفة.')">@csrf<button class="btn btn-light"><i class="bi bi-arrow-repeat"></i> إعادة حساب الهياكل</button></form>
     @endif

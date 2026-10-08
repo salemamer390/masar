@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title','البيانات الوظيفية')
 @section('content')
-<div class="page-head"><div><h1>البيانات الوظيفية</h1><p>الأقسام والوظائف والفروع والعقود الحالية للموظفين.</p></div></div>
+<div class="page-head"><div><h1>البيانات الوظيفية</h1><p>الأقسام والوظائف والفروع والعقود الحالية للموظفين.</p></div>@if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{route('master.index',['type'=>'jobs'])}}"><i class="bi bi-gear"></i> إعدادات البيانات الوظيفية</a>@endif</div>
 <div class="stat-grid compact">
 @foreach([['إجمالي الوظائف',$totalJobs,'blue','briefcase'],['الأقسام',$totalDepartments,'green','diagram-3'],['الفروع',$totalBranches,'orange','building'],['العقود النشطة',$activeContracts,'purple','file-earmark-text']] as $s)
 <div class="stat-card"><div class="stat-icon {{$s[2]}}"><i class="bi bi-{{$s[3]}}"></i></div><div><span>{{$s[0]}}</span><b>{{$s[1]}}</b><small>بيانات النظام</small></div></div>
