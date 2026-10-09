@@ -20,6 +20,7 @@ class PayrollRunService
         private readonly PayrollCalculator $calculator,
         private readonly PayrollSettingsService $settings,
         private readonly OvertimeEngine $overtime,
+        private readonly HrOperationalSettingsService $hrSettings,
     )
     {
     }
@@ -33,7 +34,14 @@ class PayrollRunService
             );
             if (in_array($run->status, ['Approved', 'Locked'], true)) abort(422, 'Approved or locked payroll runs cannot be regenerated.');
 
-            foreach (Employee::orderBy('id')->cursor() as $employee) {
+            $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
+            $employees = Employee::query()
+                ->whereDoesntHave('status', fn ($query) => $query->whereIn('name', $excludedStatuses))
+                ->orderBy('id')->cursor();
+
+            foreach ($employees as $employee) {
+                $serviceWindow = $this->serviceWindow($employee, $month);
+                if ($serviceWindow === null) continue;
                 // A historical salary can be the valid one for a past payroll month.
                 $salary = Salary::where('employee_id', $employee->id)
                     ->where('effective_from', '<=', $month->toDateString())
@@ -48,6 +56,7 @@ class PayrollRunService
                     (bool) $salary->no_insurance,
                 );
                 $calculation = $this->applyStructureStatutoryValues($calculation, $salary);
+                $calculation = $this->applyProration($calculation, $serviceWindow['factor']);
                 $payload = [
                     'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
                     'agreed_net_salary' => (float) $salary->net_salary,
@@ -67,7 +76,13 @@ class PayrollRunService
                     'attendance_deduction' => $calculation['absence_deduction'], 'penalties' => $calculation['penalty_deduction'],
                     'penalty_deduction' => $calculation['penalty_deduction'], 'net_salary' => $calculation['net_monthly'],
                     'status' => 'Draft', 'is_locked' => false,
-                    'calculation_snapshot' => array_merge($structure, $calculation, ['inputs' => $inputs, 'settings' => $run->settings_snapshot]),
+                    'calculation_snapshot' => array_merge($structure, $calculation, [
+                        'inputs' => $inputs, 'settings' => $run->settings_snapshot,
+                        'service_start' => $serviceWindow['start']->toDateString(),
+                        'service_end' => $serviceWindow['end']->toDateString(),
+                        'paid_days' => $serviceWindow['days'],
+                        'proration_factor' => $serviceWindow['factor'],
+                    ]),
                 ];
                 PayrollRecord::updateOrCreate(['employee_id' => $employee->id, 'payroll_month' => $month->toDateString()], $payload);
             }
@@ -90,7 +105,9 @@ class PayrollRunService
             ->whereIn('status', ['Approved', 'معتمد'])->get();
         $approvedLeaves = Leave::with('leaveType')->where('employee_id', $employee->id)->where('status', 'Approved')
             ->whereDate('start_date', '<=', $to)->whereDate('end_date', '>=', $from)->get();
-        $unpaidLeaveDays = $approvedLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum('days');
+        $unpaidLeaveDays = $approvedLeaves
+            ->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)
+            ->sum(fn (Leave $leave) => $this->leaveDaysWithinMonth($leave, $month));
         $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
 
         return [
@@ -152,6 +169,64 @@ class PayrollRunService
             'monthly_deductions' => round($deductions, 2),
             'net_monthly' => round((float) $calculation['entitlements'] - $deductions, 2),
         ]);
+    }
+
+    /** Salary earnings are prorated by 30 days; statutory amounts stay full-month. */
+    public function applyProration(array $calculation, float $factor): array
+    {
+        $factor = min(1, max(0, $factor));
+        if ($factor >= 1) {
+            return $calculation + [
+                'proration_factor' => 1.0,
+                'employee_cost' => round((float) $calculation['entitlements'] + (float) $calculation['employer_insurance'], 2),
+            ];
+        }
+
+        $entitlements = round((float) $calculation['entitlements'] * $factor, 2);
+        return array_merge($calculation, [
+            'entitlements' => $entitlements,
+            'net_monthly' => round($entitlements - (float) $calculation['monthly_deductions'], 2),
+            'employee_cost' => round($entitlements + (float) $calculation['employer_insurance'], 2),
+            'proration_factor' => $factor,
+        ]);
+    }
+
+    private function serviceWindow(Employee $employee, Carbon $month): ?array
+    {
+        $monthStart = $month->copy()->startOfMonth();
+        $monthEnd = $month->copy()->endOfMonth();
+        $hireDate = $employee->hire_date ? Carbon::parse($employee->hire_date) : $monthStart->copy();
+        $contractEnd = $employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy();
+        $start = $hireDate->greaterThan($monthStart) ? $hireDate : $monthStart;
+        $end = $contractEnd->lessThan($monthEnd) ? $contractEnd : $monthEnd;
+        if ($start->greaterThan($end)) return null;
+
+        $days = $start->diffInDays($end) + 1;
+        return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => min(1, $days / 30)];
+    }
+
+    /** Count only the part of an unpaid leave that belongs to this payroll month. */
+    private function leaveDaysWithinMonth(Leave $leave, Carbon $month): int
+    {
+        $monthStart = $month->copy()->startOfMonth();
+        $monthEnd = $month->copy()->endOfMonth();
+        $leaveStart = Carbon::parse($leave->start_date);
+        $leaveEnd = Carbon::parse($leave->end_date);
+        $start = $leaveStart->greaterThan($monthStart) ? $leaveStart : $monthStart;
+        $end = $leaveEnd->lessThan($monthEnd) ? $leaveEnd : $monthEnd;
+        if ($start->greaterThan($end)) return 0;
+
+        if (!$this->hrSettings->excludeRestAndHolidaysFromLeave()) {
+            return $start->diffInDays($end) + 1;
+        }
+
+        $days = 0;
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            if (!$this->hrSettings->isWeeklyRest($date) && !$this->hrSettings->isHoliday($date)) {
+                $days++;
+            }
+        }
+        return $days;
     }
 
     public function destroyDraft(PayrollRun $run): void

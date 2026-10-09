@@ -93,6 +93,7 @@ class PayrollController extends Controller
         ]);
         $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance);
         $result = $service->applyStructureStatutoryValues($result, $salary);
+        $result = $service->applyProration($result, (float) ($payrollRecord->calculation_snapshot['proration_factor'] ?? 1));
         $before = $payrollRecord->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']);
         $payrollRecord->update([
             'ot_day_hours'=>$result['ot_day_hours'], 'ot_night_hours'=>$result['ot_night_hours'], 'ot_day_amount'=>$result['ot_day_amount'], 'ot_night_amount'=>$result['ot_night_amount'],

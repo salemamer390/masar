@@ -6,11 +6,13 @@ use App\Models\ActivityLog;
 use App\Models\Salary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PayrollSettingsController extends Controller
 {
     public function index()
     {
+        $this->ensureAnnualFixedHolidays();
         $operationalSettings = DB::table('hr_operational_settings')->pluck('setting_value', 'setting_key');
         $holidays = DB::table('hr_holidays')->orderBy('holiday_date')->get();
         $settings = DB::table('payroll_calculation_settings')->where('is_active', true)->get()
@@ -64,6 +66,46 @@ class PayrollSettingsController extends Controller
     {
         DB::table('hr_holidays')->where('id', $holiday)->delete();
         return back()->with('toast', 'تم حذف العطلة الرسمية.');
+    }
+
+    public function updateHoliday(Request $request, int $holiday)
+    {
+        $data = $request->validate([
+            'holiday_date' => ['required', 'date', Rule::unique('hr_holidays', 'holiday_date')->ignore($holiday)],
+            'name' => ['required', 'string', 'max:150'],
+        ]);
+
+        DB::table('hr_holidays')->where('id', $holiday)->update([
+            'holiday_date' => $data['holiday_date'],
+            'name' => $data['name'],
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('toast', 'تم تحديث العطلة الرسمية.');
+    }
+
+    private function ensureAnnualFixedHolidays(): void
+    {
+        foreach ([now()->year, now()->addYear()->year] as $year) {
+            $holidays = [
+                ["{$year}-01-07", 'عيد الميلاد المجيد'],
+                ["{$year}-01-25", 'عيد الشرطة وثورة 25 يناير'],
+                ["{$year}-04-25", 'عيد تحرير سيناء'],
+                ["{$year}-05-01", 'عيد العمال'],
+                ["{$year}-06-30", 'ذكرى ثورة 30 يونيو'],
+                ["{$year}-07-23", 'ذكرى ثورة 23 يوليو'],
+                ["{$year}-10-06", 'عيد القوات المسلحة ونصر أكتوبر'],
+            ];
+
+            foreach ($holidays as [$date, $name]) {
+                DB::table('hr_holidays')->insertOrIgnore([
+                    'holiday_date' => $date,
+                    'name' => $name,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
     }
 
     public function update(Request $request)

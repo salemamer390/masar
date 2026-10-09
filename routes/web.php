@@ -205,6 +205,8 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:payroll.settings')->name('settings.operational.update');
         Route::post('/settings/holidays', [PayrollSettingsController::class, 'storeHoliday'])
             ->middleware('permission:payroll.settings')->name('settings.holidays.store');
+        Route::put('/settings/holidays/{holiday}', [PayrollSettingsController::class, 'updateHoliday'])
+            ->middleware('permission:payroll.settings')->name('settings.holidays.update');
         Route::delete('/settings/holidays/{holiday}', [PayrollSettingsController::class, 'destroyHoliday'])
             ->middleware('permission:payroll.settings')->name('settings.holidays.destroy');
         Route::post('/generate', [PayrollController::class, 'generate'])

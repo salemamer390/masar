@@ -5,3 +5,4 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('tazamun:send-contract-alerts --days=30')->dailyAt('08:00')->withoutOverlapping();
 Schedule::command('documents:notify-expiring')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('tazamun:sync-leave-statuses')->dailyAt('00:05')->timezone('Africa/Cairo')->withoutOverlapping();
+Schedule::command('holidays:notify-upcoming')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
