@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title','البيانات الوظيفية')
 @section('content')
+<form class="filter-bar d-flex flex-wrap gap-2 mb-3" method="GET"><div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو الكود"></div><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select><select name="contract_status" class="form-select"><option value="">كل العقود</option><option value="active" @selected(request('contract_status') === 'active')>عقود سارية</option><option value="expired" @selected(request('contract_status') === 'expired')>عقود منتهية</option></select><button class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button><a class="btn btn-light" href="{{ route('jobs.index') }}">مسح</a></form>
 <div class="page-head"><div><h1>البيانات الوظيفية</h1><p>الأقسام والوظائف والفروع والعقود الحالية للموظفين.</p></div>@if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{route('master.index',['type'=>'jobs'])}}"><i class="bi bi-gear"></i> إعدادات البيانات الوظيفية</a>@endif</div>
 <div class="stat-grid compact">
 @foreach([['إجمالي الوظائف',$totalJobs,'blue','briefcase'],['الأقسام',$totalDepartments,'green','diagram-3'],['الفروع',$totalBranches,'orange','building'],['العقود النشطة',$activeContracts,'purple','file-earmark-text']] as $s)

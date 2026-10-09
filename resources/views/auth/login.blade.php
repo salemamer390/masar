@@ -71,7 +71,7 @@
       <label class="form-label small fw-bold">البريد الإلكتروني</label>
       <div class="input-group">
         <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
-        <input type="email" name="email" class="form-control border-start-0" placeholder="amer.salem@tazamun.local" value="{{ old('email', 'amer.salem@tazamun.local') }}" required autofocus>
+        <input type="email" name="email" class="form-control border-start-0" placeholder="أدخل البريد الإلكتروني" value="{{ old('email') }}" required autofocus autocomplete="username">
       </div>
     </div>
 
@@ -79,7 +79,7 @@
       <label class="form-label small fw-bold">كلمة المرور</label>
       <div class="input-group">
         <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-        <input type="password" name="password" class="form-control border-start-0" placeholder="••••••••" value="password" required>
+        <input type="password" name="password" class="form-control border-start-0" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
       </div>
     </div>
 
@@ -88,7 +88,7 @@
         <input class="form-check-input" type="checkbox" name="remember" id="rememberMe" checked>
         <label class="form-check-label small text-muted" for="rememberMe">تذكرني</label>
       </div>
-      <small class="text-muted">الافتراضي: password</small>
+      <small class="text-muted">استخدم بيانات الحساب المخصصة لك</small>
     </div>
 
     <button type="submit" class="btn btn-primary w-100 py-2 fw-bold d-flex justify-content-center align-items-center gap-2">

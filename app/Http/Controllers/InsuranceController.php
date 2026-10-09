@@ -11,11 +11,16 @@ use Illuminate\Support\Facades\DB;
 
 class InsuranceController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])->orderBy('id')->get();
+        $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
+            ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+            ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->orderBy('id')->get();
         $employees = Employee::whereDoesntHave('insuranceRecord')->orderBy('full_name')->get();
-        return view('insurance.index', compact('insuranceRecords', 'employees'));
+        $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
+        return view('insurance.index', compact('insuranceRecords', 'employees', 'departments'));
     }
 
     public function store(Request $request)

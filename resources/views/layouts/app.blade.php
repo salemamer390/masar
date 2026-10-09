@@ -119,6 +119,17 @@
   }
   document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
 
+  // Bootstrap close controls inside forms must never submit the surrounding form.
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.btn-close').forEach(button => {
+      if (!button.getAttribute('type')) button.setAttribute('type', 'button');
+    });
+    document.querySelectorAll('.page-head').forEach(head => {
+      const filter = head.previousElementSibling;
+      if (filter?.classList.contains('filter-bar')) head.after(filter);
+    });
+  });
+
   // Global Toast function matching prototype
   function showToast(msg) {
     const textEl = document.getElementById('toastText');

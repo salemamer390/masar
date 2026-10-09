@@ -11,16 +11,22 @@ use Illuminate\Http\Request;
 
 class PenaltyController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $penalties = Penalty::with(['employee.department', 'employee.job', 'penaltyType'])
+            ->when($request->filled('employee_id'), fn ($q) => $q->where('employee_id', $request->employee_id))
+            ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $request->from_date))
+            ->when($request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $request->to_date))
             ->orderBy('penalty_date', 'desc')
-            ->paginate(25);
+            ->paginate(25)->withQueryString();
 
         $employees = Employee::orderBy('full_name')->get();
         $penaltyTypes = PenaltyType::where('is_active', 1)->get();
 
-        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes'));
+        $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
+        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\InsuranceRecord;
 use App\Models\Leave;
@@ -18,15 +19,15 @@ class ReportController extends Controller
         return view('reports.index');
     }
 
-    public function show(string $type)
+    public function show(Request $request, string $type)
     {
-        $data = $this->getReportData($type);
-        return view('reports.show', array_merge(['type' => $type], $data));
+        $data = $this->getReportData($type, $request);
+        return view('reports.show', array_merge(['type' => $type, 'departments' => Department::where('is_active', 1)->orderBy('name')->get()], $data));
     }
 
-    public function export(string $type): StreamedResponse
+    public function export(Request $request, string $type): StreamedResponse
     {
-        $data = $this->getReportData($type);
+        $data = $this->getReportData($type, $request);
         $title = $data['title'] ?? 'report';
 
         $headers = [
@@ -54,11 +55,13 @@ class ReportController extends Controller
         }, 200, $headers);
     }
 
-    private function getReportData(string $type): array
+    private function getReportData(string $type, ?Request $request = null): array
     {
         switch ($type) {
             case 'employees':
-                $items = Employee::with(['department', 'job', 'status'])->get();
+                $items = Employee::with(['department', 'job', 'status'])
+                    ->when($request?->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
+                    ->when($request?->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))->get();
                 return [
                     'title' => 'تقرير الموظفين',
                     'subtitle' => 'بيانات الموظفين والحالات والأقسام',
@@ -75,7 +78,10 @@ class ReportController extends Controller
                 ];
 
             case 'attendance':
-                $items = Attendance::with(['employee.department', 'employee.job'])->latest('attendance_date')->take(50)->get();
+                $items = Attendance::with(['employee.department', 'employee.job'])
+                    ->when($request?->filled('from_date'), fn ($q) => $q->whereDate('attendance_date', '>=', $request->from_date))
+                    ->when($request?->filled('to_date'), fn ($q) => $q->whereDate('attendance_date', '<=', $request->to_date))
+                    ->latest('attendance_date')->take(200)->get();
                 return [
                     'title' => 'تقرير الحضور والانصراف',
                     'subtitle' => 'التأخير والغياب وساعات العمل',
@@ -92,7 +98,9 @@ class ReportController extends Controller
                 ];
 
             case 'salaries':
-                $items = Salary::with(['employee.department', 'employee.job', 'paymentMethod'])->where('status', 'Active')->get();
+                $items = Salary::with(['employee.department', 'employee.job', 'paymentMethod'])->where('status', 'Active')
+                    ->when($request?->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+                    ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))->get();
                 return [
                     'title' => 'تقرير الرواتب',
                     'subtitle' => 'الصافي المتفق عليه وGross والتأمينات والضريبة وتكلفة الموظف',
@@ -114,7 +122,10 @@ class ReportController extends Controller
                 ];
 
             case 'leaves':
-                $items = Leave::with(['employee.department', 'leaveType'])->latest('start_date')->take(50)->get();
+                $items = Leave::with(['employee.department', 'leaveType'])
+                    ->when($request?->filled('from_date'), fn ($q) => $q->whereDate('start_date', '>=', $request->from_date))
+                    ->when($request?->filled('to_date'), fn ($q) => $q->whereDate('end_date', '<=', $request->to_date))
+                    ->latest('start_date')->take(200)->get();
                 return [
                     'title' => 'تقرير الإجازات',
                     'subtitle' => 'الأرصدة والطلبات والحالات',
@@ -131,7 +142,9 @@ class ReportController extends Controller
                 ];
 
             case 'insurance':
-                $items = InsuranceRecord::with(['employee.department', 'employee.job'])->get();
+                $items = InsuranceRecord::with(['employee.department', 'employee.job'])
+                    ->when($request?->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+                    ->when($request?->filled('status'), fn ($q) => $q->where('status', $request->status))->get();
                 return [
                     'title' => 'تقرير التأمينات',
                     'subtitle' => 'حالة التسجيل وأكواد المهن',
@@ -148,7 +161,9 @@ class ReportController extends Controller
 
             case 'payroll':
                 $items = PayrollRecord::with(['employee.department', 'employee.job'])
-                    ->whereIn('status', ['Approved', 'Locked'])->latest('payroll_month')->get();
+                    ->whereIn('status', ['Approved', 'Locked'])
+                    ->when($request?->filled('month'), fn ($q) => $q->whereMonth('payroll_month', $request->month))
+                    ->latest('payroll_month')->get();
                 return [
                     'title' => 'Monthly Payroll Report',
                     'subtitle' => 'Approved and locked payroll records only.',

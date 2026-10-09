@@ -12,10 +12,14 @@ use Illuminate\Http\Request;
 
 class MovementController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $movements = MovementRecord::with(['employee.department', 'employee.job', 'movementType', 'oldDepartment', 'newDepartment', 'oldJob', 'newJob'])
-            ->orderByDesc('movement_date')->paginate(25);
+            ->when($request->filled('employee_id'), fn ($q) => $q->where('employee_id', $request->employee_id))
+            ->when($request->filled('movement_type_id'), fn ($q) => $q->where('movement_type_id', $request->movement_type_id))
+            ->when($request->filled('from_date'), fn ($q) => $q->whereDate('movement_date', '>=', $request->from_date))
+            ->when($request->filled('to_date'), fn ($q) => $q->whereDate('movement_date', '<=', $request->to_date))
+            ->orderByDesc('movement_date')->paginate(25)->withQueryString();
         $employees = Employee::orderBy('full_name')->get();
         $movementTypes = MovementType::all();
         $departments = Department::where('is_active', 1)->get();
