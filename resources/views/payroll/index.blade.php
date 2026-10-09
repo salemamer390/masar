@@ -20,4 +20,27 @@ const payrollFilter=document.querySelector('form input[name="month"]')?.closest(
 <div class="modal fade" id="inputs{{ $record->id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ route('payroll.inputs.update',$record) }}">@csrf @method('PUT')<div class="modal-header"><h5>مدخلات راتب {{ $record->employee?->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="alert alert-light border small">الغياب: {{ format_number($record->absence_days) }} يوم · الجزاءات: {{ format_number($record->penalty_days) }} يوم. هذه القيم مصدرها السجلات المعتمدة ولا تعدل من هنا.</div><div class="row g-3"><div class="col-6"><label class="form-label">ساعات إضافي نهاري</label><input type="number" min="0" step="0.01" name="ot_day_hours" value="{{ format_number($record->ot_day_hours) }}" class="form-control"></div><div class="col-6"><label class="form-label">ساعات إضافي ليلي</label><input type="number" min="0" step="0.01" name="ot_night_hours" value="{{ format_number($record->ot_night_hours) }}" class="form-control"></div><div class="col-6"><label class="form-label">مكافأة</label><input type="number" min="0" step="0.01" name="bonus" value="{{ format_number($record->bonus) }}" class="form-control"></div><div class="col-6"><label class="form-label">سلف</label><input type="number" min="0" step="0.01" name="loans" value="{{ format_number($record->loans) }}" class="form-control"></div><div class="col-6"><label class="form-label">استحقاقات أخرى</label><input type="number" min="0" step="0.01" name="other_earnings" value="{{ format_number($record->other_earnings) }}" class="form-control"></div><div class="col-6"><label class="form-label">استقطاعات أخرى</label><input type="number" min="0" step="0.01" name="other_deductions" value="{{ format_number($record->other_deductions) }}" class="form-control"></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ وإعادة الحساب</button></div></form></div></div></div>
 @endif
 @endforeach
+@push('scripts')
+<script>
+document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
+  if (!form.action.includes('/inputs')) return;
+  const modal = form.closest('.modal');
+  if (!modal) return;
+  const note = modal.querySelector('.alert');
+  if (note) note.innerHTML += ' <br><strong>وحدة القياس:</strong> الإضافي بالساعات، والغياب والجزاءات بالأيام. القيم المعروضة مأخوذة من السجلات المعتمدة ولا تُكتب يدويًا من هنا.';
+});
+@if(auth()->user()?->hasPermission('payroll.create'))
+document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"]').forEach((approveForm) => {
+  const runUrl = approveForm.action.replace(/\/approve$/, '');
+  const deleteForm = document.createElement('form');
+  deleteForm.method = 'POST';
+  deleteForm.action = runUrl;
+  deleteForm.className = 'd-inline ms-1';
+  deleteForm.innerHTML = `<input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger" title="حذف المسودة"><i class="bi bi-trash"></i> حذف</button>`;
+  deleteForm.onsubmit = () => confirm('سيتم حذف مسودة المسير وسجلات الموظفين التابعة لها. هل تريد المتابعة؟');
+  approveForm.after(deleteForm);
+});
+@endif
+</script>
+@endpush
 @endsection

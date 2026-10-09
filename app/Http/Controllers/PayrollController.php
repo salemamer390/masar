@@ -78,7 +78,7 @@ class PayrollController extends Controller
     }
 
     /** Update variable monthly inputs without changing the employee's fixed salary structure. */
-    public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollCalculator $calculator)
+    public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollCalculator $calculator, PayrollRunService $service)
     {
         abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, 'لا يمكن تعديل مدخلات مسير معتمد أو مقفل.');
         $data = $request->validate([
@@ -92,6 +92,7 @@ class PayrollController extends Controller
             'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
         ]);
         $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance);
+        $result = $service->applyStructureStatutoryValues($result, $salary);
         $before = $payrollRecord->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']);
         $payrollRecord->update([
             'ot_day_hours'=>$result['ot_day_hours'], 'ot_night_hours'=>$result['ot_night_hours'], 'ot_day_amount'=>$result['ot_day_amount'], 'ot_night_amount'=>$result['ot_night_amount'],
@@ -103,6 +104,12 @@ class PayrollController extends Controller
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
         return back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
+    }
+
+    public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)
+    {
+        $service->destroyDraft($payrollRun);
+        return back()->with('toast', 'تم حذف مسودة مسير الرواتب وسجلاتها.');
     }
 
     public function pay(PayrollRecord $payrollRecord)

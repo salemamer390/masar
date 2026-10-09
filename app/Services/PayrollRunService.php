@@ -47,6 +47,7 @@ class PayrollRunService
                     $salary->insurance_wage ? (float) $salary->insurance_wage : null,
                     (bool) $salary->no_insurance,
                 );
+                $calculation = $this->applyStructureStatutoryValues($calculation, $salary);
                 $payload = [
                     'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
                     'agreed_net_salary' => (float) $salary->net_salary,
@@ -123,6 +124,45 @@ class PayrollRunService
             $run->records()->update(['status' => 'Locked', 'is_locked' => true]);
             ActivityLog::record('payroll_run_lock', 'Payroll run locked with immutable snapshots.', $run, ['status' => 'Approved'], ['status' => 'Locked'], 'payroll');
             return $run->fresh();
+        });
+    }
+
+    /**
+     * Insurance and tax are approved with the salary structure. The payroll run
+     * copies these fixed values and only adds the month's variable entries.
+     */
+    public function applyStructureStatutoryValues(array $calculation, Salary $salary): array
+    {
+        $insuranceWage = (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0);
+        $employeeInsurance = (float) ($salary->employee_insurance ?? 0);
+        $incomeTax = (float) ($salary->income_tax ?? 0);
+        $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
+        $employerInsurance = (float) ($salary->employer_insurance ?? 0);
+        $deductions = $employeeInsurance + $incomeTax + $martyrsFund
+            + (float) $calculation['absence_deduction'] + (float) $calculation['penalty_deduction']
+            + (float) $calculation['loans'] + (float) $calculation['other_deductions'];
+
+        return array_merge($calculation, [
+            'insurance_wage' => $insuranceWage,
+            'employee_insurance' => $employeeInsurance,
+            'income_tax' => $incomeTax,
+            'martyrs_fund' => $martyrsFund,
+            'employer_insurance' => $employerInsurance,
+            'employee_cost' => (float) ($salary->employee_cost ?? ((float) $calculation['gross'] + $employerInsurance)),
+            'monthly_deductions' => round($deductions, 2),
+            'net_monthly' => round((float) $calculation['entitlements'] - $deductions, 2),
+        ]);
+    }
+
+    public function destroyDraft(PayrollRun $run): void
+    {
+        DB::transaction(function () use ($run) {
+            $run->refresh();
+            abort_if($run->status !== 'Draft', 422, 'Only draft payroll runs can be deleted.');
+            $snapshot = $run->toArray();
+            $run->records()->delete();
+            $run->delete();
+            ActivityLog::record('payroll_run_delete', 'Payroll draft deleted.', null, $snapshot, null, 'payroll');
         });
     }
 }
