@@ -11,6 +11,8 @@ class PayrollSettingsController extends Controller
 {
     public function index()
     {
+        $operationalSettings = DB::table('hr_operational_settings')->pluck('setting_value', 'setting_key');
+        $holidays = DB::table('hr_holidays')->orderBy('holiday_date')->get();
         $settings = DB::table('payroll_calculation_settings')->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->setting_group.$item->setting_key");
         $allowances = DB::table('payroll_allowance_settings')->where('is_active', true)->orderBy('sort_order')->get();
@@ -22,7 +24,46 @@ class PayrollSettingsController extends Controller
             'allowance_review' => Salary::where('status', 'Active')->where('allowance_remaining', '<', 0)->count(),
         ];
 
-        return view('payroll.settings', compact('settings', 'allowances', 'history', 'salarySummary'));
+        return view('payroll.settings', compact('settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays'));
+    }
+
+    public function updateOperational(Request $request)
+    {
+        $data = $request->validate([
+            'default_shift_start' => ['required', 'date_format:H:i'],
+            'default_shift_end' => ['required', 'date_format:H:i'],
+            'absence_cutoff_time' => ['required', 'date_format:H:i'],
+            'grace_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'weekly_rest_pattern' => ['required', 'regex:/^[01]{7}$/'],
+        ]);
+        $labels = [
+            'default_shift_start' => 'بداية الدوام الافتراضية',
+            'default_shift_end' => 'نهاية الدوام الافتراضية',
+            'absence_cutoff_time' => 'وقت احتساب الغياب اليومي',
+            'grace_minutes' => 'فترة السماح بالدقائق',
+            'weekly_rest_pattern' => 'الراحة الأسبوعية (الإثنين إلى الأحد)',
+        ];
+        foreach ($data as $key => $value) {
+            DB::table('hr_operational_settings')->updateOrInsert(
+                ['setting_key' => $key],
+                ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
+            );
+        }
+        ActivityLog::record('hr_operational_settings_update', 'تم تحديث أوقات الدوام والراحة الأسبوعية.');
+        return back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.');
+    }
+
+    public function storeHoliday(Request $request)
+    {
+        $data = $request->validate(['holiday_date' => ['required', 'date'], 'name' => ['required', 'string', 'max:150']]);
+        DB::table('hr_holidays')->updateOrInsert(['holiday_date' => $data['holiday_date']], ['name' => $data['name'], 'updated_at' => now(), 'created_at' => now()]);
+        return back()->with('toast', 'تم حفظ العطلة الرسمية.');
+    }
+
+    public function destroyHoliday(int $holiday)
+    {
+        DB::table('hr_holidays')->where('id', $holiday)->delete();
+        return back()->with('toast', 'تم حذف العطلة الرسمية.');
     }
 
     public function update(Request $request)
