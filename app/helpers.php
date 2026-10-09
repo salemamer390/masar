@@ -75,3 +75,26 @@ if (! function_exists('arabic_label')) {
         ][$value] ?? $value;
     }
 }
+
+if (! function_exists('ui_theme')) {
+    /** Central semantic registry for reusable icons, colors and labels. */
+    function ui_theme(string $key): array
+    {
+        return [
+            'employees' => ['tone' => 'blue', 'icon' => 'users'],
+            'active' => ['tone' => 'green', 'icon' => 'user-check'],
+            'departments' => ['tone' => 'purple', 'icon' => 'chart-no-axes-column'],
+            'contracts' => ['tone' => 'orange', 'icon' => 'calendar-days'],
+            'insurance' => ['tone' => 'red', 'icon' => 'badge-dollar-sign'],
+            'leave' => ['tone' => 'blue', 'icon' => 'calendar-days'],
+            'approved' => ['tone' => 'green', 'icon' => 'circle-check'],
+            'pending' => ['tone' => 'orange', 'icon' => 'clock'],
+            'rejected' => ['tone' => 'red', 'icon' => 'triangle-alert'],
+            'payroll' => ['tone' => 'purple', 'icon' => 'badge-dollar-sign'],
+            'cost' => ['tone' => 'red', 'icon' => 'wallet'],
+            'attendance' => ['tone' => 'green', 'icon' => 'user-check'],
+            'requests' => ['tone' => 'purple', 'icon' => 'message-square'],
+            'documents' => ['tone' => 'orange', 'icon' => 'file-text'],
+        ][$key] ?? ['tone' => 'blue', 'icon' => 'circle-help'];
+    }
+}

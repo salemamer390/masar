@@ -12,14 +12,16 @@
     @endif
 </div>
 
+<div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">تفاصيل الطلبات</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
+
 <div class="stat-grid compact">
     @foreach([
         ['إجمالي الطلبات', $stats['all'], 'blue', 'file-earmark-text'],
         ['طلبات معلقة', $stats['pending'], 'orange', 'hourglass-split'],
         ['طلبات معتمدة', $stats['approved'], 'green', 'check-circle'],
         ['طلبات مرفوضة', $stats['rejected'], 'red', 'x-circle'],
-    ] as $stat)
-        <div class="stat-card clickable-card">
+    ] as $statIndex => $stat)
+        <div class="stat-card clickable-card request-kpi-card" data-request-kpi="{{ $statIndex }}">
             <div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div>
             <div><span>{{ $stat[0] }}</span><b>{{ format_number($stat[1]) }}</b><small>حسب النطاق المسموح لك</small></div>
         </div>
@@ -77,6 +79,11 @@
     @endif
 </div>
 @endif
+@push('scripts')
+<script>
+const requestCardData=@json($requestCardDetails);const requestKeys=['all','pending','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المعلقة','الطلبات المعتمدة','الطلبات المرفوضة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
+</script>
+@endpush
 
 <div class="panel table-panel">
     <div class="table-responsive">

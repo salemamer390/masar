@@ -71,7 +71,16 @@ class EmployeeController extends Controller
                 ->whereDate('end_date', '>=', today()))->count(),
         ];
 
-        return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary'));
+        $employeeCardDetails = [
+            'total' => Employee::with(['department', 'status'])->orderBy('full_name')->get(),
+            'active' => Employee::with(['department'])->whereHas('status', fn ($q) => $q->whereIn('name', ['Active', 'Ù†Ø´Ø·']))->orderBy('full_name')->get(),
+            'departments' => Department::whereHas('employees')->withCount('employees')->orderBy('name')->get(),
+            'contracts_due' => Employee::with(['department'])->whereBetween('contract_end_date', [today(), today()->copy()->addDays(30)])->orderBy('contract_end_date')->get(),
+            'uninsured' => Employee::with(['department'])->whereDoesntHave('insuranceRecord')->orderBy('full_name')->get(),
+            'on_leave' => Employee::with(['department'])->whereHas('leaves', fn ($q) => $q->whereIn('status', ['Approved', 'Ù…Ø¹ØªÙ…Ø¯'])->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()))->orderBy('full_name')->get(),
+        ];
+
+        return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary', 'employeeCardDetails'));
     }
 
     public function show(Employee $employee, Request $request)
@@ -164,6 +173,11 @@ class EmployeeController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
             'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
+            'gender' => ['nullable', 'string', 'max:30'],
+            'birth_date' => ['nullable', 'date'],
+            'profile' => ['nullable', 'array'],
+            'profile.nationality' => ['nullable', 'string', 'max:100'],
+            'profile.currency' => ['nullable', 'string', 'max:10'],
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
             'salary_source' => ['nullable', 'in:gross,net'],
             'salary_value' => ['nullable', 'numeric', 'min:0.01'],
@@ -213,7 +227,9 @@ class EmployeeController extends Controller
             $employee = Employee::create($validated);
             // Keep every employee compatible with the full profile screen,
             // even when optional profile fields have not been entered yet.
-            $employee->profileDetail()->create(['nationality' => 'مصري', 'currency' => 'EGP']);
+            $profile = $validated['profile'] ?? [];
+            unset($validated['profile']);
+            $employee->profileDetail()->create(['nationality' => $profile['nationality'] ?? 'مصري', 'currency' => $profile['currency'] ?? 'EGP']);
             $this->createSalaryStructureFromEmployee($employee);
             return $employee;
         });
@@ -375,12 +391,6 @@ class EmployeeController extends Controller
         $year = (int) substr($nationalId, 1, 2) + ($nationalId[0] === '3' ? 2000 : 1900);
         if (!checkdate($month, $day, $year)) {
             throw ValidationException::withMessages(['national_id' => 'تاريخ الميلاد داخل الرقم القومي غير صحيح.']);
-        }
-        $weights = [2, 7, 6, 5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
-        $sum = 0;
-        foreach ($weights as $index => $weight) $sum += ((int) $nationalId[$index]) * $weight;
-        if ((11 - ($sum % 11)) % 10 !== (int) $nationalId[13]) {
-            throw ValidationException::withMessages(['national_id' => 'الرقم القومي غير صالح. يرجى مراجعته.']);
         }
         $validated['national_id'] = $nationalId;
         $validated['birth_date'] = sprintf('%04d-%02d-%02d', $year, $month, $day);

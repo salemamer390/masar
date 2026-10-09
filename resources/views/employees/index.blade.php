@@ -26,13 +26,14 @@
     ['عقود تنتهي قريبًا', $employeeSummary['contracts_due'], 'حتى '.today()->copy()->addDays(30)->format('d/m/Y'), 'orange', 'calendar2-x-fill', route('employees.index')],
     ['غير مؤمن عليهم', $employeeSummary['uninsured'], 'موظفون بلا سجل تأمين', 'red', 'shield-x', route('insurance.index')],
     ['في إجازة حاليًا', $employeeSummary['on_leave'], 'إجازات معتمدة تشمل اليوم', 'blue', 'calendar2-check-fill', route('leaves.index')],
-  ] as $stat)
-  <a href="{{ $stat[5] }}" class="employee-kpi {{ $stat[3] }}">
+  ] as $statIndex => $stat)
+  <a href="{{ $stat[5] }}" data-kpi-index="{{ $statIndex }}" class="employee-kpi employee-kpi-detail-trigger {{ $stat[3] }}">
     <span class="employee-kpi-icon"><i class="bi bi-{{ $stat[4] }}"></i></span>
     <span><b>{{ $stat[0] }}</b><strong>{{ $stat[1] }}</strong><small>{{ $stat[2] }}</small></span>
   </a>
   @endforeach
 </div>
+<div class="modal fade" id="employeeKpiDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="employeeKpiTitle">تفاصيل الكارت</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="employeeKpiBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 <form method="GET" action="{{ route('employees.index') }}" class="filter-bar">
   <div class="search-table">
     <i class="bi bi-search"></i>
@@ -158,6 +159,14 @@
               <label class="form-label">الرقم القومي</label>
               <input type="text" name="national_id" class="form-control" placeholder="14 رقم">
             </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">النوع</label><input type="text" name="gender" class="form-control" readonly placeholder="يُستخرج من الرقم القومي"></div>
+            <div class="col-6"><label class="form-label">تاريخ الميلاد</label><input type="date" name="birth_date" class="form-control" readonly></div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">الجنسية</label><input type="text" name="profile[nationality]" class="form-control" value="مصري"></div>
+            <div class="col-6"><label class="form-label">العملة</label><input type="text" name="profile[currency]" class="form-control" value="EGP"></div>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
@@ -304,6 +313,8 @@
         }
     });
 })();
-</script>
+</script><script>
 document.querySelectorAll('input[name="national_id"]').forEach(id=>id.addEventListener('input',()=>{const f=id.closest('form');const n=id.value.replace(/\D/g,'');if(n.length!==14||!f)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const m=Number(n.slice(3,5)),d=Number(n.slice(5,7));const date=new Date(year,m-1,d);if(date.getFullYear()!==year||date.getMonth()+1!==m||date.getDate()!==d)return;const birth=f.querySelector('[name="birth_date"]'),gender=f.querySelector('[name="gender"]');if(birth)birth.value=year+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(gender)gender.value=Number(n[12])%2?'ذكر':'أنثى';}));
+const kpiData=@json($employeeCardDetails);const kpiKeys=['total','active','departments','contracts_due','uninsured','on_leave'];const kpiTitles=['إجمالي الموظفين','الموظفون النشطون','الأقسام','عقود تنتهي قريبًا','غير مؤمن عليهم','في إجازة حاليًا'];document.querySelectorAll('.employee-kpi-detail-trigger').forEach(card=>card.addEventListener('click',event=>{event.preventDefault();const index=Number(card.dataset.kpiIndex);const list=kpiData[kpiKeys[index]]||[];document.getElementById('employeeKpiTitle').textContent=kpiTitles[index];document.getElementById('employeeKpiBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.name||'—';const extra=item.employee_code?('#'+item.employee_code):((item.employees_count??'')+' موظف');return '<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.initials||name.slice(0,1))+'</span><div><a href="{{ url('/employees') }}/'+(item.id||'')+'">'+name+'</a><small>'+(item.department?.name||extra||'')+'</small></div></div>';}).join(''):'<div class="text-muted text-center p-4">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('employeeKpiDetails')).show();}));
+</script>
 @endpush

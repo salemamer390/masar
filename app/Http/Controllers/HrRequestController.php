@@ -62,8 +62,14 @@ class HrRequestController extends Controller
             'approved' => (clone $statsQuery)->where('status', 'Approved')->count(),
             'rejected' => (clone $statsQuery)->where('status', 'Rejected')->count(),
         ];
+        $requestCardDetails = [
+            'all' => (clone $statsQuery)->with('employee')->latest('id')->get(),
+            'pending' => (clone $statsQuery)->with('employee')->where('status', 'Pending')->latest('id')->get(),
+            'approved' => (clone $statsQuery)->with('employee')->where('status', 'Approved')->latest('id')->get(),
+            'rejected' => (clone $statsQuery)->with('employee')->where('status', 'Rejected')->latest('id')->get(),
+        ];
 
-        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'stats', 'selectedRequest'));
+        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'stats', 'selectedRequest', 'requestCardDetails'));
     }
 
     public function store(Request $request)

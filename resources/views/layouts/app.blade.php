@@ -12,10 +12,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
   
   <!-- Prototype Stylesheet -->
-  <link href="{{ asset('styles.css') }}" rel="stylesheet">
-  <link href="{{ asset('ux.css') }}" rel="stylesheet">
+  <link href="{{ asset('styles.css') }}?v={{ @filemtime(public_path('styles.css')) }}" rel="stylesheet">
+  <link href="{{ asset('ux.css') }}?v={{ @filemtime(public_path('ux.css')) }}" rel="stylesheet">
+  <link href="{{ asset('design-system.css') }}?v={{ @filemtime(public_path('design-system.css')) }}" rel="stylesheet">
   
   @stack('styles')
 </head>
@@ -77,6 +79,11 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+  function refreshLucideIcons(root = document) {
+    if (window.lucide?.createIcons) window.lucide.createIcons();
+  }
+  document.addEventListener('DOMContentLoaded', () => refreshLucideIcons());
+
   // Convert internal English values to Arabic at presentation time only.
   // Stored codes remain unchanged because application logic relies on them.
   const arabicUiLabels = {

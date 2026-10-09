@@ -578,4 +578,18 @@ window.openRequiredDocument = function (documentTypeId, documentName) {
 (function(){document.querySelectorAll('.profile-tabs a[href*="tab=job"]').forEach(el=>el.remove());const tabs=document.querySelector('.profile-tabs');if(tabs&&!tabs.querySelector('[href*="tab=requests"]')){const a=document.createElement('a');a.className='profile-tab';a.href='{{ route('employees.show',[$employee,'tab'=>'requests']) }}';a.innerHTML='<i class="bi bi-inbox"></i> الطلبات';tabs.appendChild(a);}})();
 (function(){const form=document.querySelector('#employeeMasterModal form');if(!form)return;const id=form.querySelector('[name="national_id"]'),birth=form.querySelector('[name="birth_date"]'),gender=form.querySelector('[name="gender"]');if(!id)return;id.addEventListener('input',()=>{const n=id.value.replace(/\D/g,'');if(n.length!==14||!birth||!gender)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const month=n.slice(3,5),day=n.slice(5,7);const d=new Date(year,Number(month)-1,Number(day));if(d.getFullYear()!==year||d.getMonth()+1!==Number(month)||d.getDate()!==Number(day))return;birth.value=year+'-'+month+'-'+day;gender.value=Number(n[12])%2?'ذكر':'أنثى';});})();
 </script>
+<script>
+(function(){
+ const editForm=document.querySelector('#employeeMasterModal form');
+ const openField=(field)=>{if(!editForm)return;const modal=document.getElementById('employeeMasterModal');bootstrap.Modal.getOrCreateInstance(modal).show();setTimeout(()=>{const input=editForm.querySelector('[name="'+field+'"]')||document.getElementById(field);input?.focus();input?.scrollIntoView({block:'center'});},250);};
+ const personal=document.querySelector('.profile-content > .profile-grid .details-grid');
+ ['full_name','national_id','birth_date','marital_status','phone','email','address','qualification'].forEach((field,index)=>{const cell=personal?.children[index];cell?.addEventListener('dblclick',()=>openField(field));cell?.classList.add('editable-detail');});
+ const summary=document.querySelector('.profile-summary');['job_id','department_id','hire_date','employee_edit_gross'].forEach((field,index)=>{const cell=summary?.children[index];cell?.addEventListener('dblclick',()=>openField(field));cell?.classList.add('editable-detail');});
+ const leavesTable=document.querySelector('.profile-tabs .active[href*="tab=leaves"]')?document.querySelector('.profile-content .table'):null;
+ if(leavesTable){const rows=leavesTable.querySelectorAll('tbody tr');const leaveData=@json($employee->leaves->map(fn($leave)=>['paid'=>(bool)$leave->leaveType?->is_paid]));const head=leavesTable.querySelector('thead tr');if(head&&head.children.length===5){const paidHead=document.createElement('th');paidHead.textContent='الأجر';head.insertBefore(paidHead,head.children[1]);const deductionHead=document.createElement('th');deductionHead.textContent='قيمة الخصم';head.insertBefore(deductionHead,head.lastElementChild);rows.forEach((row,i)=>{if(row.children.length!==5)return;const paid=document.createElement('td');paid.textContent=leaveData[i]?.paid?'بأجر':'بدون أجر';row.insertBefore(paid,row.children[1]);const deduction=document.createElement('td');deduction.textContent=leaveData[i]?.paid?'0':'يحسب في المسير';row.insertBefore(deduction,row.lastElementChild);});}}
+})();
+</script>
+<script>
+(function(){const tabs=document.querySelector('.profile-tabs');if(!tabs||tabs.querySelector('[href*="tab=job"]'))return;const a=document.createElement('a');a.className='profile-tab';a.href='{{ route('employees.show',[$employee,'tab'=>'job']) }}';a.innerHTML='<i class="bi bi-briefcase"></i> البيانات الوظيفية';const requests=tabs.querySelector('[href*="tab=requests"]');tabs.insertBefore(a,requests||null);})();
+</script>
 @endsection
