@@ -141,6 +141,18 @@
     }
   }
 
+  // Notifications center shortcut
+  document.addEventListener('DOMContentLoaded', () => {
+    const menu = document.querySelector('.notification-menu');
+    if (menu && !menu.querySelector('.notification-all-link')) {
+      const link = document.createElement('a');
+      link.className = 'dropdown-item notification-all-link text-center border-top py-2 fw-bold';
+      link.href = @json(route('notifications.index'));
+      link.textContent = 'عرض كل الإشعارات';
+      menu.appendChild(link);
+    }
+  });
+
   // Sidebar toggle
   document.getElementById('menuBtn')?.addEventListener('click', function() {
     document.getElementById('sidebar')?.classList.toggle('open');
