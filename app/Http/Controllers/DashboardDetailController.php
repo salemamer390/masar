@@ -54,7 +54,7 @@ class DashboardDetailController extends Controller
             $items = $this->dashboard->expiringDocuments($user)->filter(fn ($item) => !$search || str_contains(mb_strtolower(($item['employee']?->full_name ?? '').' '.($item['label'] ?? '')), mb_strtolower($search)))->values();
             $items = new \Illuminate\Pagination\LengthAwarePaginator($items->forPage((int) $request->query('page', 1), 15)->values(), $items->count(), 15, (int) $request->query('page', 1), ['path' => $request->url(), 'query' => $request->query()]);
         } elseif ($type === 'documents-incomplete') {
-            $items = collect($this->dashboard->documentCompleteness($user)['employees'])->filter(fn ($item) => $item['complete'] < $item['required'])->filter(fn ($item) => !$search || str_contains(mb_strtolower($item['employee']->full_name), mb_strtolower($search)))->values();
+            $items = collect($this->dashboard->documentCompleteness($user)['employees'])->filter(fn ($item) => count($item['missing_fields'] ?? []) > 0 || count($item['missing_documents'] ?? []) > 0)->filter(fn ($item) => !$search || str_contains(mb_strtolower($item['employee']->full_name), mb_strtolower($search)))->values();
             $items = new \Illuminate\Pagination\LengthAwarePaginator($items->forPage((int) $request->query('page', 1), 15)->values(), $items->count(), 15, (int) $request->query('page', 1), ['path' => $request->url(), 'query' => $request->query()]);
         } elseif ($type === 'requests') {
             $items = $this->requests->pending($user, null, $search);

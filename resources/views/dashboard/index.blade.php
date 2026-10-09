@@ -79,5 +79,23 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('dashboard-details.js') }}"></script>
+@php($dashboardDetailUrls = [
+  'employees' => route('dashboard.details', 'employees'),
+  'new-employees' => route('dashboard.details', 'new-employees'),
+  'attendance' => route('dashboard.details', 'attendance'),
+  'present' => route('dashboard.details', 'present'),
+  'absent' => route('dashboard.details', 'absent'),
+  'late' => route('dashboard.details', 'late'),
+  'payroll-cost' => route('dashboard.details', 'payroll-cost'),
+  'payroll-net' => route('dashboard.details', 'payroll-net'),
+  'payroll-summary' => route('dashboard.details', 'payroll-summary'),
+  'documents-expiring' => route('dashboard.details', 'documents-expiring'),
+  'documents-incomplete' => route('dashboard.details', 'documents-incomplete'),
+  'requests' => route('dashboard.details', 'requests'),
+  'leaves' => route('dashboard.details', 'leaves'),
+])
+<script>
+  window.dashboardDetailUrls = @json($dashboardDetailUrls);
+</script>
+<script src="{{ asset('dashboard-details.js') }}?v={{ @filemtime(public_path('dashboard-details.js')) }}-3"></script>
 @endpush
