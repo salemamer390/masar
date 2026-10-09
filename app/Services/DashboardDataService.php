@@ -71,6 +71,14 @@ class DashboardDataService
             // Presence has priority over leave; it means at least one actual clock event exists.
             if ($record && ($record->check_in || $record->check_out)) {
                 $state = ((int) $record->late_minutes > 0 || in_array($record->status, ['Late', 'متأخر'], true)) ? 'late' : 'present';
+            } elseif ($record && in_array($record->status, ['Present', 'Late', 'Absent', 'On Leave', 'Leave'], true)) {
+                $state = match ($record->status) {
+                    'Present' => 'present',
+                    'Late' => 'late',
+                    'Absent' => 'absent',
+                    'On Leave', 'Leave' => 'leave',
+                    default => 'not_recorded',
+                };
             } elseif ($onLeave->has($employee->id)) {
                 $state = 'leave';
             } else {

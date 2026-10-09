@@ -48,7 +48,7 @@ class AttendanceController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
-            'check_in' => ['nullable'], 'check_out' => ['nullable'], 'status' => ['required', 'string', 'max:50'],
+            'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'], 'status' => ['required', 'string', 'max:50'],
             'late_minutes' => ['nullable', 'integer', 'min:0'], 'source' => ['nullable', 'string', 'max:50'],
         ]);
         $periodGuard->ensureOpen($validated['attendance_date']);
