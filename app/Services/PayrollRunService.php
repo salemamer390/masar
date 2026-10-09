@@ -44,7 +44,7 @@ class PayrollRunService
                 if ($serviceWindow === null) continue;
                 // A historical salary can be the valid one for a past payroll month.
                 $salary = Salary::where('employee_id', $employee->id)
-                    ->where('effective_from', '<=', $month->toDateString())
+                    ->where('effective_from', '<=', $month->copy()->endOfMonth()->toDateString())
                     ->latest('effective_from')->latest('id')->first();
                 if (!$salary) continue;
                 $structure = $this->calculator->structureForSalary($salary);
@@ -233,7 +233,7 @@ class PayrollRunService
     {
         DB::transaction(function () use ($run) {
             $run->refresh();
-            abort_if($run->status !== 'Draft', 422, 'Only draft payroll runs can be deleted.');
+            abort_if(!in_array($run->status, ['Draft', 'Approved'], true), 422, 'لا يمكن حذف مسير مقفول أو مصروف.');
             $snapshot = $run->toArray();
             $run->records()->delete();
             $run->delete();

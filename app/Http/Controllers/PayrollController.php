@@ -46,6 +46,10 @@ class PayrollController extends Controller
     public function generate(Request $request, PayrollRunService $service)
     {
         $targetMonth = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
+        $existing = PayrollRun::whereDate('payroll_month', $targetMonth->toDateString())->first();
+        if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
+            return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا. أنشئ مسيرًا للشهر التالي أو راجع المسير الحالي.']);
+        }
         $run = $service->generate($targetMonth);
         return back()->with('toast', 'تم إنشاء/تحديث مسودة مسير ' . $targetMonth->translatedFormat('F Y') . ' وحفظ لقطة القواعد المستخدمة.');
     }
@@ -53,6 +57,10 @@ class PayrollController extends Controller
     public function generateRun(Request $request, PayrollRunService $service)
     {
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
+        $existing = PayrollRun::whereDate('payroll_month', $month->toDateString())->first();
+        if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
+            return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.']);
+        }
         $service->generate($month);
         return back()->with('toast', 'تم إنشاء مسير الرواتب كمسودة.');
     }

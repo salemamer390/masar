@@ -136,8 +136,11 @@
     const toastEl = document.getElementById('liveToast');
     if (textEl && toastEl) {
       textEl.textContent = arabicUiLabels[msg] || msg;
-      const toast = bootstrap.Toast.getOrCreateInstance(toastEl, { delay: 2500 });
+      const existingToast = bootstrap.Toast.getInstance(toastEl);
+      existingToast?.dispose();
+      const toast = new bootstrap.Toast(toastEl, { delay: 2200, autohide: true });
       toast.show();
+      window.setTimeout(() => toast.hide(), 2300);
     }
   }
 
