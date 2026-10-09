@@ -6,7 +6,8 @@
 <header class="topbar topbar-reference">
   <div class="topbar-date" aria-label="تاريخ اليوم"><i class="bi bi-calendar3"></i><strong>{{ $todayLabel }}</strong></div>
   <div class="topbar-search-area">
-    <button class="icon-btn d-lg-none" id="menuBtn" aria-label="فتح القائمة"><i class="bi bi-list"></i></button>
+    <button class="icon-btn d-lg-none" id="menuBtn" type="button" aria-label="فتح القائمة"><i class="bi bi-list"></i></button>
+    <button class="icon-btn sidebar-hamburger d-none d-lg-inline-flex" id="sidebarToggleBtn" type="button" aria-label="إخفاء القائمة الجانبية" title="إخفاء القائمة الجانبية"><i class="bi bi-list"></i></button>
     @if(auth()->user()?->hasPermission('employees.view'))
       <div class="search-box global-search-reference"><i class="bi bi-search"></i><form action="{{ route('employees.index') }}" method="GET" class="w-100 m-0"><input name="search" placeholder="ابحث عن موظف، طلب، مستند، تقرير ..." id="globalSearch" value="{{ request('search') }}"></form></div>
     @endif

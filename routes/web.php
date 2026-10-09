@@ -100,6 +100,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [AttendanceController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('store');
+        Route::put('/{attendance}', [AttendanceController::class, 'update'])
+            ->middleware('permission:attendance.edit')
+            ->name('update');
+        Route::delete('/{attendance}', [AttendanceController::class, 'destroy'])
+            ->middleware('permission:attendance.edit')
+            ->name('destroy');
         Route::patch('/{attendance}/approve', [AttendanceController::class, 'approve'])
             ->middleware('permission:attendance.edit')
             ->name('approve');
@@ -251,6 +257,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('/penalties/{penalty}/close', [PenaltyController::class, 'close'])
             ->middleware('permission:penalties.edit')
             ->name('close');
+        Route::put('/penalties/{penalty}', [PenaltyController::class, 'update'])
+            ->middleware('permission:penalties.edit')
+            ->name('update');
         Route::delete('/penalties/{penalty}', [PenaltyController::class, 'destroy'])
             ->middleware('permission:penalties.delete')
             ->name('destroy');

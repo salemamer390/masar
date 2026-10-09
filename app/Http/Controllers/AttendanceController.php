@@ -23,7 +23,7 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $today = today();
-        $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date');
+        $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date')->orderByDesc('id');
         if ($request->filled('from_date')) { $query->whereDate('attendance_date', '>=', $request->from_date); }
         if ($request->filled('to_date')) { $query->whereDate('attendance_date', '<=', $request->to_date); }
         if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
@@ -74,6 +74,48 @@ class AttendanceController extends Controller
         $attendance->update(['approval_status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         ActivityLog::record('attendance_approve', 'Attendance record approved.', $attendance, $oldValues, $attendance->only(['approval_status', 'approved_by', 'approved_at']), 'attendance');
         return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Attendance record approved.']) : back()->with('toast', 'تم اعتماد سجل الحضور.');
+    }
+
+    public function update(Request $request, Attendance $attendance, PayrollPeriodGuard $periodGuard)
+    {
+        $validated = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
+            'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'],
+            'status' => ['required', 'string', 'max:50'], 'source' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $periodGuard->ensureOpen($attendance->attendance_date);
+        $periodGuard->ensureOpen($validated['attendance_date']);
+        $duplicate = Attendance::query()->where('employee_id', $validated['employee_id'])
+            ->whereDate('attendance_date', $validated['attendance_date'])
+            ->where('id', '!=', $attendance->id)->exists();
+        if ($duplicate) return back()->withErrors(['attendance' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.']);
+
+        $employee = Employee::findOrFail($validated['employee_id']);
+        $lateMinutes = $this->lateMinutes($validated['check_in'], $employee->shift_start ?: $this->hrSettings->start());
+        $earlyLeaveMinutes = $this->earlyLeaveMinutes($validated['check_out'], $employee->shift_end ?: $this->hrSettings->end());
+        $status = $lateMinutes > 0 ? 'Late' : 'Present';
+        $old = $attendance->toArray();
+        $attendance->update([
+            'employee_id' => $employee->id, 'attendance_date' => $validated['attendance_date'],
+            'check_in' => $validated['check_in'], 'check_out' => $validated['check_out'], 'status' => $status,
+            'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes,
+            'worked_hours' => $this->workedHours($validated['check_in'], $validated['check_out']),
+            'source' => $validated['source'] ?? 'manual',
+            // أي تعديل يستلزم مراجعة السجل من جديد قبل دخوله في المسير.
+            'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
+        ]);
+        ActivityLog::record('attendance_update', 'Attendance record updated.', $attendance, $old, $attendance->toArray(), 'attendance');
+        return back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
+    }
+
+    public function destroy(Attendance $attendance, PayrollPeriodGuard $periodGuard)
+    {
+        $periodGuard->ensureOpen($attendance->attendance_date);
+        $snapshot = $attendance->toArray();
+        $attendance->delete();
+        ActivityLog::record('attendance_delete', 'Attendance record deleted.', null, $snapshot, null, 'attendance');
+        return back()->with('toast', 'تم حذف سجل الحضور.');
     }
 
     private function lateMinutes(?string $checkIn, string $shiftStart): int

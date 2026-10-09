@@ -67,3 +67,9 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 .dashboard-reference-layout .unified-requests-card .dashboard-request-actions .btn{width:28px!important;height:28px!important;border-radius:7px!important}
 .dashboard-reference-layout .unified-requests-card .text-center.text-muted{min-height:185px!important;display:grid!important;place-items:center!important;padding:20px!important}
 @media(max-width:520px){.dashboard-reference-layout .unified-requests-card .reference-list{padding-inline:10px!important}.dashboard-reference-layout .unified-requests-card .unified-request-time{font-size:10px!important}.dashboard-reference-layout .unified-requests-card .unified-request-content>span:nth-child(2) small{display:none!important}}
+/* Direct dashboard actions and request row polish. */
+.dashboard-command-bar--reference button{min-height:52px;border:1px solid var(--border);border-radius:12px;background:#fff;color:#182b50;font-size:12px;font-weight:700;cursor:pointer;transition:.18s;box-shadow:0 3px 10px rgba(23,47,83,.03)}
+.dashboard-command-bar--reference button:hover{color:#fff;background:#1769e0;border-color:#1769e0;transform:translateY(-1px)}
+.dashboard-reference-layout .unified-request-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
+.dashboard-reference-layout .unified-request-copy b{color:#0f172a;font-size:12px;font-weight:700;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dashboard-reference-layout .unified-request-copy small{color:#64748b;font-size:10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

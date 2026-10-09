@@ -4,8 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const title = document.getElementById('dashboardDetailTitle');
   const modal = modalEl ? bootstrap.Modal.getOrCreateInstance(modalEl) : null;
   const detailUrl = (type) => {
-    const aliases = { 'attendance-panel':'attendance', 'recent-leaves':'leaves', 'dates-panel':'documents-expiring', 'payroll-panel':'payroll-summary', 'requests-panel':'requests', 'document-panel':'documents-incomplete', 'new-employees':'new-employees' };
-    type = aliases[type] || type;
     const generated = window.dashboardDetailUrls?.[type];
     if (generated) {
       const parsed = new URL(generated, window.location.origin);
@@ -13,11 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const base = window.location.pathname.replace(/\/dashboard(?:\/.*)?$/, '').replace(/\/$/, '');
     return `${base}/dashboard/details/${encodeURIComponent(type)}`;
-  };
-  const sameOriginUrl = (value, fallbackType) => {
-    if (!value) return detailUrl(fallbackType);
-    const parsed = new URL(value, window.location.origin);
-    return `${parsed.pathname}${parsed.search}`;
   };
   const load = (url, fallbackTried = false) => {
     if (!body || !modal) return;
@@ -42,14 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
         body.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل التفاصيل.<small class="d-block mt-2 text-muted">${error?.message || 'تحقق من اتصال قاعدة البيانات ومسار التطبيق.'}</small><small class="d-block mt-1 text-muted text-break">الرابط: ${url}</small><small class="d-block mt-1 text-muted text-break">الصفحة الحالية: ${window.location.pathname}</small></div>`;
       });
   };
-  document.querySelectorAll('[data-dashboard-detail]:not(.reference-panel)').forEach(element => element.addEventListener('click', event => {
+  document.querySelectorAll('[data-dashboard-detail]').forEach(element => element.addEventListener('click', event => {
     event.preventDefault();
     const label = element.querySelector('b')?.textContent || 'تفاصيل المؤشر';
     const icon = element.dataset.detailIcon || 'grid-1x2-fill';
     title?.querySelector('span:last-child').replaceChildren(document.createTextNode(label));
     const iconElement = title?.querySelector('i');
     if (iconElement) iconElement.className = `bi bi-${icon}`;
-    load(sameOriginUrl(element.dataset.detailUrl, element.dataset.dashboardDetail));
+    load(detailUrl(element.dataset.dashboardDetail));
   }));
   const panelDetails = { 'attendance-panel': ['attendance', 'pie-chart-fill'], 'recent-leaves': ['leaves', 'calendar2-check'], 'dates-panel': ['documents-expiring', 'file-earmark-text-fill'], 'payroll-panel': ['payroll-summary', 'cash-stack'], 'requests-panel': ['requests', 'file-earmark-text'], 'document-panel': ['documents-incomplete', 'folder2-open'], 'new-employees': ['new-employees', 'people-fill'] };
   document.querySelectorAll('.dashboard-reference-layout .reference-panel').forEach(panel => {
@@ -65,17 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
       title?.querySelector('span:last-child').replaceChildren(document.createTextNode(heading));
       const iconElement = title?.querySelector('i');
       if (iconElement) iconElement.className = `bi bi-${icon}`;
-      let url = sameOriginUrl(panel.dataset.detailUrl, type);
-      if (type === 'payroll-summary') {
-        const month = panel.querySelector('[name="payroll_month_number"]')?.value;
-        const year = panel.querySelector('[name="payroll_year"]')?.value;
-        if (month && year) {
-          const parsed = new URL(url, window.location.origin);
-          parsed.searchParams.set('payroll_month', `${year}-${String(month).padStart(2, '0')}`);
-          url = `${parsed.pathname}${parsed.search}`;
-        }
-      }
-      load(url);
+      load(detailUrl(type));
     });
     panel.addEventListener('keydown', event => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -91,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (term.length < 2) { employeeResults.innerHTML = ''; return; }
     const base = window.location.pathname.replace(/\/dashboard(?:\/.*)?$/, '').replace(/\/$/, '');
     fetch(`${base}/dashboard/employee-search?search=` + encodeURIComponent(term), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-      .then(response => response.json())
+        .then(response => response.json())
       .then(items => { employeeResults.innerHTML = items.length ? items.map(item => `<a class="list-group-item list-group-item-action" href="${item.url}">${item.name} <small class="text-muted">(${item.code})</small></a>`).join('') : '<div class="text-muted small p-2">لا توجد نتائج.</div>'; });
   });
 });

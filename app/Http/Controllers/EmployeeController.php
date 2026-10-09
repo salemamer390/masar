@@ -33,7 +33,7 @@ class EmployeeController extends Controller
     }
     public function index(Request $request)
     {
-        $query = Employee::with(['department', 'job', 'status'])->orderBy('id', 'asc');
+        $query = Employee::with(['department', 'job', 'status'])->orderByDesc('id');
 
         if ($request->filled('search')) {
             $s = trim($request->search);

@@ -17,7 +17,7 @@ class InsuranceController extends Controller
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
-            ->orderBy('id')->get();
+            ->orderByDesc('id')->get();
         $employees = Employee::whereDoesntHave('insuranceRecord')->orderBy('full_name')->get();
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
         return view('insurance.index', compact('insuranceRecords', 'employees', 'departments'));

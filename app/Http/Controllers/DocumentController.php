@@ -12,7 +12,7 @@ class DocumentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Document::with(['employee', 'type'])->orderBy('id', 'asc');
+        $query = Document::with(['employee', 'type'])->orderByDesc('id');
 
         if ($request->filled('search')) {
             $s = trim($request->search);

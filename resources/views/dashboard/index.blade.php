@@ -8,12 +8,8 @@
 @section('content')
 <div class="dashboard-command-bar dashboard-command-bar--reference" aria-label="إجراءات سريعة">
   @foreach($quickActions as $action)
-    @if(!empty($action['modal']))
-      <button type="button" data-dashboard-action="{{ $action['modal'] }}" title="رفع مستند لموظف محدد"><i class="fa-solid fa-cloud-arrow-up"></i><span>{{ $action['label'] }}</span></button>
-    @else
-      @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','إصدار مسير الرواتب'=>'fa-circle-dollar-to-slot','تصدير تقرير'=>'fa-chart-simple'])
-      <a href="{{ $action['url'] }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-arrow-up-right-from-square' }}"></i><span>{{ $action['label'] }}</span></a>
-    @endif
+    @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus','إصدار مسير الرواتب'=>'fa-circle-dollar-to-slot'])
+    <button type="button" class="dashboard-existing-action" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
   @endforeach
 </div>
 
@@ -52,8 +48,8 @@
           <div class="unified-request-row dashboard-request-row">
             <a href="{{ $requestItem['details_url'] }}" class="unified-request-content">
               <span class="unified-request-icon request-type-icon" style="color:{{ $requestItem['icon_color'] }};background:{{ $requestItem['icon_background'] }}"><i class="bi {{ $requestItem['icon'] }}"></i></span>
-              <span><b>{{ $requestItem['title'] }}</b><small>{{ $requestItem['subtitle'] }}</small></span>
-              <time class="unified-request-time">{{ $requestItem['created_at']?->format('H:i') }}</time>
+              <span class="unified-request-copy"><b>{{ $requestItem['title'] }}</b><small>{{ $requestItem['subtitle'] }}</small></span>
+              <time class="unified-request-time" datetime="{{ $requestItem['created_at']?->toDateTimeString() }}">{{ $requestItem['created_at']?->format('d/m H:i') }}</time>
             </a>
             @if($requestItem['can_approve'])
               <div class="dashboard-request-actions">
@@ -76,6 +72,29 @@
 
 <div class="modal fade" id="dashboardDetailModal" tabindex="-1" aria-labelledby="dashboardDetailTitle" aria-hidden="true"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="dashboardDetailTitle"><span class="dashboard-modal-title-icon"><i class="bi bi-grid-1x2-fill"></i></span><span>تفاصيل المؤشر</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div><div class="modal-body" id="dashboardDetailBody"><div class="text-center p-5"><span class="spinner-border"></span></div></div></div></div></div>
 <div class="modal fade" id="documentUploadModal" tabindex="-1" aria-labelledby="documentUploadTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 id="documentUploadTitle">اختيار الموظف لرفع مستند</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted small">ابحث عن الموظف ثم افتح تبويب المستندات من ملفه.</p><input class="form-control mb-3" id="documentEmployeeSearch" placeholder="الاسم أو كود الموظف"><div id="documentEmployeeResults" class="list-group"></div></div></div></div></div>
+<div class="modal fade" id="dashboardExistingActionModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-body p-5 text-center"><span class="spinner-border text-primary" role="status"></span><p class="small text-muted mt-3 mb-0">جاري تحميل النموذج...</p></div></div></div></div>
+
+{{-- النماذج المخصصة السابقة معطلة: لوحة التحكم تستخرج النموذج الأصلي من صفحته. --}}
+{{--
+@if(false && auth()->user()?->hasPermission('employees.create'))
+<div class="modal fade" id="dashboardEmployeeModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('employees.store') }}">@csrf<div class="modal-header"><h5>إضافة موظف جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الاسم الكامل</label><input name="full_name" class="form-control" required autofocus></div><div class="row g-2"><div class="col-md-6"><label class="form-label">كود الموظف <small class="text-muted">اختياري</small></label><input name="employee_code" class="form-control" placeholder="يُنشأ تلقائيًا عند تركه فارغًا"></div><div class="col-md-6"><label class="form-label">تاريخ التعيين</label><input name="hire_date" type="date" class="form-control" value="{{ today()->toDateString() }}"></div><div class="col-md-6"><label class="form-label">الراتب الإجمالي</label><input name="gross_salary" type="number" min="0.01" step="0.01" class="form-control" required></div><div class="col-md-6"><label class="form-label">الرقم القومي</label><input name="national_id" class="form-control" inputmode="numeric"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الموظف</button></div></form></div></div></div>
+@endif
+@if(false && auth()->user()?->hasPermission('leaves.create'))
+<div class="modal fade" id="dashboardLeaveModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('leaves.store') }}">@csrf<div class="modal-header"><h5>طلب إجازة جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-3" required>@foreach($dashboardLeaveTypes as $type)<option value="{{ $type->id }}">{{ $type->name }} ({{ $type->is_paid ? 'بأجر' : 'بدون أجر' }})</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input name="start_date" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">إلى</label><input name="end_date" type="date" class="form-control" required></div></div><label class="form-label mt-3">السبب</label><textarea name="reason" class="form-control" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الطلب</button></div></form></div></div></div>
+@endif
+@if(false && auth()->user()?->hasPermission('attendance.create'))
+<div class="modal fade" id="dashboardAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" type="date" class="form-control" value="{{ today()->toDateString() }}" required></div><div class="col-6"><label class="form-label">الحالة</label><select name="status" class="form-select"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" type="time" class="form-control" required></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
+@endif
+@if(false && auth()->user()?->hasPermission('penalties.create'))
+<div class="modal fade" id="dashboardPenaltyModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('discipline.store') }}">@csrf<div class="modal-header"><h5>تسجيل جزاء أو مخالفة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الإجراء</label><select name="penalty_type_id" class="form-select mb-3" required>@foreach($dashboardPenaltyTypes as $type)<option value="{{ $type->id }}">{{ $type->name }}</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="penalty_date" type="date" value="{{ today()->toDateString() }}" class="form-control" required></div><div class="col-6"><label class="form-label">أيام الخصم</label><input name="deduction_days" type="number" min="0" step="0.5" class="form-control"></div></div><label class="form-label mt-3">سبب المخالفة</label><textarea name="reason" class="form-control" required></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ للمراجعة</button></div></form></div></div></div>
+@endif
+@if(false && auth()->user()?->hasPermission('requests.create'))
+<div class="modal fade" id="dashboardRequestModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('requests.store') }}">@csrf<div class="modal-header"><h5>طلب موارد بشرية جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الطلب</label><select name="request_type_id" class="form-select mb-3" required><option value="">اختر النوع</option>@foreach($dashboardRequestTypes as $type)<option value="{{ $type->id }}">{{ $type->display_name }}</option>@endforeach</select><label class="form-label">عنوان الطلب</label><input name="title" class="form-control mb-3" required><label class="form-label">التفاصيل</label><textarea name="details" class="form-control" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">إرسال للمراجعة</button></div></form></div></div></div>
+@endif
+@if(false && auth()->user()?->hasPermission('payroll.create'))
+<div class="modal fade" id="dashboardPayrollModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('payroll.generate') }}">@csrf<div class="modal-header"><h5>إصدار مسير رواتب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted small">سيتم إنشاء أو تحديث مسودة المسير للشهر المحدد وفق هياكل الرواتب السارية.</p><label class="form-label">شهر المسير</label><input name="month" type="month" class="form-control" value="{{ $month->format('Y-m') }}" required></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">إصدار المسير</button></div></form></div></div></div>
+@endif
+--}}
 @endsection
 
 @push('scripts')
@@ -98,4 +117,40 @@
   window.dashboardDetailUrls = @json($dashboardDetailUrls);
 </script>
 <script src="{{ asset('dashboard-details.js') }}?v={{ @filemtime(public_path('dashboard-details.js')) }}-3"></script>
+<script>
+document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const modalEl = document.getElementById('dashboardExistingActionModal');
+    const body = modalEl?.querySelector('.modal-content');
+    if (!modalEl || !body) return;
+    body.innerHTML = '<div class="modal-body p-5 text-center"><span class="spinner-border text-primary"></span><p class="small text-muted mt-3 mb-0">جاري تحميل النموذج...</p></div>';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    try {
+      const response = await fetch(button.dataset.dashboardPage, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const sourceModal = button.dataset.dashboardSourceModal ? source.getElementById(button.dataset.dashboardSourceModal) : source.querySelector(button.dataset.dashboardSourceSelector);
+      const content = sourceModal?.querySelector('.modal-content') || sourceModal;
+      if (!content) throw new Error('لم يتم العثور على نموذج الإدخال الأصلي');
+      body.innerHTML = content.innerHTML;
+      body.querySelectorAll('.btn-close').forEach((close) => close.addEventListener('click', () => bootstrap.Modal.getOrCreateInstance(modalEl).hide()));
+      // نموذج الموظف يحتوي حساب Gross/Net واستخراج الرقم القومي في سكربت الصفحة الأصلية.
+      // نشغّله هنا فقط بعد تركيب النموذج الأصلي داخل النافذة.
+      if (button.dataset.dashboardSourceModal === 'addEmployeeModal') {
+        source.querySelectorAll('script').forEach((script) => {
+          if (!script.textContent.includes('new_employee_')) return;
+          const runtimeScript = document.createElement('script');
+          runtimeScript.textContent = script.textContent;
+          document.body.appendChild(runtimeScript);
+          runtimeScript.remove();
+        });
+      }
+      body.querySelector('input,select,textarea')?.focus();
+    } catch (error) {
+      body.innerHTML = '<div class="modal-body p-4"><div class="alert alert-danger mb-0">تعذر تحميل نموذج الإدخال الأصلي. افتح الصفحة المرتبطة لإعادة المحاولة.</div></div>';
+      console.error('Dashboard action form load failed', error);
+    }
+  });
+});
+</script>
 @endpush

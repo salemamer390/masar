@@ -24,7 +24,7 @@ class LeaveController extends Controller
 
     public function index(Request $request)
     {
-        $query = Leave::with(['employee.department', 'leaveType'])->orderByDesc('start_date');
+        $query = Leave::with(['employee.department', 'leaveType'])->orderByDesc('start_date')->orderByDesc('id');
         if ($request->filled('status')) $query->where('status', $request->status);
         if ($request->filled('employee_id')) $query->where('employee_id', $request->employee_id);
         if ($request->filled('department_id')) $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id));

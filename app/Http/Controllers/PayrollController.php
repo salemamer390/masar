@@ -19,7 +19,7 @@ class PayrollController extends Controller
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $records = PayrollRecord::with(['employee.department', 'employee.job'])
             ->whereDate('payroll_month', $month->toDateString())
-            ->orderBy('id')
+            ->orderByDesc('id')
             ->get();
 
         $totalEmployees = Employee::count();
@@ -117,7 +117,7 @@ class PayrollController extends Controller
     {
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $records = PayrollRecord::with(['employee.department', 'employee.job'])
-            ->whereDate('payroll_month', $month->toDateString())->orderBy('id')->get();
+            ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
         if ($request->string('format')->lower() === 'csv') {
             $filename = 'tazamun-payroll-' . $month->format('Y-m') . '.csv';

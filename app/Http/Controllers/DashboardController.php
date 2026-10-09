@@ -38,13 +38,13 @@ class DashboardController extends Controller
         $pendingRequests = $allPendingRequests->take(5)->values();
         $pendingRequestsCount = $allPendingRequests->count();
         $requestsIndexUrl = $this->requests->listingUrl($user);
-        $recentLeaves = $can('leaves.view') ? Leave::with(['employee', 'leaveType'])->whereIn('status', ['Approved', 'Rejected'])->latest('approved_at')->latest('updated_at')->limit(7)->get() : collect();
+        $recentLeaves = $can('leaves.view') ? Leave::with(['employee', 'leaveType'])->whereIn('status', ['Approved', 'Rejected'])->latest('approved_at')->latest('updated_at')->latest('id')->limit(7)->get() : collect();
         $recentEmployees = collect();
         if ($can('employees.view')) {
-            $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereBetween('hire_date', [$currentMonth, $currentMonth->copy()->endOfMonth()])->whereDate('hire_date', '<=', $today)->latest('hire_date')->limit(7)->get();
-            if ($recentEmployees->isEmpty()) $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereDate('hire_date', '<=', $today)->latest('hire_date')->limit(7)->get();
+            $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereBetween('hire_date', [$currentMonth, $currentMonth->copy()->endOfMonth()])->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();
+            if ($recentEmployees->isEmpty()) $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();
         }
-        $recentMovements = $can('movements.view') ? MovementRecord::with(['employee', 'movementType'])->latest('movement_date')->limit(5)->get() : collect();
+        $recentMovements = $can('movements.view') ? MovementRecord::with(['employee', 'movementType'])->latest('movement_date')->latest('id')->limit(5)->get() : collect();
 
         $heroMetrics = [];
         if ($can('employees.view')) $heroMetrics[] = ['key' => 'employees', 'label' => 'الموظفون النشطون', 'value' => format_number($active), 'hint' => $newHires ? '+'.$newHires.' هذا الشهر' : 'الموظفون النشطون', 'icon' => 'people-fill', 'tone' => 'blue', 'url' => route('employees.index')];
@@ -65,15 +65,14 @@ class DashboardController extends Controller
 
         $visibleModules = array_keys(array_filter(['employees' => $can('employees.view'), 'attendance' => $can('attendance.view'), 'leaves' => $can('leaves.view'), 'documents' => $can('documents.view'), 'payroll' => $can('payroll.view'), 'movements' => $can('movements.view')]));
         $activities = $visibleModules ? ActivityLog::with('user')->whereIn('module', $visibleModules)->latest()->limit(6)->get() : collect();
+        // إجراءات لوحة التحكم تفتح نماذج الإدخال مباشرة، بدلاً من نقل المستخدم بعيداً عن سياق العمل.
         $quickActions = array_values(array_filter([
-            $can('employees.create') ? ['label' => 'موظف جديد', 'icon' => 'person-plus-fill', 'url' => route('employees.index', ['create' => 1])] : null,
-            $can('leaves.create') ? ['label' => 'تسجيل إجازة', 'icon' => 'calendar-plus-fill', 'url' => route('leaves.index', ['create' => 1])] : null,
-            $can('attendance.create') ? ['label' => 'تسجيل حضور', 'icon' => 'clock-fill', 'url' => route('attendance.index', ['create' => 1])] : null,
-            $can('penalties.create') ? ['label' => 'تسجيل جزاء', 'icon' => 'gavel', 'url' => route('discipline.index', ['create' => 1])] : null,
-            $can('documents.view') ? ['label' => 'المستندات', 'icon' => 'folder2-open', 'url' => route('documents.index')] : null,
-            $can('requests.create') ? ['label' => 'طلب HR جديد', 'icon' => 'file-earmark-plus-fill', 'url' => route('requests.index', ['create' => 1])] : null,
-            $can('payroll.create') ? ['label' => 'إصدار مسير الرواتب', 'icon' => 'currency-dollar', 'url' => route('payroll.index', ['month' => $month->format('Y-m-01')])] : null,
-            $can('reports.view') ? ['label' => 'تصدير تقرير', 'icon' => 'bar-chart-line-fill', 'url' => route('reports.index')] : null,
+            $can('employees.create') ? ['label' => 'موظف جديد', 'icon' => 'person-plus-fill', 'page' => route('employees.index', ['create' => 1]), 'source_modal' => 'addEmployeeModal'] : null,
+            $can('leaves.create') ? ['label' => 'تسجيل إجازة', 'icon' => 'calendar-plus-fill', 'page' => route('leaves.index', ['create' => 1]), 'source_modal' => 'leaveModal'] : null,
+            $can('attendance.create') ? ['label' => 'تسجيل حضور', 'icon' => 'clock-fill', 'page' => route('attendance.index', ['create' => 1]), 'source_modal' => 'attendanceModal'] : null,
+            $can('penalties.create') ? ['label' => 'تسجيل جزاء', 'icon' => 'gavel', 'page' => route('discipline.index', ['create' => 1]), 'source_modal' => 'penaltyModal'] : null,
+            $can('requests.create') ? ['label' => 'طلب HR جديد', 'icon' => 'file-earmark-plus-fill', 'page' => route('requests.index', ['create' => 1]), 'source_modal' => 'requestCreateModal'] : null,
+            $can('payroll.create') ? ['label' => 'إصدار مسير الرواتب', 'icon' => 'currency-dollar', 'page' => route('payroll.index', ['month' => $month->format('Y-m-01')]), 'source_selector' => 'form[action*="/payroll/runs/generate"]'] : null,
         ]));
 
         $payrollYears = $can('payroll.view') ? \App\Models\PayrollRun::query()->selectRaw('YEAR(payroll_month) year')->distinct()->orderByDesc('year')->pluck('year') : collect();

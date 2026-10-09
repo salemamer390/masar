@@ -19,7 +19,7 @@ class PenaltyController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $request->from_date))
             ->when($request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $request->to_date))
-            ->orderBy('penalty_date', 'desc')
+            ->orderByDesc('penalty_date')->orderByDesc('id')
             ->paginate(25)->withQueryString();
 
         $employees = Employee::orderBy('full_name')->get();
@@ -96,10 +96,44 @@ class PenaltyController extends Controller
         return back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
     }
 
+    public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard)
+    {
+        $validated = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'penalty_type_id' => ['required', 'exists:penalty_types,id'],
+            'penalty_date' => ['required', 'date'],
+            'reason' => ['required', 'string', 'max:500'],
+            'details' => ['nullable', 'string'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+            'deduction_days' => ['nullable', 'numeric', 'min:0'],
+        ]);
+        $periodGuard->ensureOpen($penalty->penalty_date);
+        $periodGuard->ensureOpen($validated['penalty_date']);
+
+        $type = PenaltyType::findOrFail($validated['penalty_type_id']);
+        $before = $penalty->toArray();
+        $penalty->update([
+            'employee_id' => $validated['employee_id'],
+            'penalty_type_id' => $type->id,
+            'penalty_date' => $validated['penalty_date'],
+            'title' => $type->name,
+            'reason' => $validated['reason'],
+            'action' => $validated['details'] ?? $validated['reason'],
+            'amount' => $validated['amount'] ?? 0,
+            'deduction_days' => array_key_exists('deduction_days', $validated) ? $validated['deduction_days'] : $type->default_deduction_days,
+            // التعديل يعيد الإجراء للمراجعة حتى لا يعتمد أثر مالي قديم على بيانات جديدة.
+            'status' => 'Pending', 'closed_at' => null,
+        ]);
+        ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
+        return back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
+    }
+
     public function destroy(Penalty $penalty, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
+        $snapshot = $penalty->toArray();
         $penalty->delete();
+        ActivityLog::record('penalty_delete', 'تم حذف إجراء تأديبي.', null, $snapshot, null, 'discipline');
         return back()->with('toast', 'تم حذف السجل');
     }
 }

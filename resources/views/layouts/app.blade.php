@@ -145,6 +145,22 @@
   document.getElementById('menuBtn')?.addEventListener('click', function() {
     document.getElementById('sidebar')?.classList.toggle('open');
   });
+  document.addEventListener('DOMContentLoaded', () => {
+    const shell = document.querySelector('.app-shell');
+    const toggle = document.getElementById('sidebarToggleBtn');
+    if (!shell || !toggle) return;
+    const applySidebarState = (collapsed) => {
+      shell.classList.toggle('sidebar-collapsed', collapsed);
+      toggle.setAttribute('aria-label', collapsed ? 'إظهار القائمة الجانبية' : 'إخفاء القائمة الجانبية');
+      toggle.setAttribute('title', collapsed ? 'إظهار القائمة الجانبية' : 'إخفاء القائمة الجانبية');
+    };
+    applySidebarState(localStorage.getItem('masar_sidebar_collapsed') === '1');
+    toggle.addEventListener('click', () => {
+      const collapsed = !shell.classList.contains('sidebar-collapsed');
+      localStorage.setItem('masar_sidebar_collapsed', collapsed ? '1' : '0');
+      applySidebarState(collapsed);
+    });
+  });
 
   // Dark mode toggle with persistence
   const themeBtn = document.getElementById('themeToggleBtn');
