@@ -93,6 +93,7 @@ class InsuranceController extends Controller
             'office_name' => ['nullable', 'string', 'max:150'], 'establishment_number' => ['nullable', 'string', 'max:100'],
             'organization_name' => ['nullable', 'string', 'max:190'], 'address' => ['nullable', 'string', 'max:255'],
             'applicant_name' => ['nullable', 'string', 'max:150'], 'applicant_title' => ['nullable', 'string', 'max:150'],
+            'applicant_insurance_number' => ['nullable', 'string', 'max:100'], 'applicant_national_id' => ['nullable', 'string', 'max:14'],
             'phone' => ['nullable', 'string', 'max:50'], 'grace_days' => ['required', 'integer', 'min:1', 'max:365'],
         ]);
         DB::table('insurance_organization_settings')->updateOrInsert(['id' => 1], $data + ['updated_at' => now(), 'created_at' => now()]);

@@ -1,1 +1,77 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>نموذج س1 — {{ $insuranceRecord->employee?->full_name }}</title><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"><style>body{font-family:Cairo,Arial,sans-serif;color:#18243a;background:#f4f7fb;margin:0}.sheet{max-width:920px;margin:28px auto;background:#fff;padding:34px;border:1px solid #dce5f1;border-radius:12px;box-shadow:0 10px 30px #1d36520f}.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #183d79;padding-bottom:16px;margin-bottom:22px}.head h1{font-size:20px;margin:0 0 5px}.muted{color:#64748b;font-size:12px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.cell{border:1px solid #dfe7f0;border-radius:8px;padding:10px 12px;min-height:46px}.cell label{display:block;color:#64748b;font-size:10px;margin-bottom:3px}.cell b{font-size:13px}.section{font-size:15px;color:#183d79;margin:23px 0 10px;border-right:4px solid #1769e0;padding-right:8px}.actions{max-width:920px;margin:20px auto;text-align:left}.actions button{border:0;border-radius:8px;background:#1769e0;color:#fff;padding:10px 18px;font-family:inherit;cursor:pointer}@media print{body{background:#fff}.sheet{box-shadow:none;border:0;margin:0;max-width:none}.actions{display:none}}</style></head><body><div class="actions"><button onclick="window.print()">طباعة نموذج س1</button></div><main class="sheet"><div class="head"><div><h1>الهيئة القومية للتأمين الاجتماعي</h1><div class="muted">نموذج رقم (1) — طلب اشتراك مؤمن عليه</div></div><div class="muted">الفئة: {{ $insuranceRecord->insurance_category ?: 'العاملون لدى الغير' }}</div></div><h2 class="section">بيانات المنشأة</h2><div class="grid"><div class="cell"><label>اسم المنشأة</label><b>{{ $organization?->organization_name ?: '—' }}</b></div><div class="cell"><label>رقم المنشأة</label><b>{{ $organization?->establishment_number ?: '—' }}</b></div><div class="cell"><label>مكتب التأمينات</label><b>{{ $insuranceRecord->insurance_office ?: $organization?->office_name ?: '—' }}</b></div><div class="cell"><label>عنوان المنشأة</label><b>{{ $organization?->address ?: '—' }}</b></div><div class="cell"><label>مقدم الطلب</label><b>{{ $organization?->applicant_name ?: '—' }}</b></div><div class="cell"><label>الصفة / الهاتف</label><b>{{ $organization?->applicant_title ?: '—' }} · {{ $organization?->phone ?: '—' }}</b></div></div><h2 class="section">بيانات المؤمن عليه</h2><div class="grid"><div class="cell"><label>كود الموظف</label><b>{{ $insuranceRecord->employee?->employee_code ?: '—' }}</b></div><div class="cell"><label>اسم المؤمن عليه</label><b>{{ $insuranceRecord->employee?->full_name ?: '—' }}</b></div><div class="cell"><label>الرقم القومي</label><b>{{ $insuranceRecord->employee?->national_id ?: '—' }}</b></div><div class="cell"><label>الرقم التأميني</label><b>{{ $insuranceRecord->insurance_number ?: '—' }}</b></div><div class="cell"><label>الوظيفة / كود المهنة</label><b>{{ $insuranceRecord->employee?->job?->title ?: '—' }} · {{ $insuranceRecord->job_code ?: '—' }}</b></div><div class="cell"><label>القسم</label><b>{{ $insuranceRecord->employee?->department?->name ?: '—' }}</b></div><div class="cell"><label>تاريخ بدء التأمين</label><b>{{ $insuranceRecord->insurance_start_date?->format('d/m/Y') ?: '—' }}</b></div><div class="cell"><label>الأجر التأميني</label><b>{{ $insuranceRecord->insured_salary !== null ? number_format($insuranceRecord->insured_salary,2).' ج.م' : '—' }}</b></div></div></main></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>نموذج س1 - {{ $insuranceRecord->employee?->full_name }}</title>
+    <style>
+        @page { size: A4 portrait; margin: 0; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #e9edf2; font-family: Tahoma, Arial, sans-serif; color: #111; }
+        .toolbar { width: 210mm; margin: 12px auto; display: flex; gap: 8px; justify-content: flex-start; }
+        .toolbar button, .toolbar a { border: 0; border-radius: 5px; padding: 9px 15px; background: #145ec8; color: #fff; text-decoration: none; font: inherit; cursor: pointer; }
+        .toolbar a { background: #fff; color: #19345b; border: 1px solid #c8d2df; }
+        .sheet { position: relative; width: 210mm; height: 297mm; margin: 0 auto 12px; background: #fff center/100% 100% no-repeat; overflow: hidden; }
+        .front { background-image: url('{{ asset('templates/insurance/s1-page1.png') }}'); }
+        .back { background-image: url('{{ asset('templates/insurance/s1-page2.png') }}'); }
+        .field { position: absolute; z-index: 2; white-space: nowrap; font-size: 3.2mm; font-weight: 700; line-height: 1; direction: rtl; }
+        .small { font-size: 2.8mm; }
+        .center { transform: translateX(-50%); text-align: center; }
+        .ltr { direction: ltr; }
+        .check { font-size: 5mm; font-weight: 900; }
+        .digits { display: flex; direction: ltr; gap: 0; height: 6.5mm; }
+        .digit { width: 6.35mm; height: 6.5mm; display: inline-flex; align-items: center; justify-content: center; font-size: 3.4mm; }
+        @media print { body { background: #fff; } .toolbar { display: none; } .sheet { margin: 0; page-break-after: always; } .sheet:last-child { page-break-after: auto; } }
+        @media screen and (max-width: 850px) { .toolbar, .sheet { width: 100vw; } .sheet { height: 141.43vw; } }
+    </style>
+</head>
+<body>
+    <div class="toolbar"><button type="button" onclick="window.print()">طباعة نموذج س1</button><a href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
+
+    @php
+        $employee = $insuranceRecord->employee;
+        $nationalId = preg_replace('/\D+/', '', (string) ($employee?->national_id ?? ''));
+        $nationalId = str_pad(substr($nationalId, 0, 14), 14, ' ');
+        $insuranceNumber = preg_replace('/\D+/', '', (string) ($insuranceRecord->insurance_number ?? ''));
+        $insuranceNumber = str_pad(substr($insuranceNumber, 0, 9), 9, ' ');
+        $establishmentNumber = preg_replace('/\D+/', '', (string) ($organization?->establishment_number ?? ''));
+        $establishmentNumber = str_pad(substr($establishmentNumber, 0, 9), 9, ' ');
+        $start = $insuranceRecord->insurance_start_date?->format('d/m/Y');
+        $arabicDigits = fn ($value) => strtr((string) $value, ['0' => '٠', '1' => '١', '2' => '٢', '3' => '٣', '4' => '٤', '5' => '٥', '6' => '٦', '7' => '٧', '8' => '٨', '9' => '٩']);
+    @endphp
+
+    <section class="sheet front">
+        {{-- مربعات الفئة --}}
+        @if(($insuranceRecord->insurance_category ?? '') === 'العاملون لدى الغير')<span class="field check" style="top:35.7mm;right:45.7mm">✓</span>@endif
+        @if(($insuranceRecord->insurance_category ?? '') !== 'العاملون لدى الغير')<span class="field check" style="top:35.7mm;right:83.8mm">✓</span>@endif
+        <span class="field" style="top:48.2mm;right:42mm">{{ $organization?->applicant_name ?: '' }}</span>
+        <span class="field" style="top:54.5mm;right:78mm">{{ $organization?->applicant_title ?: '' }}</span>
+        <span class="field ltr" style="top:61.1mm;right:77mm">{{ $organization?->phone ?: '' }}</span>
+        <span class="field digits" style="top:53.5mm;right:43mm">@foreach(str_split($insuranceNumber) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
+        <span class="field digits" style="top:63.7mm;right:43mm">@foreach(str_split($nationalId) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
+
+        <span class="field" style="top:76.7mm;right:73mm">{{ $employee?->full_name ?: '' }}</span>
+        <span class="field digits" style="top:77.5mm;right:55mm">@foreach(str_split($insuranceNumber) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
+        <span class="field digits" style="top:87.8mm;right:55mm">@foreach(str_split($nationalId) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
+        <span class="field" style="top:98.2mm;right:81mm">{{ $employee?->gender === 'female' ? 'أنثى' : 'ذكر' }}</span>
+        <span class="field" style="top:98.2mm;right:52mm">{{ $employee?->job?->title ?: '' }}</span>
+        <span class="field ltr" style="top:108.7mm;right:39mm">{{ $start ? $arabicDigits($start) : '' }}</span>
+        <span class="field" style="top:119.5mm;right:60mm">{{ $insuranceRecord->insurance_category ?: 'العاملون لدى الغير' }}</span>
+        <span class="field ltr" style="top:136.3mm;right:119mm">{{ $insuranceRecord->insured_salary !== null ? $arabicDigits(number_format((float) $insuranceRecord->insured_salary, 2)) : '' }}</span>
+        <span class="field ltr" style="top:136.3mm;right:61mm">{{ $insuranceRecord->insured_salary !== null ? $arabicDigits(number_format((float) $insuranceRecord->insured_salary, 2)) : '' }}</span>
+        <span class="field" style="top:184.7mm;right:79mm">{{ $organization?->organization_name ?: '' }}</span>
+        <span class="field digits" style="top:193.2mm;right:135mm">@foreach(str_split($establishmentNumber) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
+        <span class="field" style="top:214.4mm;right:72mm">{{ $organization?->address ?: '' }}</span>
+        <span class="field" style="top:234.5mm;right:45mm">{{ $organization?->applicant_name ?: '' }}</span>
+        <span class="field ltr" style="top:240mm;right:42mm">{{ $organization?->phone ?: '' }}</span>
+    </section>
+
+    <section class="sheet back">
+        <span class="field" style="top:144.5mm;right:49mm">{{ $organization?->organization_name ?: '' }}</span>
+        <span class="field" style="top:144.5mm;right:127mm">{{ $arabicDigits(trim($insuranceNumber)) }}</span>
+        <span class="field" style="top:153mm;right:61mm">{{ $organization?->address ?: '' }}</span>
+        <span class="field" style="top:202mm;right:52mm">{{ $organization?->applicant_name ?: '' }}</span>
+        <span class="field" style="top:246mm;right:54mm">{{ $employee?->full_name ?: '' }}</span>
+    </section>
+</body>
+</html>
