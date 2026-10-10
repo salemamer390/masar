@@ -24,11 +24,11 @@
   /* ضع ملفات الخطوط في public/fonts */
   @font-face { font-family: 'Mudir MT';        src: url('{{ asset('fonts/MudirMT.ttf') }}') format('truetype'); }
   @font-face { font-family: 'PT Bold Heading'; src: url('{{ asset('fonts/PTBoldHeading.ttf') }}') format('truetype'); }
-  @page { size: 8.5in 14in; margin: 0; }
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { margin: 0; padding: 0; color: #000; }
-  body { font-family: 'Mudir MT', 'Cairo', 'Tahoma', sans-serif; font-size: 14pt; direction: rtl; background: #ddd; }
-  .page { width: 8.5in; height: 14in; padding: .45in .5in; margin: 0 auto 12px; background: #fff; overflow: hidden; page-break-after: always; }
+  body { font-family: 'Mudir MT', 'Cairo', 'Tahoma', sans-serif; font-size: 11.8pt; direction: rtl; background: #ddd; }
+  .page { width: 210mm; height: 297mm; padding: 8mm 10mm 5mm; margin: 0 auto 12px; background: #fff; overflow: hidden; page-break-after: always; }
   .page:last-child { page-break-after: auto; }
   @media print { body { background: #fff; } .page { margin: 0; } }
 
@@ -43,7 +43,7 @@
   .sec:before, .sec:after { content: ''; flex: 1; border-top: 2.5pt solid #000; }
   .sec span { border: 1.5pt solid #000; border-radius: 9pt; padding: 1pt 24pt; min-width: 150pt; text-align: center; font-size: 14pt; white-space: nowrap; }
 
-  .r { display: flex; align-items: flex-end; min-height: 25pt; margin-bottom: 5pt; white-space: nowrap; }
+  .r { display: flex; align-items: flex-end; min-height: 21pt; margin-bottom: 3pt; white-space: nowrap; }
   .l { flex: none; }  .l1 { flex: none; width: 130pt; }  .l + .v, .l + .bx, .l + .cb { margin-right: 4pt; }
   .v { flex: 1; border-bottom: 1px dotted #000; min-height: 18pt; padding: 0 4pt; text-align: center; overflow: hidden; font-size: 14pt; }
   .gap { flex: none; width: 14pt; }
@@ -54,7 +54,7 @@
   .num { flex: none; display: inline-block; width: 19pt; height: 21pt; border: 1px solid #000; text-align: center; font-family: 'Times New Roman', serif; line-height: 19pt; }
   .money { display: flex; flex-direction: column; flex: none; }
   .money small { border: 1px solid #000; border-bottom: 0; text-align: center; font-size: 8pt; line-height: 11pt; margin-left: -1px; }
-  .note { font-size: 12pt; margin-top: 6pt; }
+  .note { font-size: 10.5pt; margin-top: 4pt; line-height: 1.35; white-space: normal; }
 
   /* صفحة الضهر */
   .txt { line-height: 24pt; text-align: justify; }
@@ -62,6 +62,15 @@
   .sub { padding-right: 27pt; }
   .sig { margin: 4pt 0 0 0; } .sig .p { margin-top: 16pt; font-size: 12pt; }
   .center { text-align: center; }
+  .page:first-of-type .sec { margin-top: 5pt; margin-bottom: 3pt; }
+  .page:first-of-type .txt { line-height: 18pt; }
+  .page:first-of-type .sig { margin-top: 2pt; }
+  /* الصفحة الأولى تحتوي على آخر ملاحظة وتوقيع؛ نترك لها مساحة إضافية داخل A4 */
+  .page:first-of-type { padding-top: 5mm; padding-bottom: 3mm; }
+  .page:first-of-type .r { min-height: 18pt; margin-bottom: 2pt; }
+  .page:first-of-type .note { font-size: 9.5pt; line-height: 1.25; margin-top: 2pt; }
+  .page:nth-of-type(2) .sig { text-align: left; direction: rtl; }
+  .page:nth-of-type(2) .sig .p { text-align: left; padding-right: 0 !important; }
 </style>
 </head>
 <body>
@@ -117,7 +126,7 @@
   <div class="r"><span class="l1">قسم / مركز :</span><span class="v">{{ $d['addr_district'] }}</span><span class="gap"></span><span class="l">محافظة :</span><span class="v">{{ $d['addr_governorate'] }}</span></div>
 
   <div class="sec"><span>التوقيع</span></div>
-  <div class="r"><span class="l1">توقيع المؤمن عليه :</span><span class="v" style="flex:.9"></span><span class="gap" style="width:40pt"></span><span class="l" style="flex:1;text-align:center">توقيع صاحب العمل / المدير المسئول</span></div>
+  <div class="r"><span class="l1 h">توقيع المؤمن عليه :</span><span class="v" style="flex:.9"></span><span class="gap" style="width:40pt"></span><span class="l h" style="flex:1;text-align:center">توقيع صاحب العمل / المدير المسئول</span></div>
   <div class="r" style="min-height:30pt"><span class="l1">رقم التليفون :</span><span class="v" dir="ltr" style="flex:.9">{{ $d['phone'] }}</span><span class="gap" style="width:40pt"></span><span class="l">(</span><span class="v" style="flex:.8"></span><span class="l">)</span></div>
   <div class="r"><span class="l1">تحريراً في :</span><span class="l" dir="ltr" style="font-family:Arial">{{ $d['issue_date'] }}</span></div>
 

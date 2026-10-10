@@ -27,6 +27,8 @@ class EditableS6Controller extends Controller
             'name' => $employee->full_name ?? '',
             'est_name' => $organization?->organization_name ?? '',
             'est_no' => $this->digits($organization?->establishment_number),
+            // The address on page two belongs to the establishment, not the employee.
+            'address' => $organization?->address ?? '',
             'end_day' => $this->arabicDigits($endDate?->format('d') ?? ''),
             'end_month' => $this->arabicDigits($endDate?->format('m') ?? ''),
             'end_year' => $this->arabicDigits($endDate?->format('Y') ?? ''),
