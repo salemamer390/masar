@@ -8,6 +8,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeContactController;
 use App\Http\Controllers\InsuranceController;
+use App\Http\Controllers\EditableS1Controller;
 use App\Http\Controllers\HrRequestController;
 use App\Http\Controllers\JobDataController;
 use App\Http\Controllers\LeaveController;
@@ -241,6 +242,9 @@ Route::middleware('auth')->group(function () {
     });
 
     // Insurance
+    Route::get('/employees/{employee}/forms/s1-editable', [EditableS1Controller::class, 'show'])
+        ->middleware('permission:insurance.view')
+        ->name('employees.forms.s1.editable');
     Route::prefix('insurance')->name('insurance.')->group(function () {
         Route::get('/', [InsuranceController::class, 'index'])
             ->middleware('permission:insurance.view')
