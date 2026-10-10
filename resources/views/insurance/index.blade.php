@@ -14,6 +14,10 @@
     <div class="col-md-6"><label class="form-label">الرقم القومي لمقدم الطلب</label><input name="applicant_national_id" maxlength="14" class="form-control" value="{{ $organization?->applicant_national_id }}"></div>
     <div class="col-md-6"><label class="form-label">رقم التليفون</label><input name="phone" class="form-control" value="{{ $organization?->phone }}"></div>
     <div class="col-md-6"><label class="form-label">اسم المنشأة</label><input name="organization_name" class="form-control" value="{{ $organization?->organization_name }}"></div>
+    <div class="col-md-6"><label class="form-label">قطاع المنشأة</label><input name="sector" class="form-control" value="{{ $organization?->sector }}"></div>
+    <div class="col-md-6"><label class="form-label">رقم التسجيل الضريبي</label><input name="tax_registration_number" class="form-control" value="{{ $organization?->tax_registration_number }}"></div>
+    <div class="col-md-6"><label class="form-label">رقم السجل التجاري</label><input name="commercial_registration_number" class="form-control" value="{{ $organization?->commercial_registration_number }}"></div>
+    <div class="col-md-6"><label class="form-label">رقم السجل التجاري الموحد</label><input name="unified_commercial_registration_number" class="form-control" value="{{ $organization?->unified_commercial_registration_number }}"></div>
     <div class="col-md-6"><label class="form-label">رقم المنشأة</label><input name="establishment_number" class="form-control" value="{{ $organization?->establishment_number }}"></div>
     <div class="col-12"><label class="form-label">العنوان</label><input name="address" class="form-control" value="{{ $organization?->address }}"></div>
     <div class="col-md-4"><label class="form-label">مدة السماح للتسجيل (يوم)</label><input type="number" min="1" max="365" name="grace_days" class="form-control" value="{{ $organization?->grace_days ?? 30 }}" required></div>

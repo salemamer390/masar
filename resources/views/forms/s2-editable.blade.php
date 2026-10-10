@@ -46,7 +46,7 @@
         .meta-field.commercial-row .fill, .meta-field.establishment-row .fill { flex: 1; min-width: 12mm; }
         .meta-field.establishment-row { grid-column: 1 / -1; grid-row: 3; gap: 1.5mm; }
         .boxes { display: inline-flex; direction: ltr; vertical-align: middle; }
-        .boxes i { display: block; width: 21pt; height: 21pt; border: 1px solid #000; margin-left: -1px; }
+        .boxes i { display: flex; align-items: center; justify-content: center; width: 21pt; height: 21pt; border: 1px solid #000; margin-left: -1px; padding: 0; font-family: Tahoma, Arial, sans-serif; font-size: 10pt; font-style: normal; line-height: 1; text-align: center; direction: ltr; unicode-bidi: isolate; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 8pt; font-size: 11pt; direction: rtl; }
         th, td { border: 1px solid #000; text-align: center; height: 20pt; }
         th { font-family: Tahoma, Arial, sans-serif; font-size: 12pt; }
@@ -66,17 +66,17 @@
     <div class="tools"><button type="button" onclick="window.print()">طباعة س2</button><a href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
     <section class="page">
         <div class="head">
-            <div class="right">الهيئة القومية للتأمين الاجتماعي<br>مكتب: <span class="line"></span></div>
+            <div class="right">الهيئة القومية للتأمين الاجتماعي<br>مكتب: <span class="line">{{ $d['office'] }}</span></div>
             <img src="{{ asset('images/nosi-logo.jpg') }}" alt="">
-            <div class="left">نموذج رقم (٢)<br><br>رقم المنشأة: <span class="boxes">@for($i=0;$i<9;$i++)<i></i>@endfor</span></div>
+            <div class="left">نموذج رقم (٢)<br><br>رقم المنشأة: <span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['establishment_number'], $i, 1) }}</i>@endfor</span></div>
         </div>
         <div class="titleline"><span class="year">٢٠٢٦</span><span>/</span><span>/</span><span>إخطار بتعديل / تحديث بيانات أجور المؤمن عليهم في</span></div>
         <div class="section-title"><span>بيانات مقدم الطلب / المنشأة</span></div>
         <div class="meta-grid">
-            <div class="meta-field"><span class="lab">مقدم الطلب:</span><span class="fill"></span></div><div class="meta-field"><span class="lab">صفة مقدم الطلب:</span><span class="fill"></span></div><div class="meta-field"><span class="lab">رقم تأميني:</span><span class="boxes">@for($i=0;$i<9;$i++)<i></i>@endfor</span></div>
-            <div class="meta-field"><span class="lab">رقم قومي:</span><span class="boxes">@for($i=0;$i<14;$i++)<i></i>@endfor</span></div><div class="meta-field phone-row"><span class="lab">رقم التليفون:</span><span class="fill"></span></div>
-            <div class="meta-field establishment-row"><span class="lab">اسم المنشأة:</span><span class="fill"></span><span class="lab">قطاع المنشأة:</span><span class="fill"></span><span class="lab">رقم التسجيل الضريبي:</span><span class="fill"></span></div>
-            <div class="meta-field commercial-row"><span class="lab">رقم السجل التجاري:</span><span class="fill"></span><span class="lab">رقم السجل التجاري الموحد:</span><span class="fill"></span></div>
+            <div class="meta-field"><span class="lab">مقدم الطلب:</span><span class="fill">{{ $d['applicant_name'] }}</span></div><div class="meta-field"><span class="lab">صفة مقدم الطلب:</span><span class="fill">{{ $d['applicant_title'] }}</span></div><div class="meta-field"><span class="lab">رقم تأميني:</span><span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['applicant_insurance_number'], $i, 1) }}</i>@endfor</span></div>
+            <div class="meta-field"><span class="lab">رقم قومي:</span><span class="boxes">@for($i=0;$i<14;$i++)<i>{{ mb_substr($d['applicant_national_id'], $i, 1) }}</i>@endfor</span></div><div class="meta-field phone-row"><span class="lab">رقم التليفون:</span><span class="fill">{{ $d['phone'] }}</span></div>
+            <div class="meta-field establishment-row"><span class="lab">اسم المنشأة:</span><span class="fill">{{ $d['organization_name'] }}</span><span class="lab">قطاع المنشأة:</span><span class="fill">{{ $d['sector'] }}</span><span class="lab">رقم التسجيل الضريبي:</span><span class="fill">{{ $d['tax_registration_number'] }}</span></div>
+            <div class="meta-field commercial-row"><span class="lab">رقم السجل التجاري:</span><span class="fill">{{ $d['commercial_registration_number'] }}</span><span class="lab">رقم السجل التجاري الموحد:</span><span class="fill">{{ $d['unified_commercial_registration_number'] }}</span></div>
         </div>
         <div class="section-title"><span>بيانات المؤمن عليهم</span></div>
         <table>
