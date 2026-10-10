@@ -396,6 +396,7 @@
         <div class="mb-3">
             <a class="btn btn-sm btn-outline-primary" href="{{ route('insurance.index', ['search' => $employee->employee_code]) }}"><i class="bi bi-shield-check"></i> إدارة التأمينات</a>
             <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ route('employees.forms.s1.editable', $employee) }}"><i class="bi bi-printer"></i> طباعة س1 الرسمي</a>
+            <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ route('employees.forms.s6.editable', $employee) }}"><i class="bi bi-printer"></i> طباعة س6</a>
         </div>
         <div class="details-grid">
             <div><label>الحالة</label><b>{{ $ins?->status ?? 'غير مسجل' }}</b></div>
