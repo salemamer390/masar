@@ -119,6 +119,27 @@
   }
   document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
 
+  // استخراج تاريخ الميلاد والنوع من الرقم القومي، بما في ذلك النماذج التي تُحقن داخل نافذة منبثقة.
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== 'national_id') return;
+    const form = input.closest('form');
+    if (!form) return;
+    const nationalId = input.value.replace(/\D/g, '').slice(0, 14);
+    const birth = form.querySelector('[name="birth_date"]');
+    const gender = form.querySelector('[name="gender"]');
+    if (nationalId.length !== 14 || !birth || !gender || !['2', '3'].includes(nationalId[0])) return;
+    const year = (nationalId[0] === '3' ? 2000 : 1900) + Number(nationalId.slice(1, 3));
+    const month = Number(nationalId.slice(3, 5));
+    const day = Number(nationalId.slice(5, 7));
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) return;
+    birth.value = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    gender.value = Number(nationalId[12]) % 2 === 1 ? '\u0630\u0643\u0631' : '\u0623\u0646\u062b\u0649';
+    birth.dispatchEvent(new Event('change', { bubbles: true }));
+    gender.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
   // Bootstrap close controls inside forms must never submit the surrounding form.
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.btn-close').forEach(button => {
