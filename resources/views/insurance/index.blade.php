@@ -121,4 +121,90 @@ document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft
     badge.replaceWith(select);
 });
 </script>
+<script>
+(function () {
+    const organizationForm = document.querySelector('#organizationModal form');
+    if (!organizationForm) return;
+    organizationForm.dataset.ajax = 'true';
+    organizationForm.dataset.ajaxLabel = 'جارٍ الحفظ';
+    document.addEventListener('masar:success', function (event) {
+        if (event.target !== organizationForm) return;
+        bootstrap.Modal.getInstance(document.getElementById('organizationModal'))?.hide();
+    });
+})();
+</script>
+<script>
+(function () {
+    const recordForms = () => [
+        ...document.querySelectorAll('#insuranceModal form, [id^="editInsurance"] form')
+    ];
+    const bindRecordForms = () => recordForms().forEach(form => {
+        form.dataset.ajax = 'true';
+        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+    });
+    const bindStatusSelects = (root = document) => {
+        // The legacy inline handler may already have converted a badge to a
+        // select. Bind only the server-rendered badge spans so we never wrap
+        // an existing select again (which could reset "غير مسجل" to the first option).
+        root.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft').forEach(badge => {
+            if (badge.dataset.statusBound === 'true') return;
+            const row = badge.closest('tr');
+            const editButton = row?.querySelector('[data-bs-target^="#editInsurance"]');
+            const editForm = editButton ? document.querySelector(editButton.dataset.bsTarget + ' form') : null;
+            if (!editForm) return;
+            const current = badge.textContent.trim();
+            const currentValue = current === 'unregistered' || current.includes('غير مسجل')
+                ? 'unregistered'
+                : 'registered';
+            const select = document.createElement('select');
+            select.className = badge.className + ' border-0';
+            select.style.cssText = 'cursor:pointer;appearance:auto;';
+            [['registered', 'مسجل'], ['unregistered', 'غير مسجل']].forEach(item => {
+                const option = new Option(item[1], item[0], currentValue === item[0], currentValue === item[0]);
+                select.add(option);
+            });
+            select.addEventListener('change', async () => {
+                const status = editForm.querySelector('[name="status"]');
+                if (!status) return;
+                status.value = select.value;
+                select.disabled = true;
+                try {
+                    await MasarUI.request(editForm);
+                    select.className = 'badge-soft border-0 ' + (select.value === 'registered' ? 'success' : 'danger');
+                    showToast('تم تحديث حالة التأمين بنجاح.');
+                } catch (error) {
+                    showToast(error.payload?.message || 'تعذر تحديث حالة التأمين.');
+                } finally { select.disabled = false; }
+            });
+            badge.replaceWith(select);
+        });
+    };
+    const refreshInsuranceList = async () => {
+        const response = await fetch(window.location.href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const currentTable = document.querySelector('.panel.table-panel');
+        const freshTable = source.querySelector('.panel.table-panel');
+        if (currentTable && freshTable) currentTable.replaceWith(freshTable);
+        const currentStats = document.querySelector('.stat-grid.compact');
+        const freshStats = source.querySelector('.stat-grid.compact');
+        if (currentStats && freshStats) currentStats.replaceWith(freshStats);
+        source.querySelectorAll('#insuranceModal, [id^="editInsurance"]').forEach(freshModal => {
+            const currentModal = document.getElementById(freshModal.id);
+            if (currentModal) currentModal.replaceWith(freshModal.cloneNode(true));
+            else document.body.appendChild(freshModal.cloneNode(true));
+        });
+        bindRecordForms();
+        bindStatusSelects();
+    };
+    bindRecordForms();
+    bindStatusSelects();
+    document.addEventListener('masar:success', async event => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !recordForms().includes(form)) return;
+        bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+        try { await refreshInsuranceList(); } catch (error) { console.error('Insurance list refresh failed', error); }
+    });
+})();
+</script>
 @endsection

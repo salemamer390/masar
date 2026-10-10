@@ -69,7 +69,7 @@ class SalaryController extends Controller
         $validated = $this->validateSalary($request);
         $employee = Employee::findOrFail((int) $validated['employee_id']);
         if ((float) $employee->gross_salary <= 0) {
-            return back()->withErrors(['employee_id' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف. أدخل الراتب من ملف الموظف أولًا.']);
+            throw ValidationException::withMessages(['employee_id' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف. أدخل الراتب من ملف الموظف أولًا.']);
         }
         $validated['salary_type'] = 'gross';
         $validated['salary_input'] = (float) $employee->gross_salary;
@@ -94,6 +94,14 @@ class SalaryController extends Controller
             $salary
         );
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.',
+                'salary' => $salary->fresh(['employee.department', 'employee.job', 'paymentMethod']),
+            ]);
+        }
+
         return back()->with('toast', 'تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.');
     }
 
@@ -102,7 +110,7 @@ class SalaryController extends Controller
         $validated = $this->validateSalary($request);
         $employee = $salary->employee;
         if ((float) $employee?->gross_salary <= 0) {
-            return back()->withErrors(['salary_input' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف.']);
+            throw ValidationException::withMessages(['salary_input' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف.']);
         }
         $validated['employee_id'] = $employee->id;
         $validated['salary_type'] = 'gross';
@@ -114,16 +122,26 @@ class SalaryController extends Controller
         Salary::syncInsuredSalary((int)$salary->employee_id);
 
         ActivityLog::record('salary_update', "تم تعديل هيكل راتب الموظف ({$salary->employee?->full_name}).", $salary);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.',
+                'salary' => $salary->fresh(['employee.department', 'employee.job', 'paymentMethod']),
+            ]);
+        }
+
         return back()->with('toast', 'تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.');
     }
 
-    public function destroy(Salary $salary)
+    public function destroy(Salary $salary, Request $request)
     {
         $employee = $salary->employee;
         $salary->update(['status' => 'Inactive']);
         Salary::syncInsuredSalary((int)$salary->employee_id);
         ActivityLog::record('salary_delete', "تم إيقاف هيكل راتب الموظف ({$employee?->full_name}).", $salary);
-        return back()->with('toast', 'تم إيقاف هيكل الراتب.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'تم إيقاف هيكل الراتب.', 'salary_id' => $salary->id])
+            : back()->with('toast', 'تم إيقاف هيكل الراتب.');
     }
 
     // يعيد حساب وحفظ كل الهياكل السارية بمنطق الضريبة الحالي (مفيد بعد أي تعديل على الشرائح أو النسب).

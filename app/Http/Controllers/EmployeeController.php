@@ -249,7 +249,7 @@ class EmployeeController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'تمت إضافة الموظف بنجاح.',
-                'employee' => $employee,
+                'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
 
@@ -361,7 +361,7 @@ class EmployeeController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث بيانات الموظف.',
-                'employee' => $employee,
+                'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
 

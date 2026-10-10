@@ -19,7 +19,9 @@ class RoleController extends Controller
     public function update(Request $request, Role $role)
     {
         if ($role->id === 1) {
-            return back()->with('toast', 'لا يمكن تعديل صلاحيات المدير العام');
+            return $request->wantsJson()
+                ? response()->json(['message' => 'لا يمكن تعديل صلاحيات المدير العام.'], 422)
+                : back()->with('toast', 'لا يمكن تعديل صلاحيات المدير العام');
         }
 
         $permissions = $request->input('permissions', []);
@@ -27,6 +29,8 @@ class RoleController extends Controller
 
         ActivityLog::record('role_update', "تم تحديث صلاحيات الدور: {$role->display_name}.", $role);
 
-        return back()->with('toast', 'تم تحديث صلاحيات الدور بنجاح');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Role permissions updated.', 'role_id' => $role->id])
+            : back()->with('toast', 'تم تحديث صلاحيات الدور بنجاح');
     }
 }

@@ -47,6 +47,15 @@ class MovementController extends Controller
             $toast .= ' تمت تصفية البدلات لأنها تجاوزت الحد المسموح للراتب الجديد.';
         }
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $toast,
+                'movement' => $result['movement']->load(['employee.department', 'employee.job', 'movementType', 'oldDepartment', 'newDepartment', 'oldJob', 'newJob']),
+                'allowances_reset' => $result['allowancesReset'],
+            ]);
+        }
+
         return back()->with('toast', $toast);
     }
 }

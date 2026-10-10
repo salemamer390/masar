@@ -102,6 +102,26 @@ class HrRequestController extends Controller
 
         ActivityLog::record('request_create', "تم إنشاء طلب HR: {$hrRequest->title} للموظف {$employee->full_name}.", $hrRequest, null, $hrRequest->toArray(), 'requests');
 
+        if ($request->wantsJson()) {
+            $hrRequest->load(['employee', 'requestType']);
+            return response()->json([
+                'success' => true,
+                'message' => 'HR request created.',
+                'request' => [
+                    'id' => $hrRequest->id,
+                    'title' => $hrRequest->title,
+                    'details' => $hrRequest->details,
+                    'status' => $hrRequest->status,
+                    'created_at' => $hrRequest->created_at?->toIso8601String(),
+                    'request_type_label' => $hrRequest->requestType?->display_name ?? $hrRequest->request_type,
+                    'employee' => [
+                        'id' => $hrRequest->employee?->id,
+                        'full_name' => $hrRequest->employee?->full_name,
+                    ],
+                ],
+            ]);
+        }
+
         return back()->with('toast', 'تم إنشاء الطلب وإرساله للمراجعة.');
     }
 
@@ -161,7 +181,9 @@ class HrRequestController extends Controller
         $hrRequest->delete();
         ActivityLog::record('request_delete', "تم حذف الطلب: {$snapshot['title']}.", null, $snapshot, null, 'requests');
 
-        return back()->with('toast', 'تم حذف الطلب.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'HR request deleted.', 'request_id' => $snapshot['id']])
+            : back()->with('toast', 'تم حذف الطلب.');
     }
 
     private function targetEmployees($user)

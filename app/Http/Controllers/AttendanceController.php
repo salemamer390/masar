@@ -64,7 +64,9 @@ class AttendanceController extends Controller
             ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null]
         );
         ActivityLog::record('attendance_record', 'Attendance record created or updated.', $attendance, null, $attendance->toArray(), 'attendance');
-        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $attendance]) : back()->with('toast', 'تم حفظ سجل الحضور كمسودة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $attendance->fresh()->load('employee.department')])
+            : back()->with('toast', 'تم حفظ سجل الحضور كمسودة.');
     }
 
     public function approve(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard)
@@ -91,7 +93,11 @@ class AttendanceController extends Controller
         $duplicate = Attendance::query()->where('employee_id', $validated['employee_id'])
             ->whereDate('attendance_date', $validated['attendance_date'])
             ->where('id', '!=', $attendance->id)->exists();
-        if ($duplicate) return back()->withErrors(['attendance' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.']);
+        if ($duplicate) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.'], 422)
+                : back()->withErrors(['attendance' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.']);
+        }
 
         $employee = Employee::findOrFail($validated['employee_id']);
         $lateMinutes = $this->lateMinutes($validated['check_in'], $employee->shift_start ?: $this->hrSettings->start());
@@ -108,16 +114,20 @@ class AttendanceController extends Controller
             'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
         ]);
         ActivityLog::record('attendance_update', 'Attendance record updated.', $attendance, $old, $attendance->toArray(), 'attendance');
-        return back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Attendance updated.', 'attendance' => $attendance->fresh()->load('employee.department')])
+            : back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
     }
 
-    public function destroy(Attendance $attendance, PayrollPeriodGuard $periodGuard)
+    public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureOpen($attendance->attendance_date);
         $snapshot = $attendance->toArray();
         $attendance->delete();
         ActivityLog::record('attendance_delete', 'Attendance record deleted.', null, $snapshot, null, 'attendance');
-        return back()->with('toast', 'تم حذف سجل الحضور.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Attendance deleted.', 'attendance_id' => $snapshot['id']])
+            : back()->with('toast', 'تم حذف سجل الحضور.');
     }
 
     private function lateMinutes(?string $checkIn, string $shiftStart): int

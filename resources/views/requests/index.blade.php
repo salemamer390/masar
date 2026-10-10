@@ -166,6 +166,39 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 </script>
 @endpush
 
+@push('scripts')
+<script>
+  // Stage 5: creation/deletion use the same guarded AJAX path as review actions.
+  const requestBaseUrl = @json(url('/requests'));
+  const requestTableBody = document.querySelector('.table-panel table tbody');
+  const canDeleteHrRequest = @json(auth()->user()?->hasPermission('requests.delete'));
+  const escapeRequestHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+  const requestDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const requestRow = (item) => {
+    const employee = item.employee || {};
+    const id = Number(item.id);
+    const detailUrl = `${requestBaseUrl}?request=${id}`;
+    const remove = item.status === 'Pending' && canDeleteHrRequest ? `<form method="POST" action="${requestBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف الطلب المعلق؟')"><input type="hidden" name="_token" value="${escapeRequestHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
+    return `<tr data-request-id="${id}"><td><a href="${detailUrl}" class="fw-bold">${escapeRequestHtml(item.title)}</a>${item.details ? `<div class="text-muted small mt-1">${escapeRequestHtml(item.details).slice(0, 70)}${String(item.details).length > 70 ? '…' : ''}</div>` : ''}</td><td><a href="${escapeRequestHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeRequestHtml(employee.full_name)}</a></td><td><span class="badge-soft info">${escapeRequestHtml(item.request_type_label)}</span></td><td>${requestDate(item.created_at)}</td><td><span class="badge-soft warning">معلق</span></td><td><div class="d-flex gap-1 align-items-center"><a class="btn btn-sm btn-light" href="${detailUrl}" title="التفاصيل"><i class="bi bi-eye"></i></a>${remove}</div></td></tr>`;
+  };
+  const wireHrRequestAjaxForms = (root = document) => {
+    root.querySelectorAll('#requestCreateModal form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الإرسال'; });
+    root.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => { const form = methodInput.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف الطلب المعلق؟'; form.removeAttribute('onsubmit'); });
+  };
+  wireHrRequestAjaxForms();
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (form.closest('#requestCreateModal')) {
+      const item = event.detail?.request;
+      if (item && requestTableBody) { requestTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item)); wireHrRequestAjaxForms(requestTableBody); }
+      bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide(); form.reset();
+    }
+    if (form.querySelector('input[name="_method"][value="DELETE"]') && form.action.includes('/requests/')) form.closest('tr')?.remove();
+  });
+</script>
+@endpush
+
 @if(request()->boolean('create') || $errors->hasAny(['employee_id', 'request_type_id', 'title', 'details']))
 @push('scripts')
 <script>document.addEventListener('DOMContentLoaded',function(){const m=document.getElementById('requestCreateModal');if(m){bootstrap.Modal.getOrCreateInstance(m).show();}});</script>

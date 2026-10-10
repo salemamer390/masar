@@ -63,7 +63,7 @@ class InsuranceController extends Controller
         Salary::syncInsuredSalary((int) $record->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record created or updated.', $record, null, $record->toArray(), 'insurance');
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Insurance record saved.']);
+            return response()->json(['success' => true, 'message' => 'Insurance record saved.', 'record' => $record->fresh(['employee.department', 'employee.currentSalary'])]);
         }
         return back()->with('toast', 'تم حفظ بيانات التأمين بنجاح.');
     }
@@ -81,7 +81,7 @@ class InsuranceController extends Controller
         Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record updated.', $insuranceRecord, $old, $insuranceRecord->fresh()->toArray(), 'insurance');
         if ($request->expectsJson()) {
-            return response()->json(['success' => true, 'message' => 'Insurance record updated.']);
+            return response()->json(['success' => true, 'message' => 'Insurance record updated.', 'record' => $insuranceRecord->fresh(['employee.department', 'employee.currentSalary'])]);
         }
         return back()->with('toast', 'تم تحديث بيانات التأمين بنجاح.');
     }
@@ -141,6 +141,10 @@ class InsuranceController extends Controller
             'grace_days' => ['required', 'integer', 'min:1', 'max:365'],
         ]);
         DB::table('insurance_organization_settings')->updateOrInsert(['id' => 1], $data + ['updated_at' => now(), 'created_at' => now()]);
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Organization insurance settings saved.']);
+        }
+
         return back()->with('toast', 'تم حفظ بيانات المنشأة والتأمينات.');
     }
 

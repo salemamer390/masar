@@ -21,9 +21,16 @@ class NotificationController extends Controller
         return redirect($item->data['url'] ?? route('dashboard'));
     }
 
-    public function markAllRead(Request $request): RedirectResponse
+    public function markAllRead(Request $request)
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Notifications marked as read.',
+            ]);
+        }
 
         return back()->with('toast', 'تم تعليم جميع الإشعارات كمقروءة.');
     }

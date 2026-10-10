@@ -52,20 +52,29 @@ class PayrollSettingsController extends Controller
             );
         }
         ActivityLog::record('hr_operational_settings_update', 'تم تحديث أوقات الدوام والراحة الأسبوعية.');
-        return back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Operational settings updated.', 'settings' => $data])
+            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.');
     }
 
     public function storeHoliday(Request $request)
     {
         $data = $request->validate(['holiday_date' => ['required', 'date'], 'name' => ['required', 'string', 'max:150']]);
         DB::table('hr_holidays')->updateOrInsert(['holiday_date' => $data['holiday_date']], ['name' => $data['name'], 'updated_at' => now(), 'created_at' => now()]);
+        if ($request->wantsJson()) {
+            $holiday = DB::table('hr_holidays')->where('holiday_date', $data['holiday_date'])->first();
+            return response()->json(['success' => true, 'message' => 'Holiday saved.', 'holiday' => $holiday]);
+        }
+
         return back()->with('toast', 'تم حفظ العطلة الرسمية.');
     }
 
-    public function destroyHoliday(int $holiday)
+    public function destroyHoliday(int $holiday, Request $request)
     {
         DB::table('hr_holidays')->where('id', $holiday)->delete();
-        return back()->with('toast', 'تم حذف العطلة الرسمية.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Holiday deleted.', 'holiday_id' => $holiday])
+            : back()->with('toast', 'تم حذف العطلة الرسمية.');
     }
 
     public function updateHoliday(Request $request, int $holiday)
@@ -80,6 +89,14 @@ class PayrollSettingsController extends Controller
             'name' => $data['name'],
             'updated_at' => now(),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Holiday updated.',
+                'holiday' => DB::table('hr_holidays')->where('id', $holiday)->first(),
+            ]);
+        }
 
         return back()->with('toast', 'تم تحديث العطلة الرسمية.');
     }

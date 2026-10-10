@@ -35,4 +35,55 @@
   });
 </script>
 @endpush
+@push('scripts')
+<script>
+  const leaveBaseUrl = @json(url('/leaves'));
+  const leaveTableBody = document.querySelector('.table-panel table tbody');
+  const canEditLeave = @json(auth()->user()?->hasPermission('leaves.edit'));
+  const canApproveLeave = @json(auth()->user()?->hasPermission('leaves.approve'));
+  const canDeleteLeave = @json(auth()->user()?->hasPermission('leaves.delete'));
+  const leaveCache = {};
+  const leaveEmployees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name]));
+  const leaveTypesData = @json($leaveTypes->map(fn ($type) => ['id' => $type->id, 'name' => $type->name]));
+  const escapeLeaveHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+  const leaveStatus = (status) => ({Pending: ['قيد المراجعة', 'warning'], 'Manager Approved': ['بانتظار اعتماد الموارد البشرية', 'warning'], Approved: ['معتمدة', 'success'], Rejected: ['مرفوضة', 'danger']}[status] || [status || '—', 'secondary']);
+  const leaveDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
+  const leaveInitials = (name) => String(name || '—').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('');
+  const leaveRow = (leave) => {
+    leaveCache[leave.id] = leave;
+    const employee = leave.employee || {};
+    const type = leave.leave_type || leave.leaveType || {};
+    const [statusLabel, statusClass] = leaveStatus(leave.status);
+    const id = Number(leave.id);
+    const approve = ['Pending', 'Manager Approved'].includes(leave.status) && canApproveLeave ? `<form method="POST" action="${leaveBaseUrl}/${id}/approve"><input type="hidden" name="_token" value="${escapeLeaveHtml(csrfToken)}"><input type="hidden" name="_method" value="PATCH"><button class="btn btn-sm btn-success">${leave.status === 'Pending' ? 'اعتماد المدير' : 'اعتماد الموارد البشرية'}</button></form>` : '';
+    const edit = canEditLeave ? `<button type="button" class="btn btn-sm btn-outline-primary leave-edit-ajax" data-leave-id="${id}" title="تعديل"><i class="bi bi-pencil"></i></button>` : '';
+    const remove = canDeleteLeave ? `<form method="POST" action="${leaveBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف طلب الإجازة؟')"><input type="hidden" name="_token" value="${escapeLeaveHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
+    return `<tr data-leave-id="${id}"><td><div class="employee-cell"><span class="employee-avatar">${escapeLeaveHtml(leaveInitials(employee.full_name))}</span><div><a class="employee-link fw-bold" href="${escapeLeaveHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeLeaveHtml(employee.full_name)}</a><small class="d-block text-muted">#${escapeLeaveHtml(employee.employee_code)}</small></div></div></td><td>${escapeLeaveHtml(type.name)}</td><td><span class="badge-soft ${type.is_paid ? 'success' : 'muted'}">${type.is_paid ? 'بأجر' : 'بدون أجر'}</span></td><td>${leaveDate(leave.start_date)}</td><td>${leaveDate(leave.end_date)}</td><td>${escapeLeaveHtml(leave.days)}</td><td><span class="badge-soft ${statusClass}">${statusLabel}</span></td><td><div class="d-flex gap-1 flex-wrap">${edit}${approve}${remove}</div></td></tr>`;
+  };
+  const wireLeaveAjaxForms = (root = document) => {
+    root.querySelectorAll('#leaveModal form, .modal[id^="editLeave"] form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
+    root.querySelectorAll('form[action*="/leaves/"][action$="/approve"]').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الاعتماد'; });
+    root.querySelectorAll('form[action*="/leaves/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => { const form = methodInput.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف طلب الإجازة؟'; form.removeAttribute('onsubmit'); });
+  };
+  wireLeaveAjaxForms();
+  document.querySelectorAll('tbody tr').forEach((row) => { const action = row.querySelector('form[action*="/leaves/"]')?.action; const match = action?.match(/\/leaves\/(\d+)/); if (match) row.dataset.leaveId = match[1]; });
+  const upsertLeaveRow = (leave) => { if (!leaveTableBody || !leave?.id) return; const oldRow = leaveTableBody.querySelector(`tr[data-leave-id="${leave.id}"]`); if (oldRow) oldRow.outerHTML = leaveRow(leave); else { leaveTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); leaveTableBody.insertAdjacentHTML('afterbegin', leaveRow(leave)); } wireLeaveAjaxForms(leaveTableBody); };
+  const ensureLeaveEditModal = (leave) => {
+    const id = Number(leave.id);
+    if (document.getElementById(`editLeave${id}`)) { bootstrap.Modal.getOrCreateInstance(document.getElementById(`editLeave${id}`)).show(); return; }
+    const employeeOptions = leaveEmployees.map((employee) => `<option value="${employee.id}" ${Number(employee.id) === Number(leave.employee_id) ? 'selected' : ''}>${escapeLeaveHtml(employee.name)}</option>`).join('');
+    const typeOptions = leaveTypesData.map((type) => `<option value="${type.id}" ${Number(type.id) === Number(leave.leave_type_id) ? 'selected' : ''}>${escapeLeaveHtml(type.name)}</option>`).join('');
+    const modal = document.createElement('div');
+    modal.className = 'modal fade'; modal.id = `editLeave${id}`; modal.tabIndex = -1;
+    modal.innerHTML = `<div class="modal-dialog"><div class="modal-content"><form method="POST" action="${leaveBaseUrl}/${id}"><input type="hidden" name="_token" value="${escapeLeaveHtml(csrfToken)}"><input type="hidden" name="_method" value="PUT"><div class="modal-header"><h5>تعديل طلب الإجازة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-2" required>${employeeOptions}</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-2" required>${typeOptions}</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input type="date" name="start_date" class="form-control" value="${String(leave.start_date || '').slice(0, 10)}" required></div><div class="col-6"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control" value="${String(leave.end_date || '').slice(0, 10)}" required></div></div><label class="form-label mt-2">الحالة</label><select name="status" class="form-select mb-2"><option value="Pending">قيد المراجعة</option><option value="Manager Approved">اعتماد المدير</option><option value="Approved">معتمدة</option><option value="Rejected">مرفوضة</option></select><label class="form-label">السبب</label><textarea name="reason" class="form-control">${escapeLeaveHtml(leave.reason)}</textarea><label class="form-label mt-2">سبب الرفض</label><textarea name="rejection_reason" class="form-control">${escapeLeaveHtml(leave.rejection_reason)}</textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div>`;
+    document.body.appendChild(modal); modal.querySelector('[name="status"]').value = leave.status; wireLeaveAjaxForms(modal); bootstrap.Modal.getOrCreateInstance(modal).show();
+  };
+  document.addEventListener('click', (event) => { const button = event.target.closest('.leave-edit-ajax'); if (!button) return; event.preventDefault(); ensureLeaveEditModal(leaveCache[button.dataset.leaveId]); });
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target; if (!(form instanceof HTMLFormElement)) return;
+    if (form.closest('#leaveModal') || form.closest('.modal[id^="editLeave"]')) { const leave = event.detail?.leave; upsertLeaveRow(leave); const modal = form.closest('.modal'); bootstrap.Modal.getInstance(modal)?.hide(); if (form.closest('#leaveModal')) form.reset(); }
+    if (form.querySelector('input[name="_method"][value="DELETE"]')) form.closest('tr')?.remove();
+  });
+</script>
+@endpush
 @endsection

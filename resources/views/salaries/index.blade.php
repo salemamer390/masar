@@ -50,7 +50,7 @@
 
 <div class="salary-layout">
 @forelse($salaries as $s)
-  <div class="salary-card salary-card-compact" data-bs-toggle="modal" data-bs-target="#salaryDetails{{ $s->id }}" role="button" tabindex="0" aria-label="عرض تفاصيل راتب {{ $s->employee?->full_name }}">
+  <div class="salary-card salary-card-compact" data-salary-id="{{ $s->id }}" data-bs-toggle="modal" data-bs-target="#salaryDetails{{ $s->id }}" role="button" tabindex="0" aria-label="عرض تفاصيل راتب {{ $s->employee?->full_name }}">
     <div class="salary-card-head">
       <div class="salary-employee">
         <div class="salary-avatar">@if($s->employee?->profile_photo_url)<img src="{{ $s->employee->profile_photo_url }}" alt="{{ $s->employee->full_name }}">@else{{ $s->employee?->initials }}@endif</div>
@@ -266,8 +266,58 @@
   employeeSelect?.addEventListener('change',()=>{syncEmployeeGross(); preview();});
   syncEmployeeGross();
   form.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',preview));
+  form.addEventListener('masar:before-submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent='إجمالي البدلات لا يمكن أن يتجاوز نسبة '+allowanceRate+'%.';error.classList.remove('d-none');}});
   form.addEventListener('submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent='إجمالي البدلات لا يمكن أن يتجاوز نسبة '+allowanceRate+'%.';error.classList.remove('d-none');}});
   modal.addEventListener('shown.bs.modal',preview);
+})();
+</script>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const bindSalaryForms = (root = document) => {
+    root.querySelectorAll('#salaryForm, [id^="editSalary"] form, .salary-layout form[action*="/salaries/"]').forEach(form => {
+      form.dataset.ajax = 'true';
+      form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? 'جارٍ الإيقاف' : 'جارٍ الحفظ';
+      if (form.querySelector('input[name="_method"][value="DELETE"]')) {
+        form.dataset.ajaxConfirm = 'إيقاف هيكل الراتب الحالي؟';
+        form.removeAttribute('onsubmit');
+      }
+    });
+  };
+  const refreshSalaryStructures = async (removedId = null) => {
+    const response = await fetch(window.location.href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const layout = document.querySelector('.salary-layout');
+    const freshLayout = source.querySelector('.salary-layout');
+    if (layout && freshLayout) layout.replaceWith(freshLayout);
+    if (removedId) document.querySelectorAll('#salaryDetails' + removedId + ', #editSalary' + removedId).forEach(modal => modal.remove());
+    source.querySelectorAll('[id^="salaryDetails"], [id^="editSalary"]').forEach(freshModal => {
+      const currentModal = document.getElementById(freshModal.id);
+      if (currentModal) currentModal.replaceWith(freshModal.cloneNode(true));
+      else document.body.appendChild(freshModal.cloneNode(true));
+    });
+    bindSalaryForms();
+  };
+  bindSalaryForms();
+  document.addEventListener('masar:success', async event => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true') return;
+    const action = new URL(form.action, window.location.origin).pathname;
+    const isStore = action.endsWith('/salaries');
+    const isUpdateOrDelete = action.includes('/salaries/');
+    if (!isStore && !isUpdateOrDelete) return;
+    const isDelete = Boolean(form.querySelector('input[name="_method"][value="DELETE"]'));
+    const removedId = isDelete ? event.detail?.salary_id : null;
+    bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+    if (form.id === 'salaryForm') form.reset();
+    try {
+      await refreshSalaryStructures(removedId);
+    } catch (error) {
+      console.error('Salary structures refresh failed', error);
+    }
+  });
 })();
 </script>
 @endpush

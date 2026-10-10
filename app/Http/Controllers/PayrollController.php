@@ -112,7 +112,9 @@ class PayrollController extends Controller
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
-        return back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Payroll inputs recalculated.', 'record' => $payrollRecord->fresh()->load('employee')])
+            : back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
     }
 
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)

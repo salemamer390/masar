@@ -7,3 +7,43 @@
 <div class="modal fade" id="userModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{route('users.store')}}">@csrf<div class="modal-header"><h5>إضافة مستخدم</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الاسم</label><input name="name" class="form-control mb-3" required><label class="form-label">البريد الإلكتروني</label><input name="email" type="email" class="form-control mb-3" required><label class="form-label">كلمة المرور</label><input name="password" type="password" class="form-control mb-3" required><label class="form-label">الدور</label><select name="role_id" class="form-select">@foreach($roles as $r)<option value="{{$r->id}}">{{$r->display_name}}</option>@endforeach</select></div><div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ</button></div></form></div></div></div>
 @foreach($users as $u)<div class="modal fade" id="editUser{{$u->id}}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{route('users.update',$u)}}">@csrf @method('PUT')<div class="modal-header"><h5>تعديل المستخدم</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input name="name" class="form-control mb-3" value="{{$u->name}}" required><select name="role_id" class="form-select mb-3">@foreach($roles as $r)<option value="{{$r->id}}" {{$u->role_id==$r->id?'selected':''}}>{{$r->display_name}}</option>@endforeach</select><input name="password" type="password" class="form-control mb-3" placeholder="اتركه فارغاً للإبقاء على كلمة المرور"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" value="1" id="active{{$u->id}}" {{$u->is_active?'checked':''}}><label class="form-check-label" for="active{{$u->id}}">الحساب نشط</label></div></div><div class="modal-footer"><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>@endforeach
 @endsection
+
+@push('scripts')
+<script>
+  const userBaseUrl = @json(url('/users'));
+  const userTableBody = document.querySelector('.table-panel table tbody');
+  const userRoles = @json($roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->display_name]));
+  const userCache = {};
+  const escapeUserHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+  const userRow = (user) => { userCache[user.id] = user; return `<tr data-user-id="${Number(user.id)}"><td>${escapeUserHtml(user.name)}</td><td>${escapeUserHtml(user.email)}</td><td>${escapeUserHtml(user.role?.display_name)}</td><td><span class="badge-soft ${user.is_active ? 'success' : 'danger'}">${user.is_active ? 'نشط' : 'موقوف'}</span></td><td>${user.last_login_at ? escapeUserHtml(user.last_login_at) : '—'}</td><td><button type="button" class="btn btn-sm btn-light user-edit-ajax" data-user-id="${Number(user.id)}">تعديل</button></td></tr>`; };
+  const wireUserAjaxForms = (root = document) => root.querySelectorAll('#userModal form, [id^="editUser"] form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
+  wireUserAjaxForms();
+  document.querySelectorAll('[id^="editUser"]').forEach((modal) => {
+    const id = modal.id.replace('editUser', '');
+    modal.querySelector('form')?.addEventListener('submit', () => { modal.closest('body')?.querySelector(`button[data-bs-target="#${modal.id}"]`)?.closest('tr')?.setAttribute('data-user-id', id); }, { once: true });
+    modal.closest('body')?.querySelector(`button[data-bs-target="#${modal.id}"]`)?.closest('tr')?.setAttribute('data-user-id', id);
+  });
+  const ensureUserEditModal = (user) => {
+    const id = Number(user.id);
+    document.getElementById(`editUser${id}`)?.remove();
+    const roleOptions = userRoles.map((role) => `<option value="${role.id}" ${Number(role.id) === Number(user.role_id) ? 'selected' : ''}>${escapeUserHtml(role.name)}</option>`).join('');
+    const modal = document.createElement('div');
+    modal.className = 'modal fade'; modal.id = `editUser${id}`; modal.tabIndex = -1;
+    modal.innerHTML = `<div class="modal-dialog"><div class="modal-content"><form method="POST" action="${userBaseUrl}/${id}"><input type="hidden" name="_token" value="${escapeUserHtml(csrfToken)}"><input type="hidden" name="_method" value="PUT"><div class="modal-header"><h5>تعديل المستخدم</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input name="name" class="form-control mb-3" value="${escapeUserHtml(user.name)}" required><select name="role_id" class="form-select mb-3">${roleOptions}</select><input name="password" type="password" class="form-control mb-3" placeholder="اتركه فارغاً للإبقاء على كلمة المرور"><div class="form-check"><input class="form-check-input" type="checkbox" name="is_active" value="1" id="activeAjax${id}" ${user.is_active ? 'checked' : ''}><label class="form-check-label" for="activeAjax${id}">الحساب نشط</label></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div>`;
+    document.body.appendChild(modal); wireUserAjaxForms(modal); bootstrap.Modal.getOrCreateInstance(modal).show();
+  };
+  document.addEventListener('click', (event) => { const button = event.target.closest('.user-edit-ajax'); if (button) ensureUserEditModal(userCache[button.dataset.userId]); });
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || (!form.closest('#userModal') && !form.closest('[id^="editUser"]'))) return;
+    const user = event.detail?.user;
+    if (user && userTableBody) {
+      const oldRow = userTableBody.querySelector(`tr[data-user-id="${user.id}"]`);
+      if (oldRow) oldRow.outerHTML = userRow(user);
+      else { userTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); userTableBody.insertAdjacentHTML('afterbegin', userRow(user)); }
+    }
+    bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+    form.reset();
+  });
+</script>
+@endpush

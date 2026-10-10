@@ -44,3 +44,33 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 </script>
 @endpush
 @endsection
+
+@push('scripts')
+<script>
+  // Payroll inputs are the only payroll action moved in this stage. Generate,
+  // approve, lock, and pay remain full server transitions by design.
+  const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  document.querySelectorAll('[id^="inputs"]').forEach((modal) => {
+    const trigger = document.querySelector(`[data-bs-target="#${modal.id}"]`);
+    const match = modal.id.match(/^inputs(\d+)$/);
+    if (trigger && match) trigger.closest('tr')?.setAttribute('data-payroll-record-id', match[1]);
+  });
+  document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ إعادة الحساب'; });
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.action.endsWith('/inputs')) return;
+    const record = event.detail?.record;
+    const row = form.closest('.modal')?.previousElementSibling?.closest('tr') || document.querySelector(`tr[data-payroll-record-id="${record?.id}"]`);
+    if (row && record) {
+      row.children[3].textContent = money(record.overtime_amount);
+      row.children[4].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
+      row.children[5].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
+      row.children[6].textContent = money(record.employee_insurance);
+      row.children[7].textContent = money(record.income_tax);
+      row.children[8].textContent = money(record.net_salary);
+      row.children[9].textContent = money(record.employee_cost);
+    }
+    bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+  });
+</script>
+@endpush

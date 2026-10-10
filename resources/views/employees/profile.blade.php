@@ -578,6 +578,55 @@ window.openDocument = function (documentId, documentName = '', documentTypeId = 
 window.openRequiredDocument = function (documentTypeId, documentName) {
     window.openDocument('', documentName, documentTypeId, '');
 };
+
+// Keep document operations smooth without attempting to rebuild file cards in
+// the browser.  The server remains the single source of truth for previews,
+// permissions and required-document placeholders; only this small section is
+// refreshed after a successful upload, replacement or deletion.
+const documentModalForm = document.querySelector('#documentModal form');
+const bindDocumentAjax = (root = document) => {
+    root.querySelectorAll('#documentModal form, form[action*="/documents/"]').forEach((form) => {
+        const path = new URL(form.action, window.location.origin).pathname;
+        const isUpload = path.includes('/employees/') && path.endsWith('/documents');
+        const isReplace = path.includes('/documents/') && path.endsWith('/replace');
+        const isDelete = path.includes('/documents/') && !isReplace;
+        if (!isUpload && !isReplace && !isDelete) return;
+        form.dataset.ajax = 'true';
+        form.dataset.ajaxLabel = isDelete ? 'جارٍ الحذف' : 'جارٍ الحفظ';
+        if (isDelete) form.dataset.ajaxConfirm = 'هل تريد حذف هذا المستند؟';
+    });
+};
+const refreshDocumentsSection = async () => {
+    const response = await fetch(window.location.href, {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const freshGrid = source.querySelector('.documents-card-grid');
+    const currentGrid = document.querySelector('.documents-card-grid');
+    if (!freshGrid || !currentGrid) return;
+    currentGrid.replaceWith(freshGrid);
+    bindDocumentAjax(freshGrid);
+};
+bindDocumentAjax();
+document.addEventListener('masar:success', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true') return;
+    const path = new URL(form.action, window.location.origin).pathname;
+    const isEmployeeDocument = path.includes('/employees/') && path.endsWith('/documents');
+    const isDocumentAction = path.includes('/documents/');
+    if (!isEmployeeDocument && !isDocumentAction) return;
+    if (form === documentModalForm) {
+        bootstrap.Modal.getInstance(document.getElementById('documentModal'))?.hide();
+        form.reset();
+    }
+    try {
+        await refreshDocumentsSection();
+    } catch (error) {
+        console.error('Document section refresh failed', error);
+    }
+});
 </script>
 @endpush
 <script>

@@ -134,6 +134,14 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
       if (!content) throw new Error('لم يتم العثور على نموذج الإدخال الأصلي');
       body.innerHTML = content.innerHTML;
       body.querySelectorAll('.btn-close').forEach((close) => close.addEventListener('click', () => bootstrap.Modal.getOrCreateInstance(modalEl).hide()));
+      const ajaxActionPaths = ['/employees', '/leaves', '/attendance', '/discipline/penalties', '/requests'];
+      body.querySelectorAll('form').forEach((form) => {
+        const path = new URL(form.action, window.location.origin).pathname;
+        if (!ajaxActionPaths.some((suffix) => path.endsWith(suffix))) return;
+        form.dataset.ajax = 'true';
+        form.dataset.dashboardAction = 'true';
+        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+      });
       // نموذج الموظف يحتوي حساب Gross/Net واستخراج الرقم القومي في سكربت الصفحة الأصلية.
       // نشغّله هنا فقط بعد تركيب النموذج الأصلي داخل النافذة.
       if (button.dataset.dashboardSourceModal === 'addEmployeeModal') {
@@ -151,6 +159,27 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
       console.error('Dashboard action form load failed', error);
     }
   });
+});
+</script>
+@endpush
+
+@push('scripts')
+<script>
+document.querySelectorAll('#dashboard-latest-requests form').forEach(form => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ التنفيذ'; });
+document.addEventListener('masar:success', event => {
+  const form = event.target;
+  if (form instanceof HTMLFormElement && form.dataset.dashboardAction === 'true') {
+    const modal = document.getElementById('dashboardExistingActionModal');
+    const body = modal?.querySelector('.modal-content');
+    if (body) body.innerHTML = '<div class="modal-body p-4 text-center"><i class="bi bi-check-circle-fill text-success fs-1"></i><p class="mb-0 mt-2">تم حفظ البيانات بنجاح.</p></div>';
+    setTimeout(() => bootstrap.Modal.getInstance(modal)?.hide(), 650);
+    return;
+  }
+  if (!(form instanceof HTMLFormElement) || !form.closest('#dashboard-latest-requests')) return;
+  const row = form.closest('.dashboard-request-row');
+  row?.remove();
+  const list = document.querySelector('#dashboard-latest-requests .reference-list');
+  if (list && !list.querySelector('.dashboard-request-row')) list.innerHTML = '<div class="text-center text-muted small py-4">لا توجد طلبات حديثة</div>';
 });
 </script>
 @endpush

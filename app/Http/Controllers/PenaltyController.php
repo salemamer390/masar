@@ -76,7 +76,7 @@ class PenaltyController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'تم تسجيل الإجراء التأديبي',
-                'penalty' => $penalty,
+                'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType']),
             ]);
         }
 
@@ -127,15 +127,19 @@ class PenaltyController extends Controller
             'status' => 'Pending', 'closed_at' => null,
         ]);
         ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
-        return back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Penalty updated.', 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType'])])
+            : back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
     }
 
-    public function destroy(Penalty $penalty, PayrollPeriodGuard $periodGuard)
+    public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
         $snapshot = $penalty->toArray();
         $penalty->delete();
         ActivityLog::record('penalty_delete', 'تم حذف إجراء تأديبي.', null, $snapshot, null, 'discipline');
-        return back()->with('toast', 'تم حذف السجل');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Penalty deleted.', 'penalty_id' => $snapshot['id']])
+            : back()->with('toast', 'تم حذف السجل');
     }
 }

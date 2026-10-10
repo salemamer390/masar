@@ -301,8 +301,14 @@
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true') return;
 
+    if (form.dataset.ajaxConfirm && !window.confirm(form.dataset.ajaxConfirm)) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     if (!form.reportValidity()) return;
+    const beforeSubmit = new CustomEvent('masar:before-submit', { cancelable: true });
+    if (!form.dispatchEvent(beforeSubmit)) return;
 
     window.MasarUI.setBusy(form, true, form.dataset.ajaxLabel || 'جارٍ الحفظ');
     try {

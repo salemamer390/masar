@@ -62,9 +62,17 @@ class LeaveController extends Controller
         $overlap = Leave::where('id', '!=', $leave->id)->where('employee_id', $data['employee_id'])
             ->whereNotIn('status', ['Rejected', 'Ù…Ø±ÙÙˆØ¶Ø©'])
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
-        if ($overlap) return back()->withErrors(['leave' => 'يوجد طلب إجازة متداخل مع هذه المدة.'])->withInput();
+        if ($overlap) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'يوجد طلب إجازة متداخل مع هذه المدة.'], 422)
+                : back()->withErrors(['leave' => 'يوجد طلب إجازة متداخل مع هذه المدة.'])->withInput();
+        }
         $days = $this->workingDays($start, $end);
-        if ($days < 1) return back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل.'])->withInput();
+        if ($days < 1) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'الفترة المحددة لا تحتوي على أيام عمل.'], 422)
+                : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل.'])->withInput();
+        }
         $oldValues = $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']);
         $leave->update([
             'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
@@ -78,7 +86,9 @@ class LeaveController extends Controller
         ]);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_update', 'Leave request updated.', $leave, $oldValues, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']), 'leaves');
-        return back()->with('toast', 'تم تحديث طلب الإجازة بنجاح.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leave request updated.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
+            : back()->with('toast', 'تم تحديث طلب الإجازة بنجاح.');
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)
@@ -95,12 +105,22 @@ class LeaveController extends Controller
         $periodGuard->ensureRangeOpen($start, $end);
         $overlap = Leave::where('employee_id', $data['employee_id'])->whereNotIn('status', ['Rejected', 'مرفوضة'])
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
-        if ($overlap) return back()->withErrors(['leave' => 'يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.'])->withInput();
+        if ($overlap) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.'], 422)
+                : back()->withErrors(['leave' => 'يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.'])->withInput();
+        }
         $days = $this->workingDays($start, $end);
-        if ($days < 1) return back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'])->withInput();
+        if ($days < 1) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'], 422)
+                : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'])->withInput();
+        }
         $leave = Leave::create($data + ['start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days, 'status' => 'Pending']);
         ActivityLog::record('leave_create', 'Leave request created.', $leave, null, $leave->toArray(), 'leaves');
-        return back()->with('toast', 'تم إنشاء طلب الإجازة بنجاح.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leave request created.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
+            : back()->with('toast', 'تم إنشاء طلب الإجازة بنجاح.');
     }
 
     public function approve(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
@@ -139,14 +159,16 @@ class LeaveController extends Controller
             : back()->with('toast', 'تم رفض طلب الإجازة.');
     }
 
-    public function destroy(Leave $leave, PayrollPeriodGuard $periodGuard)
+    public function destroy(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $snapshot = $leave->toArray();
         $leave->delete();
         $this->leaveStatus->sync();
         ActivityLog::record('leave_delete', 'Leave request deleted.', null, $snapshot, null, 'leaves');
-        return back()->with('toast', 'تم حذف طلب الإجازة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leave request deleted.', 'leave_id' => $snapshot['id']])
+            : back()->with('toast', 'تم حذف طلب الإجازة.');
     }
 
     private function workingDays(Carbon $start, Carbon $end): int

@@ -10,6 +10,82 @@
 @push('scripts')<script>document.querySelectorAll('.penalty-edit-btn').forEach(button=>button.addEventListener('click',()=>{const d=button.dataset;const form=document.getElementById('editPenaltyForm');form.action=`{{ url('/discipline/penalties') }}/${d.id}`;document.getElementById('editPenaltyEmployee').value=d.employeeId;document.getElementById('editPenaltyType').value=d.typeId;document.getElementById('editPenaltyDate').value=d.date;document.getElementById('editPenaltyReason').value=d.reason;document.getElementById('editPenaltyDetails').value=d.details;document.getElementById('editPenaltyAmount').value=d.amount;document.getElementById('editPenaltyDays').value=d.days;}));</script>@endpush
 @push('scripts')
 <script>
+  const penaltyBaseUrl = @json(url('/discipline/penalties'));
+  const penaltyTableBody = document.querySelector('.table-panel table tbody');
+  const canEditPenalty = @json(auth()->user()?->hasPermission('penalties.edit'));
+  const canDeletePenalty = @json(auth()->user()?->hasPermission('penalties.delete'));
+  const escapePenaltyHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+  const penaltyStatus = (status) => status === 'Approved' || status === 'معتمد' ? ['معتمد', 'success'] : ['قيد المراجعة', 'warning'];
+  const penaltyDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
+  const penaltyRow = (penalty) => {
+    const employee = penalty.employee || {};
+    const type = penalty.penalty_type || penalty.penaltyType || {};
+    const [statusLabel, statusClass] = penaltyStatus(penalty.status);
+    const id = Number(penalty.id);
+    const days = penalty.deduction_days ?? type.default_deduction_days ?? 0;
+    const close = penalty.status !== 'Approved' && canEditPenalty ? `<form method="POST" action="${penaltyBaseUrl}/${id}/close"><input type="hidden" name="_token" value="${escapePenaltyHtml(csrfToken)}"><input type="hidden" name="_method" value="PATCH"><button class="btn btn-sm btn-outline-success" title="اعتماد"><i class="bi bi-check-lg"></i></button></form>` : '';
+    const edit = canEditPenalty ? `<button class="btn btn-sm btn-outline-primary penalty-edit-btn" data-bs-toggle="modal" data-bs-target="#editPenaltyModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-type-id="${penalty.penalty_type_id || type.id || ''}" data-date="${String(penalty.penalty_date || '').slice(0, 10)}" data-reason="${escapePenaltyHtml(penalty.reason)}" data-details="${escapePenaltyHtml(penalty.action)}" data-amount="${escapePenaltyHtml(penalty.amount)}" data-days="${escapePenaltyHtml(penalty.deduction_days)}" title="تعديل"><i class="bi bi-pencil"></i></button>` : '';
+    const remove = canDeletePenalty ? `<form method="POST" action="${penaltyBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف هذا الإجراء؟')"><input type="hidden" name="_token" value="${escapePenaltyHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
+    return `<tr data-penalty-id="${id}"><td><a class="employee-link fw-bold" href="${escapePenaltyHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapePenaltyHtml(employee.full_name)}</a></td><td>${escapePenaltyHtml(type.name)}</td><td>${penaltyDate(penalty.penalty_date)}</td><td>${escapePenaltyHtml(penalty.reason)}</td><td>${escapePenaltyHtml(days)}</td><td><span class="badge-soft ${statusClass}">${statusLabel}</span></td><td><div class="d-flex gap-1 flex-wrap">${close}${edit}${remove}</div></td></tr>`;
+  };
+  const wirePenaltyAjaxForms = (root = document) => {
+    root.querySelectorAll('#penaltyModal form, #editPenaltyForm').forEach((form) => {
+      form.dataset.ajax = 'true';
+      form.dataset.ajaxLabel = 'جارٍ الحفظ';
+    });
+    root.querySelectorAll('form[action*="/discipline/penalties/"][action$="/close"]').forEach((form) => {
+      form.dataset.ajax = 'true';
+      form.dataset.ajaxLabel = 'جارٍ الاعتماد';
+    });
+    root.querySelectorAll('form[action*="/discipline/penalties/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+      const form = methodInput.form;
+      if (!form) return;
+      form.dataset.ajax = 'true';
+      form.dataset.ajaxLabel = 'جارٍ الحذف';
+      form.dataset.ajaxConfirm = 'هل تريد حذف هذا الإجراء؟';
+      form.removeAttribute('onsubmit');
+    });
+  };
+  wirePenaltyAjaxForms();
+  document.querySelectorAll('tbody tr').forEach((row) => {
+    const action = row.querySelector('form[action*="/discipline/penalties/"]')?.action;
+    const match = action?.match(/\/discipline\/penalties\/(\d+)/);
+    if (match) row.dataset.penaltyId = match[1];
+  });
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.penalty-edit-btn');
+    if (!button) return;
+    const d = button.dataset;
+    const form = document.getElementById('editPenaltyForm');
+    if (!form) return;
+    form.action = `${penaltyBaseUrl}/${d.id}`;
+    form.dataset.ajax = 'true';
+    document.getElementById('editPenaltyEmployee').value = d.employeeId;
+    document.getElementById('editPenaltyType').value = d.typeId;
+    document.getElementById('editPenaltyDate').value = d.date;
+    document.getElementById('editPenaltyReason').value = d.reason;
+    document.getElementById('editPenaltyDetails').value = d.details;
+    document.getElementById('editPenaltyAmount').value = d.amount;
+    document.getElementById('editPenaltyDays').value = d.days;
+  });
+  const upsertPenaltyRow = (penalty) => {
+    if (!penaltyTableBody || !penalty?.id) return;
+    const oldRow = penaltyTableBody.querySelector(`tr[data-penalty-id="${penalty.id}"]`);
+    if (oldRow) oldRow.outerHTML = penaltyRow(penalty);
+    else { penaltyTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); penaltyTableBody.insertAdjacentHTML('afterbegin', penaltyRow(penalty)); }
+    wirePenaltyAjaxForms(penaltyTableBody);
+  };
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (form.id === 'editPenaltyForm' || form.closest('#penaltyModal')) {
+      upsertPenaltyRow(event.detail?.penalty);
+      bootstrap.Modal.getInstance(document.getElementById(form.id === 'editPenaltyForm' ? 'editPenaltyModal' : 'penaltyModal'))?.hide();
+      if (form.closest('#penaltyModal')) form.reset();
+    }
+    if (form.querySelector('input[name="_method"][value="DELETE"]')) form.closest('tr')?.remove();
+  });
+
   // Stage 2: approving one penalty updates only its action control.
   document.querySelectorAll('form[action*="/discipline/penalties/"][action$="/close"]').forEach((form) => {
     form.dataset.ajax = 'true';

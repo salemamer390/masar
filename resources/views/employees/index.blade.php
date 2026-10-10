@@ -235,6 +235,42 @@
 @push('scripts')
 <script>
 (function () {
+    const employeeBaseUrl = @json(url('/employees'));
+    const employeeTableBody = document.querySelector('.table-panel table tbody');
+    const canEditEmployees = @json(auth()->user()?->hasPermission('employees.edit'));
+    const escapeEmployeeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+    const statusLabel = (status) => ({Active: 'نشط', Leave: 'إجازة', Suspended: 'موقوف', Terminated: 'منتهي الخدمة', Pending: 'قيد التعيين'}[status] || status || '—');
+    const statusTone = (status) => ['Leave', 'Pending'].includes(status) ? 'warning' : ['Suspended', 'Terminated'].includes(status) ? 'danger' : 'success';
+    const employeeRow = (employee) => {
+        const status = employee.status?.name || employee.status_name || 'Active';
+        const id = Number(employee.id);
+        return `<tr data-employee-id="${id}"><td>#${escapeEmployeeHtml(employee.employee_code)}</td><td><div class="employee-cell"><span class="employee-avatar">${escapeEmployeeHtml(String(employee.full_name || '—').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join(''))}</span><a href="${employeeBaseUrl}/${id}" class="employee-link text-decoration-none fw-bold">${escapeEmployeeHtml(employee.full_name)}</a></div></td><td>${escapeEmployeeHtml(employee.job?.title)}</td><td>${escapeEmployeeHtml(employee.department?.name)}</td><td><span class="badge-soft ${statusTone(status)}">${escapeEmployeeHtml(statusLabel(status))}</span></td><td>${employee.hire_date ? escapeEmployeeHtml(employee.hire_date) : '—'}</td><td>${canEditEmployees ? `<a class="table-action" href="${employeeBaseUrl}/${id}"><i class="bi bi-three-dots"></i></a>` : '—'}</td></tr>`;
+    };
+    const wireEmployeeAjaxForms = (root = document) => {
+        root.querySelectorAll('#addEmployeeForm').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
+        root.querySelectorAll('form[action*="/employees/"] input[name="_method"][value="PUT"]').forEach((methodInput) => {
+            const form = methodInput.form;
+            if (!form || !form.querySelector('[name="status_id"]')) return;
+            form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ التحديث'; form.dataset.ajaxConfirm = 'تأكيد تغيير حالة الموظف؟'; form.removeAttribute('onsubmit');
+        });
+    };
+    wireEmployeeAjaxForms();
+    document.querySelectorAll('tbody tr').forEach((row) => { const link = row.querySelector('a[href*="/employees/"]'); const match = link?.getAttribute('href')?.match(/\/employees\/(\d+)/); if (match) row.dataset.employeeId = match[1]; });
+    document.addEventListener('masar:success', (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.id === 'addEmployeeForm' || form.querySelector('[name="status_id"]')) {
+            const employee = event.detail?.employee;
+            if (!employee || !employee.id || !employeeTableBody) return;
+            const oldRow = employeeTableBody.querySelector(`tr[data-employee-id="${employee.id}"]`);
+            if (oldRow) oldRow.outerHTML = employeeRow(employee);
+            else { employeeTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); employeeTableBody.insertAdjacentHTML('afterbegin', employeeRow(employee)); }
+            if (form.id === 'addEmployeeForm') { bootstrap.Modal.getInstance(document.getElementById('addEmployeeModal'))?.hide(); form.reset(); }
+        }
+    });
+})();
+
+(function () {
     const hireDateInput = document.getElementById('new_employee_hire_date');
     const contractEndInput = document.getElementById('new_employee_contract_end_date');
     let contractEndEdited = false;

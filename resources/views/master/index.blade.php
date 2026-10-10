@@ -95,6 +95,35 @@ document.getElementById('masterSearch')?.addEventListener('input', e => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll('#masterRows .master-row').forEach(row => row.style.display = row.innerText.toLowerCase().includes(q) ? 'grid' : 'none');
 });
+
+// Adding a reference item is safe to handle in-place: the server already
+// returns the persisted model, while edits/deletes of document types remain
+// normal submissions until their dependent-record behavior is migrated.
+const masterForm = document.querySelector('#masterModal form');
+if (masterForm) masterForm.dataset.ajax = 'true';
+const masterType = @json($type);
+const masterRows = document.getElementById('masterRows');
+const escapeMaster = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+document.addEventListener('masar:success', event => {
+    if (event.target !== masterForm || !masterRows || !event.detail?.item) return;
+    const item = event.detail.item;
+    const name = item.name ?? item.title ?? '—';
+    const code = item.job_code ?? item.address ?? item.default_days ?? item.id ?? '—';
+    const row = document.createElement('div');
+    row.className = masterType === 'documents' ? 'master-row master-document-row document-type-card' : 'master-row';
+    if (masterType === 'documents') {
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${item.is_required ? 'مطلوب لكل موظف' : 'حسب الحاجة'}</span><div><em>${item.is_active === false ? 'غير نشط' : 'نشط'}</em></div>`;
+    } else {
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${escapeMaster(code)}</span><em>نشط</em>`;
+    }
+    masterRows.querySelector('.text-center.text-muted')?.remove();
+    masterRows.appendChild(row);
+    const activeMenu = document.querySelector('.master-menu.active');
+    const count = activeMenu?.querySelector('span:last-child');
+    if (count) count.textContent = String(Number(count.textContent) + 1);
+    bootstrap.Modal.getInstance(document.getElementById('masterModal'))?.hide();
+    masterForm.reset();
+});
 </script>
 @endpush
 @endsection

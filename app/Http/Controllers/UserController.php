@@ -43,7 +43,9 @@ class UserController extends Controller
 
         ActivityLog::record('user_create', "تم إنشاء مستخدم جديد: {$user->name}.", $user);
 
-        return back()->with('toast', 'تمت إضافة المستخدم بنجاح');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'User created.', 'user' => $user->fresh()->load('role')])
+            : back()->with('toast', 'تمت إضافة المستخدم بنجاح');
     }
 
     public function update(Request $request, User $user)
@@ -66,6 +68,8 @@ class UserController extends Controller
         $user->save();
         ActivityLog::record('user_update', "تم تحديث بيانات المستخدم: {$user->name}.", $user);
 
-        return back()->with('toast', 'تم تحديث بيانات المستخدم بنجاح');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'User updated.', 'user' => $user->fresh()->load('role')])
+            : back()->with('toast', 'تم تحديث بيانات المستخدم بنجاح');
     }
 }
