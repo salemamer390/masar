@@ -73,7 +73,9 @@ class AttendanceController extends Controller
         $oldValues = $attendance->only(['approval_status', 'approved_by', 'approved_at']);
         $attendance->update(['approval_status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         ActivityLog::record('attendance_approve', 'Attendance record approved.', $attendance, $oldValues, $attendance->only(['approval_status', 'approved_by', 'approved_at']), 'attendance');
-        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Attendance record approved.']) : back()->with('toast', 'تم اعتماد سجل الحضور.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Attendance record approved.', 'attendance' => $attendance->fresh()])
+            : back()->with('toast', 'تم اعتماد سجل الحضور.');
     }
 
     public function update(Request $request, Attendance $attendance, PayrollPeriodGuard $periodGuard)

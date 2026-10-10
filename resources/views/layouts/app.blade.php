@@ -235,6 +235,92 @@
   // CSRF setup for Fetch API
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+  // Shared, opt-in request helper for the staged smooth-navigation rollout.
+  // It is deliberately not attached to forms automatically: existing Laravel
+  // submissions keep their normal validation, redirects, uploads, and errors
+  // until each screen has been migrated and tested independently.
+  window.MasarUI = window.MasarUI || {};
+  window.MasarUI.request = async function (formOrUrl, options = {}) {
+    const form = formOrUrl instanceof HTMLFormElement ? formOrUrl : null;
+    const url = form ? form.action : String(formOrUrl);
+    const method = (options.method || form?.method || 'GET').toUpperCase();
+    const headers = new Headers(options.headers || {});
+    headers.set('Accept', 'application/json');
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+    if (csrfToken) headers.set('X-CSRF-TOKEN', csrfToken);
+
+    const request = { ...options, method, headers, credentials: 'same-origin' };
+    if (form && method !== 'GET' && method !== 'HEAD' && request.body === undefined) {
+      request.body = new FormData(form);
+    }
+
+    const response = await fetch(url, request);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json()
+      : await response.text();
+
+    if (!response.ok) {
+      const error = new Error(payload?.message || 'Request failed.');
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    return payload;
+  };
+
+  window.MasarUI.setBusy = function (form, busy, label = 'جارٍ الحفظ') {
+    if (!(form instanceof HTMLFormElement)) return;
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(button => {
+      if (busy) {
+        if (button.dataset.masarOriginalText === undefined) {
+          button.dataset.masarOriginalText = button.tagName === 'BUTTON' ? button.innerHTML : button.value;
+        }
+        button.disabled = true;
+        if (button.tagName === 'BUTTON') {
+          button.innerHTML = `<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> ${label}`;
+        } else {
+          button.value = label;
+        }
+      } else {
+        button.disabled = false;
+        if (button.dataset.masarOriginalText !== undefined) {
+          if (button.tagName === 'BUTTON') button.innerHTML = button.dataset.masarOriginalText;
+          else button.value = button.dataset.masarOriginalText;
+          delete button.dataset.masarOriginalText;
+        }
+      }
+    });
+  };
+
+  // Forms opt into AJAX individually with data-ajax="true".  The event-based
+  // result lets each screen update only the affected row/card after its own
+  // controller has confirmed a successful, authorized server-side change.
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true') return;
+
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    window.MasarUI.setBusy(form, true, form.dataset.ajaxLabel || 'جارٍ الحفظ');
+    try {
+      const payload = await window.MasarUI.request(form);
+      form.dispatchEvent(new CustomEvent('masar:success', { bubbles: true, detail: payload }));
+      showToast(payload?.message || form.dataset.ajaxSuccess || 'تم الحفظ بنجاح.');
+    } catch (error) {
+      const validationErrors = error.payload?.errors;
+      const message = validationErrors
+        ? Object.values(validationErrors).flat().find(Boolean)
+        : (error.payload?.message || error.message || 'تعذر حفظ التغييرات.');
+      form.dispatchEvent(new CustomEvent('masar:error', { bubbles: true, detail: error }));
+      showToast(message);
+    } finally {
+      window.MasarUI.setBusy(form, false);
+    }
+  }, true);
+
   // Preserve the user's place in long pages across normal Laravel redirects.
   // This is intentionally global and does not replace normal form validation,
   // uploads, or server-side redirects with unsafe client-side approximations.
@@ -256,7 +342,7 @@
     document.addEventListener('submit', (event) => {
       save();
       const form = event.target;
-      if (!(form instanceof HTMLFormElement) || form.dataset.allowDuplicateSubmit === 'true') return;
+      if (!(form instanceof HTMLFormElement) || form.dataset.ajax === 'true' || form.dataset.allowDuplicateSubmit === 'true') return;
       const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
       submitters.forEach(button => {
         if (button.disabled) return;

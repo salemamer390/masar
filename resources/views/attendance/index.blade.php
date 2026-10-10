@@ -10,4 +10,22 @@
 <div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>تعديل سجل الحضور</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">الحالة</label><select name="status" id="editAttendanceStatus" class="form-select"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">المصدر</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل نظامي</option></select></div></div><p class="small text-muted mt-3 mb-0">سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>
 @push('styles')<style>.attendance-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.attendance-stat-grid .stat-card{min-height:96px;padding:13px 15px;gap:11px}.attendance-stat-grid .stat-icon{width:42px;height:42px;min-width:42px;border-radius:11px;font-size:18px}.attendance-stat-grid .stat-card b{font-size:21px}.attendance-stat-grid .stat-card small{font-size:10px}@media(max-width:900px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.attendance-stat-grid{grid-template-columns:1fr}.attendance-stat-grid .stat-card{min-height:82px}}</style>@endpush
 @push('scripts')<script>document.querySelectorAll('.attendance-edit-btn').forEach(button=>button.addEventListener('click',()=>{const d=button.dataset;const form=document.getElementById('editAttendanceForm');form.action=`{{ url('/attendance') }}/${d.id}`;document.getElementById('editAttendanceEmployee').value=d.employeeId;document.getElementById('editAttendanceDate').value=d.date;document.getElementById('editAttendanceCheckIn').value=d.checkIn;document.getElementById('editAttendanceCheckOut').value=d.checkOut;document.getElementById('editAttendanceStatus').value=d.status;document.getElementById('editAttendanceSource').value=d.source;}));</script>@endpush
+@push('scripts')
+<script>
+  // Stage 2: approving a single attendance record is a safe, row-level update.
+  // Other attendance forms still use their existing server-rendered flow.
+  document.querySelectorAll('form[action*="/attendance/"][action$="/approve"]').forEach((form) => {
+    form.dataset.ajax = 'true';
+    form.dataset.ajaxLabel = 'جارٍ الاعتماد';
+  });
+
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('form[action*="/attendance/"][action$="/approve"]')) return;
+    const cell = form.closest('td');
+    if (!cell) return;
+    cell.innerHTML = '<span class="badge text-bg-success">معتمد</span>';
+  });
+</script>
+@endpush
 @endsection

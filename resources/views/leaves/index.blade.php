@@ -8,4 +8,31 @@
 @if($leaves->hasPages())<div class="d-flex justify-content-center mt-3">{{ $leaves->links() }}</div>@endif
 <div class="modal fade" id="leaveModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ route('leaves.store') }}">@csrf<div class="modal-header"><h5>طلب إجازة جديد</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-3" required>@foreach($leaveTypes as $type)<option value="{{ $type->id }}">{{ $type->name }} ({{ $type->is_paid ? 'بأجر' : 'بدون أجر' }})</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input type="date" name="start_date" class="form-control" required></div><div class="col-6"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control" required></div></div><label class="form-label mt-3">السبب</label><textarea name="reason" class="form-control" rows="3"></textarea></div><div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الطلب</button></div></form></div></div></div>
 @foreach($leaves as $leave)<div class="modal fade" id="editLeave{{ $leave->id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ route('leaves.update',$leave) }}">@csrf @method('PUT')<div class="modal-header"><h5>تعديل طلب الإجازة</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-2" required>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected($leave->employee_id === $employee->id)>{{ $employee->full_name }}</option>@endforeach</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-2" required>@foreach($leaveTypes as $type)<option value="{{ $type->id }}" @selected($leave->leave_type_id === $type->id)>{{ $type->name }}</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input type="date" name="start_date" class="form-control" value="{{ $leave->start_date?->format('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control" value="{{ $leave->end_date?->format('Y-m-d') }}" required></div></div><label class="form-label mt-2">الحالة</label><select name="status" class="form-select mb-2">@foreach(['Pending'=>'قيد المراجعة','Manager Approved'=>'اعتماد المدير','Approved'=>'معتمدة','Rejected'=>'مرفوضة'] as $value=>$label)<option value="{{ $value }}" @selected($leave->status === $value)>{{ $label }}</option>@endforeach</select><label class="form-label">السبب</label><textarea name="reason" class="form-control">{{ $leave->reason }}</textarea><label class="form-label mt-2">سبب الرفض</label><textarea name="rejection_reason" class="form-control">{{ $leave->rejection_reason }}</textarea></div><div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>@endforeach
+@push('scripts')
+<script>
+  // Stage 3: the approval workflow remains server-authorized, while the row
+  // reflects the new state immediately after a successful response.
+  document.querySelectorAll('form[action*="/leaves/"][action$="/approve"]').forEach((form) => {
+    form.dataset.ajax = 'true';
+    form.dataset.ajaxLabel = 'جارٍ الاعتماد';
+  });
+
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.matches('form[action*="/leaves/"][action$="/approve"]')) return;
+    const row = form.closest('tr');
+    if (!row) return;
+    const statusCell = row.children[6];
+    const status = event.detail?.leave?.status;
+    if (status === 'Manager Approved') {
+      statusCell.innerHTML = '<span class="badge-soft warning">بانتظار اعتماد الموارد البشرية</span>';
+      const button = form.querySelector('button');
+      if (button) button.textContent = 'اعتماد الموارد البشرية';
+    } else if (status === 'Approved') {
+      statusCell.innerHTML = '<span class="badge-soft success">معتمدة</span>';
+      form.remove();
+    }
+  });
+</script>
+@endpush
 @endsection

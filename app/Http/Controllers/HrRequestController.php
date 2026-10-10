@@ -121,7 +121,9 @@ class HrRequestController extends Controller
         ]);
         ActivityLog::record('request_approve', "تم اعتماد الطلب: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->only(['status', 'reviewed_by', 'reviewed_at']), 'requests');
 
-        return back()->with('toast', 'تم اعتماد الطلب.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'HR request approved.', 'request' => $hrRequest->fresh()])
+            : back()->with('toast', 'تم اعتماد الطلب.');
     }
 
     public function reject(HrRequest $hrRequest, Request $request)
@@ -143,7 +145,9 @@ class HrRequestController extends Controller
         ]);
         ActivityLog::record('request_reject', "تم رفض الطلب: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason']), 'requests');
 
-        return back()->with('toast', 'تم رفض الطلب.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'HR request rejected.', 'request' => $hrRequest->fresh()])
+            : back()->with('toast', 'تم رفض الطلب.');
     }
 
     public function destroy(HrRequest $hrRequest, Request $request)

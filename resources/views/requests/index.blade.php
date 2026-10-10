@@ -143,6 +143,29 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 @endif
 @endsection
 
+@push('scripts')
+<script>
+  // Stage 4: approval/rejection of an HR request updates only its table row.
+  document.querySelectorAll('table form[action*="/requests/"][action$="/approve"], table form[action*="/requests/"][action$="/reject"]').forEach((form) => {
+    form.dataset.ajax = 'true';
+    form.dataset.ajaxLabel = form.action.endsWith('/reject') ? 'جارٍ الرفض' : 'جارٍ الاعتماد';
+  });
+
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.closest('table') || !form.matches('form[action*="/requests/"][action$="/approve"], form[action*="/requests/"][action$="/reject"]')) return;
+    const row = form.closest('tr');
+    if (!row) return;
+    const status = event.detail?.request?.status || (form.action.endsWith('/reject') ? 'Rejected' : 'Approved');
+    const statusCell = row.children[4];
+    statusCell.innerHTML = status === 'Rejected'
+      ? '<span class="badge-soft danger">مرفوض</span>'
+      : '<span class="badge-soft success">معتمد</span>';
+    row.children[5].querySelectorAll('form[action$="/approve"], form[action$="/reject"]').forEach((actionForm) => actionForm.remove());
+  });
+</script>
+@endpush
+
 @if(request()->boolean('create') || $errors->hasAny(['employee_id', 'request_type_id', 'title', 'details']))
 @push('scripts')
 <script>document.addEventListener('DOMContentLoaded',function(){const m=document.getElementById('requestCreateModal');if(m){bootstrap.Modal.getOrCreateInstance(m).show();}});</script>

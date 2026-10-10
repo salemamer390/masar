@@ -83,7 +83,7 @@ class PenaltyController extends Controller
         return back()->with('toast', 'تم تسجيل الإجراء التأديبي');
     }
 
-    public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard)
+    public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
         $penalty->update([
@@ -93,7 +93,9 @@ class PenaltyController extends Controller
 
         ActivityLog::record('penalty_close', "تم إغلاق الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty);
 
-        return back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Penalty approved.', 'penalty' => $penalty->fresh()])
+            : back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
     }
 
     public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard)

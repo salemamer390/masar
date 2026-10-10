@@ -110,13 +110,21 @@ class LeaveController extends Controller
         if ($leave->status === 'Pending') {
             $leave->update(['status' => 'Manager Approved', 'manager_approved_by' => auth()->id(), 'manager_approved_at' => now()]);
             ActivityLog::record('leave_manager_approve', 'Leave request approved by manager.', $leave, $oldValues, $leave->only(['status', 'manager_approved_by', 'manager_approved_at']), 'leaves');
-            return back()->with('toast', 'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.');
+            return $request->wantsJson()
+                ? response()->json(['success' => true, 'message' => 'Leave request moved to HR review.', 'leave' => $leave->fresh()])
+                : back()->with('toast', 'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.');
         }
-        if ($leave->status !== 'Manager Approved') return back()->withErrors(['leave' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.']);
+        if ($leave->status !== 'Manager Approved') {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.'], 422)
+                : back()->withErrors(['leave' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.']);
+        }
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
-        return back()->with('toast', 'تم اعتماد طلب الإجازة بنجاح.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leave request approved.', 'leave' => $leave->fresh()])
+            : back()->with('toast', 'تم اعتماد طلب الإجازة بنجاح.');
     }
 
     public function reject(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
@@ -126,7 +134,9 @@ class LeaveController extends Controller
         $oldValues = $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']);
         $leave->update(['status' => 'Rejected', 'approved_by' => auth()->id(), 'approved_at' => now(), 'rejection_reason' => $data['rejection_reason'] ?? null]);
         ActivityLog::record('leave_reject', 'Leave request rejected.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']), 'leaves');
-        return back()->with('toast', 'تم رفض طلب الإجازة.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'Leave request rejected.', 'leave' => $leave->fresh()])
+            : back()->with('toast', 'تم رفض طلب الإجازة.');
     }
 
     public function destroy(Leave $leave, PayrollPeriodGuard $periodGuard)
