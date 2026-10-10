@@ -8,6 +8,21 @@ use Illuminate\Support\Facades\DB;
 /** Separate, removable Legal-sized S1 template imported from the editable package. */
 class EditableS1Controller extends Controller
 {
+    /** Print-ready batch of S1 forms for every employee in the system. */
+    public function printAll()
+    {
+        $employees = Employee::query()
+            ->with(['job', 'department', 'profileDetail', 'insuranceRecord', 'currentSalary'])
+            ->orderBy('full_name')
+            ->get();
+
+        $forms = $employees->map(function (Employee $employee): array {
+            return $this->show($employee)->getData()['d'];
+        });
+
+        return view('forms.s1-bulk', compact('forms'));
+    }
+
     public function show(Employee $employee)
     {
         $employee->load(['job', 'department', 'profileDetail', 'insuranceRecord', 'currentSalary']);

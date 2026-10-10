@@ -22,11 +22,14 @@
     // علامة ✔ لو القيمة = المطلوب
     $chk = fn ($value, $eq = true) => ((string) $value === (string) $eq) ? '✔' : '';
 @endphp
+@php($bulkMode = $bulk ?? false)
+@if (! $bulkMode)
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
 <title>س1 - {{ $d['name'] }}</title>
+@endif
 <style>
   /* ضع ملفات الخطوط في public/fonts */
   @font-face { font-family: 'Mudir MT';        src: url('{{ $mudirFont }}') format('truetype'); }
@@ -102,11 +105,13 @@
   .page:not(.page-front) .sig .h { text-align: left; padding-right: 0 !important; }
   .page:not(.page-front) .sig .p { text-align: left; padding-right: 0 !important; }
 </style>
+@if (! $bulkMode)
 </head>
 <body class="{{ request()->boolean('pdf') ? 'pdf-output' : '' }}">
 <div class="tools" aria-label="إجراءات النموذج">
   <button type="button" onclick="window.print()">طباعة</button>
 </div>
+@endif
 
 {{-- ======================= صفحة 1 (الوش) ======================= --}}
 <div class="page page-front">
@@ -191,8 +196,10 @@
   <div class="sig"><div class="h" style="font-size:14pt;margin-top:6pt;padding-right:40pt">توقيع المؤمن عليه</div><div class="p" style="padding-right:10pt">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</div></div>
 </div>
 
-@if(request('print'))
+@if(! $bulkMode && request('print'))
 <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });</script>
 @endif
+@if (! $bulkMode)
 </body>
 </html>
+@endif

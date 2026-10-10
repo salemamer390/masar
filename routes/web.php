@@ -247,6 +247,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/employees/{employee}/forms/s1-editable', [EditableS1Controller::class, 'show'])
         ->middleware('permission:insurance.view')
         ->name('employees.forms.s1.editable');
+    Route::get('/insurance/forms/s1/print-all', [EditableS1Controller::class, 'printAll'])
+        ->middleware('permission:insurance.view')
+        ->name('insurance.forms.s1.print-all');
     Route::get('/insurance/forms/s2-editable', [EditableS2Controller::class, 'show'])
         ->middleware('permission:insurance.view')
         ->name('insurance.forms.s2.editable');
