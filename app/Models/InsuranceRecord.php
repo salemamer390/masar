@@ -36,6 +36,8 @@ class InsuranceRecord extends Model
     public function getStatusBadgeClassAttribute(): string
     {
         return match ($this->status) {
+            'registered' => 'success',
+            'unregistered' => 'danger',
             'مسجل', 'Active' => 'success',
             'قيد التسجيل', 'Pending' => 'warning',
             default => 'danger',

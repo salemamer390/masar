@@ -235,6 +235,39 @@
   // CSRF setup for Fetch API
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
+  // Preserve the user's place in long pages across normal Laravel redirects.
+  // This is intentionally global and does not replace normal form validation,
+  // uploads, or server-side redirects with unsafe client-side approximations.
+  (() => {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const key = `masar_scroll:${location.pathname}`;
+    let saveTimer;
+    const save = () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => sessionStorage.setItem(key, String(window.scrollY)), 80);
+    };
+    window.addEventListener('scroll', save, { passive: true });
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('DOMContentLoaded', () => {
+      const saved = Number(sessionStorage.getItem(key));
+      if (!Number.isFinite(saved) || saved <= 0) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'auto' })));
+    });
+    document.addEventListener('submit', (event) => {
+      save();
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || form.dataset.allowDuplicateSubmit === 'true') return;
+      const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+      submitters.forEach(button => {
+        if (button.disabled) return;
+        button.dataset.originalText = button.innerHTML ?? button.value;
+        button.disabled = true;
+        if (button.tagName === 'BUTTON') button.innerHTML = '<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> جارٍ الحفظ';
+        else button.value = 'جارٍ الحفظ';
+      });
+    }, true);
+  })();
+
   // Trigger flash toasts from Laravel session
   @if(session('toast'))
     document.addEventListener('DOMContentLoaded', function() {

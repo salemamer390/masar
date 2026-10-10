@@ -25,4 +25,100 @@
 
 <div class="modal fade" id="insuranceModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form method="POST" action="{{ route('insurance.store') }}">@csrf<div class="modal-header"><h5>تسجيل موظف بالتأمينات</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-md-6"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="col-md-6"><label class="form-label">الفئة التأمينية</label><input name="insurance_category" class="form-control" value="العاملون لدى الغير"></div><div class="col-md-4"><label class="form-label">الرقم التأميني</label><input name="insurance_number" class="form-control"></div><div class="col-md-4"><label class="form-label">مكتب التأمينات</label><input name="insurance_office" class="form-control" value="{{ $organization?->office_name }}"></div><div class="col-md-4"><label class="form-label">كود المهنة</label><input name="job_code" class="form-control"></div><div class="col-md-4"><label class="form-label">تاريخ البداية</label><input name="insurance_start_date" type="date" class="form-control"></div><div class="col-md-4"><label class="form-label">آخر موعد للتسجيل</label><input name="registration_deadline" type="date" class="form-control"></div><div class="col-md-4"><label class="form-label">الحالة</label><select name="status" class="form-select"><option>مسجل</option><option>قيد التسجيل</option><option>غير مسجل</option></select></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ السجل</button></div></form></div></div></div>
 @foreach($insuranceRecords as $record)<div class="modal fade" id="editInsurance{{ $record->id }}" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><form method="POST" action="{{ route('insurance.update',$record) }}">@csrf @method('PUT')<div class="modal-header"><h5>تعديل بيانات تأمين {{ $record->employee?->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body row g-3"><div class="col-md-4"><label class="form-label">الرقم التأميني</label><input name="insurance_number" class="form-control" value="{{ $record->insurance_number }}"></div><div class="col-md-4"><label class="form-label">مكتب التأمينات</label><input name="insurance_office" class="form-control" value="{{ $record->insurance_office }}"></div><div class="col-md-4"><label class="form-label">كود المهنة</label><input name="job_code" class="form-control" value="{{ $record->job_code }}"></div><div class="col-md-4"><label class="form-label">الفئة</label><input name="insurance_category" class="form-control" value="{{ $record->insurance_category }}"></div><div class="col-md-4"><label class="form-label">تاريخ البداية</label><input name="insurance_start_date" type="date" class="form-control" value="{{ $record->insurance_start_date?->format('Y-m-d') }}"></div><div class="col-md-4"><label class="form-label">تاريخ النهاية</label><input name="insurance_end_date" type="date" class="form-control" value="{{ $record->insurance_end_date?->format('Y-m-d') }}"></div><div class="col-md-4"><label class="form-label">موعد التسجيل</label><input name="registration_deadline" type="date" class="form-control" value="{{ $record->registration_deadline?->format('Y-m-d') }}"></div><div class="col-md-4"><label class="form-label">الحالة</label><select name="status" class="form-select">@foreach(['مسجل','قيد التسجيل','غير مسجل'] as $status)<option @selected($record->status===$status)>{{ $status }}</option>@endforeach</select></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>@endforeach
+<script>
+document.querySelectorAll('input[name="insurance_category"]').forEach(function (input) {
+    const current = input.value || '\u0627\u0644\0639\0627\0645\0644\0648\0646 \u0644\062f\u0649 \u0627\0644\063a\064a\u0631';
+    const select = document.createElement('select');
+    select.name = input.name;
+    select.className = input.className.replace('form-control', 'form-select');
+    select.required = true;
+    [
+        ['\u0627\u0644\0639\0627\0645\0644\0648\0646 \u0644\062f\0649 \u0627\u0644\063a\064a\0631', '\u0627\u0644\0639\0627\0645\0644\u0648\0646 \u0644\062f\0649 \u0627\u0644\063a\064a\0631'],
+        ['\u0623\u0635\062d\0627\0628 \u0623\0639\u0645\u0627\0644 \u0644\u0647\u0645 \u0645\0646\u0634\u0622\u062a', '\u0623\u0635\062d\u0627\u0628 \u0623\u0639\u0645\u0627\u0644 \u0644\u0647\u0645 \u0645\0646\u0634\u0622\u062a'],
+        ['\u0627\u0644\0639\0627\u0645\0644\064a\0646 \u0628\u0627\u0644\u0645\062e\0627\0628\0632', '\u0627\u0644\0639\u0627\0645\u0644\064a\0646 \u0628\u0627\u0644\u0645\062e\u0627\u0628\0632']
+    ].forEach(function (item) {
+        const option = new Option(item[1], item[0]);
+        option.selected = item[0] === current;
+        select.add(option);
+    });
+    select.dataset.currentCategory = current;
+    input.replaceWith(select);
+});
+</script>
+<script>
+document.querySelectorAll('select[name="insurance_category"]').forEach(function (select) {
+    const selected = select.dataset.currentCategory || select.value;
+    select.innerHTML = '';
+    [
+        ['workers', '&#x627;&#x644;&#x639;&#x627;&#x645;&#x644;&#x648;&#x646; &#x644;&#x62F;&#x649; &#x627;&#x644;&#x63A;&#x64A;&#x631;'],
+        ['owners', '&#x623;&#x635;&#x62D;&#x627;&#x628; &#x623;&#x639;&#x645;&#x627;&#x644; &#x644;&#x647;&#x645; &#x645;&#x646;&#x634;&#x622;&#x62A;'],
+        ['bakeries', '&#x627;&#x644;&#x639;&#x627;&#x645;&#x644;&#x64A;&#x646; &#x628;&#x627;&#x644;&#x645;&#x62E;&#x627;&#x628;&#x632;']
+    ].forEach(function (item) {
+        const option = document.createElement('option');
+        option.value = item[0];
+        option.innerHTML = item[1];
+        option.selected = item[0] === selected;
+        select.appendChild(option);
+    });
+    if (!select.value) select.value = 'workers';
+});
+</script>
+<script>
+document.querySelectorAll('select[name="status"]').forEach(function (select) {
+    const current = select.value;
+    select.innerHTML = '';
+    [
+        ['registered', '&#x645;&#x633;&#x62C;&#x644;'],
+        ['unregistered', '&#x63A;&#x64A;&#x631; &#x645;&#x633;&#x62C;&#x644;']
+    ].forEach(function (item) {
+        const option = document.createElement('option');
+        option.value = item[0];
+        option.innerHTML = item[1];
+        option.selected = current === option.value || (item[0] === 'registered' && !current);
+        select.appendChild(option);
+    });
+    if (!select.value) select.selectedIndex = 0;
+});
+</script>
+<script>
+document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft').forEach(function (badge) {
+    const row = badge.closest('tr');
+    const editButton = row?.querySelector('[data-bs-target^="#editInsurance"]');
+    const editForm = editButton ? document.querySelector(editButton.dataset.bsTarget + ' form') : null;
+    if (!editForm) return;
+    const select = document.createElement('select');
+    select.className = badge.className.replace('badge-soft', 'badge-soft border-0');
+    select.style.cssText = 'cursor:pointer;appearance:auto;';
+    [['registered', '&#x645;&#x633;&#x62C;&#x644;'], ['unregistered', '&#x63A;&#x64A;&#x631; &#x645;&#x633;&#x62C;&#x644;']].forEach(function (item) {
+        const option = document.createElement('option');
+        option.value = item[0];
+        option.innerHTML = item[1];
+        option.selected = badge.textContent.trim() === item[0] || badge.textContent.trim() === option.textContent;
+        select.appendChild(option);
+    });
+    select.addEventListener('change', function () {
+        const status = editForm.querySelector('[name="status"]');
+        if (!status) return;
+        status.value = select.value;
+        select.disabled = true;
+        fetch(editForm.action, {
+            method: 'POST',
+            body: new FormData(editForm),
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function (response) {
+            if (!response.ok) throw new Error('status update failed');
+            const badgeClass = select.value === 'registered' ? 'success' : 'danger';
+            badge.className = 'badge-soft ' + badgeClass;
+            select.className = 'badge-soft border-0 ' + badgeClass;
+            select.disabled = false;
+            if (typeof showToast === 'function') showToast('Insurance record updated.');
+        }).catch(function () {
+            select.disabled = false;
+            if (typeof showToast === 'function') showToast('تعذر تحديث الحالة، حاول مرة أخرى.');
+        });
+    });
+    badge.replaceWith(select);
+});
+</script>
 @endsection

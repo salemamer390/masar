@@ -29,8 +29,10 @@ class EditableS1Controller extends Controller
         $organization = DB::table('insurance_organization_settings')->first();
         $record = $employee->insuranceRecord;
         $salary = $employee->currentSalary;
-        $category = (string) ($record?->insurance_category ?? 'العاملون لدى الغير');
-        $category = str_contains($category, 'مخابز') ? 3 : (str_contains($category, 'أصحاب') ? 2 : 1);
+        $category = (string) ($record?->insurance_category ?? 'workers');
+        $bakery = json_decode('"\\u0627\\u0644\\u0639\\u0627\\u0645\\u0644\\u064a\\u0646 \\u0628\\u0627\\u0644\\u0645\\u062e\\u0627\\u0628\\u0632"', true);
+        $owner = json_decode('"\\u0623\\u0635\\u062d\\u0627\\u0628 \\u0623\\u0639\\u0645\\u0627\\u0644 \\u0644\\u0647\\u0645 \\u0645\\u0646\\u0634\\u0622\\u062a"', true);
+        $category = $category === 'bakeries' || ($bakery && str_contains($category, $bakery)) ? 3 : ($category === 'owners' || ($owner && str_contains($category, $owner)) ? 2 : 1);
         $start = $record?->insurance_start_date;
         $profile = $employee->profileDetail;
         $data = [

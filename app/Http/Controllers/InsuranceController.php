@@ -17,9 +17,13 @@ class InsuranceController extends Controller
         $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $this->normalizeInsuranceStatus($request->status)))
             ->when($request->filled('office'), fn ($q) => $q->where('insurance_office', 'like', '%'.$request->office.'%'))
             ->orderByDesc('id')->get();
+        $insuranceRecords->each(function (InsuranceRecord $record): void {
+            $record->insurance_category = $this->normalizeInsuranceCategory($record->insurance_category);
+            $record->status = $this->normalizeInsuranceStatus($record->status);
+        });
         $employees = Employee::whereDoesntHave('insuranceRecord')->orderBy('full_name')->get();
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
         $organization = DB::table('insurance_organization_settings')->first();
@@ -36,6 +40,8 @@ class InsuranceController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateRecord($request, true);
+        $data['insurance_category'] = $this->normalizeInsuranceCategory($data['insurance_category'] ?? null);
+        $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
         $organization = DB::table('insurance_organization_settings')->first();
         $employee = Employee::findOrFail($data['employee_id']);
 
@@ -56,12 +62,17 @@ class InsuranceController extends Controller
         });
         Salary::syncInsuredSalary((int) $record->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record created or updated.', $record, null, $record->toArray(), 'insurance');
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Insurance record saved.']);
+        }
         return back()->with('toast', 'تم حفظ بيانات التأمين بنجاح.');
     }
 
     public function update(Request $request, InsuranceRecord $insuranceRecord)
     {
         $data = $this->validateRecord($request, false);
+        $data['insurance_category'] = $this->normalizeInsuranceCategory($data['insurance_category'] ?? null);
+        $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
         $old = $insuranceRecord->toArray();
         DB::transaction(function () use ($insuranceRecord, $data, $old) {
             $insuranceRecord->update($data);
@@ -69,6 +80,9 @@ class InsuranceController extends Controller
         });
         Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);
         ActivityLog::record('insurance_update', 'Insurance record updated.', $insuranceRecord, $old, $insuranceRecord->fresh()->toArray(), 'insurance');
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Insurance record updated.']);
+        }
         return back()->with('toast', 'تم تحديث بيانات التأمين بنجاح.');
     }
 
@@ -85,6 +99,31 @@ class InsuranceController extends Controller
             'insured_salary' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', 'max:50'],
         ]));
+    }
+
+    private function normalizeInsuranceCategory(?string $category): string
+    {
+        $category = trim((string) $category);
+        if (in_array($category, ['workers', 'owners', 'bakeries'], true)) {
+            return $category;
+        }
+
+        $bakery = json_decode('"\\u0627\\u0644\\u0639\\u0627\\u0645\\u0644\\u064a\\u0646 \\u0628\\u0627\\u0644\\u0645\\u062e\\u0627\\u0628\\u0632"', true);
+        $owner = json_decode('"\\u0623\\u0635\\u062d\\u0627\\u0628 \\u0623\\u0639\\u0645\\u0627\\u0644 \\u0644\\u0647\\u0645 \\u0645\\u0646\\u0634\\u0622\\u062a"', true);
+        if ($bakery && str_contains($category, $bakery)) return 'bakeries';
+        if ($owner && str_contains($category, $owner)) return 'owners';
+        return 'workers';
+    }
+
+    private function normalizeInsuranceStatus(?string $status): string
+    {
+        $status = trim((string) $status);
+        if (in_array($status, ['registered', 'unregistered'], true)) {
+            return $status;
+        }
+
+        $unregistered = json_decode('"\\u063a\\u064a\\u0631 \\u0645\\u0633\\u062c\\u0644"', true);
+        return $unregistered && $status === $unregistered ? 'unregistered' : 'registered';
     }
 
     public function updateOrganization(Request $request)
