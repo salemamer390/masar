@@ -47,6 +47,12 @@
         .meta-field.establishment-row { grid-column: 1 / -1; grid-row: 3; gap: 1.5mm; }
         .boxes { display: inline-flex; direction: ltr; vertical-align: middle; }
         .boxes i { display: flex; align-items: center; justify-content: center; width: 21pt; height: 21pt; border: 1px solid #000; margin-left: -1px; padding: 0; font-family: Tahoma, Arial, sans-serif; font-size: 10pt; font-style: normal; line-height: 1; text-align: center; direction: ltr; unicode-bidi: isolate; }
+        .table-grid-cell { padding: 0; height: 20pt; }
+        .table-grid { display: grid; height: 100%; width: 100%; direction: ltr; }
+        .table-grid.grid-9 { grid-template-columns: repeat(9, 1fr); }
+        .table-grid.grid-14 { grid-template-columns: repeat(14, 1fr); }
+        .table-grid span { display: block; min-width: 0; height: 100%; }
+        .table-grid span + span { border-left: 1px solid #000; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 8pt; font-size: 11pt; direction: rtl; }
         th, td { border: 1px solid #000; text-align: center; height: 20pt; }
         th { font-family: Tahoma, Arial, sans-serif; font-size: 12pt; }
@@ -82,7 +88,7 @@
         <table>
             <colgroup><col style="width:22.1%"><col style="width:17.5%"><col style="width:24.2%"><col style="width:4.5%"><col style="width:5.1%"><col style="width:6.1%"><col style="width:10.5%"><col style="width:10%"></colgroup>
             <thead><tr><th>الرقم التأميني</th><th>اسم المؤمن عليه</th><th>الرقم القومي</th><th colspan="3">تاريخ الالتحاق</th><th>أجر الاشتراك</th><th>الأجر الشامل</th></tr><tr><th></th><th></th><th></th><th>يوم</th><th>شهر</th><th>سنة</th><th>جنيه</th><th>جنيه</th></tr></thead>
-            <tbody>@for($row = 0; $row < 10; $row++)<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>@endfor</tbody>
+            <tbody>@for($row = 0; $row < 10; $row++)<tr><td class="table-grid-cell"><div class="table-grid grid-9">@for($i=0;$i<9;$i++)<span></span>@endfor</div></td><td></td><td class="table-grid-cell"><div class="table-grid grid-14">@for($i=0;$i<14;$i++)<span></span>@endfor</div></td><td></td><td></td><td></td><td></td><td></td></tr>@endfor</tbody>
         </table>
     </section>
     <section class="page">
