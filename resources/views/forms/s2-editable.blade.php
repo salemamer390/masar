@@ -39,7 +39,7 @@
         .meta-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm 6mm; margin: 1mm 3mm 2mm; direction: rtl; }
         .meta-field { display: flex; align-items: flex-end; gap: 1.5mm; min-width: 0; min-height: 7mm; font-size: 9pt; white-space: nowrap; }
         .meta-field .lab { font-weight: 700; flex: none; }
-        .meta-field .fill { border-bottom: .25mm dotted #111; min-width: 0; flex: 1; min-height: 5mm; padding: 0 1mm; text-align: center; overflow: hidden; }
+        .meta-field .fill { border-bottom: .25mm dotted #111; min-width: 0; flex: 1; min-height: 5mm; padding: 0 1mm; text-align: center; overflow: hidden; font-size: 11pt; font-weight: 500; line-height: 1.15; }
         .meta-field.phone-row { grid-column: 3; grid-row: 2; }
         .meta-field.commercial-row { grid-column: 1 / -1; grid-row: 4; gap: 1.5mm; }
         .meta-field.commercial-row .lab, .meta-field.establishment-row .lab { font-size: 8.5pt; }
