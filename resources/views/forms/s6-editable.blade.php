@@ -286,12 +286,16 @@
             white-space: normal
         }
 
-        /* Keep the final note and applicant signature inside the first Legal page. */
+        .back-note {
+            margin-top: 20pt;
+            text-align: left;
+            font-weight: 700;
+            font-size: 12pt;
+            direction: rtl;
+        }
+
+        /* Fit all first-page declarations, signatures and the back-note inside A4. */
         .page:first-of-type { padding-top: .35in; padding-bottom: .2in; }
-        .page:first-of-type .section { margin-top: 7pt; margin-bottom: 5pt; }
-        .page:first-of-type .declaration { margin: 7pt 0; line-height: 1.55; }
-        .page:first-of-type .note { margin-top: 8pt; padding-top: 4pt; font-size: 11pt; line-height: 1.35; }
-        .page:first-of-type .note + .row { margin-top: 7pt; min-height: 21pt; }
         .page:first-of-type .header { padding-bottom: 2pt; }
         .page:first-of-type .header img { height: 44pt; }
         .page:first-of-type .title { font-size: 14pt; margin: 4pt 0 3pt; }
@@ -299,9 +303,10 @@
         .page:first-of-type .section span { padding-top: 1pt; padding-bottom: 1pt; }
         .page:first-of-type .row { min-height: 15pt; margin-bottom: 1pt; }
         .page:first-of-type .line { min-height: 12pt; }
-        .page:first-of-type .boxes i { height: 18pt; line-height: 17pt; }
+        .page:first-of-type .declaration { margin: 7pt 0; line-height: 1.55; }
         .page:first-of-type .note { margin-top: 3pt; padding-top: 2pt; font-size: 10pt; line-height: 1.25; }
         .page:first-of-type .note + .row { margin-top: 3pt; min-height: 16pt; }
+        .page:first-of-type .back-note { margin-top: 12pt; font-size: 11pt; }
 
         @media print {
             body {
@@ -384,6 +389,7 @@
         <div class="row" style="margin-top:15pt"><span class="label-wide">توقيع مقدم الطلب:</span><span
                 class="line"></span><span class="gap"></span><span class="label">التاريخ:</span><span
                 class="line">{{ $d['issue_date'] }}</span></div>
+        <div class="back-note">(انظر خلفه)</div>
     </section>
     <section class="page">
         <div class="subtitle">إرشادات</div>

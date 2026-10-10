@@ -76,7 +76,7 @@
   .sub { padding-right: 27pt; }
   .sig { margin: 4pt 0 0 0; } .sig .p { margin-top: 16pt; font-size: 12pt; }
   .center { text-align: center; letter-spacing: 0; }
-  .page:nth-of-type(2) .center.h { font-family: 'Mudir MT', 'Cairo', Tahoma, sans-serif; font-weight: 700; }
+  .page:not(.page-front) .center.h { font-family: 'Mudir MT', 'Cairo', Tahoma, sans-serif; font-weight: 700; }
   .page-front .sec { margin-top: 5pt; margin-bottom: 3pt; }
   .page-front .txt { line-height: 18pt; }
   .page-front .sig { margin-top: 2pt; }
@@ -98,8 +98,9 @@
   .page-front .sig .p { margin-top: 6pt; }
   .page1-footer { position: static; margin-top: 3pt; background: #fff; }
   .page1-footer .sec { margin-top: 0; }
-  .page:nth-of-type(2) .sig { text-align: left; direction: rtl; }
-  .page:nth-of-type(2) .sig .p { text-align: left; padding-right: 0 !important; }
+  .page:not(.page-front) .sig { text-align: left; direction: rtl; }
+  .page:not(.page-front) .sig .h { text-align: left; padding-right: 0 !important; }
+  .page:not(.page-front) .sig .p { text-align: left; padding-right: 0 !important; }
 </style>
 </head>
 <body class="{{ request()->boolean('pdf') ? 'pdf-output' : '' }}">
