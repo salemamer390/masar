@@ -71,17 +71,17 @@
   <div class="hdr h">
     <div class="org"><div>الهيئة القومية للتأمين الاجتماعي</div><div>مكتب : <span class="v" style="border-bottom:1px dotted #000">{{ $d['office'] }}</span></div></div>
     <div class="c"><img src="{{ asset('images/nosi-logo.jpg') }}" alt=""></div>
-    <div class="no">نموذج رقم ( 1 )</div>
+    <div class="no">نموذج رقم ( ١ )</div>
   </div>
   <div class="title h">طلــــب اشتــــراك مــؤمـــــن عليـــــه</div>
 
   <div class="r"><span class="l" style="width:46pt">الفئة :</span>
-    <span class="num">1</span><span class="l" style="margin:0 4pt 0 0">عاملين لدى الغير</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 1) }}</span>
+    <span class="num">١</span><span class="l" style="margin:0 4pt 0 0">عاملين لدى الغير</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 1) }}</span>
     <span style="width:34pt"></span>
-    <span class="num">2</span><span class="l" style="margin:0 4pt 0 0">أصحاب أعمال لهم منشآت</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 2) }}</span>
+    <span class="num">٢</span><span class="l" style="margin:0 4pt 0 0">أصحاب أعمال لهم منشآت</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 2) }}</span>
   </div>
   <div class="r"><span class="l" style="width:46pt"></span>
-    <span class="num">3</span><span class="l" style="margin:0 4pt 0 0">العاملين بالمخابز</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 3) }}</span>
+    <span class="num">٣</span><span class="l" style="margin:0 4pt 0 0">العاملين بالمخابز</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 3) }}</span>
   </div>
 
   <div class="sec"><span>بيانات مقدم الطلب</span></div>

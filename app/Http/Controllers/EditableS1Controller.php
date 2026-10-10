@@ -32,7 +32,7 @@ class EditableS1Controller extends Controller
             'nationality' => $profile?->nationality ?? 'مصري',
             'qualification' => $employee->qualification ?? '',
             'job' => $employee->job?->title ?? '',
-            'start_day' => $start?->format('d') ?? '', 'start_month' => $start?->format('m') ?? '', 'start_year' => $start?->format('Y') ?? '',
+            'start_day' => $this->arabicDigits($start?->format('d') ?? ''), 'start_month' => $this->arabicDigits($start?->format('m') ?? ''), 'start_year' => $this->arabicDigits($start?->format('Y') ?? ''),
             'sector' => '', 'sub_code' => '', 'period_type' => '',
             'wage' => $this->money($salary?->applied_insurance_wage ?? $record?->insured_salary),
             'total_wage' => $this->money($employee->gross_salary),
@@ -46,12 +46,13 @@ class EditableS1Controller extends Controller
 
     private function digits($value): string
     {
-        return preg_replace('/\D+/', '', strtr((string) $value, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']));
+        $latin = preg_replace('/\D+/', '', strtr((string) $value, ['٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9']));
+        return $this->arabicDigits($latin);
     }
 
     private function money($value): string
     {
-        return $value === null ? '' : (string) (int) round((float) $value);
+        return $value === null ? '' : $this->arabicDigits((string) (int) round((float) $value));
     }
 
     private function arabicDigits(string $value): string
