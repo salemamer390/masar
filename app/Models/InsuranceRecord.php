@@ -11,7 +11,10 @@ class InsuranceRecord extends Model
         'employee_id',
         'insurance_number',
         'job_code',
+        'insurance_office',
+        'insurance_category',
         'insurance_start_date',
+        'registration_deadline',
         'insurance_end_date',
         'insured_salary',
         'status',
@@ -20,6 +23,7 @@ class InsuranceRecord extends Model
 
     protected $casts = [
         'insurance_start_date' => 'date',
+        'registration_deadline' => 'date',
         'insurance_end_date' => 'date',
         'insured_salary' => 'decimal:2',
     ];

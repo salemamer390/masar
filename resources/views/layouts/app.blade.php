@@ -177,6 +177,27 @@
     }
   });
 
+  // عرض إشعار مختصر في كل صفحات التطبيق عند وصول إشعار جديد.
+  document.addEventListener('DOMContentLoaded', () => {
+    const alert = document.getElementById('notificationLiveAlert');
+    if (!alert) return;
+    const id = alert.dataset.notificationId;
+    const storageKey = 'masar_last_notification_popup';
+    const close = () => {
+      alert.classList.remove('is-visible');
+      window.setTimeout(() => alert.remove(), 260);
+    };
+    alert.querySelector('.notification-live-close')?.addEventListener('click', close);
+    alert.querySelector('.notification-live-content')?.addEventListener('click', () => {
+      if (alert.dataset.notificationUrl) window.location.href = alert.dataset.notificationUrl;
+    });
+    if (id && localStorage.getItem(storageKey) !== id) {
+      localStorage.setItem(storageKey, id);
+      window.setTimeout(() => alert.classList.add('is-visible'), 180);
+      window.setTimeout(close, 6200);
+    }
+  });
+
   // Sidebar toggle
   document.getElementById('menuBtn')?.addEventListener('click', function() {
     document.getElementById('sidebar')?.classList.toggle('open');

@@ -251,6 +251,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/{insuranceRecord}', [InsuranceController::class, 'update'])
             ->middleware('permission:insurance.edit')
             ->name('update');
+        Route::get('/{insuranceRecord}/form', [InsuranceController::class, 'form'])
+            ->middleware('permission:insurance.view')
+            ->name('form');
+        Route::put('/organization/settings', [InsuranceController::class, 'updateOrganization'])
+            ->middleware('permission:insurance.edit')
+            ->name('organization.update');
     });
 
     // Discipline & Penalties

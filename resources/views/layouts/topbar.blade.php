@@ -17,4 +17,12 @@
     <div class="dropdown"><button class="icon-btn notification-trigger position-relative" data-bs-toggle="dropdown" aria-expanded="false" aria-label="الإشعارات"><i class="bi bi-bell"></i>@if($notifications->isNotEmpty())<span class="notification-dot">{{ $notifications->count() }}</span>@endif</button><div class="dropdown-menu dropdown-menu-end notification-menu shadow border-0 p-0 mt-2"><div class="px-3 py-2 border-bottom d-flex justify-content-between"><b>الإشعارات</b><small class="text-muted">{{ $notifications->count() }} جديدة</small></div>@forelse($notifications as $notification)<form method="POST" action="{{ route('notifications.read', $notification->id) }}">@csrf<button class="dropdown-item notification-item" type="submit"><i class="bi bi-file-earmark-text text-warning"></i><span>{{ $notification->data['message'] ?? 'إشعار جديد' }}<small>{{ $notification->created_at?->diffForHumans() }}</small></span></button></form>@empty<div class="p-3 text-muted small">لا توجد إشعارات جديدة.</div>@endforelse</div></div>
     <button class="icon-btn" id="themeToggleBtn" title="الوضع الليلي / الفاتح" aria-label="تبديل المظهر"><i class="bi bi-moon"></i></button>
   </div>
+  @if($notifications->isNotEmpty())
+    @php($latestNotification = $notifications->first())
+    <div class="notification-live-alert" id="notificationLiveAlert" data-notification-id="{{ $latestNotification->id }}" data-notification-url="{{ $latestNotification->data['url'] ?? route('notifications.index') }}" role="status" aria-live="polite">
+      <div class="notification-live-icon"><i class="bi bi-bell-fill"></i></div>
+      <div class="notification-live-content"><strong>إشعار جديد</strong><span>{{ $latestNotification->data['message'] ?? 'لديك إشعار جديد يحتاج إلى المراجعة.' }}</span><small>{{ $latestNotification->created_at?->diffForHumans() }}</small></div>
+      <button type="button" class="notification-live-close" aria-label="إغلاق"><i class="bi bi-x-lg"></i></button>
+    </div>
+  @endif
 </header>

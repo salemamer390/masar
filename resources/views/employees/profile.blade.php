@@ -393,11 +393,18 @@
     <div class="panel profile-panel">
         <div class="panel-head"><h3>بيانات التأمينات الاجتماعية</h3></div>
         @php($ins = $employee->insuranceRecord)
+        <div class="mb-3">
+            <a class="btn btn-sm btn-outline-primary" href="{{ route('insurance.index', ['search' => $employee->employee_code]) }}"><i class="bi bi-shield-check"></i> إدارة التأمينات</a>
+        </div>
         <div class="details-grid">
             <div><label>الحالة</label><b>{{ $ins?->status ?? 'غير مسجل' }}</b></div>
             <div><label>الرقم التأميني</label><b>{{ $ins?->insurance_number ?? '—' }}</b></div>
             <div><label>كود المهنة</label><b>{{ $ins?->job_code ?? '—' }}</b></div>
             <div><label>تاريخ بدء التأمين</label><b>{{ $ins?->insurance_start_date?->format('d/m/Y') ?? '—' }}</b></div>
+            <div><label>مكتب التأمينات</label><b>{{ $ins?->insurance_office ?? '—' }}</b></div>
+            <div><label>فئة التأمين</label><b>{{ $ins?->insurance_category ?? '—' }}</b></div>
+            <div><label>مهلة التسجيل</label><b>{{ $ins?->registration_deadline?->format('d/m/Y') ?? '—' }}</b></div>
+            <div><label>الأجر التأميني</label><b>{{ $employee->currentSalary && !$employee->currentSalary->no_insurance ? format_money($employee->currentSalary->applied_insurance_wage) . ' ج.م' : '—' }}</b></div>
         </div>
     </div>
 

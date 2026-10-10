@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Bank;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\User;
 use App\Models\EmployeeStatus;
 use App\Models\EmploymentType;
 use App\Models\Job;
@@ -21,6 +22,7 @@ use Illuminate\Validation\ValidationException;
 use App\Services\PayrollSettingsService;
 use App\Services\PayrollCalculator;
 use App\Services\EmployeeProfileCompletionService;
+use App\Notifications\WorkPermitDeadlineNotification;
 
 class EmployeeController extends Controller
 {
@@ -237,6 +239,11 @@ class EmployeeController extends Controller
             $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
         }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
+
+        $recipients = User::with('role.permissions')->where('is_active', true)->get()
+            ->filter(fn (User $user) => $user->hasPermission('employees.view') || (int) $user->employee_id === (int) $employee->id)
+            ->unique('id');
+        $recipients->each(fn (User $user) => $user->notify(new WorkPermitDeadlineNotification($employee)));
 
         if ($request->wantsJson()) {
             return response()->json([

@@ -6,3 +6,4 @@ Schedule::command('tazamun:send-contract-alerts --days=30')->dailyAt('08:00')->w
 Schedule::command('documents:notify-expiring')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('tazamun:sync-leave-statuses')->dailyAt('00:05')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('holidays:notify-upcoming')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
+Schedule::command('insurance:notify-registration')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
