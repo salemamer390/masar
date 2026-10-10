@@ -1,0 +1,22 @@
+StartFontMetrics 4.1
+Notice Converted by PHP-font-lib
+Comment https://github.com/dompdf/php-font-lib
+EncodingScheme FontSpecific
+Copyright Typeface © Monotype Typography ltd. Data © Monotype Typography ltd, Type Solutions Inc 1990-1993. All rights reserved.
+FontName Monotype Koufi
+FontSubfamily Bold
+UniqueID Monotype - Monotype Koufi Bold
+FullName Monotype Koufi Bold
+Version Version 1.0 - May 1993
+PostScriptName MonotypeKoufi-Bold
+Trademark Monotype Koufi™ Trademark of Monotype Typography Ltd.
+Weight Bold
+ItalicAngle 0
+IsFixedPitch false
+UnderlineThickness 44
+UnderlinePosition -88
+FontHeightOffset 0
+Ascender 1061
+Descender -552
+FontBBox -126 -494 1027 1145
+EndFontMetrics

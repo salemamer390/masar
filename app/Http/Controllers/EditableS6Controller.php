@@ -15,7 +15,7 @@ class EditableS6Controller extends Controller
         $record = $employee->insuranceRecord;
         $endDate = $record?->insurance_end_date ?? $employee->termination_date;
 
-        return view('forms.s6-editable', ['d' => [
+        $data = [
             'office' => $record?->insurance_office ?: ($organization?->office_name ?? ''),
             'applicant_name' => $organization?->applicant_name ?? '',
             'applicant_role' => $organization?->applicant_title ?? '',
@@ -34,7 +34,9 @@ class EditableS6Controller extends Controller
             'end_year' => $this->arabicDigits($endDate?->format('Y') ?? ''),
             'end_reason' => '',
             'issue_date' => $this->arabicDigits(now()->format('d / m / Y')),
-        ]]);
+        ];
+
+        return view('forms.s6-editable', ['d' => $data]);
     }
 
     private function digits($value): string

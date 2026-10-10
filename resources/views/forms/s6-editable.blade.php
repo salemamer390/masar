@@ -1,4 +1,12 @@
 @php
+    $pdfAsset = function (string $path, string $mime): string {
+        $file = public_path($path);
+        return file_exists($file) ? 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($file)) : asset($path);
+    };
+    $mudirFont = $pdfAsset('fonts/MudirMT.ttf', 'font/ttf');
+    $ptFont = $pdfAsset('fonts/PTBoldHeading.ttf', 'font/ttf');
+    $koufiFont = $pdfAsset('fonts/MonotypeKoufi-Bold.ttf', 'font/ttf');
+    $logoImage = $pdfAsset('images/nosi-logo.jpg', 'image/jpeg');
     $boxes = function ($value, $count, $right = false) {
         $value = (string) $value;
         if ($right) {
@@ -21,21 +29,21 @@
     <style>
         @font-face {
             font-family: 'Mudir MT';
-            src: url('{{ asset('fonts/MudirMT.ttf') }}') format('truetype');
+            src: url('{{ $mudirFont }}') format('truetype');
             font-weight: 400;
             font-style: normal
         }
 
         @font-face {
             font-family: 'PT Bold Heading';
-            src: url('{{ asset('fonts/PTBoldHeading.ttf') }}') format('truetype');
+            src: url('{{ $ptFont }}') format('truetype');
             font-weight: 700;
             font-style: normal
         }
 
         @font-face {
             font-family: 'Monotype Koufi';
-            src: url('{{ asset('fonts/MonotypeKoufi-Bold.ttf') }}') format('truetype');
+            src: url('{{ $koufiFont }}') format('truetype');
             font-weight: 700;
             font-style: normal
         }
@@ -88,6 +96,14 @@
             background: #fff;
             color: #19345b;
             border: 1px solid #c8d2df
+        }
+
+        .tools .pdf {
+            background: #198754
+        }
+
+        .pdf-output .tools {
+            display: none !important
         }
 
         .page {
@@ -180,7 +196,7 @@
 
         .label-wide {
             flex: none;
-            width: 132pt
+            width: 112pt
         }
 
         .line {
@@ -192,8 +208,12 @@
             overflow: hidden
         }
 
+        .row > .line {
+            text-align: right
+        }
+
         .gap {
-            width: 14pt;
+            width: 8pt;
             flex: none
         }
 
@@ -272,6 +292,16 @@
         .page:first-of-type .declaration { margin: 7pt 0; line-height: 1.55; }
         .page:first-of-type .note { margin-top: 8pt; padding-top: 4pt; font-size: 11pt; line-height: 1.35; }
         .page:first-of-type .note + .row { margin-top: 7pt; min-height: 21pt; }
+        .page:first-of-type .header { padding-bottom: 2pt; }
+        .page:first-of-type .header img { height: 44pt; }
+        .page:first-of-type .title { font-size: 14pt; margin: 4pt 0 3pt; }
+        .page:first-of-type .section { margin-top: 4pt; margin-bottom: 2pt; }
+        .page:first-of-type .section span { padding-top: 1pt; padding-bottom: 1pt; }
+        .page:first-of-type .row { min-height: 15pt; margin-bottom: 1pt; }
+        .page:first-of-type .line { min-height: 12pt; }
+        .page:first-of-type .boxes i { height: 18pt; line-height: 17pt; }
+        .page:first-of-type .note { margin-top: 3pt; padding-top: 2pt; font-size: 10pt; line-height: 1.25; }
+        .page:first-of-type .note + .row { margin-top: 3pt; min-height: 16pt; }
 
         @media print {
             body {
@@ -301,14 +331,14 @@
     </style>
 </head>
 
-<body>
-    <div class="tools"><button onclick="window.print()">طباعة نموذج س٦</button><a
+<body class="{{ request()->boolean('pdf') ? 'pdf-output' : '' }}">
+    <div class="tools"><button type="button" onclick="window.print()">طباعة نموذج س٦</button><a
             href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
     <section class="page">
         <div class="header">
             <div class="office">الهيئة القومية للتأمين الاجتماعي<br>مكتب: <span class="line"
                     style="display:inline-block;min-width:150pt">{{ $d['office'] }}</span></div><img
-                src="{{ asset('images/nosi-logo.jpg') }}" alt="">
+                src="{{ $logoImage }}" alt="">
             <div class="no">نموذج رقم ( ٦ )</div>
         </div>
         <div class="title">إخطار بانتهاء اشتراك مؤمن عليه</div>
@@ -361,7 +391,7 @@
             انتهاء خدمة المؤمن عليه.<br>ب. انتهاء مدة التلمذة الصناعية أو التدرج.<br>ج. انتهاء العمل بالمشروع الصيفي
             للطلبة.<br><br>٢. في حالة إخلال صاحب العمل بالإخطار في الموعد المشار إليه، يلتزم بأداء مبلغ إضافي يقدر بنسبة
             من قيمة الاشتراك المستحق عن المدة وفقاً للقواعد المنظمة.</div>
-        <div class="subtitle" style="margin-top:22pt">إقـــــــرار</div>
+        <div class="subtitle" style="margin-top:22pt">إقرار</div>
         <div class="row"><span class="label-wide">اسم المنشأة:</span><span
                 class="line">{{ $d['est_name'] }}</span><span class="gap"></span><span class="label">رقمها
                 التأميني:</span>{!! $boxes($d['est_no'], 9, true) !!}</div>

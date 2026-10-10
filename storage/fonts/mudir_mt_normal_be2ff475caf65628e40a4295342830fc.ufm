@@ -1,0 +1,22 @@
+StartFontMetrics 4.1
+Notice Converted by PHP-font-lib
+Comment https://github.com/dompdf/php-font-lib
+EncodingScheme FontSpecific
+Copyright Typeface © Monotype Typography ltd. Data © Monotype Typography ltd, Type Solutions Inc 1990-1993. All rights reserved.
+FontName Mudir MT
+FontSubfamily Regular
+UniqueID Monotype - Mudir MT
+FullName Mudir MT
+Version Version 1.0 - May 1993
+PostScriptName MudirMT
+Trademark Mudir™ Trademark of The Monotype Corporation.
+Weight Bold
+ItalicAngle 0
+IsFixedPitch false
+UnderlineThickness 50
+UnderlinePosition -100
+FontHeightOffset 0
+Ascender 1254
+Descender -590
+FontBBox -125 -587 1355 1249
+EndFontMetrics

@@ -9,6 +9,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeContactController;
 use App\Http\Controllers\InsuranceController;
 use App\Http\Controllers\EditableS1Controller;
+use App\Http\Controllers\EditableS2Controller;
 use App\Http\Controllers\EditableS6Controller;
 use App\Http\Controllers\HrRequestController;
 use App\Http\Controllers\JobDataController;
@@ -246,6 +247,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/employees/{employee}/forms/s1-editable', [EditableS1Controller::class, 'show'])
         ->middleware('permission:insurance.view')
         ->name('employees.forms.s1.editable');
+    Route::get('/insurance/forms/s2-editable', [EditableS2Controller::class, 'show'])
+        ->middleware('permission:insurance.view')
+        ->name('insurance.forms.s2.editable');
     Route::get('/employees/{employee}/forms/s6-editable', [EditableS6Controller::class, 'show'])
         ->middleware('permission:insurance.view')
         ->name('employees.forms.s6.editable');

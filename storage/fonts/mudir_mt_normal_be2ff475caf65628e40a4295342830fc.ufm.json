@@ -1,0 +1,26 @@
+{
+    "codeToName": [],
+    "isUnicode": true,
+    "EncodingScheme": "FontSpecific",
+    "FontName": "Mudir MT",
+    "FullName": "Mudir MT",
+    "Version": "Version 1.0 - May 1993",
+    "PostScriptName": "MudirMT",
+    "Weight": "Bold",
+    "ItalicAngle": "0",
+    "IsFixedPitch": "false",
+    "UnderlineThickness": "50",
+    "UnderlinePosition": "-100",
+    "FontHeightOffset": "0",
+    "Ascender": "1254",
+    "Descender": "-590",
+    "FontBBox": [
+        "-125",
+        "-587",
+        "1355",
+        "1249"
+    ],
+    "CIDtoGID_Compressed": true,
+    "CIDtoGID": "eJztwTEBAAAAwqD1T+1hDaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAbgAeAAE=",
+    "_version_": 6
+}

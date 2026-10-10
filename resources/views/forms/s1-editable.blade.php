@@ -1,5 +1,12 @@
 {{-- resources/views/forms/s1.blade.php  —  نموذج رقم (1) طلب اشتراك مؤمن عليه (ورق فاضي، Legal) --}}
 @php
+    $pdfAsset = function (string $path, string $mime): string {
+        $file = public_path($path);
+        return file_exists($file) ? 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($file)) : asset($path);
+    };
+    $mudirFont = $pdfAsset('fonts/MudirMT.ttf', 'font/ttf');
+    $ptFont = $pdfAsset('fonts/PTBoldHeading.ttf', 'font/ttf');
+    $logoImage = $pdfAsset('images/nosi-logo.jpg', 'image/jpeg');
     // خانات الأرقام: الرقم يتقرأ من الشمال لليمين زي الاستمارة الأصلية (الأرقام المالية/رقم المنشأة بتتحط من اليمين)
     $boxes = function ($value, $n, $right = false) {
         $value = (string) $value;
@@ -22,8 +29,8 @@
 <title>س1 - {{ $d['name'] }}</title>
 <style>
   /* ضع ملفات الخطوط في public/fonts */
-  @font-face { font-family: 'Mudir MT';        src: url('{{ asset('fonts/MudirMT.ttf') }}') format('truetype'); }
-  @font-face { font-family: 'PT Bold Heading'; src: url('{{ asset('fonts/PTBoldHeading.ttf') }}') format('truetype'); }
+  @font-face { font-family: 'Mudir MT';        src: url('{{ $mudirFont }}') format('truetype'); }
+  @font-face { font-family: 'PT Bold Heading'; src: url('{{ $ptFont }}') format('truetype'); }
   @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { margin: 0; padding: 0; color: #000; }
@@ -31,22 +38,29 @@
   .page { width: 210mm; height: 297mm; padding: 8mm 10mm 5mm; margin: 0 auto 12px; background: #fff; overflow: hidden; page-break-after: always; }
   .page:last-child { page-break-after: auto; }
   @media print { body { background: #fff; } .page { margin: 0; } }
+  .tools { width: 210mm; margin: 12px auto; display: flex; gap: 8px; direction: rtl; }
+  .tools button, .tools a { padding: 9px 16px; border: 0; border-radius: 5px; background: #145ec8; color: #fff; font: inherit; cursor: pointer; text-decoration: none; }
+  .tools a.pdf { background: #198754; }
+  @media print { .tools { display: none !important; } }
+  .pdf-output .tools { display: none !important; }
 
   .h { font-family: 'PT Bold Heading', 'Mudir MT', sans-serif; }
   .hdr { display: flex; align-items: center; justify-content: space-between; border-bottom: 3pt double #000; padding-bottom: 4pt; }
   .hdr .c { text-align: center; } .hdr img { height: 54pt; }
   .hdr .org { font-size: 12pt; line-height: 1.5; } .hdr .org .v { display: inline-block; min-width: 130pt; }
   .hdr .no { font-size: 12pt; width: 160pt; text-align: left; }
-  .title { text-align: center; font-size: 16pt; margin: 6pt 0 4pt; letter-spacing: 1pt; }
+  .title { text-align: center; font-size: 16pt; margin: 6pt 0 4pt; letter-spacing: 0; font-family: 'Mudir MT', 'Cairo', Tahoma, sans-serif; font-weight: 700; }
 
   .sec { display: flex; align-items: center; margin: 7pt 0 5pt; }
   .sec:before, .sec:after { content: ''; flex: 1; border-top: 2.5pt solid #000; }
   .sec span { border: 1.5pt solid #000; border-radius: 9pt; padding: 1pt 24pt; min-width: 150pt; text-align: center; font-size: 14pt; white-space: nowrap; }
 
   .r { display: flex; align-items: flex-end; min-height: 21pt; margin-bottom: 3pt; white-space: nowrap; }
-  .l { flex: none; }  .l1 { flex: none; width: 130pt; }  .l + .v, .l + .bx, .l + .cb { margin-right: 4pt; }
+  .l { flex: none; }  .l1 { flex: none; width: 112pt; }  .l + .v, .l + .bx, .l + .cb { margin-right: 2pt; }
   .v { flex: 1; border-bottom: 1px dotted #000; min-height: 18pt; padding: 0 4pt; text-align: center; overflow: hidden; font-size: 14pt; }
-  .gap { flex: none; width: 14pt; }
+  /* إبقاء قيمة الحقل ملاصقة للتسمية بدل تمركزها في منتصف الخط الطويل */
+  .r > .v { text-align: right; }
+  .gap { flex: none; width: 8pt; }
   .bx { display: inline-flex; flex: none; direction: ltr; }
   .bx i { font-style: normal; width: 19pt; height: 22pt; border: 1px solid #000; margin-left: -1px; text-align: center; font-family: Arial, sans-serif; font-size: 13pt; line-height: 20pt; }
   .sl { flex: none; width: 12pt; text-align: center; font-family: Arial, sans-serif; }
@@ -61,28 +75,46 @@
   .it { display: flex; line-height: 24pt; text-align: justify; } .it b { flex: none; width: 27pt; font-weight: normal; }
   .sub { padding-right: 27pt; }
   .sig { margin: 4pt 0 0 0; } .sig .p { margin-top: 16pt; font-size: 12pt; }
-  .center { text-align: center; }
-  .page:first-of-type .sec { margin-top: 5pt; margin-bottom: 3pt; }
-  .page:first-of-type .txt { line-height: 18pt; }
-  .page:first-of-type .sig { margin-top: 2pt; }
+  .center { text-align: center; letter-spacing: 0; }
+  .page:nth-of-type(2) .center.h { font-family: 'Mudir MT', 'Cairo', Tahoma, sans-serif; font-weight: 700; }
+  .page-front .sec { margin-top: 5pt; margin-bottom: 3pt; }
+  .page-front .txt { line-height: 18pt; }
+  .page-front .sig { margin-top: 2pt; }
   /* الصفحة الأولى تحتوي على آخر ملاحظة وتوقيع؛ نترك لها مساحة إضافية داخل A4 */
-  .page:first-of-type { padding-top: 5mm; padding-bottom: 3mm; }
-  .page:first-of-type .r { min-height: 18pt; margin-bottom: 2pt; }
-  .page:first-of-type .note { font-size: 9.5pt; line-height: 1.25; margin-top: 2pt; }
+  .page-front { padding-top: 4mm; padding-bottom: 2mm; }
+  .page-front .hdr { padding-bottom: 2pt; }
+  .page-front .hdr img { height: 46pt; }
+  .page-front .title { font-size: 14pt; margin: 3pt 0 2pt; }
+  .page-front .sec span { font-size: 12pt; padding: 0 18pt; }
+  .page-front .r { min-height: 15pt; margin-bottom: 0; }
+  .page-front .v { min-height: 13pt; font-size: 11pt; }
+  .page-front .bx i { width: 17pt; height: 18pt; font-size: 11pt; line-height: 17pt; }
+  .page-front .cb { width: 17pt; height: 17pt; line-height: 16pt; }
+  .page-front .num { width: 17pt; height: 18pt; line-height: 17pt; }
+  .page-front .note { font-size: 9pt; line-height: 1.2; margin-top: 1pt; }
+  .page-front .sec { margin-top: 2pt; margin-bottom: 1pt; }
+  .page-front .r { min-height: 13pt; }
+  .page-front .v { min-height: 11pt; }
+  .page-front .sig .p { margin-top: 6pt; }
+  .page1-footer { position: static; margin-top: 3pt; background: #fff; }
+  .page1-footer .sec { margin-top: 0; }
   .page:nth-of-type(2) .sig { text-align: left; direction: rtl; }
   .page:nth-of-type(2) .sig .p { text-align: left; padding-right: 0 !important; }
 </style>
 </head>
-<body>
+<body class="{{ request()->boolean('pdf') ? 'pdf-output' : '' }}">
+<div class="tools" aria-label="إجراءات النموذج">
+  <button type="button" onclick="window.print()">طباعة</button>
+</div>
 
 {{-- ======================= صفحة 1 (الوش) ======================= --}}
-<div class="page">
+<div class="page page-front">
   <div class="hdr h">
     <div class="org"><div>الهيئة القومية للتأمين الاجتماعي</div><div>مكتب : <span class="v" style="border-bottom:1px dotted #000">{{ $d['office'] }}</span></div></div>
-    <div class="c"><img src="{{ asset('images/nosi-logo.jpg') }}" alt=""></div>
+    <div class="c"><img src="{{ $logoImage }}" alt=""></div>
     <div class="no">نموذج رقم ( ١ )</div>
   </div>
-  <div class="title h">طلــــب اشتــــراك مــؤمـــــن عليـــــه</div>
+  <div class="title h">طلب اشتراك مؤمن عليه</div>
 
   <div class="r"><span class="l" style="width:46pt">الفئة :</span>
     <span class="num">١</span><span class="l" style="margin:0 4pt 0 0">عاملين لدى الغير</span><span class="cb" style="margin-right:6pt">{{ $chk($d['category'], 1) }}</span>
@@ -130,14 +162,16 @@
   <div class="r" style="min-height:30pt"><span class="l1">رقم التليفون :</span><span class="v" dir="ltr" style="flex:.9">{{ $d['phone'] }}</span><span class="gap" style="width:40pt"></span><span class="l">(</span><span class="v" style="flex:.8"></span><span class="l">)</span></div>
   <div class="r"><span class="l1">تحريراً في :</span><span class="l" dir="ltr" style="font-family:Arial">{{ $d['issue_date'] }}</span></div>
 
-  <div class="sec"><span>مطابقة التوقيع</span></div>
-  <div class="r"><span class="l">توقيع الموظف المختص بالمطابقة :</span><span class="v"></span><span class="gap"></span><span class="l">تاريخ المطابقة :</span><span class="l" style="font-family:Arial;margin-right:6pt">&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
-  <div class="note"><span class="h">ملحوظة :</span> على صاحب العمل والعامل الاطلاع على التوجيهات الموضحة خلف النموذج مع التوقيع على الإقرار. &nbsp;&nbsp;(انظر خلفه)</div>
+  <div class="page1-footer">
+    <div class="sec"><span>مطابقة التوقيع</span></div>
+    <div class="r"><span class="l">توقيع الموظف المختص بالمطابقة :</span><span class="v"></span><span class="gap"></span><span class="l">تاريخ المطابقة :</span><span class="l" style="font-family:Arial;margin-right:6pt">&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
+    <div class="note"><span class="h">ملحوظة :</span> على صاحب العمل والعامل الاطلاع على التوجيهات الموضحة خلف النموذج مع التوقيع على الإقرار. &nbsp;&nbsp;(انظر خلفه)</div>
+  </div>
 </div>
 
 {{-- ======================= صفحة 2 (الضهر) ======================= --}}
 <div class="page">
-  <div class="center h" style="font-size:14pt;margin-bottom:2pt">إرشـــــــــــادات</div>
+  <div class="center h" style="font-size:14pt;margin-bottom:2pt">إرشادات</div>
   <div class="it"><b>١.</b><span>على صاحب العمل أن يرسل هذا النموذج مع طلب اشتراكه في الهيئة لأول مرة وخلال أسبوعين على الأكثر من تاريخ التحاق أي عامل جديد بالعمل لديه سواء كان التحاقاً نهائياً أو تحت الاختبار.</span></div>
   <div class="it"><b>٢.</b><span>التوقيع على هذا النموذج بما يفيد الاطلاع والموافقة على جميع البيانات الواردة به ولا يجوز لمـــــن وقَّع عليه أن يعارض في تلك البيانات أمام الهيئة وله أن يلجأ إلى مكتب علاقات العمل المختص أو القضاء.</span></div>
   <div class="it"><b>٣.</b><span>يستخدم هذا النموذج كطلب اشتراك في تأمين إصابات العمل فقط بالنسبة للفئات التالية:</span></div>
@@ -146,7 +180,7 @@
   <div class="it sub"><b>(ج)</b><span>العاملون المتدرجون والتلاميذ الصناعيون والطلاب المشتغلون في مشروعات التشغيل الصيفـــي والخدمة العامة، ويشترط اعتماد النموذج المحرر لهم من المدير المسئول بالهيئة التي تشرف على التلمذة الصناعية، والتدريب مع ختمها بخاتم هذه الجهة مع إرفاق نســـخة من عقد عمل المتدرب أو المســـتند المثبت لنوع العمل في جميع هذه الحالات.</span></div>
   <div class="it sub"><b>(د)</b><span>يقتصر استيفاء الأجر على الفئات التي يتقاضى فيها المؤمن عليه أجراً من صاحب العمل.</span></div>
 
-  <div class="center h" style="font-size:14pt;margin:16pt 0 2pt">إقـــــــــــرار</div>
+  <div class="center h" style="font-size:14pt;margin:16pt 0 2pt">إقرار</div>
   <div class="r"><span class="l" style="width:92pt">اســـم المنشأة :</span><span class="v" style="flex:1.6;font-size:{{ $fs($d['est_name']) }}">{{ $d['est_name'] }}</span><span class="gap"></span><span class="l">رقمها التأميني :</span><span class="v">{{ $d['est_no'] }}</span></div>
   <div class="r"><span class="l" style="width:92pt">العنـــوان :</span><span class="v">{{ $d['est_address'] }}</span></div>
   <div class="txt" style="margin-top:4pt">أقر أنا الموقع على هذا النموذج بالالتزام بعرض المؤمن عليه على اللجنة الطبية المختصـــة بالهيئة المعنية بالتأمين الصحي أو الجهة الطبية المختصـــة لإجراء الفحص الطبي الأولي وإثبات حالته الصـــحية وقت توقيع الكشـــف الطبي مع الالتزام بموافاة الهيئة بتقرير اللياقة الطبية الصـــادر من الجهة الطبية المختصـــة عن حالته الصـــحية خلال أسبوعين على الأكثر من تاريخ التحاقه بالعمل تطبيقاً لأحكام قانون العمل.</div>

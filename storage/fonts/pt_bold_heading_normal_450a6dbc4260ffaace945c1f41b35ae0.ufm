@@ -1,0 +1,114 @@
+StartFontMetrics 4.1
+Notice Converted by PHP-font-lib
+Comment https://github.com/dompdf/php-font-lib
+EncodingScheme FontSpecific
+Copyright Designed for Microsoft Corp. by Platinum Inc.
+FontName PT Bold Heading
+FontSubfamily Regular
+UniqueID PT Bold Heading
+FullName PT Bold Heading
+Version Version 2.10
+PostScriptName PTBoldHeading
+Weight Medium
+ItalicAngle 0
+IsFixedPitch false
+UnderlineThickness 49
+UnderlinePosition -366
+FontHeightOffset 0
+Ascender 1302
+Descender -474
+FontBBox -125 -474 1150 1302
+StartCharMetrics 395
+U 13 ; WX 244 ; N uni000d ; G 2
+U 32 ; WX 244 ; N uni0020 ; G 3
+U 33 ; WX 312 ; N uni0021 ; G 4
+U 34 ; WX 278 ; N uni0022 ; G 5
+U 40 ; WX 278 ; N uni0028 ; G 11
+U 41 ; WX 278 ; N uni0029 ; G 12
+U 46 ; WX 278 ; N uni002e ; G 17
+U 58 ; WX 278 ; N uni003a ; G 29
+U 1569 ; WX 365 ; N uni0621 ; G 52
+U 1600 ; WX 277 ; N uni0640 ; G 78
+U 1638 ; WX 500 ; N uni0666 ; G 106
+U 64421 ; WX 396 ; N unifba5 ; G 374
+U 64520 ; WX 957 ; N unifc08 ; G 245
+U 64526 ; WX 957 ; N unifc0e ; G 246
+U 64578 ; WX 826 ; N unifc42 ; G 251
+U 64580 ; WX 802 ; N unifc44 ; G 253
+U 64590 ; WX 957 ; N unifc4e ; G 254
+U 64624 ; WX 719 ; N unifc70 ; G 264
+U 64627 ; WX 888 ; N unifc73 ; G 265
+U 64657 ; WX 719 ; N unifc91 ; G 268
+U 64660 ; WX 888 ; N unifc94 ; G 269
+U 64669 ; WX 780 ; N unifc9d ; G 271
+U 64671 ; WX 816 ; N unifc9f ; G 273
+U 64674 ; WX 780 ; N unifca2 ; G 275
+U 64676 ; WX 816 ; N unifca4 ; G 277
+U 64680 ; WX 1102 ; N unifca8 ; G 279
+U 64682 ; WX 1102 ; N unifcaa ; G 280
+U 64684 ; WX 1102 ; N unifcac ; G 281
+U 64714 ; WX 793 ; N unifcca ; G 284
+U 64716 ; WX 434 ; N unifccc ; G 286
+U 64717 ; WX 774 ; N unifccd ; G 287
+U 64719 ; WX 1041 ; N unifccf ; G 289
+U 64721 ; WX 1031 ; N unifcd1 ; G 291
+U 64723 ; WX 780 ; N unifcd3 ; G 293
+U 64725 ; WX 816 ; N unifcd5 ; G 307
+U 64816 ; WX 1182 ; N unifd30 ; G 299
+U 64904 ; WX 845 ; N unifd88 ; G 302
+U 65010 ; WX 904 ; N unifdf2 ; G 303
+U 65152 ; WX 365 ; N unife80 ; G 120
+U 65156 ; WX 187 ; N unife84 ; G 124
+U 65158 ; WX 421 ; N unife86 ; G 126
+U 65159 ; WX 229 ; N unife87 ; G 127
+U 65160 ; WX 187 ; N unife88 ; G 128
+U 65164 ; WX 437 ; N unife8c ; G 132
+U 65165 ; WX 240 ; N unife8d ; G 133
+U 65166 ; WX 187 ; N unife8e ; G 134
+U 65168 ; WX 854 ; N unife90 ; G 136
+U 65169 ; WX 385 ; N unife91 ; G 137
+U 65172 ; WX 396 ; N unife94 ; G 140
+U 65173 ; WX 792 ; N unife95 ; G 141
+U 65175 ; WX 385 ; N unife97 ; G 143
+U 65176 ; WX 448 ; N unife98 ; G 144
+U 65181 ; WX 573 ; N unife9d ; G 149
+U 65183 ; WX 635 ; N unife9f ; G 151
+U 65187 ; WX 656 ; N unifea3 ; G 155
+U 65188 ; WX 521 ; N unifea4 ; G 156
+U 65191 ; WX 656 ; N unifea7 ; G 159
+U 65193 ; WX 469 ; N unifea9 ; G 161
+U 65195 ; WX 469 ; N unifeab ; G 163
+U 65197 ; WX 385 ; N unifead ; G 165
+U 65198 ; WX 407 ; N unifeae ; G 166
+U 65207 ; WX 719 ; N unifeb7 ; G 175
+U 65211 ; WX 833 ; N unifebb ; G 179
+U 65220 ; WX 583 ; N unifec4 ; G 188
+U 65223 ; WX 667 ; N unifec7 ; G 191
+U 65226 ; WX 542 ; N unifeca ; G 194
+U 65227 ; WX 500 ; N unifecb ; G 195
+U 65228 ; WX 510 ; N unifecc ; G 196
+U 65239 ; WX 396 ; N unifed7 ; G 207
+U 65240 ; WX 365 ; N unifed8 ; G 208
+U 65241 ; WX 708 ; N unifed9 ; G 209
+U 65244 ; WX 417 ; N unifedc ; G 212
+U 65246 ; WX 600 ; N unifede ; G 214
+U 65247 ; WX 354 ; N unifedf ; G 215
+U 65248 ; WX 302 ; N unifee0 ; G 216
+U 65250 ; WX 573 ; N unifee2 ; G 218
+U 65251 ; WX 625 ; N unifee3 ; G 219
+U 65252 ; WX 604 ; N unifee4 ; G 220
+U 65254 ; WX 580 ; N unifee6 ; G 222
+U 65255 ; WX 396 ; N unifee7 ; G 223
+U 65258 ; WX 396 ; N unifeea ; G 226
+U 65260 ; WX 615 ; N unifeec ; G 228
+U 65262 ; WX 421 ; N unifeee ; G 230
+U 65266 ; WX 750 ; N unifef2 ; G 234
+U 65268 ; WX 437 ; N unifef4 ; G 236
+U 65271 ; WX 469 ; N unifef7 ; G 239
+U 65272 ; WX 531 ; N unifef8 ; G 240
+U 65273 ; WX 458 ; N unifef9 ; G 241
+U 65274 ; WX 531 ; N unifefa ; G 242
+U 65275 ; WX 469 ; N unifefb ; G 243
+U 65276 ; WX 531 ; N unifefc ; G 244
+EndCharMetrics
+EndFontMetrics
