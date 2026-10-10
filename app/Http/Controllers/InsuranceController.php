@@ -102,9 +102,9 @@ class InsuranceController extends Controller
 
     public function form(InsuranceRecord $insuranceRecord)
     {
-        $organization = DB::table('insurance_organization_settings')->first();
-        $insuranceRecord->load(['employee.department','employee.job']);
-        return view('insurance.form', compact('insuranceRecord', 'organization'));
+        // Keep the old route as a compatibility alias; the official editable
+        // Legal-sized S1 template is now the canonical print page.
+        return redirect()->route('employees.forms.s1.editable', $insuranceRecord->employee_id);
     }
 
     private function recordHistory(InsuranceRecord $record, ?array $old): void
