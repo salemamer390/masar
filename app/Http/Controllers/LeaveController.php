@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Services\HrOperationalSettingsService;
 use App\Services\EmployeeLeaveStatusService;
 use App\Services\PayrollPeriodGuard;
+use App\Services\LeaveBalanceService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -18,6 +19,7 @@ class LeaveController extends Controller
     public function __construct(
         private readonly HrOperationalSettingsService $hrSettings,
         private readonly EmployeeLeaveStatusService $leaveStatus,
+        private readonly LeaveBalanceService $leaveBalances,
     )
     {
     }
@@ -54,9 +56,14 @@ class LeaveController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
             'status' => ['required', 'in:Pending,Manager Approved,Approved,Rejected'],
             'rejection_reason' => ['nullable', 'string', 'max:500'],
+            'is_early_grant' => ['nullable', 'boolean'],
+            'early_grant_reason' => ['required_if:is_early_grant,1', 'nullable', 'string', 'max:500'],
         ]);
         $start = Carbon::parse($data['start_date']);
         $end = Carbon::parse($data['end_date']);
+        if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
+            abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
+        }
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $periodGuard->ensureRangeOpen($start, $end);
         $overlap = Leave::where('id', '!=', $leave->id)->where('employee_id', $data['employee_id'])
@@ -74,6 +81,9 @@ class LeaveController extends Controller
                 : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل.'])->withInput();
         }
         $oldValues = $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']);
+        $proposed = clone $leave;
+        $proposed->fill(['employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'], 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'is_early_grant' => (bool) ($data['is_early_grant'] ?? false), 'early_grant_reason' => $data['early_grant_reason'] ?? null]);
+        if ($data['status'] === 'Approved') $this->leaveBalances->validateForApproval($proposed, $leave->id);
         $leave->update([
             'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
             'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days,
@@ -83,6 +93,10 @@ class LeaveController extends Controller
             'approved_at' => in_array($data['status'], ['Approved', 'Rejected'], true) ? now() : null,
             'manager_approved_by' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? auth()->id() : null,
             'manager_approved_at' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? now() : null,
+            'is_early_grant' => (bool) ($data['is_early_grant'] ?? false),
+            'early_grant_reason' => $data['early_grant_reason'] ?? null,
+            'early_grant_approved_by' => ($data['status'] === 'Approved' && !empty($data['is_early_grant'])) ? auth()->id() : null,
+            'early_grant_approved_at' => ($data['status'] === 'Approved' && !empty($data['is_early_grant'])) ? now() : null,
         ]);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_update', 'Leave request updated.', $leave, $oldValues, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']), 'leaves');
@@ -99,9 +113,14 @@ class LeaveController extends Controller
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'is_early_grant' => ['nullable', 'boolean'],
+            'early_grant_reason' => ['required_if:is_early_grant,1', 'nullable', 'string', 'max:500'],
         ]);
         $start = Carbon::parse($data['start_date']);
         $end = Carbon::parse($data['end_date']);
+        if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
+            abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
+        }
         $periodGuard->ensureRangeOpen($start, $end);
         $overlap = Leave::where('employee_id', $data['employee_id'])->whereNotIn('status', ['Rejected', 'مرفوضة'])
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
@@ -116,7 +135,13 @@ class LeaveController extends Controller
                 ? response()->json(['message' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'], 422)
                 : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'])->withInput();
         }
-        $leave = Leave::create($data + ['start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days, 'status' => 'Pending']);
+        $leave = Leave::create($data + ['start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days, 'status' => 'Pending', 'is_early_grant' => (bool) ($data['is_early_grant'] ?? false), 'early_grant_reason' => $data['early_grant_reason'] ?? null]);
+        try {
+            $this->leaveBalances->validateForApproval($leave);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $leave->delete();
+            throw $exception;
+        }
         ActivityLog::record('leave_create', 'Leave request created.', $leave, null, $leave->toArray(), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request created.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
@@ -139,7 +164,8 @@ class LeaveController extends Controller
                 ? response()->json(['message' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.'], 422)
                 : back()->withErrors(['leave' => 'لا يمكن اعتماد طلب الإجازة في حالته الحالية.']);
         }
-        $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+        $this->leaveBalances->validateForApproval($leave);
+        $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now(), 'early_grant_approved_by' => $leave->is_early_grant ? auth()->id() : null, 'early_grant_approved_at' => $leave->is_early_grant ? now() : null]);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
         return $request->wantsJson()

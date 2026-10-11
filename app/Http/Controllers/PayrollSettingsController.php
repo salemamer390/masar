@@ -7,6 +7,7 @@ use App\Models\Salary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Models\LeaveType;
 
 class PayrollSettingsController extends Controller
 {
@@ -25,8 +26,48 @@ class PayrollSettingsController extends Controller
             'total_net' => Salary::where('status', 'Active')->sum('net_salary'),
             'allowance_review' => Salary::where('status', 'Active')->where('allowance_remaining', '<', 0)->count(),
         ];
+        $leavePolicies = DB::table('leave_policy_settings')->orderBy('id')->get()->keyBy('setting_key');
+        $leavePolicyLabels = [
+            'annual_first_year' => 'رصيد السنة الأولى', 'annual_second_year' => 'رصيد ما بعد السنة الأولى',
+            'annual_long_service' => 'رصيد 10 سنوات / 50 سنة', 'annual_long_service_years' => 'سنوات الخدمة للرصيد الأعلى',
+            'annual_age_threshold' => 'سن الرصيد الأعلى', 'annual_disability_days' => 'رصيد ذوي الإعاقة والأقزام',
+            'annual_hazardous_extra_days' => 'إضافة العمل الخطر أو النائي', 'annual_wait_months' => 'مدة الانتظار (شهر)',
+            'annual_prorate_first_year' => 'احتساب السنة الأولى نسبيًا (1 نعم / 0 لا)', 'allow_early_leave' => 'السماح بمنح استثنائي (1 نعم / 0 لا)',
+            'casual_max_days_year' => 'حد العارضة السنوي', 'casual_max_days_request' => 'حد العارضة للطلب الواحد',
+            'maternity_days' => 'مدة إجازة الوضع (يوم)', 'maternity_min_postpartum_days' => 'الحد الأدنى بعد الولادة (يوم)',
+            'maternity_max_occurrences' => 'الحد الأقصى لمرات الوضع', 'pregnancy_reduced_hours_from_month' => 'بدء تخفيض ساعات الحامل (الشهر)',
+            'pregnancy_reduced_hours_per_day' => 'تخفيض ساعات الحامل يوميًا', 'pregnancy_overtime_protection_months' => 'حماية منع الإضافي بعد الوضع (شهر)',
+            'nursing_sessions_per_day' => 'فترات الرضاعة يوميًا', 'nursing_minutes_per_session' => 'مدة فترة الرضاعة (دقيقة)',
+            'childcare_max_years_per_request' => 'رعاية الطفل (سنوات للطلب)', 'childcare_max_occurrences' => 'مرات رعاية الطفل بالخدمة',
+            'pilgrimage_min_service_months' => 'خدمة الحج / القدس (شهر)', 'newborn_max_occurrences' => 'مرات إجازة المولود بالخدمة',
+        ];
+        $leaveTypes = LeaveType::where('is_active', true)->orderBy('id')->get();
 
-        return view('payroll.settings', compact('settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays'));
+        return view('payroll.settings', compact('settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes'));
+    }
+
+    public function updateLeavePolicy(Request $request)
+    {
+        $data = $request->validate([
+            'policies' => ['required', 'array'],
+            'policies.*' => ['nullable', 'numeric', 'min:0'],
+            'types' => ['required', 'array'],
+            'types.*.default_days' => ['nullable', 'numeric', 'min:0'],
+            'types.*.max_days_per_request' => ['nullable', 'numeric', 'min:0'],
+            'types.*.max_days_per_year' => ['nullable', 'numeric', 'min:0'],
+            'types.*.min_service_months' => ['nullable', 'integer', 'min:0'],
+            'types.*.max_occurrences_service' => ['nullable', 'integer', 'min:0'],
+        ]);
+        DB::transaction(function () use ($data): void {
+            foreach ($data['policies'] as $key => $value) {
+                DB::table('leave_policy_settings')->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
+            }
+            foreach ($data['types'] as $id => $values) {
+                LeaveType::whereKey($id)->update(array_intersect_key($values, array_flip(['default_days', 'max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service'])));
+            }
+        });
+        ActivityLog::record('leave_policy_update', 'Leave policy settings updated.');
+        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', 'تم حفظ إعدادات الإجازات بنجاح.');
     }
 
     public function updateOperational(Request $request)

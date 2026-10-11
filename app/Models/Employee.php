@@ -40,6 +40,7 @@ class Employee extends Model
         'shift_start',
         'shift_end',
         'manual_annual_balance',
+        'leave_entitlement_category',
         'manager_employee_id',
         'notes',
     ];

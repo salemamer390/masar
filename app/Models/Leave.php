@@ -21,6 +21,10 @@ class Leave extends Model
         'approved_at',
         'rejection_reason',
         'notes',
+        'is_early_grant',
+        'early_grant_reason',
+        'early_grant_approved_by',
+        'early_grant_approved_at',
     ];
 
     protected $casts = [
@@ -29,6 +33,8 @@ class Leave extends Model
         'days' => 'decimal:2',
         'approved_at' => 'datetime',
         'manager_approved_at' => 'datetime',
+        'is_early_grant' => 'boolean',
+        'early_grant_approved_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo

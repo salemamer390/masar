@@ -628,6 +628,14 @@ document.addEventListener('masar:success', async (event) => {
     }
 });
 </script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const annual = document.querySelector('input[name="profile[annual_leave_days]"]');
+  if (!annual || document.querySelector('[name="leave_entitlement_category"]')) return;
+  annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', '<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option></select></div>');
+  const category = document.querySelector('[name="leave_entitlement_category"]'); if (category) category.value = @json(old('leave_entitlement_category', $employee->leave_entitlement_category ?? 'normal'));
+});
+</script>
 @endpush
 <script>
 (function(){const cards=document.querySelectorAll('.profile-summary>div');if(cards[3]){const label=cards[3].querySelector('span');if(label)label.textContent='الراتب الصافي';}})();
