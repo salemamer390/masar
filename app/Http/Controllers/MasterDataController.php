@@ -205,12 +205,26 @@ class MasterDataController extends Controller
 
         ActivityLog::record('document_type_update', "تم تعديل نوع المستند ({$documentType->name}).", $documentType);
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تعديل نوع المستند بنجاح.',
+                'item' => $documentType->fresh(),
+            ]);
+        }
+
         return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم تعديل نوع المستند بنجاح');
     }
 
-    public function destroyDocument(DocumentType $documentType)
+    public function destroyDocument(Request $request, DocumentType $documentType)
     {
         if ($documentType->documents()->exists()) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'message' => 'لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.',
+                ], 422);
+            }
+
             return redirect()->route('master.index', ['type' => 'documents'])
                 ->with('error', 'لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.');
         }
@@ -218,6 +232,14 @@ class MasterDataController extends Controller
         $name = $documentType->name;
         $documentType->delete();
         ActivityLog::record('document_type_delete', "تم حذف نوع المستند ({$name}).");
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حذف نوع المستند بنجاح.',
+                'item_id' => $documentType->id,
+            ]);
+        }
 
         return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم حذف نوع المستند بنجاح');
     }

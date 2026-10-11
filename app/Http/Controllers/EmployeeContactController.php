@@ -28,7 +28,9 @@ class EmployeeContactController extends Controller
         });
 
         ActivityLog::record('emergency_contact_create', 'Emergency contact created.', $contact, null, $contact->toArray(), 'employees');
-        return back()->with('toast', 'تم حفظ جهة اتصال الطوارئ.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'تم حفظ جهة اتصال الطوارئ.', 'contact' => $contact->fresh()])
+            : back()->with('toast', 'تم حفظ جهة اتصال الطوارئ.');
     }
 
     public function storeBankAccount(Request $request, Employee $employee)
@@ -52,6 +54,8 @@ class EmployeeContactController extends Controller
         });
 
         ActivityLog::record('bank_account_create', 'Employee bank account created.', $account, null, $account->toArray(), 'employees');
-        return back()->with('toast', 'تم حفظ الحساب البنكي.');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'تم حفظ الحساب البنكي.', 'account' => $account->fresh(['bank', 'paymentMethod'])])
+            : back()->with('toast', 'تم حفظ الحساب البنكي.');
     }
 }

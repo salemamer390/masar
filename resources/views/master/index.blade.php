@@ -106,6 +106,11 @@ const masterRows = document.getElementById('masterRows');
 const escapeMaster = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
 document.addEventListener('masar:success', event => {
     if (event.target !== masterForm || !masterRows || !event.detail?.item) return;
+    if (masterType === 'documents') {
+        bootstrap.Modal.getInstance(document.getElementById('masterModal'))?.hide();
+        masterForm.reset();
+        return;
+    }
     const item = event.detail.item;
     const name = item.name ?? item.title ?? '—';
     const code = item.job_code ?? item.address ?? item.default_days ?? item.id ?? '—';
@@ -124,6 +129,54 @@ document.addEventListener('masar:success', event => {
     bootstrap.Modal.getInstance(document.getElementById('masterModal'))?.hide();
     masterForm.reset();
 });
+
+// Document types have grouped rows and one edit modal per row.  Refresh just
+// this server-rendered section after a create, edit or delete so its grouping,
+// permissions and modal data stay accurate without reloading the whole page.
+if (masterType === 'documents') {
+    const documentForms = () => [
+        ...(masterForm ? [masterForm] : []),
+        ...document.querySelectorAll('[id^="editDocumentType"] form, form[action*="/master/documents/"]'),
+    ];
+    const isDocumentForm = form => {
+        if (form === masterForm) return true;
+        const path = new URL(form.action, window.location.origin).pathname;
+        return /^\/master\/documents\/\d+$/.test(path);
+    };
+    const bindDocumentForms = () => documentForms().filter(isDocumentForm).forEach(form => {
+        form.dataset.ajax = 'true';
+        form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? 'جارٍ الحذف' : 'جارٍ الحفظ';
+        if (form.querySelector('input[name="_method"][value="DELETE"]')) {
+            form.dataset.ajaxConfirm = 'هل تريد حذف نوع المستند؟';
+            form.removeAttribute('onsubmit');
+        }
+    });
+    const refreshDocumentTypes = async () => {
+        const response = await fetch(window.location.href, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const freshRows = source.getElementById('masterRows');
+        const currentRows = document.getElementById('masterRows');
+        if (freshRows && currentRows) currentRows.replaceWith(freshRows);
+        document.querySelectorAll('[id^="editDocumentType"]').forEach(modal => modal.remove());
+        source.querySelectorAll('[id^="editDocumentType"]').forEach(modal => document.body.appendChild(modal.cloneNode(true)));
+        bindDocumentForms();
+    };
+    bindDocumentForms();
+    document.addEventListener('masar:success', async event => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !isDocumentForm(form)) return;
+        bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+        try {
+            await refreshDocumentTypes();
+        } catch (error) {
+            console.error('Document types refresh failed', error);
+        }
+    });
+}
 </script>
 @endpush
 @endsection

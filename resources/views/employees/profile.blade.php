@@ -59,7 +59,7 @@
 <div class="profile-content">
 @if($activeTab === 'overview')
     <div class="profile-grid">
-        <div class="panel profile-panel">
+        <div class="panel profile-panel" id="employee-emergency-contacts">
             <div class="panel-head">
                 <div>
                     <h3>البيانات الشخصية</h3>
@@ -110,18 +110,18 @@
                 <div class="details-grid mb-2"><div><label>الاسم</label><b>{{ $contact->name }}</b></div><div><label>الهاتف</label><b>{{ $contact->phone }}</b></div><div><label>الصلة</label><b>{{ $contact->relationship }}</b></div></div>
             @empty <p class="text-muted">لا توجد جهة اتصال مسجلة.</p> @endforelse
             @if(auth()->user()?->hasPermission('employees.edit'))
-            <form method="POST" action="{{ route('employees.emergency-contacts.store', $employee) }}" class="row g-2 mt-2">@csrf
+            <form method="POST" action="{{ route('employees.emergency-contacts.store', $employee) }}" class="row g-2 mt-2 employee-contact-form">@csrf
                 <div class="col-md-4"><input name="name" class="form-control" placeholder="الاسم" required></div><div class="col-md-3"><input name="phone" class="form-control" placeholder="الهاتف" required></div><div class="col-md-3"><input name="relationship" class="form-control" placeholder="صلة القرابة" required></div><div class="col-md-2"><button class="btn btn-light w-100">إضافة</button></div>
             </form>
             @endif
         </div>
-        <div class="panel profile-panel">
+        <div class="panel profile-panel" id="employee-bank-accounts">
             <div class="panel-head"><h3>الحسابات البنكية</h3></div>
             @forelse($employee->bankAccounts as $account)
                 <div class="details-grid mb-2"><div><label>البنك</label><b>{{ $account->bank?->name ?? '—' }}</b></div><div><label>IBAN</label><b>{{ $account->iban ?? '—' }}</b></div><div><label>طريقة الصرف</label><b>{{ $account->paymentMethod?->name ?? '—' }}</b></div></div>
             @empty <p class="text-muted">لا توجد حسابات بنكية مسجلة.</p> @endforelse
             @if(auth()->user()?->hasPermission('employees.edit'))
-            <form method="POST" action="{{ route('employees.bank-accounts.store', $employee) }}" class="row g-2 mt-2">@csrf
+            <form method="POST" action="{{ route('employees.bank-accounts.store', $employee) }}" class="row g-2 mt-2 employee-contact-form">@csrf
                 <div class="col-md-4"><select name="bank_id" class="form-select"><option value="">البنك</option>@foreach($banks as $bank)<option value="{{ $bank->id }}">{{ $bank->name }}</option>@endforeach</select></div>
                 <div class="col-md-4"><input name="iban" class="form-control" placeholder="IBAN"></div>
                 <div class="col-md-2"><select name="payment_method_id" class="form-select"><option value="">طريقة الصرف</option>@foreach($paymentMethods as $method)<option value="{{ $method->id }}">{{ $method->name }}</option>@endforeach</select></div>
@@ -647,4 +647,48 @@ document.addEventListener('masar:success', async (event) => {
  if(leavesTable){const rows=leavesTable.querySelectorAll('tbody tr');const leaveData=@json($employee->leaves->map(fn($leave)=>['paid'=>(bool)$leave->leaveType?->is_paid]));const head=leavesTable.querySelector('thead tr');if(head&&head.children.length===5){const paidHead=document.createElement('th');paidHead.textContent='الأجر';head.insertBefore(paidHead,head.children[1]);const deductionHead=document.createElement('th');deductionHead.textContent='قيمة الخصم';head.insertBefore(deductionHead,head.lastElementChild);rows.forEach((row,i)=>{if(row.children.length!==5)return;const paid=document.createElement('td');paid.textContent=leaveData[i]?.paid?'بأجر':'بدون أجر';row.insertBefore(paid,row.children[1]);const deduction=document.createElement('td');deduction.textContent=leaveData[i]?.paid?'0':'يحسب في المسير';row.insertBefore(deduction,row.lastElementChild);});}}
 })();
 </script>
+@push('scripts')
+<script>
+(function () {
+    const forms = document.querySelectorAll('.employee-contact-form');
+    if (!forms.length) return;
+
+    forms.forEach(form => {
+        form.dataset.ajax = 'true';
+        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+    });
+
+    const refreshPanel = async (id) => {
+        const response = await fetch(window.location.href, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const current = document.getElementById(id);
+        const fresh = source.getElementById(id);
+        if (current && fresh) current.replaceWith(fresh);
+    };
+
+    document.addEventListener('masar:success', async event => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.classList.contains('employee-contact-form')) return;
+        const panelId = form.action.includes('/emergency-contacts')
+            ? 'employee-emergency-contacts'
+            : 'employee-bank-accounts';
+        form.reset();
+        try {
+            await refreshPanel(panelId);
+            const replacement = document.getElementById(panelId)?.querySelector('.employee-contact-form');
+            if (replacement) {
+                replacement.dataset.ajax = 'true';
+                replacement.dataset.ajaxLabel = 'جارٍ الحفظ';
+            }
+        } catch (error) {
+            console.error('Employee contact section refresh failed', error);
+        }
+    });
+})();
+</script>
+@endpush
 @endsection
