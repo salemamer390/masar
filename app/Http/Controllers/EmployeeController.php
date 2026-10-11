@@ -16,6 +16,7 @@ use App\Models\Salary;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\CompanySubscription;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -167,11 +168,12 @@ class EmployeeController extends Controller
     {
         $employeeCode = trim((string) $request->input('employee_code', ''));
         $request->merge(['employee_code' => $employeeCode !== '' ? $employeeCode : null]);
+        $companyId = auth()->user()->company_id ?: DB::table('companies')->value('id');
 
         $validated = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
-            'employee_code' => ['nullable', 'string', 'max:50', 'unique:employees,employee_code'],
-            'national_id' => ['nullable', 'string', 'max:50', 'unique:employees,national_id'],
+            'employee_code' => ['nullable', 'string', 'max:50', Rule::unique('employees', 'employee_code')->where(fn ($query) => $query->where('company_id', $companyId))],
+            'national_id' => ['nullable', 'string', 'max:50', Rule::unique('employees', 'national_id')->where(fn ($query) => $query->where('company_id', $companyId))],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
             'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
@@ -196,6 +198,8 @@ class EmployeeController extends Controller
         ]);
 
         $validated = $this->applyNationalIdData($validated);
+        $validated['company_id'] = $companyId;
+        $this->ensureEmployeeCapacity($companyId);
         $this->validateSalarySource($request, true);
         [$grossSalary, $calculatedNet] = $this->resolveEmployeeSalary($request);
         $validated['gross_salary'] = $grossSalary;
@@ -218,6 +222,7 @@ class EmployeeController extends Controller
                 // If no code is supplied, generate the next numeric code safely.
                 $lastCode = Employee::query()
                     ->lockForUpdate()
+                    ->where('company_id', $validated['company_id'])
                     ->whereRaw("employee_code REGEXP '^[0-9]+$'")
                     ->selectRaw('MAX(CAST(employee_code AS UNSIGNED)) as max_code')
                     ->value('max_code');
@@ -259,12 +264,14 @@ class EmployeeController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
+        if (!auth()->user()->isSuperAdmin() && (int) $employee->company_id !== (int) auth()->user()->company_id) abort(403);
         $validated = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
             'first_name' => ['nullable', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
             'last_name' => ['nullable', 'string', 'max:100'],
-            'national_id' => ['nullable', 'string', 'max:50', 'unique:employees,national_id,'.$employee->id],
+            'national_id' => ['nullable', 'string', 'max:50', Rule::unique('employees', 'national_id')->where(fn ($query) => $query->where('company_id', $employee->company_id))->ignore($employee->id)],
+            'employee_code' => ['nullable', 'string', 'max:50', Rule::unique('employees', 'employee_code')->where(fn ($query) => $query->where('company_id', $employee->company_id))->ignore($employee->id)],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:190'],
             'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
@@ -368,6 +375,15 @@ class EmployeeController extends Controller
         }
 
         return back()->with('toast', 'تم تحديث بيانات الموظف');
+    }
+
+    private function ensureEmployeeCapacity(?int $companyId): void
+    {
+        if (!$companyId) return;
+        $subscription = CompanySubscription::with('plan')->where('company_id', $companyId)->whereIn('status', ['active','trial'])->latest('id')->first();
+        if (!$subscription || !$subscription->plan) return;
+        $count = Employee::where('company_id', $companyId)->whereHas('status', fn ($query) => $query->whereNotIn('name', ['منتهي الخدمة','موقوف','قيد التعيين','Terminated','Suspended','Pending']))->count();
+        if ($count >= $subscription->plan->employee_limit) abort(422, "لا يمكن إضافة موظف جديد: باقتك تسمح حتى {$subscription->plan->employee_limit} موظفًا، والمستخدمون حاليًا {$count}.");
     }
 
     public function updatePhoto(Request $request, Employee $employee)

@@ -11,7 +11,7 @@ class EditableS6Controller extends Controller
     public function show(Employee $employee)
     {
         $employee->load(['insuranceRecord', 'profileDetail']);
-        $organization = DB::table('insurance_organization_settings')->first();
+        $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
         $record = $employee->insuranceRecord;
         $endDate = $record?->insurance_end_date ?? $employee->termination_date;
 

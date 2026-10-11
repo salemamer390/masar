@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class EmployeeProfileDetail extends Model
 {
+    use BelongsToCompany;
     protected $fillable = [
         'nationality', 'personal_email', 'work_pattern', 'weekly_work_days', 'daily_work_hours',
         'working_hours_text', 'contract_type', 'probation_period', 'annual_leave_days',

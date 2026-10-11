@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -19,6 +21,7 @@ class User extends Authenticatable
         'employee_id',
         'is_active',
         'last_login_at',
+        'company_id',
     ];
 
     protected $hidden = [
@@ -45,6 +48,10 @@ class User extends Authenticatable
         return $this->belongsTo(Employee::class);
     }
 
+    public function company(): BelongsTo { return $this->belongsTo(Company::class); }
+
+    public function directPermissions(): BelongsToMany { return $this->belongsToMany(Permission::class, 'user_permissions'); }
+
     public function isSuperAdmin(): bool
     {
         return $this->role && ($this->role->name === 'super_admin' || $this->role_id === 1);
@@ -63,6 +70,10 @@ class User extends Authenticatable
 
         if (!$this->relationLoaded('role')) {
             $this->load('role.permissions');
+        }
+
+        if ($this->directPermissions()->exists()) {
+            return $this->directPermissions()->where('name', $permissionName)->exists();
         }
 
         if (!$this->role) {

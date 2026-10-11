@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class PayrollRecord extends Model
 {
+    use BelongsToCompany;
     protected $fillable = [
         'payroll_run_id','employee_id','salary_id','payroll_month','basic_salary','allowances','housing_allowance','transportation_allowance','meal_allowance','clothing_allowance','overtime_amount','deductions','absence_deduction',
         'gross_salary','insurance_wage','employee_insurance','income_tax','martyrs_fund','employer_insurance',

@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class Salary extends Model
 {
+    use BelongsToCompany;
     protected $fillable = [
         'employee_id','effective_from','salary_type','salary_input','basic_salary','allowances',
         'allowance_limit_pct','allowance_limit','allowance_remaining',

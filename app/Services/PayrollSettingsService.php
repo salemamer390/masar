@@ -30,6 +30,7 @@ class PayrollSettingsService
         }
 
         $value = DB::table('payroll_calculation_settings')
+            ->where('company_id', auth()->user()?->company_id)
             ->where('setting_group', $group)
             ->where('setting_key', $key)
             ->where('is_active', 1)
@@ -308,6 +309,7 @@ class PayrollSettingsService
         }
 
         return $this->allowanceDistributionCache = DB::table('payroll_allowance_settings')
+            ->where('company_id', auth()->user()?->company_id)
             ->where('is_active', 1)
             ->orderBy('sort_order')
             ->get([

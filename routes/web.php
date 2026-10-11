@@ -24,6 +24,9 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SubscriptionPlanController;
+use App\Http\Controllers\CompanyAccountController;
+use App\Http\Controllers\SubscriptionRenewalController;
 use Illuminate\Support\Facades\Route;
 
 // Guest Routes
@@ -33,11 +36,26 @@ Route::middleware('guest')->group(function () {
 });
 
 // Authenticated Routes
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'subscription'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::middleware('superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
+        Route::get('/', [SubscriptionPlanController::class, 'index'])->name('index');
+        Route::post('/plans', [SubscriptionPlanController::class, 'store'])->name('plans.store');
+        Route::put('/plans/{plan}', [SubscriptionPlanController::class, 'update'])->name('plans.update');
+        Route::post('/companies', [SubscriptionPlanController::class, 'storeCompany'])->name('companies.store');
+        Route::put('/companies/{company}/subscription', [SubscriptionPlanController::class, 'updateCompanySubscription'])->name('companies.subscription.update');
+        Route::put('/companies/{company}/status', [SubscriptionPlanController::class, 'updateCompanyStatus'])->name('companies.status.update');
+        Route::put('/renewals/{renewal}', [SubscriptionRenewalController::class, 'update'])->name('renewals.update');
+    });
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::get('/company/account', [CompanyAccountController::class, 'index'])
+        ->middleware('permission:users.view')
+        ->name('company.account');
+    Route::post('/company/renewals', [SubscriptionRenewalController::class, 'store'])
+        ->middleware('permission:users.view')
+        ->name('company.renewals.store');
 
     Route::get('/', fn() => redirect()->route('dashboard'));
 

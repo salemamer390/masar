@@ -148,7 +148,12 @@ class MasterDataController extends Controller
         }
 
         $request->validate([
-            'name' => array_merge(['required', 'string', 'max:150'], $type === 'documents' ? [Rule::unique('document_types', 'name')] : []),
+            'name' => array_merge(
+                ['required', 'string', 'max:150'],
+                $type === 'documents'
+                    ? [Rule::unique('document_types', 'name')->where(fn ($query) => $query->where('company_id', auth()->user()->company_id))]
+                    : []
+            ),
             'code' => ['nullable', 'string', 'max:50'],
             'category' => $type === 'documents' ? ['required', 'in:basic,job,workplace'] : ['nullable'],
         ], [
@@ -189,8 +194,9 @@ class MasterDataController extends Controller
 
     public function updateDocument(Request $request, DocumentType $documentType)
     {
+        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, 'لا يمكن تعديل العنصر العام من حساب الشركة.');
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:150', Rule::unique('document_types', 'name')->ignore($documentType->id)],
+            'name' => ['required', 'string', 'max:150', Rule::unique('document_types', 'name')->where(fn ($query) => $query->where('company_id', $documentType->company_id))->ignore($documentType->id)],
             'category' => ['required', 'in:basic,job,workplace'],
             'required' => ['nullable', 'boolean'],
         ], [
@@ -218,6 +224,7 @@ class MasterDataController extends Controller
 
     public function destroyDocument(Request $request, DocumentType $documentType)
     {
+        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, 'لا يمكن حذف العنصر العام من حساب الشركة.');
         if ($documentType->documents()->exists()) {
             if ($request->wantsJson()) {
                 return response()->json([

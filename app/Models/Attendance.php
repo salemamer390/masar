@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class Attendance extends Model
 {
+    use BelongsToCompany;
     protected $table = 'attendance';
 
     protected $fillable = [

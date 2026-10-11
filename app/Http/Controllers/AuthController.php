@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\CompanySubscription;
 
 class AuthController extends Controller
 {
@@ -37,6 +38,17 @@ class AuthController extends Controller
                 return back()->withErrors([
                     'email' => 'هذا الحساب معطل حاليًا. يرجى مراجعة مدير النظام.',
                 ]);
+            }
+            if (!$user->isSuperAdmin()) {
+                $subscription = $user->company_id ? CompanySubscription::where('company_id', $user->company_id)->whereIn('status', ['trial', 'active'])->latest('id')->first() : null;
+                $message = !$user->company_id || !$user->company || $user->company->status !== 'active'
+                    ? 'حساب الشركة غير نشط حاليًا. يرجى التواصل مع مدير المنصة.'
+                    : (!$subscription ? 'لا يوجد اشتراك نشط لهذه الشركة. يرجى التواصل لتفعيل الاشتراك.' : (($subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) ? 'انتهت مدة التجربة أو الاشتراك. يرجى التواصل مع مدير المنصة لتجديده.' : null));
+                if ($message) {
+                    if ($subscription && $subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) $subscription->update(['status' => 'expired']);
+                    Auth::logout();
+                    return back()->withErrors(['email' => $message]);
+                }
             }
 
             $user->update(['last_login_at' => now()]);

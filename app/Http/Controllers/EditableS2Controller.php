@@ -9,7 +9,7 @@ class EditableS2Controller extends Controller
 {
     public function show()
     {
-        $organization = DB::table('insurance_organization_settings')->first();
+        $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
 
         $data = [
             'office' => $organization?->office_name ?? '',

@@ -10,9 +10,21 @@
 
 @push('scripts')
 <script>
+  const companyPermissions = @json($permissionGroups);
+  const addPermissionControls = (modal) => {
+    const form = modal?.querySelector('form'); if (!form || form.querySelector('.user-permission-controls')) return;
+    const direct = modal.id === 'userModal' ? [] : (userCache[modal.id.replace('editUser','')]?.direct_permissions || []).map(p => Number(p.id));
+    const box = document.createElement('details'); box.className = 'user-permission-controls mt-3'; box.innerHTML = `<summary class="fw-bold">صلاحيات مخصصة لهذا الحساب <small class="text-muted">(اتركها فارغة لاستخدام صلاحيات الدور)</small></summary><div class="row g-2 mt-1">${companyPermissions.map(group => `<div class="col-md-6"><div class="border rounded p-2"><b class="small d-block mb-1">${escapeUserHtml(group.module)}</b>${group.items.map(permission => `<label class="d-flex gap-2 small mb-1"><input type="checkbox" name="permissions[]" value="${permission.id}" ${direct.includes(Number(permission.id)) ? 'checked' : ''}>${escapeUserHtml(permission.name)}</label>`).join('')}</div></div>`).join('')}</div>`;
+    form.querySelector('.modal-body')?.append(box);
+  };
+  document.addEventListener('DOMContentLoaded', () => { addPermissionControls(document.getElementById('userModal')); document.querySelectorAll('[id^="editUser"]').forEach(addPermissionControls); });
+  new MutationObserver(() => document.querySelectorAll('[id^="editUser"]').forEach(addPermissionControls)).observe(document.body, {childList:true});
+  const userCompanies = @json($companyOptions);
+  const companySelect = document.querySelector('#userModal select[name="role_id"]');
+  if (companySelect && userCompanies.length) { const wrapper = document.createElement('div'); wrapper.className='mb-3'; wrapper.innerHTML='<label class="form-label">الشركة</label><select name="company_id" class="form-select" required></select>'; companySelect.parentElement.insertBefore(wrapper, companySelect.parentElement.firstChild); const select=wrapper.querySelector('select'); select.innerHTML=userCompanies.map(company=>`<option value="${company.id}">${company.name}</option>`).join(''); }
   const userBaseUrl = @json(url('/users'));
   const userTableBody = document.querySelector('.table-panel table tbody');
-  const userRoles = @json($roles->map(fn ($role) => ['id' => $role->id, 'name' => $role->display_name]));
+  const userRoles = @json($roleOptions);
   const userCache = {};
   const escapeUserHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const userRow = (user) => { userCache[user.id] = user; return `<tr data-user-id="${Number(user.id)}"><td>${escapeUserHtml(user.name)}</td><td>${escapeUserHtml(user.email)}</td><td>${escapeUserHtml(user.role?.display_name)}</td><td><span class="badge-soft ${user.is_active ? 'success' : 'danger'}">${user.is_active ? 'نشط' : 'موقوف'}</span></td><td>${user.last_login_at ? escapeUserHtml(user.last_login_at) : '—'}</td><td><button type="button" class="btn btn-sm btn-light user-edit-ajax" data-user-id="${Number(user.id)}">تعديل</button></td></tr>`; };

@@ -13,7 +13,9 @@ class LeaveBalanceService
 {
     public function policy(string $key, string $default = ''): string
     {
-        return (string) (DB::table('leave_policy_settings')->where('setting_key', $key)->value('setting_value') ?? $default);
+        $query = DB::table('leave_policy_settings')->where('setting_key', $key);
+        if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
+        return (string) ($query->value('setting_value') ?? $default);
     }
 
     public function entitlement(Employee $employee, int $year): float

@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Models\Concerns\BelongsToCompanyOrGlobal;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class RequestType extends Model
 {
+    use BelongsToCompanyOrGlobal;
     protected $fillable = [
         'code',
         'display_name',
@@ -17,6 +19,7 @@ class RequestType extends Model
         'metadata',
         'is_active',
         'sort_order',
+        'company_id',
     ];
 
     protected function casts(): array

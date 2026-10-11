@@ -26,7 +26,7 @@ class EditableS1Controller extends Controller
     public function show(Employee $employee)
     {
         $employee->load(['job', 'department', 'profileDetail', 'insuranceRecord', 'currentSalary']);
-        $organization = DB::table('insurance_organization_settings')->first();
+        $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
         $record = $employee->insuranceRecord;
         $salary = $employee->currentSalary;
         $category = (string) ($record?->insurance_category ?? 'workers');

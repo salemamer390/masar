@@ -10,7 +10,9 @@ class HrOperationalSettingsService
 {
     public function value(string $key, string $default = ''): string
     {
-        return (string) (DB::table('hr_operational_settings')->where('setting_key', $key)->value('setting_value') ?? $default);
+        $query = DB::table('hr_operational_settings')->where('setting_key', $key);
+        if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
+        return (string) ($query->value('setting_value') ?? $default);
     }
     public function start(): string { return $this->value('default_shift_start', '09:00'); }
     public function end(): string { return $this->value('default_shift_end', '17:00'); }
@@ -38,7 +40,9 @@ class HrOperationalSettingsService
             return false;
         }
 
-        return DB::table('hr_holidays')->whereDate('holiday_date', $date->toDateString())->exists();
+        $query = DB::table('hr_holidays')->whereDate('holiday_date', $date->toDateString());
+        if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
+        return $query->exists();
     }
 
 }

@@ -12,6 +12,25 @@
     <button type="button" class="dashboard-existing-action" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
   @endforeach
 </div>
+@if($companySubscription?->plan)
+<section class="panel mb-3 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div>
+        <small class="text-muted d-block">الباقة الحالية</small>
+        <strong>{{ $companySubscription->plan->name }}</strong>
+    </div>
+    <div>
+        <small class="text-muted d-block">الموظفون المستخدمون</small>
+        <strong>{{ format_number($companyEmployeeCount ?? 0) }} / {{ format_number($companySubscription->plan->employee_limit) }}</strong>
+    </div>
+    <div class="text-muted small">
+        @if($companySubscription->ends_at)
+            تنتهي في {{ $companySubscription->ends_at->format('d/m/Y') }}
+        @else
+            اشتراك نشط
+        @endif
+    </div>
+</section>
+@endif
 
 <div class="reference-kpi-grid reference-kpi-grid--six">
   @forelse($heroMetrics as $metric)

@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class HrRequest extends Model
 {
+    use BelongsToCompany;
     protected $fillable = [
         'employee_id',
         'request_type',

@@ -7,9 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Builder;
 
 class Employee extends Model
 {
+    protected static function booted(): void
+    {
+        static::addGlobalScope('company', function (Builder $builder): void {
+            $user = auth()->user();
+            if ($user && !$user->isSuperAdmin() && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
+        });
+    }
     protected $fillable = [
         'employee_code',
         'first_name',
@@ -42,6 +50,7 @@ class Employee extends Model
         'manual_annual_balance',
         'leave_entitlement_category',
         'manager_employee_id',
+        'company_id',
         'notes',
     ];
 
@@ -59,6 +68,8 @@ class Employee extends Model
     {
         return $this->belongsTo(Department::class);
     }
+
+    public function company(): BelongsTo { return $this->belongsTo(Company::class); }
 
     public function job(): BelongsTo
     {

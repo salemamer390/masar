@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\BelongsToCompany;
 
 class Leave extends Model
 {
+    use BelongsToCompany;
     protected $fillable = [
         'employee_id',
         'leave_type_id',

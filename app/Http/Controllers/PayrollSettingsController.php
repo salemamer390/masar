@@ -14,11 +14,12 @@ class PayrollSettingsController extends Controller
     public function index()
     {
         $this->ensureAnnualFixedHolidays();
-        $operationalSettings = DB::table('hr_operational_settings')->pluck('setting_value', 'setting_key');
-        $holidays = DB::table('hr_holidays')->orderBy('holiday_date')->get();
-        $settings = DB::table('payroll_calculation_settings')->where('is_active', true)->get()
+        $companyId = auth()->user()->company_id;
+        $operationalSettings = DB::table('hr_operational_settings')->where('company_id',$companyId)->pluck('setting_value', 'setting_key');
+        $holidays = DB::table('hr_holidays')->where('company_id',$companyId)->orderBy('holiday_date')->get();
+        $settings = DB::table('payroll_calculation_settings')->where('company_id',$companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->setting_group.$item->setting_key");
-        $allowances = DB::table('payroll_allowance_settings')->where('is_active', true)->orderBy('sort_order')->get();
+        $allowances = DB::table('payroll_allowance_settings')->where('company_id',$companyId)->where('is_active', true)->orderBy('sort_order')->get();
         $history = DB::table('payroll_setting_changes')->leftJoin('users', 'users.id', '=', 'payroll_setting_changes.changed_by')
             ->select('payroll_setting_changes.*', 'users.name as changed_by_name')->latest('payroll_setting_changes.id')->limit(20)->get();
         $salarySummary = [
@@ -26,7 +27,7 @@ class PayrollSettingsController extends Controller
             'total_net' => Salary::where('status', 'Active')->sum('net_salary'),
             'allowance_review' => Salary::where('status', 'Active')->where('allowance_remaining', '<', 0)->count(),
         ];
-        $leavePolicies = DB::table('leave_policy_settings')->orderBy('id')->get()->keyBy('setting_key');
+        $leavePolicies = DB::table('leave_policy_settings')->where('company_id',$companyId)->orderBy('id')->get()->keyBy('setting_key');
         $leavePolicyLabels = [
             'annual_first_year' => 'رصيد السنة الأولى', 'annual_second_year' => 'رصيد ما بعد السنة الأولى',
             'annual_long_service' => 'رصيد 10 سنوات / 50 سنة', 'annual_long_service_years' => 'سنوات الخدمة للرصيد الأعلى',
@@ -60,7 +61,7 @@ class PayrollSettingsController extends Controller
         ]);
         DB::transaction(function () use ($data): void {
             foreach ($data['policies'] as $key => $value) {
-                DB::table('leave_policy_settings')->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
+                DB::table('leave_policy_settings')->where('company_id', auth()->user()->company_id)->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
             }
             foreach ($data['types'] as $id => $values) {
                 LeaveType::whereKey($id)->update(array_intersect_key($values, array_flip(['default_days', 'max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service'])));
@@ -87,8 +88,8 @@ class PayrollSettingsController extends Controller
             'weekly_rest_pattern' => 'الراحة الأسبوعية (الإثنين إلى الأحد)',
         ];
         foreach ($data as $key => $value) {
-            DB::table('hr_operational_settings')->updateOrInsert(
-                ['setting_key' => $key],
+                DB::table('hr_operational_settings')->updateOrInsert(
+                ['company_id' => auth()->user()->company_id, 'setting_key' => $key],
                 ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
             );
         }
@@ -101,9 +102,9 @@ class PayrollSettingsController extends Controller
     public function storeHoliday(Request $request)
     {
         $data = $request->validate(['holiday_date' => ['required', 'date'], 'name' => ['required', 'string', 'max:150']]);
-        DB::table('hr_holidays')->updateOrInsert(['holiday_date' => $data['holiday_date']], ['name' => $data['name'], 'updated_at' => now(), 'created_at' => now()]);
+        DB::table('hr_holidays')->updateOrInsert(['company_id'=>auth()->user()->company_id, 'holiday_date' => $data['holiday_date']], ['name' => $data['name'], 'updated_at' => now(), 'created_at' => now()]);
         if ($request->wantsJson()) {
-            $holiday = DB::table('hr_holidays')->where('holiday_date', $data['holiday_date'])->first();
+            $holiday = DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('holiday_date', $data['holiday_date'])->first();
             return response()->json(['success' => true, 'message' => 'Holiday saved.', 'holiday' => $holiday]);
         }
 
@@ -112,7 +113,7 @@ class PayrollSettingsController extends Controller
 
     public function destroyHoliday(int $holiday, Request $request)
     {
-        DB::table('hr_holidays')->where('id', $holiday)->delete();
+        DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('id', $holiday)->delete();
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Holiday deleted.', 'holiday_id' => $holiday])
             : back()->with('toast', 'تم حذف العطلة الرسمية.');
@@ -121,11 +122,11 @@ class PayrollSettingsController extends Controller
     public function updateHoliday(Request $request, int $holiday)
     {
         $data = $request->validate([
-            'holiday_date' => ['required', 'date', Rule::unique('hr_holidays', 'holiday_date')->ignore($holiday)],
+            'holiday_date' => ['required', 'date', Rule::unique('hr_holidays', 'holiday_date')->where(fn ($query) => $query->where('company_id', auth()->user()->company_id))->ignore($holiday)],
             'name' => ['required', 'string', 'max:150'],
         ]);
 
-        DB::table('hr_holidays')->where('id', $holiday)->update([
+        DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('id', $holiday)->update([
             'holiday_date' => $data['holiday_date'],
             'name' => $data['name'],
             'updated_at' => now(),
@@ -135,7 +136,7 @@ class PayrollSettingsController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Holiday updated.',
-                'holiday' => DB::table('hr_holidays')->where('id', $holiday)->first(),
+                'holiday' => DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('id', $holiday)->first(),
             ]);
         }
 
@@ -157,6 +158,7 @@ class PayrollSettingsController extends Controller
 
             foreach ($holidays as [$date, $name]) {
                 DB::table('hr_holidays')->insertOrIgnore([
+                    'company_id' => auth()->user()->company_id,
                     'holiday_date' => $date,
                     'name' => $name,
                     'created_at' => now(),
@@ -191,21 +193,21 @@ class PayrollSettingsController extends Controller
 
         DB::transaction(function () use ($data) {
             $before = [
-                'settings' => DB::table('payroll_calculation_settings')->where('is_active', true)->get(),
-                'allowances' => DB::table('payroll_allowance_settings')->where('is_active', true)->get(),
+                'settings' => DB::table('payroll_calculation_settings')->where('company_id',auth()->user()->company_id)->where('is_active', true)->get(),
+                'allowances' => DB::table('payroll_allowance_settings')->where('company_id',auth()->user()->company_id)->where('is_active', true)->get(),
             ];
             foreach ($data['settings'] as $name => $value) {
                 [$group, $key] = explode('.', $name, 2);
-                DB::table('payroll_calculation_settings')->where('setting_group', $group)->where('setting_key', $key)->where('is_active', true)
+                DB::table('payroll_calculation_settings')->where('company_id',auth()->user()->company_id)->where('setting_group', $group)->where('setting_key', $key)->where('is_active', true)
                     ->update(['setting_value' => $value, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
             }
             foreach ($data['allowances'] as $key => $percentage) {
-                DB::table('payroll_allowance_settings')->where('allowance_key', $key)->where('is_active', true)
+                DB::table('payroll_allowance_settings')->where('company_id',auth()->user()->company_id)->where('allowance_key', $key)->where('is_active', true)
                     ->update(['percentage' => $percentage, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
             }
             $after = [
-                'settings' => DB::table('payroll_calculation_settings')->where('is_active', true)->get(),
-                'allowances' => DB::table('payroll_allowance_settings')->where('is_active', true)->get(),
+                'settings' => DB::table('payroll_calculation_settings')->where('company_id',auth()->user()->company_id)->where('is_active', true)->get(),
+                'allowances' => DB::table('payroll_allowance_settings')->where('company_id',auth()->user()->company_id)->where('is_active', true)->get(),
             ];
             DB::table('payroll_setting_changes')->insert([
                 'effective_from' => $data['effective_from'], 'before_snapshot' => json_encode($before, JSON_THROW_ON_ERROR),

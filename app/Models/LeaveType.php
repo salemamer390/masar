@@ -1,12 +1,14 @@
 <?php
 
 namespace App\Models;
+use App\Models\Concerns\BelongsToCompanyOrGlobal;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LeaveType extends Model
 {
+    use BelongsToCompanyOrGlobal;
     public $timestamps = false;
 
     protected $fillable = [
@@ -16,7 +18,7 @@ class LeaveType extends Model
         'is_paid',
         'is_active',
         'policy_code', 'max_days_per_request', 'max_days_per_year', 'min_service_months',
-        'max_occurrences_service', 'requires_document', 'eligibility_gender', 'min_employees',
+        'max_occurrences_service', 'requires_document', 'eligibility_gender', 'min_employees', 'company_id',
     ];
 
     protected $casts = [

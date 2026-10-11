@@ -24,9 +24,20 @@ class InsuranceController extends Controller
             $record->insurance_category = $this->normalizeInsuranceCategory($record->insurance_category);
             $record->status = $this->normalizeInsuranceStatus($record->status);
         });
-        $employees = Employee::whereDoesntHave('insuranceRecord')->orderBy('full_name')->get();
+        // Keep employees without a record visible as "غير مسجل" in the main
+        // screen as well as in the registration modal. This is important for
+        // a newly added employee: absence of an InsuranceRecord must not hide
+        // the employee from the insurance workflow.
+        $employees = Employee::whereDoesntHave('insuranceRecord')
+            ->when($request->filled('search'), fn ($q) => $q->where(function ($employee) use ($request) {
+                $employee->where('full_name', 'like', '%'.$request->search.'%')
+                    ->orWhere('employee_code', 'like', '%'.$request->search.'%');
+            }))
+            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
+            ->when($request->filled('status') && $this->normalizeInsuranceStatus($request->status) !== 'unregistered', fn ($q) => $q->whereRaw('1 = 0'))
+            ->orderBy('full_name')->get();
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
-        $organization = DB::table('insurance_organization_settings')->first();
+        $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
         $totalEmployees = Employee::count();
         $registered = InsuranceRecord::where('status', 'مسجل')->count();
         $unregistered = Employee::whereDoesntHave('insuranceRecord', fn ($q) => $q->where('status', 'مسجل'))->count();
@@ -42,7 +53,7 @@ class InsuranceController extends Controller
         $data = $this->validateRecord($request, true);
         $data['insurance_category'] = $this->normalizeInsuranceCategory($data['insurance_category'] ?? null);
         $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
-        $organization = DB::table('insurance_organization_settings')->first();
+        $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
         $employee = Employee::findOrFail($data['employee_id']);
 
         // Keep the deadline automatic unless the user deliberately chooses another date.
@@ -140,7 +151,7 @@ class InsuranceController extends Controller
             'unified_commercial_registration_number' => ['nullable', 'string', 'max:100'],
             'grace_days' => ['required', 'integer', 'min:1', 'max:365'],
         ]);
-        DB::table('insurance_organization_settings')->updateOrInsert(['id' => 1], $data + ['updated_at' => now(), 'created_at' => now()]);
+        DB::table('insurance_organization_settings')->updateOrInsert(['company_id' => auth()->user()->company_id], $data + ['updated_at' => now(), 'created_at' => now()]);
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Organization insurance settings saved.']);
         }
