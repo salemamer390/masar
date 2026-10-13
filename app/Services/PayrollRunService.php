@@ -33,6 +33,7 @@ class PayrollRunService
                 ['status' => 'Draft', 'created_by' => auth()->id(), 'settings_snapshot' => $this->settings->snapshot()]
             );
             if (in_array($run->status, ['Approved', 'Locked'], true)) abort(422, 'Approved or locked payroll runs cannot be regenerated.');
+            $run->update(['settings_snapshot' => $this->settings->snapshot()]);
 
             $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
             $employees = Employee::query()

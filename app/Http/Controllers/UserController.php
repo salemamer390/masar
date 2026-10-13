@@ -9,6 +9,7 @@ use App\Models\Company;
 use App\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use App\Models\CompanySubscription;
 
 class UserController extends Controller
 {
@@ -63,6 +64,7 @@ class UserController extends Controller
 
         $companyId = auth()->user()->isSuperAdmin() ? ($validated['company_id'] ?? null) : auth()->user()->company_id;
         if (!$companyId) return back()->withErrors(['company_id' => 'يجب ربط المستخدم بشركة قبل إنشاء الحساب.'])->withInput();
+        if (!auth()->user()->isSuperAdmin()) $this->ensureHrCapacity($companyId);
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -109,6 +111,15 @@ class UserController extends Controller
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'User updated.', 'user' => $user->fresh()->load(['role', 'directPermissions'])])
             : back()->with('toast', 'تم تحديث بيانات المستخدم بنجاح');
+    }
+
+    private function ensureHrCapacity(int $companyId): void
+    {
+        $subscription = CompanySubscription::with('plan')->where('company_id', $companyId)->whereIn('status', ['active', 'trial'])->latest('id')->first();
+        $limit = (int) ($subscription?->plan?->hr_user_limit ?? 5);
+        $ownerId = User::where('company_id', $companyId)->oldest('id')->value('id');
+        $count = User::where('company_id', $companyId)->when($ownerId, fn ($q) => $q->whereKeyNot($ownerId))->count();
+        abort_if($count >= $limit, 422, "لا يمكن إنشاء حساب HR جديد: الباقة تسمح بـ {$limit} حسابات HR بالإضافة إلى حساب المالك.");
     }
 
     private function authorizePermissionAssignment(array $validated): void

@@ -46,6 +46,7 @@ class PenaltyController extends Controller
             'reason.required' => 'سبب المخالفة مطلوب.',
         ]);
         $periodGuard->ensureOpen($validated['penalty_date']);
+        $employee = Employee::findOrFail($validated['employee_id']);
 
         if (empty($validated['penalty_type_id'])) {
             $name = $request->input('penalty_type_name', 'لفت نظر');
@@ -69,7 +70,7 @@ class PenaltyController extends Controller
             'issued_by' => auth()->id(),
         ]);
 
-        $emp = Employee::find($validated['employee_id']);
+        $emp = $employee;
         ActivityLog::record('penalty_create', "تم تسجيل إجراء تأديبي ({$title}) بحق الموظف ({$emp?->full_name}).", $penalty);
 
         if ($request->wantsJson()) {
@@ -112,6 +113,7 @@ class PenaltyController extends Controller
         $periodGuard->ensureOpen($penalty->penalty_date);
         $periodGuard->ensureOpen($validated['penalty_date']);
 
+        Employee::findOrFail($validated['employee_id']);
         $type = PenaltyType::findOrFail($validated['penalty_type_id']);
         $before = $penalty->toArray();
         $penalty->update([

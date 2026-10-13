@@ -21,6 +21,7 @@ class PayrollSettingsController extends Controller
             ->keyBy(fn ($item) => "$item->setting_group.$item->setting_key");
         $allowances = DB::table('payroll_allowance_settings')->where('company_id',$companyId)->where('is_active', true)->orderBy('sort_order')->get();
         $history = DB::table('payroll_setting_changes')->leftJoin('users', 'users.id', '=', 'payroll_setting_changes.changed_by')
+            ->where('payroll_setting_changes.company_id', $companyId)
             ->select('payroll_setting_changes.*', 'users.name as changed_by_name')->latest('payroll_setting_changes.id')->limit(20)->get();
         $salarySummary = [
             'active' => Salary::where('status', 'Active')->count(),
@@ -210,6 +211,7 @@ class PayrollSettingsController extends Controller
                 'allowances' => DB::table('payroll_allowance_settings')->where('company_id',auth()->user()->company_id)->where('is_active', true)->get(),
             ];
             DB::table('payroll_setting_changes')->insert([
+                'company_id' => auth()->user()->company_id,
                 'effective_from' => $data['effective_from'], 'before_snapshot' => json_encode($before, JSON_THROW_ON_ERROR),
                 'after_snapshot' => json_encode($after, JSON_THROW_ON_ERROR), 'changed_by' => auth()->id(),
                 'ip_address' => request()->ip(), 'created_at' => now(), 'updated_at' => now(),

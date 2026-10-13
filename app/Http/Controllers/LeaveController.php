@@ -61,6 +61,7 @@ class LeaveController extends Controller
         ]);
         $start = Carbon::parse($data['start_date']);
         $end = Carbon::parse($data['end_date']);
+        $this->ensureOwnedReferences($data);
         if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
             abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
         }
@@ -118,6 +119,7 @@ class LeaveController extends Controller
         ]);
         $start = Carbon::parse($data['start_date']);
         $end = Carbon::parse($data['end_date']);
+        $this->ensureOwnedReferences($data);
         if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
             abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
         }
@@ -212,5 +214,11 @@ class LeaveController extends Controller
         }
 
         return $days;
+    }
+
+    private function ensureOwnedReferences(array $data): void
+    {
+        Employee::findOrFail($data['employee_id']);
+        LeaveType::findOrFail($data['leave_type_id']);
     }
 }

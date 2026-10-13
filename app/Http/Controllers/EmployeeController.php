@@ -198,6 +198,7 @@ class EmployeeController extends Controller
         ]);
 
         $validated = $this->applyNationalIdData($validated);
+        $this->ensureOwnedEmployeeReferences($validated);
         $validated['company_id'] = $companyId;
         $this->ensureEmployeeCapacity($companyId);
         $this->validateSalarySource($request, true);
@@ -246,7 +247,8 @@ class EmployeeController extends Controller
         }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
 
-        $recipients = User::with('role.permissions')->where('is_active', true)->get()
+        $recipients = User::with('role.permissions')->where('is_active', true)
+            ->where('company_id', $employee->company_id)->get()
             ->filter(fn (User $user) => $user->hasPermission('employees.view') || (int) $user->employee_id === (int) $employee->id)
             ->unique('id');
         $recipients->each(fn (User $user) => $user->notify(new WorkPermitDeadlineNotification($employee)));
@@ -314,6 +316,7 @@ class EmployeeController extends Controller
             'profile.military_status' => ['nullable', 'string', 'max:100'],
         ]);
 
+        $this->ensureOwnedEmployeeReferences($validated, $employee);
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
         if ($salaryChanged) {
             $validated = $this->applyNationalIdData($validated);
@@ -384,6 +387,17 @@ class EmployeeController extends Controller
         if (!$subscription || !$subscription->plan) return;
         $count = Employee::where('company_id', $companyId)->whereHas('status', fn ($query) => $query->whereNotIn('name', ['منتهي الخدمة','موقوف','قيد التعيين','Terminated','Suspended','Pending']))->count();
         if ($count >= $subscription->plan->employee_limit) abort(422, "لا يمكن إضافة موظف جديد: باقتك تسمح حتى {$subscription->plan->employee_limit} موظفًا، والمستخدمون حاليًا {$count}.");
+    }
+
+    private function ensureOwnedEmployeeReferences(array $data, ?Employee $employee = null): void
+    {
+        foreach (['department_id' => Department::class, 'job_id' => Job::class, 'branch_id' => Branch::class, 'employment_type_id' => EmploymentType::class] as $key => $model) {
+            if (!empty($data[$key])) $model::findOrFail($data[$key]);
+        }
+        if (!empty($data['manager_employee_id'])) {
+            abort_if($employee && (int) $data['manager_employee_id'] === (int) $employee->id, 422, 'لا يمكن اختيار الموظف مديرًا لنفسه.');
+            Employee::findOrFail($data['manager_employee_id']);
+        }
     }
 
     public function updatePhoto(Request $request, Employee $employee)

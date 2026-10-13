@@ -18,10 +18,11 @@ class SendContractExpiryAlerts extends Command
         $employees = Employee::whereNotNull('contract_end_date')
             ->whereBetween('contract_end_date', [today(), today()->copy()->addDays($days)])
             ->get();
-        $users = User::with('role.permissions')->where('is_active', true)->get()
-            ->filter(fn (User $user) => $user->hasPermission('employees.view'));
         $sent = 0;
         foreach ($employees as $employee) {
+            $users = User::with('role.permissions')->where('is_active', true)
+                ->where('company_id', $employee->company_id)->get()
+                ->filter(fn (User $user) => $user->hasPermission('employees.view'));
             foreach ($users as $user) {
                 $exists = $user->notifications()->where('type', ContractExpiryNotification::class)
                     ->where('data->employee_id', $employee->id)

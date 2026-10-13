@@ -11,6 +11,7 @@ use App\Models\EmployeeProfileDetail;
 use App\Models\EmploymentType;
 use App\Models\Job;
 use App\Models\Salary;
+use App\Models\Company;
 use App\Services\PayrollCalculator;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -18,46 +19,50 @@ use Illuminate\Support\Facades\DB;
 
 class ImportCurrentStaff extends Command
 {
-    protected $signature = 'tazamun:import-current-staff {file} {--dry-run}';
+    protected $signature = 'tazamun:import-current-staff {file} {--company= : Target company ID} {--dry-run}';
     protected $description = 'Import approved current-staff JSON including employee and salary structures.';
 
     public function handle(PayrollCalculator $calculator): int
     {
         $file = (string) $this->argument('file');
+        $companyId = (int) $this->option('company');
+        if (!$companyId || !Company::whereKey($companyId)->exists()) { $this->error('A valid --company ID is required.'); return self::FAILURE; }
         $staff = json_decode((string) @file_get_contents($file), true);
         if (!is_array($staff)) { $this->error('A valid JSON array is required.'); return self::FAILURE; }
         $this->table(['Code', 'Name', 'Hire date', 'Net', 'Action'], array_map(function ($row) {
-            $existing = Employee::where('national_id', $row['national_id'])->orWhere('email', $row['email'] ?: '__none__')->first();
+            $existing = Employee::where('company_id', $companyId)->where(function ($q) use ($row) { $q->where('national_id', $row['national_id'])->orWhere('email', $row['email'] ?: '__none__'); })->first();
             return [$existing?->employee_code ?? 'Auto', $row['full_name'], $row['hire_date'], $row['net_salary'], $existing ? 'update' : 'create'];
         }, $staff));
         if ($this->option('dry-run')) { $this->info('Validated '.count($staff).' employee records; no changes made.'); return self::SUCCESS; }
 
-        DB::transaction(function () use ($staff, $calculator) {
-            foreach ($staff as $row) $this->import($row, $calculator);
+        DB::transaction(function () use ($staff, $calculator, $companyId) {
+            foreach ($staff as $row) $this->import($row, $calculator, $companyId);
         });
         $this->info('Imported '.count($staff).' employee records and their salary structures.');
         return self::SUCCESS;
     }
 
-    private function import(array $row, PayrollCalculator $calculator): void
+    private function import(array $row, PayrollCalculator $calculator, int $companyId): void
     {
-        $department = Department::firstOrCreate(['name' => $row['department']], ['is_active' => true]);
-        $job = Job::firstOrCreate(['title' => $row['job_title']], ['is_active' => true]);
-        $branch = Branch::firstOrCreate(['name' => $row['work_location']], ['is_active' => true]);
+        $department = Department::firstOrCreate(['name' => $row['department'], 'company_id' => $companyId], ['is_active' => true]);
+        $job = Job::firstOrCreate(['title' => $row['job_title'], 'company_id' => $companyId], ['is_active' => true]);
+        $branch = Branch::firstOrCreate(['name' => $row['work_location'], 'company_id' => $companyId], ['is_active' => true]);
         $type = EmploymentType::firstOrCreate(['name' => 'Full Time']);
         $status = EmployeeStatus::firstOrCreate(['name' => 'Active']);
         $parts = preg_split('/\s+/u', trim($row['full_name']));
+        $companyPayload = ['company_id' => $companyId];
         $notes = ["Imported source: current staff dataset.", "Direct manager: {$row['manager']}.", "Work mode: {$row['work_mode']}; schedule: {$row['schedule']}; {$row['daily_hours']} hours/day.", "Annual leave entitlement: {$row['annual_leave_days']} days.", "Contract attachment reported: {$row['contract_attachment']}."];
         if ($row['contract_end_date'] && Carbon::parse($row['contract_end_date'])->lte(Carbon::parse($row['contract_start_date']))) {
             $notes[] = "Contract end date in source is invalid and was not imported: {$row['contract_end_date']}.";
         }
         if (Carbon::parse($row['hire_date'])->isFuture()) $notes[] = "Review source: hire date is in the future ({$row['hire_date']}).";
-        $employee = Employee::where('national_id', $row['national_id'])->orWhere('email', $row['email'] ?: '__none__')->first();
+        $employee = Employee::where('company_id', $companyId)->where(function ($q) use ($row) { $q->where('national_id', $row['national_id'])->orWhere('email', $row['email'] ?: '__none__'); })->first();
         $payload = ['first_name' => $parts[0], 'middle_name' => $parts[1] ?? null, 'last_name' => count($parts) > 2 ? implode(' ', array_slice($parts, 2)) : null, 'full_name' => $row['full_name'], 'national_id' => $row['national_id'], 'phone' => $row['phone'], 'email' => $row['email'] ?: null, 'department_id' => $department->id, 'job_id' => $job->id, 'branch_id' => $branch->id, 'employment_type_id' => $type->id, 'status_id' => $status->id, 'hire_date' => $row['hire_date'], 'contract_start_date' => $row['contract_start_date'], 'contract_end_date' => $row['contract_end_date'] && Carbon::parse($row['contract_end_date'])->gt(Carbon::parse($row['contract_start_date'])) ? $row['contract_end_date'] : null, 'contract_duration' => $row['contract_duration'], 'notes' => implode("\n", $notes)];
         if (!$employee) {
             $payload['employee_code'] = $this->nextEmployeeCode();
         }
         $before = $employee?->toArray();
+        $payload = $companyPayload + $payload;
         $employee ? $employee->update($payload) : $employee = Employee::create($payload);
         EmployeeProfileDetail::updateOrCreate(['employee_id' => $employee->id], [
             'nationality' => $row['nationality'] ?? 'مصري',

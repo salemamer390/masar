@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeStatus;
 use App\Models\Job;
+use App\Models\Company;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -14,12 +15,14 @@ use ZipArchive;
 
 class ImportEmployeesWorkbook extends Command
 {
-    protected $signature = 'tazamun:import-employees {file : Path to the XLSX workbook} {--dry-run : Validate and report without writing}';
+    protected $signature = 'tazamun:import-employees {file : Path to the XLSX workbook} {--company= : Target company ID} {--dry-run : Validate and report without writing}';
     protected $description = 'Import the Employees Data worksheet from the Tazamun HR workbook.';
 
     public function handle(): int
     {
         $file = (string) $this->argument('file');
+        $companyId = (int) $this->option('company');
+        if (!$companyId || !Company::whereKey($companyId)->exists()) { $this->error('A valid --company ID is required.'); return self::FAILURE; }
         if (!is_file($file)) {
             $this->error("Workbook not found: {$file}");
             return self::FAILURE;
@@ -48,24 +51,24 @@ class ImportEmployeesWorkbook extends Command
 
         $created = 0;
         $updated = 0;
-        DB::transaction(function () use ($rows, &$created, &$updated): void {
+        DB::transaction(function () use ($rows, $companyId, &$created, &$updated): void {
             foreach ($rows as $row) {
-                $departmentId = $row['department_name'] ? Department::firstOrCreate(['name' => $row['department_name']], ['is_active' => true])->id : null;
-                $jobId = $row['job_title'] ? Job::firstOrCreate(['title' => $row['job_title']], ['is_active' => true])->id : null;
+                $departmentId = $row['department_name'] ? Department::firstOrCreate(['name' => $row['department_name'], 'company_id' => $companyId], ['is_active' => true])->id : null;
+                $jobId = $row['job_title'] ? Job::firstOrCreate(['title' => $row['job_title'], 'company_id' => $companyId], ['is_active' => true])->id : null;
                 $statusId = EmployeeStatus::firstOrCreate(['name' => $row['status_name']])->id;
 
-                $employee = Employee::where('employee_code', $row['employee_code'])->first();
+                $employee = Employee::where('company_id', $companyId)->where('employee_code', $row['employee_code'])->first();
                 if ($employee && $row['national_id'] && $employee->national_id !== $row['national_id']) {
-                    $owner = Employee::where('national_id', $row['national_id'])->whereKeyNot($employee->id)->exists();
+                    $owner = Employee::where('company_id', $companyId)->where('national_id', $row['national_id'])->whereKeyNot($employee->id)->exists();
                     if ($owner) {
                         throw new \RuntimeException("National ID in workbook is already assigned to another employee: {$row['employee_code']}");
                     }
                 }
                 if (!$employee && $row['national_id']) {
-                    $employee = Employee::where('national_id', $row['national_id'])->first();
+                    $employee = Employee::where('company_id', $companyId)->where('national_id', $row['national_id'])->first();
                 }
 
-                $payload = [
+                $payload = ['company_id' => $companyId,
                     'employee_code' => $row['employee_code'], 'first_name' => $row['first_name'], 'middle_name' => $row['middle_name'],
                     'last_name' => $row['last_name'], 'full_name' => $row['full_name'], 'national_id' => $row['national_id'], 'phone' => $row['phone'],
                     'department_id' => $departmentId, 'job_id' => $jobId, 'status_id' => $statusId, 'hire_date' => $row['hire_date'],

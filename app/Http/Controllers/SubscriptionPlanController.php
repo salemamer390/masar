@@ -44,14 +44,15 @@ class SubscriptionPlanController extends Controller
     }
     public function store(Request $request)
     {
-        $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string']);
+        $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','hr_user_limit'=>'nullable|integer|min:0|max:1000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string']);
         $features = collect(preg_split('/[,\n]+/', (string) ($data['features'] ?? '')))->map(fn($v)=>trim($v))->filter()->values()->all();
-        SubscriptionPlan::create(['name'=>$data['name'],'slug'=>Str::slug($data['name']).'-'.Str::random(5),'employee_limit'=>$data['employee_limit'],'price'=>$data['price'] ?? 0,'billing_period'=>$data['billing_period'],'features'=>$features,'sort_order'=>$data['employee_limit']]);
+        SubscriptionPlan::create(['name'=>$data['name'],'slug'=>Str::slug($data['name']).'-'.Str::random(5),'employee_limit'=>$data['employee_limit'],'hr_user_limit'=>$data['hr_user_limit'] ?? 5,'price'=>$data['price'] ?? 0,'billing_period'=>$data['billing_period'],'features'=>$features,'sort_order'=>$data['employee_limit']]);
         return back()->with('toast','تمت إضافة الباقة بنجاح.');
     }
     public function update(Request $request, SubscriptionPlan $plan)
     {
-        $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string','is_active'=>'nullable|boolean']);
+        $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','hr_user_limit'=>'nullable|integer|min:0|max:1000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string','is_active'=>'nullable|boolean']);
+        $data['hr_user_limit'] = $data['hr_user_limit'] ?? 5;
         $data['features'] = collect(preg_split('/[,\n]+/', (string) ($data['features'] ?? '')))->map(fn($v)=>trim($v))->filter()->values()->all();
         $plan->update($data + ['is_active'=>(bool)($data['is_active'] ?? false)]);
         return back()->with('toast','تم تحديث الباقة بنجاح.');

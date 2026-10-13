@@ -30,11 +30,14 @@ class SendDocumentExpiryNotifications extends Command
             }
         }
         if (!$pending) { $this->info('No new document expiry notifications.'); return self::SUCCESS; }
-        $recipients = User::with('role.permissions')->where('is_active', true)->get()->filter(function (User $user) {
-            return in_array($user->role?->name, ['super_admin', 'hr_manager', 'hr_specialist', 'manager'], true) || $user->hasPermission('documents.view');
-        });
-        foreach ($recipients as $recipient) $recipient->notify(new DocumentExpiryDigestNotification($pending));
-        $this->info('Document expiry digests sent: '.$recipients->count().' recipient(s), '.count($pending).' item(s).');
+        $recipientCount = 0;
+        foreach (collect($pending)->groupBy(fn (array $item) => $documents->firstWhere('id', $item['document_id'])?->company_id) as $companyId => $items) {
+            $recipients = User::with('role.permissions')->where('is_active', true)->where('company_id', $companyId)->get()->filter(function (User $user) {
+                return in_array($user->role?->name, ['hr_manager', 'hr_specialist', 'manager'], true) || $user->hasPermission('documents.view');
+            });
+            foreach ($recipients as $recipient) { $recipient->notify(new DocumentExpiryDigestNotification($items->values()->all())); $recipientCount++; }
+        }
+        $this->info('Document expiry digests sent: '.$recipientCount.' recipient(s), '.count($pending).' item(s).');
         return self::SUCCESS;
     }
 }
