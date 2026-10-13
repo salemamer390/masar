@@ -96,11 +96,15 @@ class PayrollController extends Controller
         ]);
         $salary = $payrollRecord->salary ?? Salary::find($payrollRecord->salary_id);
         abort_unless($salary, 422, 'لا يوجد هيكل راتب مرتبط بهذا السجل.');
+        $insuranceDueSnapshot = data_get($payrollRecord->calculation_snapshot, 'insurance_due');
+        $insuranceDue = $insuranceDueSnapshot === null
+            ? $this->insuranceDueForExistingRecord($payrollRecord)
+            : (bool) $insuranceDueSnapshot;
         $inputs = array_merge($data, [
             'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
         ]);
-        $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance);
-        $result = $service->applyStructureStatutoryValues($result, $salary);
+        $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance || !$insuranceDue);
+        $result = $service->applyStructureStatutoryValues($result, $salary, $insuranceDue);
         $result = $service->applyProration($result, (float) ($payrollRecord->calculation_snapshot['proration_factor'] ?? 1));
         $before = $payrollRecord->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']);
         $payrollRecord->update([
@@ -110,11 +114,22 @@ class PayrollController extends Controller
             'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
             'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],
+            'calculation_snapshot'=>array_merge($payrollRecord->calculation_snapshot ?? [], ['insurance_due'=>$insuranceDue]),
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Payroll inputs recalculated.', 'record' => $payrollRecord->fresh()->load('employee')])
             : back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
+    }
+
+    private function insuranceDueForExistingRecord(PayrollRecord $record): bool
+    {
+        $employee = $record->employee;
+        if (!$employee?->hire_date) return true;
+
+        $month = Carbon::parse($record->payroll_month)->startOfMonth();
+        $hireDate = Carbon::parse($employee->hire_date)->startOfDay();
+        return !($hireDate->isSameMonth($month) && !$hireDate->isSameDay($month));
     }
 
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)

@@ -37,7 +37,10 @@ class PayrollRunService
 
             $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
             $employees = Employee::query()
-                ->whereDoesntHave('status', fn ($query) => $query->whereIn('name', $excludedStatuses))
+                ->where(function ($query) use ($excludedStatuses, $month) {
+                    $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', $excludedStatuses))
+                        ->orWhereHas('payrollRecords', fn ($records) => $records->whereDate('payroll_month', $month->toDateString()));
+                })
                 ->orderBy('id')->cursor();
 
             foreach ($employees as $employee) {
@@ -50,13 +53,14 @@ class PayrollRunService
                 if (!$salary) continue;
                 $structure = $this->calculator->structureForSalary($salary);
                 $inputs = $this->approvedInputs($employee, $month, $structure);
+                $insuranceDue = $this->insuranceIsDueForMonth($employee, $month);
                 $calculation = $this->calculator->monthly(
                     (float) $structure['gross'],
                     $inputs,
                     $salary->insurance_wage ? (float) $salary->insurance_wage : null,
-                    (bool) $salary->no_insurance,
+                    (bool) $salary->no_insurance || !$insuranceDue,
                 );
-                $calculation = $this->applyStructureStatutoryValues($calculation, $salary);
+                $calculation = $this->applyStructureStatutoryValues($calculation, $salary, $insuranceDue);
                 $calculation = $this->applyProration($calculation, $serviceWindow['factor']);
                 $payload = [
                     'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
@@ -79,6 +83,7 @@ class PayrollRunService
                     'status' => 'Draft', 'is_locked' => false,
                     'calculation_snapshot' => array_merge($structure, $calculation, [
                         'inputs' => $inputs, 'settings' => $run->settings_snapshot,
+                        'insurance_due' => $insuranceDue,
                         'service_start' => $serviceWindow['start']->toDateString(),
                         'service_end' => $serviceWindow['end']->toDateString(),
                         'paid_days' => $serviceWindow['days'],
@@ -149,13 +154,13 @@ class PayrollRunService
      * Insurance and tax are approved with the salary structure. The payroll run
      * copies these fixed values and only adds the month's variable entries.
      */
-    public function applyStructureStatutoryValues(array $calculation, Salary $salary): array
+    public function applyStructureStatutoryValues(array $calculation, Salary $salary, bool $insuranceDue = true): array
     {
-        $insuranceWage = (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0);
-        $employeeInsurance = (float) ($salary->employee_insurance ?? 0);
+        $insuranceWage = $insuranceDue ? (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0) : 0.0;
+        $employeeInsurance = $insuranceDue ? (float) ($salary->employee_insurance ?? 0) : 0.0;
         $incomeTax = (float) ($salary->income_tax ?? 0);
         $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
-        $employerInsurance = (float) ($salary->employer_insurance ?? 0);
+        $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) : 0.0;
         $deductions = $employeeInsurance + $incomeTax + $martyrsFund
             + (float) $calculation['absence_deduction'] + (float) $calculation['penalty_deduction']
             + (float) $calculation['loans'] + (float) $calculation['other_deductions'];
@@ -166,7 +171,9 @@ class PayrollRunService
             'income_tax' => $incomeTax,
             'martyrs_fund' => $martyrsFund,
             'employer_insurance' => $employerInsurance,
-            'employee_cost' => (float) ($salary->employee_cost ?? ((float) $calculation['gross'] + $employerInsurance)),
+            'employee_cost' => $insuranceDue
+                ? (float) ($salary->employee_cost ?? ((float) $calculation['gross'] + $employerInsurance))
+                : (float) $calculation['gross'],
             'monthly_deductions' => round($deductions, 2),
             'net_monthly' => round((float) $calculation['entitlements'] - $deductions, 2),
         ]);
@@ -204,6 +211,14 @@ class PayrollRunService
 
         $days = $start->diffInDays($end) + 1;
         return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => min(1, $days / 30)];
+    }
+
+    private function insuranceIsDueForMonth(Employee $employee, Carbon $month): bool
+    {
+        if (!$employee->hire_date) return true;
+
+        $hireDate = Carbon::parse($employee->hire_date)->startOfDay();
+        return !($hireDate->isSameMonth($month) && !$hireDate->isSameDay($month->copy()->startOfMonth()));
     }
 
     /** Count only the part of an unpaid leave that belongs to this payroll month. */
