@@ -4,21 +4,41 @@
 
 @section('content')
 @php($profile = $employee->profileDetail)
+@php($ageYears = $employee->birth_date ? $employee->birth_date->age : null)
+@php($servicePeriod = null)
+@if($employee->hire_date)
+    @php($serviceDiff = $employee->hire_date->diff(today()))
+    @php($servicePeriod = ['years' => $serviceDiff->y, 'months' => $serviceDiff->m, 'days' => $serviceDiff->d])
+@endif
 <div class="profile-head">
     <a href="{{ route('employees.index') }}" class="back-btn profile-back-btn">
         <i class="bi bi-arrow-right"></i> العودة للموظفين
     </a>
 
     <div class="profile-person">
-        <button type="button" class="profile-avatar profile-avatar-button" data-bs-toggle="modal" data-bs-target="#profilePhotoModal" title="إدارة الصورة">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else{{ $employee->initials }}@endif</button>
+        <button type="button" class="profile-avatar profile-avatar-button" data-bs-toggle="modal" data-bs-target="#profilePhotoModal" title="إدارة الصورة">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else<i class="bi bi-person-fill" aria-hidden="true"></i>@endif</button>
         <div>
             <h1>{{ $employee->full_name }}</h1>
             <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
             <div class="profile-tags">
                 @php($employeeStatus = $employee->status?->name ?? 'Active')
                 <span class="badge-soft {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}">{{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}</span>
-                <span>كود الموظف #{{ $employee->employee_code }}</span>
             </div>
+        </div>
+        <div class="profile-metrics" aria-label="ملخص بيانات الموظف">
+            <div class="profile-metric"><i class="bi bi-hash"></i><span>كود الموظف</span><b>{{ $employee->employee_code ?? '—' }}</b></div>
+            <div class="profile-metric"><i class="bi bi-person"></i><span>العمر</span><b>{{ $ageYears !== null ? $ageYears.' سنة' : '—' }}</b></div>
+            <div class="profile-metric"><i class="bi bi-briefcase"></i><span>مدة الخدمة</span><b>
+                @if(!$servicePeriod) —
+                @elseif($servicePeriod['years'] > 0)
+                    {{ $servicePeriod['years'] }} سنة{{ $servicePeriod['months'] > 0 ? ' و'.$servicePeriod['months'].' شهر' : '' }}
+                @elseif($servicePeriod['months'] > 0)
+                    {{ $servicePeriod['months'] }} شهر{{ $servicePeriod['days'] > 0 ? ' و'.$servicePeriod['days'].' يوم' : '' }}
+                @else
+                    {{ $servicePeriod['days'] }} يوم
+                @endif
+            </b></div>
+            <div class="profile-metric"><i class="bi bi-diagram-3"></i><span>القسم</span><b>{{ $employee->department?->name ?? '—' }}</b></div>
         </div>
     </div>
 
@@ -646,11 +666,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script>
 (function(){
- const editForm=document.querySelector('#employeeMasterModal form');
- const openField=(field)=>{if(!editForm)return;const modal=document.getElementById('employeeMasterModal');bootstrap.Modal.getOrCreateInstance(modal).show();setTimeout(()=>{const input=editForm.querySelector('[name="'+field+'"]')||document.getElementById(field);input?.focus();input?.scrollIntoView({block:'center'});},250);};
- const personal=document.querySelector('.profile-content > .profile-grid .details-grid');
- ['full_name','national_id','birth_date','marital_status','phone','email','address','qualification'].forEach((field,index)=>{const cell=personal?.children[index];if(cell){cell.addEventListener('dblclick',()=>openField(field));cell.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openField(field);}});cell.classList.add('editable-detail');cell.setAttribute('role','button');cell.setAttribute('tabindex','0');}});
- const summary=document.querySelector('.profile-summary');['job_id','department_id','hire_date','employee_edit_gross'].forEach((field,index)=>{const cell=summary?.children[index];if(cell){cell.addEventListener('dblclick',()=>openField(field));cell.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openField(field);}});cell.classList.add('editable-detail');cell.setAttribute('role','button');cell.setAttribute('tabindex','0');}});
  const leavesTable=document.querySelector('.profile-tabs .active[href*="tab=leaves"]')?document.querySelector('.profile-content .table'):null;
  if(leavesTable){const rows=leavesTable.querySelectorAll('tbody tr');const leaveData=@json($employee->leaves->map(fn($leave)=>['paid'=>(bool)$leave->leaveType?->is_paid]));const head=leavesTable.querySelector('thead tr');if(head&&head.children.length===5){const paidHead=document.createElement('th');paidHead.textContent='الأجر';head.insertBefore(paidHead,head.children[1]);const deductionHead=document.createElement('th');deductionHead.textContent='قيمة الخصم';head.insertBefore(deductionHead,head.lastElementChild);rows.forEach((row,i)=>{if(row.children.length!==5)return;const paid=document.createElement('td');paid.textContent=leaveData[i]?.paid?'بأجر':'بدون أجر';row.insertBefore(paid,row.children[1]);const deduction=document.createElement('td');deduction.textContent=leaveData[i]?.paid?'0':'يحسب في المسير';row.insertBefore(deduction,row.lastElementChild);});}}
 })();

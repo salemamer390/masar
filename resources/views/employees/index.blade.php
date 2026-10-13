@@ -165,6 +165,9 @@
             <div class="col-6"><label class="form-label">تاريخ الميلاد</label><input type="date" name="birth_date" class="form-control" readonly></div>
           </div>
           <div class="row g-2 mb-3">
+            <div class="col-6"><label class="form-label">سن الموظف</label><input type="text" id="new_employee_age" class="form-control" readonly placeholder="يُحسب تلقائيًا"></div>
+          </div>
+          <div class="row g-2 mb-3">
             <div class="col-6"><label class="form-label">الجنسية</label><input type="text" name="profile[nationality]" class="form-control" value="مصري"></div>
             <div class="col-6"><label class="form-label">العملة</label><input type="text" name="profile[currency]" class="form-control" value="EGP"></div>
           </div>
@@ -350,7 +353,7 @@
     });
 })();
 </script><script>
-document.querySelectorAll('input[name="national_id"]').forEach(id=>id.addEventListener('input',()=>{const f=id.closest('form');const n=id.value.replace(/\D/g,'');if(n.length!==14||!f)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const m=Number(n.slice(3,5)),d=Number(n.slice(5,7));const date=new Date(year,m-1,d);if(date.getFullYear()!==year||date.getMonth()+1!==m||date.getDate()!==d)return;const birth=f.querySelector('[name="birth_date"]'),gender=f.querySelector('[name="gender"]');if(birth)birth.value=year+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(gender)gender.value=Number(n[12])%2?'ذكر':'أنثى';}));
+document.querySelectorAll('input[name="national_id"]').forEach(id=>id.addEventListener('input',()=>{const f=id.closest('form');const n=id.value.replace(/\D/g,'');const age=f?.querySelector('#new_employee_age');if(age)age.value='';if(n.length!==14||!f)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const m=Number(n.slice(3,5)),d=Number(n.slice(5,7));const date=new Date(year,m-1,d);if(date.getFullYear()!==year||date.getMonth()+1!==m||date.getDate()!==d)return;const birth=f.querySelector('[name="birth_date"]'),gender=f.querySelector('[name="gender"]');if(birth)birth.value=year+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(gender)gender.value=Number(n[12])%2?'ذكر':'أنثى';if(age){const now=new Date();let years=now.getFullYear()-year;if(now.getMonth()<m-1||(now.getMonth()===m-1&&now.getDate()<d))years--;age.value=Math.max(0,years)+' سنة';}}));
 const kpiData=@json($employeeCardDetails);const kpiKeys=['total','active','departments','contracts_due','uninsured','on_leave'];const kpiTitles=['إجمالي الموظفين','الموظفون النشطون','الأقسام','عقود تنتهي قريبًا','غير مؤمن عليهم','في إجازة حاليًا'];document.querySelectorAll('.employee-kpi-detail-trigger').forEach(card=>card.addEventListener('click',event=>{event.preventDefault();const index=Number(card.dataset.kpiIndex);const list=kpiData[kpiKeys[index]]||[];document.getElementById('employeeKpiTitle').textContent=kpiTitles[index];document.getElementById('employeeKpiBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.name||'—';const extra=item.employee_code?('#'+item.employee_code):((item.employees_count??'')+' موظف');return '<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.initials||name.slice(0,1))+'</span><div><a href="{{ url('/employees') }}/'+(item.id||'')+'">'+name+'</a><small>'+(item.department?.name||extra||'')+'</small></div></div>';}).join(''):'<div class="text-muted text-center p-4">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('employeeKpiDetails')).show();}));
 </script>
 @endpush
