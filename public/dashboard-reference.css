@@ -70,6 +70,42 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 /* Direct dashboard actions and request row polish. */
 .dashboard-command-bar--reference button{min-height:52px;border:1px solid var(--border);border-radius:12px;background:#fff;color:#182b50;font-size:12px;font-weight:700;cursor:pointer;transition:.18s;box-shadow:0 3px 10px rgba(23,47,83,.03)}
 .dashboard-command-bar--reference button:hover{color:#fff;background:#1769e0;border-color:#1769e0;transform:translateY(-1px)}
+
+@media(max-width:520px){
+  .dashboard-command-bar--reference{
+    grid-template-columns:repeat(3,max-content)!important;
+    justify-content:start!important;
+    align-items:start!important;
+  }
+  .reference-kpi-grid--six{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+  .dashboard-command-bar--reference>*{
+    width:max-content!important;
+    min-width:72px!important;
+    max-width:92px!important;
+    min-height:62px!important;
+    padding:7px 4px!important;
+    flex-direction:column!important;
+    gap:3px!important;
+    border-radius:9px!important;
+  }
+  .dashboard-command-bar--reference>* i{font-size:19px!important;line-height:1}
+  .dashboard-command-bar--reference>* span{display:none!important}
+  .dashboard-command-bar--reference>*::after{content:attr(data-short-label);font-size:9px;line-height:1.2;white-space:nowrap}
+
+  .reference-kpi-grid--six .reference-kpi{
+    min-height:70px!important;
+    padding:8px!important;
+    flex-direction:row!important;
+    justify-content:flex-start!important;
+    text-align:right!important;
+    gap:8px!important;
+  }
+  .reference-kpi-grid--six .reference-kpi-icon{width:36px;height:36px;font-size:17px;flex:0 0 36px}
+  .reference-kpi-grid--six .reference-kpi>span:last-child{min-width:0;flex:1}
+  .reference-kpi-grid--six .reference-kpi>span:last-child b{font-size:9px!important;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reference-kpi-grid--six .reference-kpi>span:last-child strong{font-size:17px!important;line-height:1.15;margin:2px 0 0;display:block!important}
+  .reference-kpi-grid--six .reference-kpi>span:last-child small{display:none!important}
+}
 .dashboard-reference-layout .unified-request-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
 .dashboard-reference-layout .unified-request-copy b{color:#0f172a;font-size:12px;font-weight:700;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dashboard-reference-layout .unified-request-copy small{color:#64748b;font-size:10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

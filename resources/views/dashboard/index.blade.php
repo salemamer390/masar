@@ -7,9 +7,10 @@
 
 @section('content')
 <div class="dashboard-command-bar dashboard-command-bar--reference" aria-label="إجراءات سريعة">
+  @php($shortActionLabels = ['موظف', 'إجازة', 'حضور', 'جزاء', 'طلب', 'رواتب'])
   @foreach($quickActions as $action)
     @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus','إصدار مسير الرواتب'=>'fa-circle-dollar-to-slot'])
-    <button type="button" class="dashboard-existing-action" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
+    <button type="button" class="dashboard-existing-action" data-short-label="{{ $shortActionLabels[$loop->index] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
   @endforeach
 </div>
 @if($companySubscription?->plan)

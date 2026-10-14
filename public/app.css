@@ -173,6 +173,71 @@ select {
   top: 10px;
   right: 10px;
 }
+
+/* Keep the notification counter consistent with the dashboard reference header. */
+.topbar .notification-dot {
+  min-width: 17px;
+  width: auto;
+  height: 17px;
+  padding: 0 4px;
+  top: 2px;
+  right: 2px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: #ef233c;
+}
+
+@media (max-width: 520px) {
+  /* Compact cards across the application while keeping the label and value readable. */
+  .stat-card,
+  .payroll-kpi-card,
+  .request-kpi-card,
+  .employee-kpi,
+  .ui-kpi-card {
+    min-height: 70px !important;
+    padding: 9px 10px !important;
+    gap: 9px !important;
+  }
+  .stat-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .stat-card .stat-icon,
+  .payroll-kpi-card .stat-icon,
+  .request-kpi-card .stat-icon,
+  .employee-kpi-icon,
+  .ui-kpi-icon {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    font-size: 17px !important;
+  }
+  .stat-card span,
+  .payroll-kpi-card span,
+  .request-kpi-card span {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+  }
+  .stat-card b,
+  .payroll-kpi-card b,
+  .request-kpi-card b {
+    display: block !important;
+    font-size: 18px !important;
+    line-height: 1.15 !important;
+    margin-top: 2px !important;
+  }
+  .stat-card small,
+  .payroll-kpi-card small,
+  .request-kpi-card small {
+    display: none !important;
+  }
+}
 .user-menu {
   display: flex;
   align-items: center;
