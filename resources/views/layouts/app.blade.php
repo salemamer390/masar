@@ -14,10 +14,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Prototype Stylesheet -->
-  <link href="{{ asset('styles.css') }}?v={{ @filemtime(public_path('styles.css')) }}" rel="stylesheet">
-  <link href="{{ asset('ux.css') }}?v={{ @filemtime(public_path('ux.css')) }}" rel="stylesheet">
-  <link href="{{ asset('design-system.css') }}?v={{ @filemtime(public_path('design-system.css')) }}" rel="stylesheet">
+  <!-- Application stylesheet (styles + ux + design-system merged; originals in _archive/public) -->
+  <link href="{{ asset('app.css') }}?v={{ @filemtime(public_path('app.css')) }}" rel="stylesheet">
   
   @stack('styles')
 </head>

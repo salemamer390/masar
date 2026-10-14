@@ -1,0 +1,674 @@
+/* MASAR responsive layer. Kept separate from the visual system so existing
+   colors, spacing and page-specific components remain unchanged. */
+
+html { overflow-x: hidden; }
+body { min-width: 320px; overflow-x: hidden; }
+.app-shell { min-width: 0; }
+.main, .content, .topbar, .page-head, .panel, .table-panel { min-width: 0; }
+.content { width: 100%; }
+.topbar { gap: 16px; }
+.topbar-search-area, .topbar-tools, .page-head > *, .panel-head > * { min-width: 0; }
+.topbar-search-area, .topbar-tools { display: flex; align-items: center; gap: 10px; }
+.topbar-date { white-space: nowrap; min-width: 0; }
+.topbar-date strong { overflow: hidden; text-overflow: ellipsis; }
+.sidebar-backdrop { display: none; }
+.table-responsive { -webkit-overflow-scrolling: touch; }
+img, svg, video, canvas { max-width: 100%; }
+input, select, textarea { max-width: 100%; }
+
+/* Desktop mini-sidebar. Labels collapse while the navigation stays usable. */
+@media (min-width: 992px) {
+  .app-shell .sidebar,
+  .app-shell .main { transition: width .24s ease, margin-right .24s ease, transform .24s ease, opacity .24s ease; }
+  .app-shell.sidebar-collapsed .sidebar {
+    width: 76px !important;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    padding: 18px 10px;
+    overflow-x: visible;
+  }
+  .app-shell.sidebar-collapsed .main { margin-right: 76px !important; width: calc(100% - 76px) !important; }
+  .app-shell.sidebar-collapsed .brand { justify-content: center; padding: 4px 0 18px; }
+  .app-shell.sidebar-collapsed .brand > div:not(.brand-icon),
+  .app-shell.sidebar-collapsed .side-section,
+  .app-shell.sidebar-collapsed .nav-item span,
+  .app-shell.sidebar-collapsed .system-status { display: none !important; }
+  .app-shell.sidebar-collapsed .nav-item {
+    position: relative;
+    justify-content: center;
+    width: 56px;
+    height: 48px;
+    margin: 4px auto;
+    padding: 0;
+    border-radius: 12px;
+  }
+  .app-shell.sidebar-collapsed .nav-item i { width: auto; margin: 0; font-size: 20px; }
+  .app-shell.sidebar-collapsed .nav-item::after {
+    content: attr(aria-label);
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%) translateX(4px);
+    width: max-content;
+    max-width: 220px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: #111d33;
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease;
+    z-index: 80;
+    box-shadow: 0 8px 18px rgba(0,0,0,.18);
+  }
+  .app-shell.sidebar-collapsed .nav-item:hover::after,
+  .app-shell.sidebar-collapsed .nav-item:focus-visible::after { opacity: 1; visibility: visible; transform: translateY(-50%) translateX(0); }
+  .app-shell.sidebar-collapsed .sidebar-bottom { padding: 12px 0 0; }
+}
+
+/* One shared header layout for every non-dashboard module. The dashboard has
+   its own visual skin, but the same three header zones must never overlap. */
+.topbar-reference {
+  display: grid !important;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  direction: ltr;
+  align-items: center;
+  min-height: 74px;
+  height: auto;
+  padding-inline: clamp(12px, 2.2vw, 30px);
+  gap: clamp(8px, 1.5vw, 18px);
+}
+.topbar-reference .topbar-tools,
+.topbar-reference .topbar-search-area,
+.topbar-reference .topbar-date { position: static !important; min-width: 0; }
+.topbar-reference .topbar-tools { grid-column: 1; grid-row: 1; justify-content: flex-start; }
+.topbar-reference .topbar-search-area { grid-column: 2; grid-row: 1; width: 100%; }
+.topbar-reference .topbar-date { grid-column: 3; grid-row: 1; direction: rtl; }
+.topbar-reference .global-search-reference { width: min(100%, 560px); max-width: 560px; margin-inline: auto; }
+.topbar-reference .topbar-tools .user-menu { white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .topbar-reference { grid-template-columns: auto 1fr auto; min-height: 68px; padding-block: 10px; }
+  .topbar-reference .topbar-tools { grid-column: 1; grid-row: 1; }
+  .topbar-reference .topbar-date { grid-column: 3; grid-row: 1; display: flex !important; max-width: 35vw; overflow: hidden; }
+  .topbar-reference .topbar-search-area { grid-column: 1 / -1; grid-row: 2; }
+  .topbar-reference .global-search-reference { max-width: none; }
+}
+
+@media (max-width: 520px) {
+  .topbar-reference { grid-template-columns: auto 1fr auto; min-height: 62px; padding-inline: 10px; }
+  .topbar-reference .topbar-date { font-size: 9px; max-width: 38vw; }
+  .topbar-reference .topbar-date strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-reference .topbar-tools { gap: 4px; }
+  .topbar-reference .topbar-tools .user-text,
+  .topbar-reference .topbar-tools .user-menu > i { display: none; }
+  .topbar-reference .topbar-tools .icon-btn { width: 36px; height: 36px; }
+  .topbar-reference .topbar-search-area { grid-column: 1 / -1; }
+}
+
+/* Normalize the desktop shell across every module. Previously the dashboard
+   used 220px while other pages inherited 285px, making the sidebar jump when
+   navigating between screens. */
+@media (min-width: 1101px) {
+  .app-shell:not(.sidebar-collapsed) .sidebar { width: 285px !important; }
+  .app-shell:not(.sidebar-collapsed) .main { width: calc(100% - 285px) !important; margin-right: 285px !important; }
+}
+@media (min-width: 992px) and (max-width: 1100px) {
+  .app-shell:not(.sidebar-collapsed) .sidebar { width: 245px !important; }
+  .app-shell:not(.sidebar-collapsed) .main { width: calc(100% - 245px) !important; margin-right: 245px !important; }
+}
+@media (max-width: 991.98px) {
+  .app-shell .sidebar { width: min(285px, 86vw) !important; right: calc(-1 * min(285px, 86vw)); }
+  .app-shell .sidebar.open { right: 0; }
+  .app-shell .main { width: 100% !important; margin-right: 0 !important; }
+}
+
+/* Shared topbar tools: keep notification, theme and user controls identical
+   on every page (not only the dashboard reference layout). */
+.topbar-reference .topbar-tools {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  direction: ltr;
+  gap: 10px;
+  min-width: max-content;
+  white-space: nowrap;
+}
+.topbar-reference .topbar-tools > .dropdown { flex: 0 0 auto; }
+.topbar-reference .topbar-tools .user-menu {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  direction: rtl;
+  padding: 0;
+  min-height: 42px;
+}
+.topbar-reference .topbar-tools .user-avatar { flex: 0 0 auto; }
+.topbar-reference .topbar-tools .icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 1px solid #dfe7f2;
+  border-radius: 14px;
+  background: #fff;
+  color: #16356d;
+  line-height: 1;
+}
+.topbar-reference .topbar-tools .icon-btn i { line-height: 1; }
+.topbar-reference .topbar-tools .notification-trigger { position: relative; }
+.topbar-reference .topbar-tools .notification-dot {
+  top: 5px;
+  right: 5px;
+  min-width: 10px;
+  width: auto;
+  height: 10px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 0;
+}
+.topbar-reference .notification-menu {
+  z-index: 1060;
+  min-width: 300px;
+  max-width: min(390px, calc(100vw - 24px));
+}
+.topbar-reference .dropdown-menu { direction: rtl; text-align: right; }
+
+@media (max-width: 767.98px) {
+  .topbar-reference .topbar-tools { gap: 6px; }
+  .topbar-reference .topbar-tools .icon-btn { width: 40px; height: 40px; min-width: 40px; border-radius: 12px; }
+  .topbar-reference .topbar-tools .user-avatar { width: 38px; height: 38px; }
+  .topbar-reference .topbar-tools .user-text { display: none; }
+  .topbar-reference .notification-menu { position: fixed !important; top: 68px !important; left: 10px !important; right: 10px !important; width: auto; min-width: 0; max-width: none; transform: none !important; }
+}
+
+/* Leave management has five KPI cards and a dense filter row; keep both
+   layouts deterministic instead of allowing flex items to jump between rows. */
+.leaves-page { min-width: 0; }
+.content:has(.leaves-page) { animation: none !important; }
+.leaves-page .stat-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.leaves-page .filter-bar { align-items: stretch; }
+.leaves-page .filter-bar > * { min-width: 0; flex: 1 1 150px; }
+.leaves-page .table-panel { min-width: 0; }
+@media (max-width: 1199.98px) {
+  .leaves-page .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+  .leaves-page .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .leaves-page .filter-bar { gap: 8px !important; }
+  .leaves-page .filter-bar > * { flex: 1 1 calc(50% - 8px); width: auto; }
+  .leaves-page .filter-bar .btn { width: auto; }
+}
+@media (max-width: 480px) {
+  .leaves-page .stat-grid { grid-template-columns: 1fr; }
+  .leaves-page .filter-bar > * { flex-basis: 100%; width: 100%; }
+  .leaves-page .filter-bar .btn { width: 100%; }
+}
+
+/* Medium screens: retain the desktop navigation while giving content more room. */
+@media (max-width: 1199.98px) {
+  .content { padding-left: 22px; padding-right: 22px; }
+  .topbar { padding-left: 22px; padding-right: 22px; }
+  .topbar-date { font-size: 12px; }
+  .global-search-reference { width: min(300px, 34vw); }
+  .page-head h1 { font-size: 24px; }
+  .dashboard-grid, .profile-grid { gap: 14px; }
+  .module-flow { justify-content: stretch; }
+  .flow-card { flex: 1 1 120px; min-width: 0; }
+  .salary-layout { gap: 14px; }
+}
+
+/* Tablets and phones use the existing hamburger as a slide-in navigation. */
+@media (max-width: 991.98px) {
+  .sidebar { right: -285px; width: 285px; transition: right .24s ease, box-shadow .24s ease; }
+  .sidebar.open { right: 0; box-shadow: -18px 0 44px rgba(11,31,85,.22); }
+  .main { margin-right: 0 !important; width: 100% !important; }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 19; border: 0; padding: 0; background: rgba(7,18,40,.48); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .2s ease, visibility .2s ease; }
+  body:has(.sidebar.open) .sidebar-backdrop { opacity: 1; visibility: visible; pointer-events: auto; }
+  .sidebar-hamburger { display: none !important; }
+  .topbar { height: 76px; padding-left: 16px; padding-right: 16px; }
+  .topbar-search-area { flex: 1 1 auto; }
+  .topbar-tools { flex: 0 0 auto; }
+  .global-search-reference { width: min(360px, 42vw); }
+  .user-text { max-width: 150px; }
+  .user-text strong, .user-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .content { padding: 22px 18px 40px; }
+  .page-head { align-items: flex-start; gap: 14px; }
+  .page-head > :last-child { flex: 0 0 auto; }
+  .panel-head { gap: 12px; flex-wrap: wrap; }
+  .panel-head > form, .panel-head > .btn, .panel-head > .btn-group { max-width: 100%; }
+  .filter-bar { flex-wrap: wrap; }
+  .filter-bar > * { flex: 1 1 180px; max-width: none; min-width: 0; }
+  .filter-bar .search-table { flex-basis: 100%; }
+  .table-panel { overflow: hidden; }
+  .table-responsive { width: 100%; overflow-x: auto; }
+  .table { min-width: 680px; }
+  .modal-dialog { margin: 12px auto; max-width: calc(100% - 24px); }
+  .modal-dialog.modal-xl, .modal-dialog.modal-lg { max-width: calc(100% - 24px); }
+  .modal-body { max-height: calc(100dvh - 170px); overflow-y: auto; }
+  .form-row, .form-grid { min-width: 0; }
+}
+
+@media (max-width: 767.98px) {
+  .content { padding: 18px 12px 32px; }
+  .topbar { height: 68px; gap: 8px; }
+  .topbar-date { display: none; }
+  .topbar-search-area { order: 1; }
+  .topbar-tools { order: 2; gap: 6px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .global-search-reference { width: auto; flex: 1 1 auto; }
+  .global-search-reference input { min-width: 0; }
+  .user-text { display: none; }
+  .user-menu { padding: 0; }
+  .user-avatar { width: 38px; height: 38px; }
+  .page-head { flex-direction: column; margin-bottom: 16px; }
+  .page-head > :last-child { width: 100%; }
+  .page-head > :last-child .btn, .page-head > :last-child .btn-group { width: 100%; }
+  .page-head h1 { font-size: 21px; line-height: 1.35; }
+  .page-head p { font-size: 11px; }
+  .panel-head { padding: 14px; }
+  .panel-head h3 { font-size: 14px; }
+  .panel-head span { display: block; line-height: 1.6; }
+  .panel-body, .table-panel { max-width: 100%; }
+  .stat-grid, .employee-kpi-grid, .payroll-employee-kpi-grid, .salary-layout, .report-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-grid, .profile-grid, .master-layout { grid-template-columns: 1fr; }
+  .dashboard-command-bar, .reference-kpi-grid, .reference-kpi-grid--six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .module-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .flow-arrow { display: none; }
+  .module-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .salary-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 12px; }
+  .profile-head { padding: 15px; }
+  .profile-actions { width: 100%; flex-wrap: wrap; }
+  .profile-actions .btn { flex: 1 1 140px; }
+  .profile-tabs { margin-bottom: 12px; padding: 4px; }
+  .profile-tab { padding: 9px 10px; font-size: 10px; }
+  .employee-salary-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+  .employee-salary-row > div:last-child { grid-column: 1 / -1; }
+  .panel-head .payroll-inline-filter form { flex-wrap: wrap; }
+  .panel-head .payroll-inline-filter .col-md-3 { flex: 1 1 180px; width: auto; }
+  .panel-head .payroll-inline-filter .col-md-2 { flex: 1 1 auto; }
+  .toast-container { z-index: 1100; }
+  .notification-live-alert { width: calc(100vw - 24px); }
+}
+
+@media (max-width: 575.98px) {
+  .topbar-tools .dropdown-menu { max-width: calc(100vw - 24px); }
+  .content { padding-left: 10px; padding-right: 10px; }
+  .stat-grid, .employee-kpi-grid, .payroll-employee-kpi-grid, .salary-layout, .report-grid, .dashboard-command-bar, .reference-kpi-grid, .reference-kpi-grid--six { grid-template-columns: 1fr; }
+  .stat-card, .employee-kpi { min-height: 90px; padding: 13px; }
+  .stat-card b { font-size: 21px; }
+  .employee-kpi strong { font-size: 27px; }
+  .module-row { grid-template-columns: 1fr; }
+  .module-flow { grid-template-columns: 1fr; }
+  .flow-card { width: 100%; }
+  .salary-detail-grid, .details-grid { grid-template-columns: 1fr; }
+  .filter-bar > * { flex-basis: 100%; width: 100%; }
+  .filter-bar .btn { width: 100%; }
+  .table { min-width: 620px; }
+  .table th, .table td { padding: 11px 10px; }
+  .modal-dialog, .modal-dialog.modal-xl, .modal-dialog.modal-lg { margin: 8px; max-width: calc(100% - 16px); }
+  .modal-content { border-radius: 12px; }
+  .modal-header, .modal-footer { padding: 12px 14px; }
+  .modal-body { padding: 14px; max-height: calc(100dvh - 145px); }
+  .modal-footer { flex-wrap: wrap; gap: 8px; }
+  .modal-footer .btn { flex: 1 1 120px; }
+  .form-control, .form-select { min-height: 40px; }
+  .btn { min-height: 38px; }
+  .notification-menu { position: fixed !important; top: 62px !important; left: 10px !important; right: 10px !important; width: auto; transform: none !important; }
+  .notification-live-alert { top: 72px; }
+}
+
+@media (max-width: 380px) {
+  .topbar { padding-left: 10px; padding-right: 10px; }
+  .topbar-tools { gap: 3px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .user-avatar { width: 34px; height: 34px; }
+  .page-head h1 { font-size: 19px; }
+  .panel-head { padding: 12px; }
+  .table { min-width: 560px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Final adaptive pass
+   A single, predictable layer for edge cases that appear across the Blade
+   screens (long Arabic labels, narrow phones, keyboards and safe areas).
+   ------------------------------------------------------------------------- */
+:root {
+  --layout-gutter: clamp(10px, 2.2vw, 32px);
+  --content-max: 1560px;
+}
+
+html { min-width: 320px; scrollbar-gutter: stable; }
+body { min-height: 100dvh; }
+.app-shell { width: 100%; min-height: 100dvh; }
+.main { min-width: 0; overflow-x: hidden; }
+.main > .content { min-width: 0; overflow-x: hidden; }
+@media (min-width: 801px){
+  .app-shell:not(.sidebar-collapsed) .main{overflow-x:hidden!important}
+  .app-shell:not(.sidebar-collapsed) .content{overflow-x:hidden!important}
+  .app-shell:not(.sidebar-collapsed) .stat-grid,.app-shell:not(.sidebar-collapsed) .filter-bar,.app-shell:not(.sidebar-collapsed) .page-head{min-width:0;max-width:100%}
+  .app-shell:not(.sidebar-collapsed) .stat-grid>*{min-width:0}
+}
+.content { width: min(100%, var(--content-max)); padding-inline: var(--layout-gutter); }
+
+/* Long Arabic text must shrink inside flex/grid tracks instead of creating a
+   second horizontal page. */
+.page-head > *, .panel-head > *, .profile-head > *, .profile-main,
+.employee-kpi > *, .stat-card > *, .reference-kpi > *, .doc-info,
+.notification-item > *, .dropdown-menu, .alert, .form-group, .row > [class*="col-"] {
+  min-width: 0;
+}
+.page-head h1, .panel-head h3, .profile-main h1, .doc-name,
+.employee-kpi b, .employee-kpi small, .stat-card span, .reference-kpi small,
+.table td, .table th { overflow-wrap: anywhere; }
+
+/* Keep controls usable with touch and keyboard input. */
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid rgba(22, 119, 255, .35);
+  outline-offset: 2px;
+}
+button, .btn, .icon-btn, .nav-item { touch-action: manipulation; }
+.icon-btn, .sidebar-hamburger { flex: 0 0 auto; }
+.btn-group { max-width: 100%; flex-wrap: wrap; }
+.btn-group > .btn { flex: 0 1 auto; }
+
+/* Scroll containers are visually contained and easy to use on touch devices. */
+.table-responsive, .table-panel, .master-rows, .profile-tabs {
+  scrollbar-width: thin;
+  scrollbar-color: #b8c8df transparent;
+}
+.table-responsive { overscroll-behavior-inline: contain; }
+.table-responsive > .table { width: max-content; min-width: 100%; }
+.table-panel > .table { width: max-content; min-width: 100%; }
+.table td, .table th { max-width: 30rem; }
+
+/* The mobile drawer should own the viewport while it is open. */
+@media (max-width: 991.98px) {
+  body:has(.sidebar.open) { overflow: hidden; }
+  .sidebar { padding-top: max(18px, env(safe-area-inset-top)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .topbar { padding-inline-start: max(12px, env(safe-area-inset-left)); padding-inline-end: max(12px, env(safe-area-inset-right)); }
+  .content { padding-top: clamp(16px, 3vw, 24px); padding-bottom: max(32px, env(safe-area-inset-bottom)); }
+  .page-head, .documents-page-head, .profile-section-head { align-items: flex-start; }
+  .page-head > :last-child, .documents-page-head > :last-child { width: auto; max-width: 100%; }
+  .page-head > :last-child .btn-group { justify-content: flex-end; }
+  .panel-head > form, .panel-head > .btn-group { flex: 1 1 260px; }
+  .panel-head > form .form-control, .panel-head > form .form-select { width: 100%; }
+  .modal-dialog { max-height: calc(100dvh - 16px); }
+  .modal-content { max-height: calc(100dvh - 16px); }
+}
+
+@media (max-width: 767.98px) {
+  .topbar-reference .topbar-tools { order: 1; }
+  .topbar-reference .topbar-search-area { order: 3; }
+  .topbar-reference .topbar-date { order: 2; }
+  .topbar-search-area { min-width: 0; }
+  .global-search-reference { min-width: 0; }
+  .global-search-reference input { font-size: 12px; }
+  .page-head > :last-child, .page-head > :last-child .btn-group { width: 100%; }
+  .page-head > :last-child .btn, .page-head > :last-child a.btn { flex: 1 1 130px; }
+  .filter-bar { align-items: stretch; }
+  .filter-bar > * { min-height: 40px; }
+  .filter-bar .search-table { flex-basis: 100%; }
+  .panel-head { align-items: flex-start; }
+  .panel-head > .btn, .panel-head > a.btn { flex: 1 1 130px; }
+  .profile-head { gap: 12px; }
+  .profile-main { align-items: flex-start; }
+  .profile-main h1 { font-size: clamp(18px, 5vw, 23px); }
+  .profile-actions { width: 100%; }
+  .profile-actions .btn { flex: 1 1 130px; }
+  .toast-container { inset-inline: 8px !important; width: auto; padding-inline: 0 !important; }
+  .toast { width: 100%; }
+}
+
+@media (max-width: 430px) {
+  .content { padding-inline: 8px; }
+  .topbar-reference { padding-inline: 8px; }
+  .topbar-tools { gap: 4px; }
+  .topbar-tools .icon-btn { width: 36px; height: 36px; }
+  .topbar-reference .topbar-date { max-width: 42vw; overflow: hidden; }
+  .topbar-reference .topbar-date strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel-head, .panel-body { padding-inline: 12px; }
+  .panel-head > .btn, .panel-head > a.btn, .panel-head > .btn-group { width: 100%; }
+  .panel-head > .btn-group > .btn { flex: 1 1 110px; }
+  .modal-dialog, .modal-dialog.modal-lg, .modal-dialog.modal-xl { margin-inline: 6px; width: calc(100% - 12px); }
+  .modal-header, .modal-footer { padding-inline: 12px; }
+  .table { min-width: 560px; }
+  .empty-page { min-height: 42vh; padding: 24px 14px; }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .topbar { min-height: 60px; height: 60px; }
+  .sidebar { padding-block: 12px; }
+  .modal-body { max-height: calc(100dvh - 118px); }
+}
+
+@media print {
+  .sidebar, .topbar, .sidebar-backdrop, .toast-container,
+  .notification-live-alert, .page-head .btn, .no-print { display: none !important; }
+  .main { margin: 0 !important; width: 100% !important; }
+  .content { max-width: none; padding: 0; }
+  .panel, .table-panel, .profile-head, .salary-card, .report-card { box-shadow: none !important; break-inside: avoid; }
+  .table-responsive, .table-panel { overflow: visible !important; }
+  .table-responsive > .table, .table-panel > .table { width: 100%; min-width: 0; }
+}
+
+/* Stable global header geometry. Page-specific dashboard CSS may add visual
+   decoration, but it must not change the shared header flow. */
+.topbar-reference {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.topbar-reference .topbar-tools { order: 1; flex: 0 0 auto; position: static; }
+.topbar-reference .topbar-search-area { order: 2; flex: 1 1 auto; min-width: 0; }
+.topbar-reference .topbar-date { order: 3; flex: 0 1 auto; min-width: 0; }
+.topbar-reference .global-search-reference { width: min(100%, 560px); max-width: 560px; }
+
+@media (max-width: 991.98px) {
+  .topbar-reference { min-height: 72px; height: auto; padding-block: 10px; }
+  .topbar-reference .topbar-tools { position: static; }
+  .topbar-reference .topbar-search-area { min-width: 0; }
+  .topbar-reference .topbar-date { font-size: 11px; }
+}
+
+@media (max-width: 767.98px) {
+  .topbar-reference { flex-wrap: wrap; row-gap: 8px; }
+  .topbar-reference .topbar-tools { order: 1; }
+  .topbar-reference .topbar-date { display: flex !important; order: 2; margin-inline-start: auto; max-width: 46vw; font-size: 10px; }
+  .topbar-reference .topbar-search-area { order: 3; flex: 1 0 100%; width: 100%; }
+  .topbar-reference .global-search-reference { width: 100%; max-width: none; }
+}
+
+/* Desktop mini-sidebar: keep the content width in lockstep with the drawer. */
+@media (min-width: 992px) {
+  .app-shell .sidebar, .app-shell .main { transition: width .24s ease, margin-right .24s ease, transform .24s ease, opacity .24s ease; }
+  .app-shell.sidebar-collapsed .sidebar { width: 76px !important; padding-inline: 10px; transform: none !important; opacity: 1 !important; pointer-events: auto !important; overflow-x: visible; }
+  .app-shell.sidebar-collapsed .main { width: calc(100% - 76px) !important; margin-right: 76px !important; }
+  .app-shell.sidebar-collapsed .brand { justify-content: center; padding-inline: 0; }
+  .app-shell.sidebar-collapsed .brand > div:not(.brand-icon),
+  .app-shell.sidebar-collapsed .side-section,
+  .app-shell.sidebar-collapsed .nav-item span,
+  .app-shell.sidebar-collapsed .system-status { display: none !important; }
+  .app-shell.sidebar-collapsed .nav-item { position: relative; width: 56px; height: 48px; margin: 4px auto; padding: 0; justify-content: center; }
+  .app-shell.sidebar-collapsed .nav-item i { width: auto; margin: 0; font-size: 20px; }
+  .app-shell.sidebar-collapsed .nav-item::after { content: attr(aria-label); position: absolute; right: calc(100% + 10px); top: 50%; z-index: 80; padding: 7px 10px; border-radius: 8px; background: #111d33; color: #fff; font-size: 11px; line-height: 1.4; white-space: nowrap; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-50%) translateX(4px); transition: opacity .16s ease, transform .16s ease; box-shadow: 0 8px 18px rgba(0,0,0,.18); }
+  .app-shell.sidebar-collapsed .nav-item:hover::after, .app-shell.sidebar-collapsed .nav-item:focus-visible::after { opacity: 1; visibility: visible; transform: translateY(-50%); }
+}
+
+/* Final header override: shared by insurance, requests, settings,
+   subscriptions and users as well as the dashboard. */
+@media (min-width: 901px) {
+  .topbar-reference { display: grid !important; grid-template-columns: auto minmax(180px, 1fr) auto; direction: ltr; align-items: center; min-height: 74px; height: auto; }
+  .topbar-reference .topbar-tools { grid-column: 1; grid-row: 1; position: static !important; }
+  .topbar-reference .topbar-search-area { grid-column: 2; grid-row: 1; position: static !important; width: 100%; }
+  .topbar-reference .topbar-date { grid-column: 3; grid-row: 1; position: static !important; display: flex !important; direction: rtl; }
+}
+@media (max-width: 900px) {
+  .topbar-reference { display: grid !important; grid-template-columns: auto 1fr auto; direction: ltr; min-height: 68px; height: auto; padding-block: 10px; }
+  .topbar-reference .topbar-tools { grid-column: 1; grid-row: 1; position: static !important; }
+  .topbar-reference .topbar-date { grid-column: 3; grid-row: 1; position: static !important; display: flex !important; max-width: 38vw; direction: rtl; overflow: hidden; }
+  .topbar-reference .topbar-search-area { grid-column: 1 / -1; grid-row: 2; position: static !important; width: 100%; padding: 0 !important; }
+  .topbar-reference .global-search-reference { width: 100%; max-width: none; }
+}
+@media (max-width: 520px) {
+  .topbar-reference { min-height: 62px; padding-inline: 10px; }
+  .topbar-reference .topbar-date { font-size: 9px; }
+  .topbar-reference .topbar-date strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar-reference .topbar-tools { gap: 4px; }
+  .topbar-reference .topbar-tools .user-text, .topbar-reference .topbar-tools .user-menu > i { display: none; }
+  .topbar-reference .topbar-tools .icon-btn { width: 36px; height: 36px; }
+}
+
+/* Final notification/header control normalization for every module. */
+.topbar-reference .topbar-tools { display:flex !important; align-items:center; justify-content:flex-start; direction:ltr; gap:10px; min-width:max-content; white-space:nowrap; }
+.topbar-reference .topbar-tools > .dropdown { flex:0 0 auto; }
+.topbar-reference .topbar-tools .user-menu { display:flex; align-items:center; gap:9px; direction:rtl; padding:0; min-height:42px; }
+.topbar-reference .topbar-tools .icon-btn { display:inline-grid; place-items:center; width:44px; height:44px; min-width:44px; padding:0; border:1px solid #dfe7f2; border-radius:14px; background:#fff; color:#16356d; line-height:1; }
+.topbar-reference .topbar-tools .notification-trigger { position:relative; }
+.topbar-reference .topbar-tools .notification-dot { top:5px; right:5px; min-width:10px; width:auto; height:10px; padding:0; border:2px solid #fff; border-radius:50%; font-size:0; }
+.topbar-reference .notification-menu { z-index:1060; min-width:300px; max-width:min(390px,calc(100vw - 24px)); }
+.topbar-reference .dropdown-menu { direction:rtl; text-align:right; }
+@media (max-width:767.98px) {
+  .topbar-reference .topbar-tools { gap:6px; }
+  .topbar-reference .topbar-tools .icon-btn { width:40px; height:40px; min-width:40px; border-radius:12px; }
+  .topbar-reference .topbar-tools .user-avatar { width:38px; height:38px; }
+  .topbar-reference .topbar-tools .user-text { display:none; }
+  .topbar-reference .notification-menu { position:fixed !important; top:68px !important; left:10px !important; right:10px !important; width:auto; min-width:0; max-width:none; transform:none !important; }
+}
+
+/* Dashboard keeps its approved reference header styling. The global header
+   normalization above applies to the other modules only. */
+body:has(.reference-kpi-grid--six) .topbar-reference .topbar-tools { gap: 12px; direction: ltr; }
+body:has(.reference-kpi-grid--six) .topbar-reference .topbar-tools .icon-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #09245b;
+}
+body:has(.reference-kpi-grid--six) .topbar-reference .topbar-tools .icon-btn:hover {
+  background: #f1f6ff;
+  color: #1769e0;
+}
+body:has(.reference-kpi-grid--six) .topbar-reference .topbar-tools .user-avatar { width: 39px; height: 39px; }
+body:has(.reference-kpi-grid--six) .topbar-reference .topbar-tools .notification-dot {
+  top: 2px;
+  right: 2px;
+  min-width: 17px;
+  width: auto;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* Apply the same approved dashboard header treatment to all other screens. */
+body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools { gap: 12px; direction: ltr; }
+body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools .icon-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #09245b;
+}
+body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools .icon-btn:hover {
+  background: #f1f6ff;
+  color: #1769e0;
+}
+body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools .user-avatar { width: 39px; height: 39px; }
+body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools .notification-dot {
+  top: 2px;
+  right: 2px;
+  min-width: 17px;
+  width: auto;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid #fff;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  line-height: 1;
+}
+@media (max-width: 767.98px) {
+  body:not(:has(.reference-kpi-grid--six)) .topbar-reference .topbar-tools .icon-btn { width: 40px; height: 40px; min-width: 40px; }
+}
+
+/* Final shell normalization across all modules. */
+@media (min-width: 1101px) {
+  .app-shell:not(.sidebar-collapsed) .sidebar { width: 285px !important; }
+  .app-shell:not(.sidebar-collapsed) .main { width: calc(100% - 285px) !important; margin-right: 285px !important; }
+}
+@media (min-width: 992px) and (max-width: 1100px) {
+  .app-shell:not(.sidebar-collapsed) .sidebar { width: 245px !important; }
+  .app-shell:not(.sidebar-collapsed) .main { width: calc(100% - 245px) !important; margin-right: 245px !important; }
+}
+@media (max-width: 991.98px) {
+  .app-shell .sidebar { width: min(285px, 86vw) !important; right: calc(-1 * min(285px, 86vw)) !important; }
+  .app-shell .sidebar.open { right: 0 !important; }
+  .app-shell .main { width: 100% !important; margin-right: 0 !important; }
+}
+
+@media (min-width:1101px){
+  .app-shell:not(.sidebar-collapsed) .main{margin-right:285px!important;width:calc(100% - 285px)!important;max-width:calc(100% - 285px);overflow-x:hidden}
+  .app-shell:not(.sidebar-collapsed) .content{min-width:0;max-width:100%;overflow-x:hidden}
+  .app-shell:not(.sidebar-collapsed) .table-responsive,.app-shell:not(.sidebar-collapsed) .table-panel{max-width:100%;overflow-x:auto}
+}
+.sidebar-collapse-btn{margin-right:auto;width:34px;height:34px;border:1px solid rgba(255,255,255,.16);border-radius:9px;background:rgba(255,255,255,.07);color:#fff;display:grid;place-items:center;flex:0 0 auto;font-size:19px;cursor:pointer}.sidebar-collapse-btn:hover{background:rgba(255,255,255,.15)}
+@media (min-width:801px){.app-shell.sidebar-collapsed .brand{display:grid!important;grid-template-columns:1fr;gap:8px;padding:4px 0 12px!important}.app-shell.sidebar-collapsed .brand-icon{margin:auto}.app-shell.sidebar-collapsed .sidebar-collapse-btn{display:grid!important;margin:auto;width:48px;height:40px}.app-shell.sidebar-collapsed .sidebar-collapse-btn i{font-size:22px}}
+
+/* Reserve the drawer's actual rendered width. Fixed sidebars are removed from
+   flex flow, so a hard-coded calc can let wide cards slide underneath them
+   when zoom, fonts, or a page-specific rule changes the drawer width. */
+@media (min-width:992px){
+  .app-shell:not(.sidebar-collapsed) .main{
+    width:calc(100% - var(--sidebar-space, 285px)) !important;
+    max-width:none !important;
+    margin-right:var(--sidebar-space, 285px) !important;
+    overflow-x:hidden !important;
+  }
+  .app-shell:not(.sidebar-collapsed) .content{
+    width:100% !important;
+    max-width:1550px;
+    min-width:0;
+  }
+}
+
+/* Shared page sizing: every module uses the space left by the drawer instead
+   of relying on a page-specific fixed width. */
+@media (min-width: 992px) {
+  .app-shell .sidebar,
+  .app-shell .main { will-change: width, margin-right; }
+  .app-shell .sidebar { transition: width .28s cubic-bezier(.22,.61,.36,1), transform .28s cubic-bezier(.22,.61,.36,1), opacity .18s ease; }
+  .app-shell .main { transition: width .28s cubic-bezier(.22,.61,.36,1), margin-right .28s cubic-bezier(.22,.61,.36,1); }
+  .app-shell:not(.sidebar-collapsed) .content > * { max-width: 100%; min-width: 0; }
+  .app-shell:not(.sidebar-collapsed) .stat-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); min-width: 0; }
+  .app-shell:not(.sidebar-collapsed) .stat-grid > * { min-width: 0; }
+  .app-shell:not(.sidebar-collapsed) .filter-bar { width: 100%; max-width: 100%; min-width: 0; }
+  .app-shell:not(.sidebar-collapsed) .filter-bar > .form-control,
+  .app-shell:not(.sidebar-collapsed) .filter-bar > .form-select { min-width: 0; }
+  .app-shell:not(.sidebar-collapsed) .table-panel { max-width: 100%; min-width: 0; overflow: hidden; }
+  .app-shell:not(.sidebar-collapsed) .table-panel > .table-responsive { max-width: 100%; min-width: 0; overflow-x: auto; }
+}

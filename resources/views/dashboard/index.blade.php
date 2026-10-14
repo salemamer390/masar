@@ -2,7 +2,7 @@
 @section('title', 'لوحة التحكم')
 @push('styles')
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" referrerpolicy="no-referrer">
-<link href="{{ asset('dashboard-reference.css') }}?v={{ @filemtime(public_path('dashboard-reference.css')) }}" rel="stylesheet">
+<link href="{{ asset('dashboard-reference.css') }}" rel="stylesheet">
 @endpush
 
 @section('content')
