@@ -84,7 +84,9 @@ class SubscriptionPlanController extends Controller
                 'is_active' => true,
             ]);
             $sourceId = Company::whereKeyNot($company->id)->oldest('id')->value('id');
-            foreach (['payroll_calculation_settings','payroll_allowance_settings','leave_policy_settings','hr_operational_settings','hr_holidays','insurance_organization_settings'] as $table) {
+            // بيانات المنشأة التأمينية خاصة بكل شركة، لذلك تبدأ الشركة الجديدة
+            // بدون بيانات منشأة موروثة من شركة أخرى.
+            foreach (['payroll_calculation_settings','payroll_allowance_settings','leave_policy_settings','hr_operational_settings','hr_holidays'] as $table) {
                 if (!$sourceId) continue;
                 $rows = DB::table($table)->where('company_id',$sourceId)->get();
                 foreach ($rows as $row) { $copy=(array)$row; unset($copy['id']); $copy['company_id']=$company->id; $copy['created_at']=now(); $copy['updated_at']=now(); DB::table($table)->insert($copy); }
