@@ -23,6 +23,7 @@
 </head>
 <body>
 <div class="app-shell">
+  <script>try{if(localStorage.getItem('masar_sidebar_collapsed')==='1')document.currentScript.parentElement.classList.add('sidebar-collapsed')}catch(e){}</script>
   @include('layouts.sidebar')
 
   <main class="main">
@@ -204,19 +205,30 @@
   });
   document.addEventListener('DOMContentLoaded', () => {
     const shell = document.querySelector('.app-shell');
-    const toggle = document.getElementById('sidebarToggleBtn');
-    if (!shell || !toggle) return;
+    const toggles = document.querySelectorAll('[data-sidebar-toggle]');
+    if (!shell || !toggles.length) return;
+
+    // تلميح باسم الصفحة عند مرور الماوس على الأيقونة وهي في وضع الشريط
+    document.querySelectorAll('.sidebar .nav-item').forEach(link => {
+      const label = link.querySelector('span')?.textContent.trim();
+      if (label && !link.title) link.title = label;
+    });
+
     const applySidebarState = (collapsed) => {
       shell.classList.toggle('sidebar-collapsed', collapsed);
-      toggle.setAttribute('aria-label', collapsed ? 'إظهار القائمة الجانبية' : 'إخفاء القائمة الجانبية');
-      toggle.setAttribute('title', collapsed ? 'إظهار القائمة الجانبية' : 'إخفاء القائمة الجانبية');
+      const text = collapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية';
+      toggles.forEach(btn => {
+        btn.setAttribute('aria-label', text);
+        btn.setAttribute('title', text);
+      });
     };
-    applySidebarState(localStorage.getItem('masar_sidebar_collapsed') === '1');
-    toggle.addEventListener('click', () => {
+    applySidebarState(shell.classList.contains('sidebar-collapsed'));
+
+    toggles.forEach(btn => btn.addEventListener('click', () => {
       const collapsed = !shell.classList.contains('sidebar-collapsed');
-      localStorage.setItem('masar_sidebar_collapsed', collapsed ? '1' : '0');
+      try { localStorage.setItem('masar_sidebar_collapsed', collapsed ? '1' : '0'); } catch (e) {}
       applySidebarState(collapsed);
-    });
+    }));
   });
 
   // Dark mode toggle with persistence

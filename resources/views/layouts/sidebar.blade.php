@@ -1,5 +1,5 @@
 <aside class="sidebar" id="sidebar">
-  <div class="brand"><div class="brand-icon"><i class="bi bi-diamond-fill"></i></div><div><div class="brand-title">تزامن</div><small>لتقنية المعلومات</small></div></div>
+  <div class="brand"><div class="brand-icon"><i class="bi bi-diamond-fill"></i></div><div><div class="brand-title">تزامن</div><small>لتقنية المعلومات</small></div><button type="button" class="sidebar-collapse-btn" data-sidebar-toggle aria-label="طي القائمة الجانبية" title="طي القائمة الجانبية"><i class="bi bi-chevron-double-right"></i></button></div>
   <div class="side-section">الرئيسية</div>
   @if(auth()->user()?->hasPermission('dashboard.view') && auth()->user()?->role?->name !== 'employee')<a href="{{ route('dashboard') }}" class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>@endif
   <div class="side-section">إدارة الموظفين</div>
