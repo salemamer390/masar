@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ActivityLog;
+use App\Notifications\PlatformCompanyAnnouncement;
 class SubscriptionPlanController extends Controller
 {
     public function index()
@@ -111,5 +112,37 @@ class SubscriptionPlanController extends Controller
         $company->update($data);
         ActivityLog::record('subscription_company_status', "تم تحديث حالة الشركة: {$company->name}.", $company, null, $company->toArray(), 'subscriptions');
         return back()->with('toast','تم تحديث حالة الشركة.');
+    }
+
+    public function sendAnnouncement(Request $request)
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:2000'],
+            'audience' => ['required', 'in:all,company'],
+            'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
+        if ($data['audience'] === 'company' && empty($data['company_id'])) {
+            return back()->withErrors(['company_id' => 'يرجى اختيار الشركة المستهدفة.']);
+        }
+
+        $recipients = User::query()
+            ->where('is_active', true)
+            ->whereNotNull('company_id')
+            ->when($data['audience'] === 'company', fn ($query) => $query->where('company_id', $data['company_id']))
+            ->get();
+
+        $recipients->each->notify(new PlatformCompanyAnnouncement($data['message']));
+
+        ActivityLog::record(
+            'company_announcement',
+            $data['audience'] === 'all' ? 'Company-wide announcement sent.' : 'Company announcement sent.',
+            null,
+            null,
+            ['audience' => $data['audience'], 'company_id' => $data['company_id'] ?? null, 'recipients' => $recipients->count()],
+            'subscriptions'
+        );
+
+        return back()->with('toast', "تم إرسال الإشعار إلى {$recipients->count()} مستخدم.");
     }
 }

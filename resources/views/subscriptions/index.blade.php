@@ -1,6 +1,17 @@
 @extends('layouts.app')
 @section('title','إدارة الباقات والشركات')
 @section('content')
+<div class="panel mb-4"><div class="panel-head"><div><h3>إرسال إشعار للشركات</h3><span>يرسل الإشعار إلى المستخدمين النشطين داخل شركة محددة أو جميع الشركات.</span></div></div><form method="POST" action="{{ route('subscriptions.announcements.send') }}" class="p-3 row g-3">@csrf<div class="col-md-3"><label class="form-label">نطاق الإرسال</label><select name="audience" id="announcementAudience" class="form-select" required><option value="all">جميع الشركات</option><option value="company">شركة محددة</option></select></div><div class="col-md-4"><label class="form-label">الشركة</label><select name="company_id" id="announcementCompany" class="form-select"><option value="">اختر الشركة</option>@foreach($companies as $company)<option value="{{ $company->id }}">{{ $company->name }}</option>@endforeach</select></div><div class="col-12"><label class="form-label">نص الإشعار</label><textarea name="message" class="form-control" rows="3" maxlength="2000" required placeholder="اكتب رسالة الإشعار..."></textarea></div><div class="col-12"><button class="btn btn-primary">إرسال الإشعار</button></div></form></div>
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const audience = document.getElementById('announcementAudience');
+    const company = document.getElementById('announcementCompany');
+    const sync = () => { company.disabled = audience.value !== 'company'; if (company.disabled) company.value = ''; };
+    audience?.addEventListener('change', sync); sync();
+});
+</script>
+@endpush
 <div class="page-head"><div><h1>إدارة الباقات والشركات</h1><p>تحكم في حدود الموظفين ومزايا كل باقة وقائمة الشركات المشتركة.</p></div></div>
 <div class="row g-3 mb-4">
     <div class="col-md-3"><div class="panel p-3"><small class="text-muted d-block">الشركات النشطة</small><strong class="fs-4">{{ format_number($activeCompanies) }}</strong></div></div>

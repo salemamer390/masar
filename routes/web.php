@@ -47,6 +47,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::put('/companies/{company}/subscription', [SubscriptionPlanController::class, 'updateCompanySubscription'])->name('companies.subscription.update');
         Route::put('/companies/{company}/status', [SubscriptionPlanController::class, 'updateCompanyStatus'])->name('companies.status.update');
         Route::put('/renewals/{renewal}', [SubscriptionRenewalController::class, 'update'])->name('renewals.update');
+        Route::post('/announcements', [SubscriptionPlanController::class, 'sendAnnouncement'])->name('announcements.send');
     });
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
