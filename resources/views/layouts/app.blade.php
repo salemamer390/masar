@@ -148,6 +148,30 @@
       const filter = head.previousElementSibling;
       if (filter?.classList.contains('filter-bar')) head.after(filter);
     });
+
+    // Keep every listing filter consistent with the employee filter: changing
+    // a select applies immediately, while reset removes all query filters.
+    const filterForms = document.querySelectorAll(
+      'form.filter-bar, form.documents-toolbar, form.salary-filter-bar, form.panel-filter, .panel > form.row.g-2.align-items-end'
+    );
+    filterForms.forEach((form) => {
+      form.classList.add('unified-filter');
+      form.setAttribute('role', 'search');
+      form.querySelectorAll('select').forEach((select) => {
+        if (!select.hasAttribute('onchange')) {
+          select.addEventListener('change', () => form.requestSubmit());
+        }
+      });
+      const hasQuery = [...new URLSearchParams(window.location.search).keys()]
+        .some((key) => key !== 'page');
+      if (!hasQuery || form.querySelector('.filter-reset, a.btn-light[href]')) return;
+      const reset = document.createElement('a');
+      reset.href = window.location.pathname;
+      reset.className = 'btn btn-light filter-reset';
+      reset.innerHTML = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>مسح</span>';
+      reset.setAttribute('aria-label', 'مسح الفلاتر');
+      form.appendChild(reset);
+    });
   });
 
   // Global Toast function matching prototype

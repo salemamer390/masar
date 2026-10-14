@@ -4773,6 +4773,80 @@ body {
   z-index: 3;
 }
 
+/* Unified list filters: matches the employee-screen filter across modules. */
+.filter-bar,
+.documents-toolbar,
+.panel > form.row.g-2.align-items-end {
+  width: 100%;
+  min-width: 0;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  padding: 12px;
+  gap: 9px;
+  align-items: center;
+}
+.documents-toolbar {
+  display: flex;
+}
+.documents-toolbar select,
+.filter-bar select:not(.form-select) {
+  height: 40px;
+  min-width: 150px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--color-card-bg);
+  color: var(--color-text-secondary);
+  padding: 0 12px;
+  font-size: 11px;
+  outline: 0;
+}
+.filter-bar > .btn,
+.documents-toolbar > .btn,
+.filter-bar > a.btn,
+.documents-toolbar > a.btn {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.panel > form.row.g-2.align-items-end {
+  margin: 0;
+}
+.panel > form.row.g-2.align-items-end > [class*="col-"] {
+  padding: 0;
+  width: auto;
+  flex: 0 1 auto;
+}
+.panel > form.row.g-2.align-items-end .form-label {
+  margin: 0 0 5px;
+  font-size: 11px;
+}
+@media (max-width: 800px) {
+  .filter-bar,
+  .documents-toolbar,
+  .panel > form.row.g-2.align-items-end {
+    flex-wrap: wrap;
+  }
+  .filter-bar .search-table,
+  .documents-toolbar .search-table {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .filter-bar > .form-control,
+  .filter-bar > .form-select,
+  .filter-bar > select,
+  .documents-toolbar > select {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+  .panel > form.row.g-2.align-items-end > [class*="col-"] {
+    flex: 1 1 160px;
+  }
+}
+
 /* Mobile sidebar controls */
 .sidebar-mobile-close,
 .sidebar-overlay { display: none; }
