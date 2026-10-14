@@ -1,5 +1,5 @@
 <aside class="sidebar" id="sidebar">
-  <div class="brand"><div class="brand-icon"><i class="bi bi-diamond-fill"></i></div><div><div class="brand-title">تزامن</div><small>لتقنية المعلومات</small></div><button type="button" class="sidebar-collapse-btn" data-sidebar-toggle aria-label="طي القائمة الجانبية" title="طي القائمة الجانبية"><i class="bi bi-chevron-double-right"></i></button></div>
+  <div class="brand"><div class="brand-icon"><i class="bi bi-diamond-fill"></i></div><div><div class="brand-title">تزامن</div><small>لتقنية المعلومات</small></div><button type="button" class="sidebar-collapse-btn" data-sidebar-toggle aria-label="طي القائمة الجانبية" title="طي القائمة الجانبية"><i class="bi bi-chevron-double-right"></i></button><button type="button" class="sidebar-mobile-close" data-sidebar-mobile-close aria-label="إغلاق القائمة الجانبية" title="إغلاق القائمة الجانبية"><i class="bi bi-x-lg"></i></button></div>
   <div class="side-section">الرئيسية</div>
   @if(auth()->user()?->hasPermission('dashboard.view') && auth()->user()?->role?->name !== 'employee')<a href="{{ route('dashboard') }}" class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}"><i class="bi bi-speedometer2"></i><span>لوحة التحكم</span></a>@endif
   <div class="side-section">إدارة الموظفين</div>
@@ -23,3 +23,4 @@
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'active' : '' }}"><i class="bi bi-person-gear"></i><span>حسابات HR والموظفين</span></a>@endif
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('company.account') }}" class="nav-item {{ request()->routeIs('company.account') ? 'active' : '' }}"><i class="bi bi-building"></i><span>حساب الشركة</span></a>@endif
 </aside>
+<div class="sidebar-overlay" data-sidebar-overlay aria-hidden="true"></div>
