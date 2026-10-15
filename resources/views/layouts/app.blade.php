@@ -422,26 +422,6 @@
     // Company-isolation diagnostic removed after verification.
   })();
       /* Company-isolation diagnostic removed.
-        document.querySelectorAll('a[href]').forEach((link) => {
-          const id = employeeIdFromUrl(link.href);
-          if (!id || !companyMap[id] || link.querySelector('.company-id-debug')) return;
-          const marker = badge(id); if (marker) link.append(' ', marker);
-        });
-        document.querySelectorAll('select[name="employee_id"] option').forEach((option) => {
-          const marker = badge(option.value);
-          if (marker && !option.textContent.includes('Company ID:')) option.textContent += ` — ${marker.textContent}`;
-        });
-        document.querySelectorAll('[data-employee-id]').forEach((node) => {
-          const id = String(node.dataset.employeeId || '');
-          const marker = badge(id);
-          if (marker && !node.querySelector('.company-id-debug')) node.append(' ', marker);
-        });
-        if (current && companyMap[current]) {
-          const heading = document.querySelector('.profile-person h1');
-          const marker = badge(current);
-          if (heading && marker && !heading.querySelector('.company-id-debug')) heading.append(' ', marker);
-        }
-      }).catch(() => {});
   })(); */
 </script>
 
