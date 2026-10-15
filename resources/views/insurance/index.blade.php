@@ -179,8 +179,28 @@ document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft
                 if (!status) return;
                 status.value = select.value;
                 select.disabled = true;
+                const row = select.closest('tr');
+                row?.classList.add('insurance-row-updating');
                 try {
-                    await MasarUI.request(editForm);
+                    const response = await fetch(editForm.action, {
+                        method: 'POST',
+                        body: new FormData(editForm),
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        const error = new Error(payload.message || 'Insurance status update failed.');
+                        error.payload = payload;
+                        throw error;
+                    }
+                    if (row) {
+                        row.style.transition = 'opacity .28s ease, transform .28s ease';
+                        row.style.opacity = '0';
+                        row.style.transform = 'translateX(-18px)';
+                        window.setTimeout(() => row.remove(), 300);
+                    }
+                    scheduleInsuranceStatsRefresh();
                     select.className = 'badge-soft border-0 ' + (select.value === 'registered' ? 'success' : 'danger');
                     showToast('تم تحديث حالة التأمين بنجاح.');
                 } catch (error) {
@@ -189,6 +209,20 @@ document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft
             });
             badge.replaceWith(select);
         });
+    };
+    let statsRefreshTimer;
+    const scheduleInsuranceStatsRefresh = () => {
+        window.clearTimeout(statsRefreshTimer);
+        statsRefreshTimer = window.setTimeout(async () => {
+            try {
+                const response = await fetch(window.location.href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) return;
+                const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+                const currentStats = document.querySelector('.stat-grid.compact');
+                const freshStats = source.querySelector('.stat-grid.compact');
+                if (currentStats && freshStats) currentStats.replaceWith(freshStats);
+            } catch (error) { console.error('Insurance stats refresh failed', error); }
+        }, 350);
     };
     const refreshInsuranceList = async () => {
         const response = await fetch(window.location.href, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
