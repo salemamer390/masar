@@ -7,18 +7,86 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmploymentType;
 use App\Models\Job;
+use App\Models\Attendance;
+use App\Models\Leave;
+use App\Models\Penalty;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use App\Services\LeaveBalanceService;
 
 class JobDataController extends Controller
 {
     public function index(Request $request)
     {
-        $employees = Employee::with(['department', 'job', 'branch', 'employmentType'])
+        $month = $request->filled('month')
+            ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth()
+            : now()->startOfMonth();
+        $monthStart = $month->copy()->startOfMonth()->toDateString();
+        $monthEnd = $month->copy()->endOfMonth()->toDateString();
+
+        $employees = Employee::with(['department', 'job', 'branch', 'employmentType', 'currentSalary'])
             ->when($request->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
             ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
             ->when($request->filled('contract_status'), function ($q) use ($request) { return $request->contract_status === 'active' ? $q->where(function ($x) { $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()); }) : $q->whereDate('contract_end_date', '<', today()); })
             ->orderByDesc('id')
             ->get();
+
+        $employeeIds = $employees->pluck('id');
+        $attendance = Attendance::query()
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('attendance_date', [$monthStart, $monthEnd])
+            ->where('approval_status', 'Approved')
+            ->get()
+            ->groupBy('employee_id');
+        $penalties = Penalty::with('penaltyType')
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('penalty_date', [$monthStart, $monthEnd])
+            ->whereIn('status', ['Approved', 'ظ…ط¹طھظ…ط¯'])
+            ->get()
+            ->groupBy('employee_id');
+        $leaves = Leave::with('leaveType')
+            ->whereIn('employee_id', $employeeIds)
+            ->where('status', 'Approved')
+            ->whereDate('start_date', '<=', $monthEnd)
+            ->whereDate('end_date', '>=', $monthStart)
+            ->get()
+            ->groupBy('employee_id');
+
+        $leaveBalanceService = app(LeaveBalanceService::class);
+        $monthlyRows = $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $month, $leaveBalanceService): array {
+            $attendanceRows = $attendance->get($employee->id, collect());
+            $employeeLeaves = $leaves->get($employee->id, collect());
+            $employeePenalties = $penalties->get($employee->id, collect());
+            $unpaidLeaveDays = $employeeLeaves
+                ->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)
+                ->sum(fn (Leave $leave) => $this->daysWithinMonth($leave, $month));
+            $salary = $employee->currentSalary;
+            $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinMonth($leave, $month)]);
+            $leaveByPolicy = fn (string $policy): float => $employeeLeaves
+                ->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)
+                ->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
+            $annualBalance = $leaveBalanceService->balance($employee, $month->year);
+
+            return [
+                'employee' => $employee,
+                'salary' => $salary,
+                'attendance_days' => $attendanceRows->whereNotIn('status', ['Absent', 'غائب'])->count(),
+                'late_days' => $attendanceRows->filter(fn (Attendance $item) => in_array($item->status, ['Late', 'متأخر'], true) || (int) $item->late_minutes > 0)->count(),
+                'late_minutes' => (int) $attendanceRows->sum('late_minutes'),
+                'absence_days' => $attendanceRows->filter(fn (Attendance $item) => in_array($item->status, ['Absent', 'غائب'], true))->count(),
+                'overtime_minutes' => (int) $attendanceRows->sum('overtime_minutes'),
+                'annual_leave_days' => $leaveByPolicy('annual'),
+                'casual_leave_days' => $leaveByPolicy('casual'),
+                'sick_leave_days' => $leaveByPolicy('sick'),
+                'maternity_leave_days' => $leaveByPolicy('maternity'),
+                'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity')),
+                'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0),
+                'unpaid_leave_days' => $unpaidLeaveDays,
+                'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),
+                'penalty_count' => $employeePenalties->count(),
+                'annual_balance_remaining' => $annualBalance['remaining'],
+            ];
+        });
 
         $totalJobs = Job::where('is_active', 1)->count();
         $totalDepartments = Department::where('is_active', 1)->count();
@@ -32,7 +100,7 @@ class JobDataController extends Controller
         $employmentTypes = EmploymentType::all();
 
         return view('jobs.index', compact(
-            'employees',
+            'employees', 'monthlyRows', 'month',
             'totalJobs',
             'totalDepartments',
             'totalBranches',
@@ -44,4 +112,12 @@ class JobDataController extends Controller
             'employmentTypes'
         ));
     }
+
+    private function daysWithinMonth(Leave $leave, Carbon $month): int
+    {
+        $start = Carbon::parse($leave->start_date)->max($month->copy()->startOfMonth());
+        $end = Carbon::parse($leave->end_date)->min($month->copy()->endOfMonth());
+        return $start->greaterThan($end) ? 0 : $start->diffInDays($end) + 1;
+    }
 }
+
