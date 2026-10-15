@@ -118,6 +118,19 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/jobs', [JobDataController::class, 'index'])
         ->middleware('permission:employees.view')
         ->name('jobs.index');
+    Route::get('/jobs/export', [JobDataController::class, 'export'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.export');
+    // Kept for backward compatibility with old bookmarks; snapshots are now created automatically.
+    Route::post('/jobs/summary-history', [JobDataController::class, 'saveSnapshot'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.summary-history.store');
+    Route::get('/jobs/summary-history/{snapshot}', [JobDataController::class, 'showSnapshot'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.summary-history.show');
+    Route::get('/jobs/summary-history/{snapshot}/export', [JobDataController::class, 'exportSnapshot'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.summary-history.export');
 
     // Attendance
     Route::prefix('attendance')->name('attendance.')->group(function () {
