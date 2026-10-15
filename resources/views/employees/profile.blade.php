@@ -6,6 +6,10 @@
 @php($profile = $employee->profileDetail)
 @php($ageYears = $employee->birth_date ? $employee->birth_date->age : null)
 @php($servicePeriod = null)
+@php($resignationMovement = $employee->movements->first(fn ($movement) => str_contains((string) $movement->reason, 'استقالة')))
+@php($dismissalMovement = $employee->movements->first(fn ($movement) => str_contains((string) $movement->reason, 'فصل')))
+@php($hasPreviousResignation = $employee->termination_type === 'resignation' || (bool) $resignationMovement)
+@php($hasPreviousDismissal = $employee->termination_type === 'dismissal' || (bool) $dismissalMovement)
 @if($employee->hire_date)
     @php($serviceDiff = $employee->hire_date->diff(today()))
     @php($servicePeriod = ['years' => $serviceDiff->y, 'months' => $serviceDiff->m, 'days' => $serviceDiff->d])
@@ -22,7 +26,13 @@
             <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
             <div class="profile-tags">
                 @php($employeeStatus = $employee->status?->name ?? 'Active')
-                <span class="badge-soft {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}">{{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}</span>
+                <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}" data-bs-toggle="modal" data-bs-target="#employeeStatusModal">{{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }} <i class="bi bi-chevron-down"></i></button>
+                @if($hasPreviousResignation)
+                    <span class="badge-soft warning d-block" title="استقالة سابقة" aria-label="استقالة سابقة"><i class="bi bi-file-earmark-text"></i></span>
+                @endif
+                @if($hasPreviousDismissal)
+                    <span class="badge-soft danger d-block">فصل سابق{{ ($employee->termination_type === 'dismissal' && $employee->termination_date) ? ' · '.$employee->termination_date->format('d/m/Y') : ($dismissalMovement?->movement_date ? ' · '.$dismissalMovement->movement_date->format('d/m/Y') : '') }}</span>
+                @endif
             </div>
         </div>
         <div class="profile-metrics" aria-label="ملخص بيانات الموظف">
@@ -190,8 +200,10 @@
         <form method="POST" action="{{ route('employees.update', $employee) }}" class="p-3 row g-3 align-items-end">
             @csrf @method('PUT')
             <input type="hidden" name="full_name" value="{{ $employee->full_name }}">
-            <div class="col-md-6"><label class="form-label" for="employee_status_id">الحالة</label><select id="employee_status_id" name="status_id" class="form-select" required>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected($employee->status_id == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
-            <div class="col-md-3"><button class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> حفظ الحالة</button></div>
+            <div class="col-md-4"><label class="form-label" for="employee_status_id">الحالة</label><select id="employee_status_id" name="status_id" class="form-select" required>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected($employee->status_id == $item->id)>{{ $item->name }}</option>@endforeach</select></div>
+            <div class="col-md-3"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation" @selected($employee->termination_type === 'resignation')>استقالة</option><option value="dismissal" @selected($employee->termination_type === 'dismissal')>فصل</option></select></div>
+            <div class="col-md-3"><label class="form-label">تاريخ انتهاء الخدمة</label><input type="date" name="termination_date" class="form-control" value="{{ $employee->termination_date?->format('Y-m-d') }}"></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100"><i class="bi bi-check-lg"></i> حفظ الحالة</button></div>
         </form>
     </section>
     @endif
@@ -462,12 +474,13 @@
         <div class="panel-head"><h3>الحركات الوظيفية</h3></div>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>التاريخ</th><th>الحركة</th><th>القسم السابق</th><th>القسم الجديد</th><th>الوظيفة السابقة</th><th>الوظيفة الجديدة</th><th>الراتب الجديد</th></tr></thead>
+                <thead><tr><th>التاريخ</th><th>الحركة</th><th>التفاصيل</th><th>القسم السابق</th><th>القسم الجديد</th><th>الوظيفة السابقة</th><th>الوظيفة الجديدة</th><th>الراتب الجديد</th></tr></thead>
                 <tbody>
                 @forelse($employee->movements as $m)
                     <tr>
                         <td>{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td>
-                        <td>{{ $m->movementType?->name ?? '—' }}</td>
+                        <td>{{ match($m->movementType?->name) { 'Status Change' => 'تغيير الحالة', 'Profile Update' => 'تحديث بيانات وظيفية', default => $m->movementType?->name ?? '—' } }}</td>
+                        <td>{{ $m->reason ?? $m->notes ?? '—' }}</td>
                         <td>{{ $m->oldDepartment?->name ?? '—' }}</td>
                         <td>{{ $m->newDepartment?->name ?? '—' }}</td>
                         <td>{{ $m->oldJob?->title ?? '—' }}</td>
@@ -475,7 +488,7 @@
                         <td>{{ format_money($m->new_salary ?? 0) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="text-center py-5">لا توجد حركات.</td></tr>
+                    <tr><td colspan="8" class="text-center py-5">لا توجد حركات.</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -499,13 +512,33 @@
 </div></div>
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الوظيفية والعقد</h3><span>تُحفظ العلاقات بالمعرّفات وتظهر بالاسم.</span></div></div><div class="p-3 row g-3">
 <div class="col-md-3"><label class="form-label">القسم</label><select name="department_id" class="form-select"><option value="">—</option>@foreach($departments as $item)<option value="{{ $item->id }}" @selected(old('department_id',$employee->department_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">الوظيفة</label><select name="job_id" class="form-select"><option value="">—</option>@foreach($jobs as $item)<option value="{{ $item->id }}" @selected(old('job_id',$employee->job_id)==$item->id)>{{ $item->title }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">الفرع / مقر العمل</label><select name="branch_id" class="form-select"><option value="">—</option>@foreach($branches as $item)<option value="{{ $item->id }}" @selected(old('branch_id',$employee->branch_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">نوع التوظيف</label><select name="employment_type_id" class="form-select"><option value="">—</option>@foreach($employmentTypes as $item)<option value="{{ $item->id }}" @selected(old('employment_type_id',$employee->employment_type_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div>
-<div class="col-md-3"><label class="form-label">الحالة</label><select name="status_id" class="form-select"><option value="">—</option>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected(old('status_id',$employee->status_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">المدير المباشر</label><select name="manager_employee_id" class="form-select"><option value="">—</option>@foreach($managers as $item)<option value="{{ $item->id }}" @selected(old('manager_employee_id',$employee->manager_employee_id)==$item->id)>{{ $item->full_name }} (#{{ $item->employee_code }})</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">تاريخ التعيين</label><input id="employee_hire_date" type="date" name="hire_date" class="form-control" value="{{ old('hire_date',$employee->hire_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">نوع العقد</label><input name="profile[contract_type]" class="form-control" value="{{ old('profile.contract_type',$profile?->contract_type) }}"></div>
+<div class="col-md-3"><label class="form-label">الحالة</label><select name="status_id" class="form-select"><option value="">—</option>@foreach($statuses as $item)<option value="{{ $item->id }}" @selected(old('status_id',$employee->status_id)==$item->id)>{{ $item->name }}</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation" @selected(old('termination_type',$employee->termination_type)==='resignation')>استقالة</option><option value="dismissal" @selected(old('termination_type',$employee->termination_type)==='dismissal')>فصل</option></select></div><div class="col-md-3"><label class="form-label">تاريخ انتهاء الخدمة</label><input type="date" name="termination_date" class="form-control" value="{{ old('termination_date',$employee->termination_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">المدير المباشر</label><select name="manager_employee_id" class="form-select"><option value="">—</option>@foreach($managers as $item)<option value="{{ $item->id }}" @selected(old('manager_employee_id',$employee->manager_employee_id)==$item->id)>{{ $item->full_name }} (#{{ $item->employee_code }})</option>@endforeach</select></div><div class="col-md-3"><label class="form-label">تاريخ التعيين</label><input id="employee_hire_date" type="date" name="hire_date" class="form-control" value="{{ old('hire_date',$employee->hire_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">نوع العقد</label><input name="profile[contract_type]" class="form-control" value="{{ old('profile.contract_type',$profile?->contract_type) }}"></div>
 <div class="col-md-3"><label class="form-label">بداية العقد</label><input id="employee_contract_start_date" type="date" name="contract_start_date" class="form-control" value="{{ old('contract_start_date',$employee->contract_start_date?->format('Y-m-d')) }}" readonly></div><div class="col-md-3"><label class="form-label">نهاية العقد</label><input id="employee_contract_end_date" type="date" name="contract_end_date" class="form-control" value="{{ old('contract_end_date',$employee->contract_end_date?->format('Y-m-d')) }}"></div><div class="col-md-3"><label class="form-label">مدة العقد</label><input name="contract_duration" class="form-control" value="{{ old('contract_duration',$employee->contract_duration) }}" placeholder="سنة"></div><div class="col-md-3"><label class="form-label">فترة التجربة</label><input name="profile[probation_period]" class="form-control" value="{{ old('profile.probation_period',$profile?->probation_period) }}"></div>
 <div class="col-md-3"><label class="form-label">نمط العمل</label><input name="profile[work_pattern]" class="form-control" value="{{ old('profile.work_pattern',$profile?->work_pattern) }}"></div><div class="col-md-3"><label class="form-label">أيام العمل</label><input name="profile[weekly_work_days]" class="form-control" value="{{ old('profile.weekly_work_days',$profile?->weekly_work_days) }}"></div><div class="col-md-3"><label class="form-label">ساعات العمل يوميًا</label><input name="profile[daily_work_hours]" type="number" step="0.01" min="0" max="24" class="form-control" value="{{ old('profile.daily_work_hours',format_number($profile?->daily_work_hours)) }}"></div><div class="col-md-3"><label class="form-label">مواعيد العمل</label><input name="profile[working_hours_text]" class="form-control" value="{{ old('profile.working_hours_text',$profile?->working_hours_text) }}"></div>
 <div class="col-md-3"><label class="form-label">الإجازة السنوية</label><input name="profile[annual_leave_days]" type="number" step="0.01" min="0" class="form-control" value="{{ old('profile.annual_leave_days',format_number($profile?->annual_leave_days)) }}"></div><div class="col-md-3"><label class="form-label">حالة إرفاق العقد</label><input name="profile[contract_attachment_status]" class="form-control" value="{{ old('profile.contract_attachment_status',$profile?->contract_attachment_status) }}"></div><div class="col-md-3"><label class="form-label">العملة</label><input name="profile[currency]" class="form-control" value="{{ old('profile.currency',$profile?->currency) }}"></div>
 </div></div>
 <div class="panel"><div class="panel-head"><div><h3>بيانات الهوية والملاحظات</h3></div></div><div class="p-3 row g-3"><div class="col-md-4"><label class="form-label">تاريخ إصدار الهوية</label><input type="date" name="profile[national_id_issue_date]" class="form-control" value="{{ old('profile.national_id_issue_date',$profile?->national_id_issue_date?->format('Y-m-d')) }}"></div><div class="col-md-4"><label class="form-label">تاريخ انتهاء الهوية</label><input type="date" name="profile[national_id_expiry_date]" class="form-control" value="{{ old('profile.national_id_expiry_date',$profile?->national_id_expiry_date?->format('Y-m-d')) }}"></div><div class="col-md-4"><label class="form-label">مكان إصدار الهوية</label><input name="profile[national_id_place]" class="form-control" value="{{ old('profile.national_id_place',$profile?->national_id_place) }}"></div><div class="col-md-6"><label class="form-label">شروط إضافية</label><textarea name="profile[additional_conditions]" class="form-control" rows="2">{{ old('profile.additional_conditions',$profile?->additional_conditions) }}</textarea></div><div class="col-md-6"><label class="form-label">ملاحظات</label><textarea name="notes" class="form-control" rows="2">{{ old('notes',$employee->notes) }}</textarea></div></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ بيانات الموظف</button></div></form></div></div></div>
+@endif
+
+@if(auth()->user()?->hasPermission('employees.edit'))
+<div class="modal fade" id="employeeStatusModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+    <form method="POST" action="{{ route('employees.update', $employee) }}" id="employeeStatusForm">
+      @csrf @method('PUT')
+      <div class="modal-header"><h5 class="modal-title">تغيير حالة الموظف</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_action" value="1">
+        <label class="form-label">الحالة</label>
+        <select name="status_id" id="profile_status_id" class="form-select mb-3" required>@foreach($statuses as $item)<option value="{{ $item->id }}" data-status-name="{{ $item->name }}" @selected($employee->status_id == $item->id)>{{ match($item->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $item->name } }}</option>@endforeach</select>
+        <div id="profileTerminationFields" class="row g-3"><div class="col-6"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation" @selected($employee->termination_type === 'resignation')>استقالة</option><option value="dismissal" @selected($employee->termination_type === 'dismissal')>فصل</option></select></div><div class="col-6"><label class="form-label">تاريخ الحالة</label><input type="date" name="termination_date" class="form-control" value="{{ $employee->termination_date?->format('Y-m-d') ?? now()->toDateString() }}"></div></div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الحالة</button></div>
+    </form>
+  </div></div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () { const select=document.getElementById('profile_status_id'), fields=document.getElementById('profileTerminationFields'), type=fields?.querySelector('[name="termination_type"]'), date=fields?.querySelector('[name="termination_date"]'); const sync=()=>{const name=select?.selectedOptions[0]?.dataset.statusName||'', suspended=['Suspended','موقوف'].includes(name), resigned=['Resigned','Resignation','مستقيل','استقالة'].includes(name), show=['Terminated','منتهي الخدمة','منتهى الخدمة','Suspended','موقوف','Resigned','Resignation','مستقيل','استقالة'].includes(name); fields?.classList.toggle('d-none',!show); type?.closest('.col-6')?.classList.toggle('d-none',suspended||resigned); if(show&&date)date.value=new Date().toISOString().slice(0,10); if(type)type.value=suspended?'':(resigned?'resignation':type.value);}; select?.addEventListener('change',sync); sync(); });
+</script>
 @endif
 
 @push('scripts')

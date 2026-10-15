@@ -3247,6 +3247,16 @@ button,
 .salary-details-modal [data-bs-target^="#editSalary"] {
   display: none !important;
 }
+/* End-of-service details are edited only from the status dialog. */
+#employeeMasterModal [name="termination_type"],
+#employeeMasterModal [name="termination_date"] {
+  display: none !important;
+}
+#employeeMasterModal .row.g-3 > div:has([name="termination_type"]),
+#employeeMasterModal .row.g-3 > div:has([name="termination_date"]) {
+  display: none !important;
+}
+#employment-status { display: none !important; }
 .quick-grid a {
   border: 1px solid var(--border);
   background: #fff;

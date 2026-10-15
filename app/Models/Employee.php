@@ -48,6 +48,7 @@ class Employee extends Model
         'contract_end_date',
         'contract_duration',
         'termination_date',
+        'termination_type',
         'shift_start',
         'shift_end',
         'manual_annual_balance',

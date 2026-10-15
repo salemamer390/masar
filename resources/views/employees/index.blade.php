@@ -79,6 +79,9 @@
               <a href="{{ route('employees.show', $employee) }}" class="employee-link text-decoration-none fw-bold">
                 {{ $employee->full_name }}
               </a>
+              @if($employee->termination_type || $employee->termination_date)
+                <small class="text-{{ $employee->termination_type === 'dismissal' ? 'danger' : 'warning' }} d-block">{{ $employee->termination_type === 'dismissal' ? 'فصل' : ($employee->termination_type === 'resignation' ? 'استقالة' : 'انتهاء خدمة سابق') }}{{ $employee->termination_date ? ' · '.$employee->termination_date->format('d/m/Y') : '' }}</small>
+              @endif
             </div>
           </td>
           <td>{{ $employee->job?->title ?? '—' }}</td>
@@ -93,7 +96,11 @@
               <ul class="dropdown-menu shadow-sm border-0 p-2">
                 @foreach($statuses as $status)
                   @php($statusTone = match($status->name) { 'Leave', 'Pending' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' })
-                  <li><form method="POST" action="{{ route('employees.update', $employee) }}" onsubmit="return confirm('تأكيد تغيير حالة الموظف إلى: {{ $status->name }}؟')">@csrf @method('PUT')<input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_id" value="{{ $status->id }}"><button class="dropdown-item rounded-2 d-flex align-items-center gap-2" @disabled($employee->status_id == $status->id)><span class="badge-soft {{ $statusTone }}">{{ match($status->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $status->name } }}</span>@if($employee->status_id == $status->id)<i class="bi bi-check-lg ms-auto"></i>@endif</button></form></li>
+                  @if(in_array($status->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Suspended', 'موقوف', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true))
+                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-status-action" data-status-id="{{ $status->id }}" data-status-name="{{ $status->name }}" data-employee-url="{{ route('employees.update', $employee) }}"><span class="badge-soft danger">{{ in_array($status->name, ['Suspended', 'موقوف'], true) ? 'موقوف' : 'منتهي الخدمة' }}</span><small class="text-muted">حدّد تاريخ الحالة</small></a></li>
+                  @else
+                    <li><form method="POST" action="{{ route('employees.update', $employee) }}" onsubmit="return confirm('تأكيد تغيير حالة الموظف إلى: {{ $status->name }}؟')">@csrf @method('PUT')<input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_id" value="{{ $status->id }}"><button class="dropdown-item rounded-2 d-flex align-items-center gap-2" @disabled($employee->status_id == $status->id)><span class="badge-soft {{ $statusTone }}">{{ match($status->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $status->name } }}</span>@if($employee->status_id == $status->id)<i class="bi bi-check-lg ms-auto"></i>@endif</button></form></li>
+                  @endif
                 @endforeach
               </ul>
             </div>
@@ -110,7 +117,7 @@
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                 <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person me-2"></i> عرض الملف الكامل</a></li>
                 @if(auth()->user()?->hasPermission('employees.edit'))
-                <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'job']) }}#employment-status"><i class="bi bi-person-gear me-2"></i> تعديل حالة الموظف</a></li>
+                <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person-gear me-2"></i> تعديل حالة الموظف</a></li>
                 @endif
                 <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'documentsProfile']) }}"><i class="bi bi-folder me-2"></i> مسوغات التعيين</a></li>
                 <li><a class="dropdown-item py-2" href="{{ route('employees.print', $employee) }}" target="_blank"><i class="bi bi-printer me-2"></i> طباعة الملف</a></li>
@@ -357,3 +364,11 @@ document.querySelectorAll('input[name="national_id"]').forEach(id=>id.addEventLi
 const kpiData=@json($employeeCardDetails);const kpiKeys=['total','active','departments','contracts_due','uninsured','on_leave'];const kpiTitles=['إجمالي الموظفين','الموظفون النشطون','الأقسام','عقود تنتهي قريبًا','غير مؤمن عليهم','في إجازة حاليًا'];document.querySelectorAll('.employee-kpi-detail-trigger').forEach(card=>card.addEventListener('click',event=>{event.preventDefault();const index=Number(card.dataset.kpiIndex);const list=kpiData[kpiKeys[index]]||[];document.getElementById('employeeKpiTitle').textContent=kpiTitles[index];document.getElementById('employeeKpiBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.name||'—';const extra=item.employee_code?('#'+item.employee_code):((item.employees_count??'')+' موظف');return '<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.initials||name.slice(0,1))+'</span><div><a href="{{ url('/employees') }}/'+(item.id||'')+'">'+name+'</a><small>'+(item.department?.name||extra||'')+'</small></div></div>';}).join(''):'<div class="text-muted text-center p-4">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('employeeKpiDetails')).show();}));
 </script>
 @endpush
+<div class="modal fade" id="employeeListStatusModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="employeeListStatusForm">@csrf @method('PUT')<input type="hidden" name="status_action" value="1">
+  <div class="modal-header"><h5 class="modal-title">تغيير حالة الموظف</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input type="hidden" name="full_name" id="employeeListStatusName"><input type="hidden" name="status_id" id="employeeListStatusId"><div class="alert alert-light mb-3" id="employeeListStatusLabel"></div><div class="row g-3"><div class="col-6"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" id="employeeListTerminationType" class="form-select"><option value="">—</option><option value="resignation">استقالة</option><option value="dismissal">فصل</option></select></div><div class="col-6"><label class="form-label">تاريخ الحالة</label><input type="date" name="termination_date" id="employeeListTerminationDate" class="form-control" value="{{ now()->toDateString() }}"></div></div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الحالة</button></div>
+</form></div></div></div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElementById('employeeListStatusModal'),form=document.getElementById('employeeListStatusForm'),date=document.getElementById('employeeListTerminationDate'),type=document.getElementById('employeeListTerminationType');document.querySelectorAll('.employee-status-action').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();const row=link.closest('tr');form.action=link.dataset.employeeUrl;document.getElementById('employeeListStatusId').value=link.dataset.statusId;document.getElementById('employeeListStatusName').value=row?.querySelector('.employee-link')?.textContent.trim()||'';const name=link.dataset.statusName,suspended=['Suspended','موقوف'].includes(name),resigned=['Resigned','Resignation','مستقيل','استقالة'].includes(name);document.getElementById('employeeListStatusLabel').textContent=suspended?'موقوف — حدّد تاريخ الإيقاف':(resigned?'استقالة — حدّد تاريخ الاستقالة':'منتهي الخدمة — حدّد النوع والتاريخ');type.closest('.col-6').classList.toggle('d-none',suspended||resigned);type.value=suspended?'':(resigned?'resignation':'');date.value=new Date().toISOString().slice(0,10);bootstrap.Modal.getOrCreateInstance(modal).show();}));});
+</script>

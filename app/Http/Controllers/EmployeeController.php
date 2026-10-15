@@ -13,6 +13,8 @@ use App\Models\EmploymentType;
 use App\Models\Job;
 use App\Models\PaymentMethod;
 use App\Models\Salary;
+use App\Models\MovementRecord;
+use App\Models\MovementType;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -308,6 +310,8 @@ class EmployeeController extends Controller
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'contract_duration' => ['nullable', 'string', 'max:100'],
+            'termination_date' => ['nullable', 'date'],
+            'termination_type' => ['nullable', Rule::in(['resignation', 'dismissal'])],
             'notes' => ['nullable', 'string'],
             'profile' => ['nullable', 'array'],
             'profile.nationality' => ['nullable', 'string', 'max:100'],
@@ -329,6 +333,7 @@ class EmployeeController extends Controller
         ]);
 
         $this->ensureOwnedEmployeeReferences($validated, $employee);
+        $validated = $this->applyTerminationDetails($request, $validated, $employee);
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
         if ($salaryChanged) {
             $validated = $this->applyNationalIdData($validated);
@@ -363,11 +368,45 @@ class EmployeeController extends Controller
         }
         $oldValues = $employee->only(array_keys($validated));
         $oldProfile = $employee->profileDetail?->toArray();
-        DB::transaction(function () use ($employee, $validated, $profileData, $salaryChanged): void {
+        $oldStatusId = (int) $employee->status_id;
+        $newStatusId = (int) ($validated['status_id'] ?? $employee->status_id);
+        $statusChanged = $oldStatusId !== $newStatusId || $request->boolean('status_action');
+        $trackedFields = ['department_id', 'job_id', 'branch_id', 'gross_salary'];
+        $changedFields = [];
+        foreach ($trackedFields as $field) {
+            if (array_key_exists($field, $validated) && (string) $employee->{$field} !== (string) $validated[$field]) {
+                $changedFields[$field] = ['old' => $employee->{$field}, 'new' => $validated[$field]];
+            }
+        }
+        $movementChanged = $statusChanged || $changedFields !== [];
+        DB::transaction(function () use ($employee, $validated, $profileData, $salaryChanged, $movementChanged, $statusChanged, $oldStatusId, $changedFields): void {
             $employee->update($validated);
             $employee->profileDetail()->updateOrCreate([], $profileData);
             if ($salaryChanged) {
                 $this->syncSalaryStructureFromEmployee($employee->fresh());
+            }
+            if ($movementChanged) {
+                $fresh = $employee->fresh(['status']);
+                $movementTypeName = $statusChanged ? 'Status Change' : 'Profile Update';
+                $movementType = MovementType::firstOrCreate(
+                    ['name' => $movementTypeName],
+                    ['company_id' => $fresh->company_id]
+                );
+                $statusLabel = match ($fresh->status?->name) {
+                    'Terminated', 'منتهي الخدمة', 'منتهى الخدمة' => $fresh->termination_type === 'dismissal' ? 'فصل' : ($fresh->termination_type === 'resignation' ? 'استقالة' : 'انتهاء خدمة'),
+                    'Suspended', 'موقوف' => 'إيقاف',
+                    'Active', 'نشط' => 'عودة إلى العمل',
+                    default => $fresh->status?->name ?? 'تغيير الحالة',
+                };
+                MovementRecord::create([
+                    'employee_id' => $fresh->id,
+                    'movement_type_id' => $movementType->id,
+                    'movement_date' => $fresh->termination_date ?? today(),
+                    'reason' => $statusChanged ? 'تغيير حالة الموظف: '.$statusLabel : 'تحديث بيانات الموظف الوظيفية',
+                    'old_values' => ['status_id' => $oldStatusId, 'changes' => $changedFields],
+                    'new_values' => ['status_id' => $fresh->status_id, 'termination_type' => $fresh->termination_type, 'termination_date' => optional($fresh->termination_date)->toDateString(), 'changes' => $changedFields],
+                    'created_by' => auth()->id(),
+                ]);
             }
         });
         $employee->refresh();
@@ -399,6 +438,53 @@ class EmployeeController extends Controller
         if (!$subscription || !$subscription->plan) return;
         $count = Employee::where('company_id', $companyId)->whereHas('status', fn ($query) => $query->whereNotIn('name', ['منتهي الخدمة','موقوف','قيد التعيين','Terminated','Suspended','Pending']))->count();
         if ($count >= $subscription->plan->employee_limit) abort(422, "لا يمكن إضافة موظف جديد: باقتك تسمح حتى {$subscription->plan->employee_limit} موظفًا، والمستخدمون حاليًا {$count}.");
+    }
+
+    /**
+     * Keep the termination classification and its effective date together.
+     * Lightweight status-only actions in the employee list intentionally do
+     * not overwrite existing termination data; the profile form owns it.
+     */
+    private function applyTerminationDetails(Request $request, array $validated, ?Employee $employee = null): array
+    {
+        if (! $request->has('termination_type') && ! $request->has('termination_date')) {
+            return $validated;
+        }
+
+        $statusId = $validated['status_id'] ?? $employee?->status_id;
+        $statusName = EmployeeStatus::find($statusId)?->name;
+        $isResigned = in_array($statusName, ['Resigned', 'Resignation', 'مستقيل', 'استقالة'], true);
+        $isTerminated = $isResigned || in_array($statusName, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true);
+        $isSuspended = in_array($statusName, ['Suspended', 'موقوف'], true);
+
+        if (! $isTerminated && ! $isSuspended) {
+            unset($validated['termination_type'], $validated['termination_date']);
+            return $validated;
+        }
+
+        if ($isSuspended) {
+            if ($employee?->termination_type && blank($validated['termination_type'] ?? null)) {
+                unset($validated['termination_type'], $validated['termination_date']);
+                return $validated;
+            }
+            $validated['termination_date'] = blank($validated['termination_date'] ?? null) ? today()->toDateString() : $validated['termination_date'];
+            $validated['termination_type'] = null;
+            return $validated;
+        }
+
+        if ($isResigned && blank($validated['termination_type'] ?? null)) {
+            $validated['termination_type'] = 'resignation';
+        }
+
+        if (blank($validated['termination_type'] ?? null)) {
+            throw ValidationException::withMessages([
+                'termination_type' => 'يرجى تحديد هل انتهاء الخدمة استقالة أم فصل.',
+            ]);
+        }
+
+        $validated['termination_date'] = blank($validated['termination_date'] ?? null) ? today()->toDateString() : $validated['termination_date'];
+
+        return $validated;
     }
 
     private function ensureOwnedEmployeeReferences(array $data, ?Employee $employee = null): void
