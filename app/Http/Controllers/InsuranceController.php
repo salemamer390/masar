@@ -8,13 +8,31 @@ use App\Models\InsuranceRecord;
 use App\Models\Salary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
 class InsuranceController extends Controller
 {
     public function index(Request $request)
     {
+        $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
+        $monthStart = $month->copy()->startOfMonth()->toDateString();
+        $monthEnd = $month->copy()->endOfMonth()->toDateString();
+        $eligible = fn (Builder $query) => $query->where(function (Builder $employee) use ($monthStart, $monthEnd): void {
+            $employee->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Active', 'نشط']))
+                ->orWhere(function (Builder $ended) use ($monthStart, $monthEnd): void {
+                    $ended->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
+                        ->where(function (Builder $termination) use ($monthStart, $monthEnd): void {
+                            $termination->whereBetween('termination_date', [$monthStart, $monthEnd])
+                                ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereIn('status', ['registered', 'مسجل'])
+                                    ->where(function (Builder $recordDate) use ($monthStart): void {
+                                        $recordDate->whereNull('insurance_end_date')->orWhereDate('insurance_end_date', '>=', $monthStart);
+                                    }));
+                        });
+                });
+        });
         $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
+            ->whereHas('employee', $eligible)
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $this->normalizeInsuranceStatus($request->status)))
@@ -23,12 +41,15 @@ class InsuranceController extends Controller
         $insuranceRecords->each(function (InsuranceRecord $record): void {
             $record->insurance_category = $this->normalizeInsuranceCategory($record->insurance_category);
             $record->status = $this->normalizeInsuranceStatus($record->status);
+            if (blank($record->insurance_number) && filled($record->employee?->insurance_number)) {
+                $record->insurance_number = $record->employee->insurance_number;
+            }
         });
         // Keep employees without a record visible as "غير مسجل" in the main
         // screen as well as in the registration modal. This is important for
         // a newly added employee: absence of an InsuranceRecord must not hide
         // the employee from the insurance workflow.
-        $employees = Employee::whereDoesntHave('insuranceRecord')
+        $employees = Employee::where($eligible)->whereDoesntHave('insuranceRecord')
             ->when($request->filled('search'), fn ($q) => $q->where(function ($employee) use ($request) {
                 $employee->where('full_name', 'like', '%'.$request->search.'%')
                     ->orWhere('employee_code', 'like', '%'.$request->search.'%');
@@ -45,7 +66,7 @@ class InsuranceController extends Controller
         $overdue = Employee::whereDoesntHave('insuranceRecord', fn ($q) => $q->where('status', 'مسجل'))
             ->whereDate('hire_date', '<', today()->subDays((int) ($organization->grace_days ?? 30)))
             ->count();
-        return view('insurance.index', compact('insuranceRecords', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue'));
+        return view('insurance.index', compact('insuranceRecords', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue', 'month'));
     }
 
     public function store(Request $request)
@@ -53,8 +74,12 @@ class InsuranceController extends Controller
         $data = $this->validateRecord($request, true);
         $data['insurance_category'] = $this->normalizeInsuranceCategory($data['insurance_category'] ?? null);
         $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
+        if ($data['status'] === 'unregistered' && blank($data['insurance_end_date'] ?? null)) {
+            $data['insurance_end_date'] = today()->toDateString();
+        }
         $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
         $employee = Employee::findOrFail($data['employee_id']);
+        $data['insurance_number'] = $data['insurance_number'] ?: $employee->insurance_number;
 
         // Keep the deadline automatic unless the user deliberately chooses another date.
         if (empty($data['registration_deadline']) && $employee->hire_date) {
@@ -68,6 +93,7 @@ class InsuranceController extends Controller
         $record = DB::transaction(function () use ($data) {
             $old = InsuranceRecord::where('employee_id', $data['employee_id'])->first()?->toArray();
             $record = InsuranceRecord::updateOrCreate(['employee_id' => $data['employee_id']], $data);
+            Employee::whereKey($record->employee_id)->update(['insurance_number' => $data['insurance_number']]);
             $this->recordHistory($record, $old);
             return $record;
         });
@@ -84,9 +110,13 @@ class InsuranceController extends Controller
         $data = $this->validateRecord($request, false);
         $data['insurance_category'] = $this->normalizeInsuranceCategory($data['insurance_category'] ?? null);
         $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
+        if ($data['status'] === 'unregistered') {
+            $data['insurance_end_date'] = today()->toDateString();
+        }
         $old = $insuranceRecord->toArray();
         DB::transaction(function () use ($insuranceRecord, $data, $old) {
             $insuranceRecord->update($data);
+            Employee::whereKey($insuranceRecord->employee_id)->update(['insurance_number' => $data['insurance_number'] ?? null]);
             $this->recordHistory($insuranceRecord, $old);
         });
         Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);

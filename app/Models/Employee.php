@@ -28,6 +28,7 @@ class Employee extends Model
         'last_name',
         'full_name',
         'national_id',
+        'insurance_number',
         'phone',
         'email',
         'profile_photo_path',
