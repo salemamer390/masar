@@ -6,6 +6,8 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\InsuranceRecord;
 use App\Models\Salary;
+use App\Models\MovementRecord;
+use App\Models\MovementType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,7 +34,7 @@ class InsuranceController extends Controller
                 });
         });
         $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
-            ->whereHas('employee', $eligible)
+            ->whereHas('employee')
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $this->normalizeInsuranceStatus($request->status)))
@@ -49,7 +51,7 @@ class InsuranceController extends Controller
         // screen as well as in the registration modal. This is important for
         // a newly added employee: absence of an InsuranceRecord must not hide
         // the employee from the insurance workflow.
-        $employees = Employee::where($eligible)->whereDoesntHave('insuranceRecord')
+        $employees = Employee::query()->whereDoesntHave('insuranceRecord')
             ->when($request->filled('search'), fn ($q) => $q->where(function ($employee) use ($request) {
                 $employee->where('full_name', 'like', '%'.$request->search.'%')
                     ->orWhere('employee_code', 'like', '%'.$request->search.'%');
@@ -66,7 +68,15 @@ class InsuranceController extends Controller
         $overdue = Employee::whereDoesntHave('insuranceRecord', fn ($q) => $q->where('status', 'مسجل'))
             ->whereDate('hire_date', '<', today()->subDays((int) ($organization->grace_days ?? 30)))
             ->count();
-        return view('insurance.index', compact('insuranceRecords', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue', 'month'));
+        $registeredRecords = $insuranceRecords->where('status', 'registered')->values();
+        $unregisteredRecords = $insuranceRecords->where('status', '!=', 'registered')->values();
+        $registered = $registeredRecords->count();
+        $pending = $insuranceRecords->where('status', 'pending')->count();
+        $unregistered = $unregisteredRecords->count() + $employees->count();
+        $overdue = $employees->filter(fn (Employee $employee): bool => $employee->hire_date
+            && $employee->hire_date->lt(today()->subDays((int) ($organization->grace_days ?? 30))))->count();
+        $activeTab = $request->input('tab', 'registered');
+        return view('insurance.index', compact('insuranceRecords', 'registeredRecords', 'unregisteredRecords', 'activeTab', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue', 'month'));
     }
 
     public function store(Request $request)
@@ -90,14 +100,15 @@ class InsuranceController extends Controller
         if (empty($data['insurance_office']) && !empty($organization?->office_name)) {
             $data['insurance_office'] = $organization->office_name;
         }
-        $record = DB::transaction(function () use ($data) {
-            $old = InsuranceRecord::where('employee_id', $data['employee_id'])->first()?->toArray();
+        $old = InsuranceRecord::where('employee_id', $data['employee_id'])->first()?->toArray();
+        $record = DB::transaction(function () use ($data, $old) {
             $record = InsuranceRecord::updateOrCreate(['employee_id' => $data['employee_id']], $data);
             Employee::whereKey($record->employee_id)->update(['insurance_number' => $data['insurance_number']]);
             $this->recordHistory($record, $old);
             return $record;
         });
         Salary::syncInsuredSalary((int) $record->employee_id);
+        $this->recordInsuranceMovement($record, $old);
         ActivityLog::record('insurance_update', 'Insurance record created or updated.', $record, null, $record->toArray(), 'insurance');
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Insurance record saved.', 'record' => $record->fresh(['employee.department', 'employee.currentSalary'])]);
@@ -112,6 +123,8 @@ class InsuranceController extends Controller
         $data['status'] = $this->normalizeInsuranceStatus($data['status'] ?? null);
         if ($data['status'] === 'unregistered') {
             $data['insurance_end_date'] = today()->toDateString();
+        } elseif ($data['status'] === 'registered') {
+            $data['insurance_end_date'] = null;
         }
         $old = $insuranceRecord->toArray();
         DB::transaction(function () use ($insuranceRecord, $data, $old) {
@@ -120,6 +133,7 @@ class InsuranceController extends Controller
             $this->recordHistory($insuranceRecord, $old);
         });
         Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);
+        $this->recordInsuranceMovement($insuranceRecord->fresh(), $old);
         ActivityLog::record('insurance_update', 'Insurance record updated.', $insuranceRecord, $old, $insuranceRecord->fresh()->toArray(), 'insurance');
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Insurance record updated.', 'record' => $insuranceRecord->fresh(['employee.department', 'employee.currentSalary'])]);
@@ -194,6 +208,35 @@ class InsuranceController extends Controller
         // Keep the old route as a compatibility alias; the official editable
         // Legal-sized S1 template is now the canonical print page.
         return redirect()->route('employees.forms.s1.editable', $insuranceRecord->employee_id);
+    }
+
+    private function recordInsuranceMovement(InsuranceRecord $record, ?array $old): void
+    {
+        $employee = $record->employee()->first();
+        if (!$employee) {
+            return;
+        }
+
+        $type = MovementType::firstOrCreate([
+            'name' => 'Insurance Update',
+            'company_id' => $employee->company_id,
+        ]);
+
+        $wasRegistered = ($old['status'] ?? null) === 'registered';
+        $isRegistered = $record->status === 'registered';
+        $reason = $isRegistered
+            ? ($wasRegistered ? 'Insurance data updated.' : 'Employee re-registered in insurance.')
+            : 'Employee insurance registration changed to unregistered.';
+
+        MovementRecord::create([
+            'employee_id' => $employee->id,
+            'movement_type_id' => $type->id,
+            'movement_date' => $record->insurance_end_date ?? $record->insurance_start_date ?? today(),
+            'reason' => $reason,
+            'old_values' => $old,
+            'new_values' => $record->fresh()->toArray(),
+            'created_by' => auth()->id(),
+        ]);
     }
 
     private function recordHistory(InsuranceRecord $record, ?array $old): void

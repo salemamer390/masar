@@ -425,6 +425,11 @@
     <div class="panel profile-panel">
         <div class="panel-head"><h3>بيانات التأمينات الاجتماعية</h3></div>
         @php($ins = $employee->insuranceRecord)
+        @if($ins && $ins->status !== 'registered')
+            <form method="POST" action="{{ route('insurance.update', $ins) }}" class="d-inline">@csrf @method('PUT')<input type="hidden" name="insurance_number" value="{{ $employee->insurance_number ?? $ins->insurance_number }}"><input type="hidden" name="insurance_start_date" value="{{ $ins->insurance_start_date?->format('Y-m-d') ?? now()->toDateString() }}"><input type="hidden" name="insurance_category" value="workers"><input type="hidden" name="status" value="registered"><button class="btn btn-sm btn-primary"><i class="bi bi-shield-check"></i> إعادة التسجيل بالتأمينات</button></form>
+        @elseif(!$ins)
+            <a class="btn btn-sm btn-primary" href="{{ route('insurance.index', ['tab' => 'unregistered', 'search' => $employee->employee_code]) }}"><i class="bi bi-shield-plus"></i> تسجيل بالتأمينات</a>
+        @endif
         <div class="mb-3">
             <a class="btn btn-sm btn-outline-primary" href="{{ route('insurance.index', ['search' => $employee->employee_code]) }}"><i class="bi bi-shield-check"></i> إدارة التأمينات</a>
             <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ route('employees.forms.s1.editable', $employee) }}"><i class="bi bi-printer"></i> طباعة س1 الرسمي</a>

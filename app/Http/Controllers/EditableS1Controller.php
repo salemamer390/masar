@@ -11,7 +11,10 @@ class EditableS1Controller extends Controller
     /** Print-ready batch of S1 forms for every employee in the system. */
     public function printAll()
     {
+        $companyId = auth()->user()?->company_id;
+        abort_if(!$companyId, 403, 'A company account is required to print employee insurance forms.');
         $employees = Employee::query()
+            ->where('company_id', $companyId)
             ->with(['job', 'department', 'profileDetail', 'insuranceRecord', 'currentSalary'])
             ->orderBy('full_name')
             ->get();
