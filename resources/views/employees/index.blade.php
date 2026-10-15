@@ -273,7 +273,14 @@
             const employee = event.detail?.employee;
             if (!employee || !employee.id || !employeeTableBody) return;
             const oldRow = employeeTableBody.querySelector(`tr[data-employee-id="${employee.id}"]`);
-            if (oldRow) oldRow.outerHTML = employeeRow(employee);
+            if (oldRow && form.id !== 'addEmployeeForm') {
+                const statusCell = oldRow.children[4];
+                const status = employee.status?.name || employee.status_name || 'Active';
+                if (statusCell) statusCell.querySelector('.badge-soft')?.replaceChildren(document.createTextNode(statusLabel(status)));
+                statusCell?.querySelector('.badge-soft')?.classList.remove('success', 'warning', 'danger');
+                statusCell?.querySelector('.badge-soft')?.classList.add(statusTone(status));
+                bootstrap.Modal.getInstance(document.getElementById('employeeListStatusModal'))?.hide();
+            } else if (oldRow) oldRow.outerHTML = employeeRow(employee);
             else { employeeTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); employeeTableBody.insertAdjacentHTML('afterbegin', employeeRow(employee)); }
             if (form.id === 'addEmployeeForm') { bootstrap.Modal.getInstance(document.getElementById('addEmployeeModal'))?.hide(); form.reset(); }
         }
