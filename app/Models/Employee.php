@@ -15,7 +15,10 @@ class Employee extends Model
     {
         static::addGlobalScope('company', function (Builder $builder): void {
             $user = auth()->user();
-            if ($user && !$user->isSuperAdmin() && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
+            // A company-linked account is always isolated to its company,
+            // including Super Admin accounts. Only an unlinked platform
+            // account (company_id = null) may see all companies.
+            if ($user && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
         });
     }
     protected $fillable = [

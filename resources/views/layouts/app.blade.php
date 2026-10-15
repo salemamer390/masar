@@ -417,6 +417,55 @@
       showToast(@json($errors->first()));
     });
   @endif
+
+  {{-- Temporary company-isolation diagnostic. Remove after verification. --}}
+  (() => {
+    const ids = new Set();
+    const employeeIdFromUrl = (value) => {
+      const match = String(value || '').match(/\/employees\/(\d+)(?:\/|$)/);
+      return match ? match[1] : null;
+    };
+    document.querySelectorAll('a[href], select[name="employee_id"] option').forEach((node) => {
+      const id = node.tagName === 'OPTION' ? node.value : employeeIdFromUrl(node.href);
+      if (id) ids.add(String(id));
+    });
+    const current = employeeIdFromUrl(location.pathname);
+    if (current) ids.add(current);
+    if (!ids.size) return;
+    const query = [...ids].map(id => `ids[]=${encodeURIComponent(id)}`).join('&');
+    fetch(`{{ route('employees.company-map') }}?${query}`, {headers: {'Accept': 'application/json'}})
+      .then(response => response.ok ? response.json() : {})
+      .then(companyMap => {
+        const badge = (id) => {
+          const companyId = companyMap[id];
+          if (companyId === undefined || companyId === null) return null;
+          const element = document.createElement('span');
+          element.className = 'company-id-debug';
+          element.textContent = `Company ID: ${companyId}`;
+          element.title = 'Temporary company isolation diagnostic';
+          return element;
+        };
+        document.querySelectorAll('a[href]').forEach((link) => {
+          const id = employeeIdFromUrl(link.href);
+          if (!id || !companyMap[id] || link.querySelector('.company-id-debug')) return;
+          const marker = badge(id); if (marker) link.append(' ', marker);
+        });
+        document.querySelectorAll('select[name="employee_id"] option').forEach((option) => {
+          const marker = badge(option.value);
+          if (marker && !option.textContent.includes('Company ID:')) option.textContent += ` — ${marker.textContent}`;
+        });
+        document.querySelectorAll('[data-employee-id]').forEach((node) => {
+          const id = String(node.dataset.employeeId || '');
+          const marker = badge(id);
+          if (marker && !node.querySelector('.company-id-debug')) node.append(' ', marker);
+        });
+        if (current && companyMap[current]) {
+          const heading = document.querySelector('.profile-person h1');
+          const marker = badge(current);
+          if (heading && marker && !heading.querySelector('.company-id-debug')) heading.append(' ', marker);
+        }
+      }).catch(() => {});
+  })();
 </script>
 
 @stack('scripts')

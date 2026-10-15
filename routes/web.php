@@ -76,6 +76,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware('permission:employees.view')
             ->name('index');
+        Route::get('/company-map', [EmployeeController::class, 'companyMap'])
+            ->middleware('permission:employees.view')
+            ->name('company-map');
         Route::post('/', [EmployeeController::class, 'store'])
             ->middleware('permission:employees.create')
             ->name('store');

@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Salary;
 use App\Services\PayrollCalculator;
 use App\Services\PayrollSettingsService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -20,8 +21,12 @@ class SalaryController extends Controller
 
     public function index(PayrollCalculator $calculator, Request $request)
     {
+        $companyId = auth()->user()?->company_id;
+        $eligibleEmployeeIds = $this->eligibleEmployeesForSalary($companyId)->select('id');
         $salariesQuery = Salary::with(['employee.department', 'employee.job', 'paymentMethod'])
-            ->where('status', 'Active');
+            ->where('status', 'Active')
+            ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
+            ->whereIn('employee_id', $eligibleEmployeeIds);
         if ($request->filled('employee_id')) {
             $salariesQuery->where('employee_id', (int) $request->input('employee_id'));
         }
@@ -37,7 +42,7 @@ class SalaryController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        $employees = Employee::with(['department', 'job'])->orderBy('full_name')->get();
+        $employees = $this->eligibleEmployeesForSalary($companyId)->with(['department', 'job'])->orderBy('full_name')->get();
         $departments = Department::where('is_active', 1)->orderBy('name')->get();
         $paymentMethods = PaymentMethod::orderBy('name')->get();
         $allowanceRate = $this->settings->allowanceRate();
@@ -68,6 +73,7 @@ class SalaryController extends Controller
     {
         $validated = $this->validateSalary($request);
         $employee = Employee::findOrFail((int) $validated['employee_id']);
+        $this->ensureEmployeeIsEligibleForSalary($employee);
         if ((float) $employee->gross_salary <= 0) {
             throw ValidationException::withMessages(['employee_id' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف. أدخل الراتب من ملف الموظف أولًا.']);
         }
@@ -109,6 +115,7 @@ class SalaryController extends Controller
     {
         $validated = $this->validateSalary($request);
         $employee = $salary->employee;
+        $this->ensureEmployeeIsEligibleForSalary($employee);
         if ((float) $employee?->gross_salary <= 0) {
             throw ValidationException::withMessages(['salary_input' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف.']);
         }
@@ -147,8 +154,12 @@ class SalaryController extends Controller
     // يعيد حساب وحفظ كل الهياكل السارية بمنطق الضريبة الحالي (مفيد بعد أي تعديل على الشرائح أو النسب).
     public function recalculate(PayrollCalculator $calculator)
     {
+        $companyId = auth()->user()?->company_id;
         $count = 0;
-        foreach (Salary::where('status', 'Active')->get() as $salary) {
+        foreach (Salary::where('status', 'Active')
+            ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
+            ->whereIn('employee_id', $this->eligibleEmployeesForSalary($companyId)->select('id'))
+            ->get() as $salary) {
             $this->syncBreakdown($salary, $calculator, true);
             Salary::syncInsuredSalary((int)$salary->employee_id);
             $count++;
@@ -264,5 +275,28 @@ class SalaryController extends Controller
         if ($save) $salary->update($fields);
         else $salary->setRawAttributes(array_merge($salary->getAttributes(), $fields), true);
         return $structure;
+    }
+
+    /** Salary structures are available to every employee except resigned/terminated staff. */
+    private function eligibleEmployeesForSalary(?int $companyId): Builder
+    {
+        return Employee::query()
+            ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
+            ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', [
+                'Terminated', 'منتهي الخدمة', 'منتهى الخدمة',
+                'Resigned', 'Resignation', 'مستقيل', 'استقال', 'استقالة',
+            ]));
+    }
+
+    private function ensureEmployeeIsEligibleForSalary(?Employee $employee): void
+    {
+        $currentCompanyId = auth()->user()?->company_id;
+        if (!$employee
+            || ($currentCompanyId && (int) $employee->company_id !== (int) $currentCompanyId)
+            || !$this->eligibleEmployeesForSalary($employee->company_id)->whereKey($employee->id)->exists()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'لا يمكن إنشاء أو تعديل هيكل راتب لموظف مستقيل أو منتهي الخدمة.',
+            ]);
+        }
     }
 }

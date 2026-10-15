@@ -16,13 +16,15 @@ class PayrollController extends Controller
 {
     public function index(Request $request)
     {
+        $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $records = PayrollRecord::with(['employee.department', 'employee.job'])
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())
             ->orderByDesc('id')
             ->get();
 
-        $totalEmployees = Employee::count();
+        $totalEmployees = Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->count();
         $reviewedCount = $records->whereIn('status', ['معتمدة', 'تم الصرف', 'Approved', 'Paid'])->count();
         $pendingReview = $records->whereIn('status', ['قيد الإعداد', 'Draft'])->count();
         $totalNet = $records->sum('net_salary');
@@ -31,9 +33,9 @@ class PayrollController extends Controller
         $totalTax = $records->sum('income_tax');
         $totalEmployerInsurance = $records->sum('employer_insurance');
         $totalMartyrs = $records->sum('martyrs_fund');
-        $runs = PayrollRun::withCount('records')->orderByDesc('payroll_month')->limit(12)->get();
+        $runs = PayrollRun::withCount('records')->when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderByDesc('payroll_month')->limit(12)->get();
         $cardDetails = [
-            'employees' => Employee::orderBy('full_name')->get(['id','full_name','employee_code']),
+            'employees' => Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderBy('full_name')->get(['id','full_name','employee_code']),
             'reviewed' => $records->whereIn('status', ['Ù…Ø¹ØªÙ…Ø¯Ø©', 'ØªÙ… Ø§Ù„ØµØ±Ù', 'Approved', 'Paid'])->values(),
             'drafts' => $records->whereIn('status', ['Ù‚ÙŠØ¯ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'Draft'])->values(),
             'net' => $records->sortByDesc('net_salary')->values(),
@@ -45,8 +47,9 @@ class PayrollController extends Controller
 
     public function generate(Request $request, PayrollRunService $service)
     {
+        $companyId = auth()->user()?->company_id;
         $targetMonth = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $existing = PayrollRun::whereDate('payroll_month', $targetMonth->toDateString())->first();
+        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $targetMonth->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
             return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا. أنشئ مسيرًا للشهر التالي أو راجع المسير الحالي.']);
         }
@@ -56,8 +59,9 @@ class PayrollController extends Controller
 
     public function generateRun(Request $request, PayrollRunService $service)
     {
+        $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $existing = PayrollRun::whereDate('payroll_month', $month->toDateString())->first();
+        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $month->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
             return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.']);
         }
@@ -148,8 +152,10 @@ class PayrollController extends Controller
 
     public function export(Request $request)
     {
+        $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $records = PayrollRecord::with(['employee.department', 'employee.job'])
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
         if ($request->string('format')->lower() === 'csv') {

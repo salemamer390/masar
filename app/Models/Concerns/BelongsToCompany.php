@@ -9,7 +9,10 @@ trait BelongsToCompany
     {
         static::addGlobalScope('company', function (Builder $builder): void {
             $user = Auth::user();
-            if ($user && !$user->isSuperAdmin() && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
+            // Keep company-linked users isolated even when their role is
+            // Super Admin. Platform-wide access is reserved for accounts
+            // without a company_id.
+            if ($user && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
         });
         static::saving(function ($model): void {
             $actor = Auth::user();
@@ -25,7 +28,7 @@ trait BelongsToCompany
             }
 
             $model->company_id ??= $actor?->company_id;
-            if ($actor && !$actor->isSuperAdmin() && $actor->company_id && (int) $model->company_id !== (int) $actor->company_id) {
+            if ($actor && $actor->company_id && (int) $model->company_id !== (int) $actor->company_id) {
                 throw new \Illuminate\Auth\Access\AuthorizationException('The record does not belong to the current company.');
             }
         });

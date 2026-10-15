@@ -28,18 +28,23 @@ class PayrollRunService
     public function generate(Carbon $month): PayrollRun
     {
         return DB::transaction(function () use ($month) {
+            $companyId = auth()->user()?->company_id;
             $run = PayrollRun::lockForUpdate()->firstOrCreate(
-                ['payroll_month' => $month->toDateString()],
-                ['status' => 'Draft', 'created_by' => auth()->id(), 'settings_snapshot' => $this->settings->snapshot()]
+                ['company_id' => $companyId, 'payroll_month' => $month->toDateString()],
+                ['company_id' => $companyId, 'status' => 'Draft', 'created_by' => auth()->id(), 'settings_snapshot' => $this->settings->snapshot()]
             );
             if (in_array($run->status, ['Approved', 'Locked'], true)) abort(422, 'Approved or locked payroll runs cannot be regenerated.');
             $run->update(['settings_snapshot' => $this->settings->snapshot()]);
 
             $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
             $employees = Employee::query()
+                ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
                 ->where(function ($query) use ($excludedStatuses, $month) {
                     $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', $excludedStatuses))
-                        ->orWhereHas('payrollRecords', fn ($records) => $records->whereDate('payroll_month', $month->toDateString()));
+                        ->orWhere(function ($terminated) use ($month) {
+                            $terminated->whereHas('status', fn ($status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة']))
+                                ->whereBetween('termination_date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()]);
+                        });
                 })
                 ->orderBy('id')->cursor();
 
@@ -203,8 +208,25 @@ class PayrollRunService
     {
         $monthStart = $month->copy()->startOfMonth();
         $monthEnd = $month->copy()->endOfMonth();
+        $status = strtolower(trim((string) $employee->status?->name));
+        $terminal = in_array($status, ['terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true);
+        $eligibleWhileActive = in_array($status, ['', 'active', 'leave', 'إجازة'], true);
+
+        // Suspended/pending employees are not payable. A terminated employee is
+        // payable only for the month in which the termination occurred.
+        if (!$eligibleWhileActive && !$terminal) return null;
+
         $hireDate = $employee->hire_date ? Carbon::parse($employee->hire_date) : $monthStart->copy();
-        $contractEnd = $employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy();
+        $terminationDate = $employee->termination_date
+            ? Carbon::parse($employee->termination_date)->startOfDay()
+            : ($terminal && $employee->contract_end_date ? Carbon::parse($employee->contract_end_date)->startOfDay() : null);
+        if ($terminal) {
+            // No termination date means there is no reliable month to include;
+            // do not accidentally include the employee in every future run.
+            if (!$terminationDate || !$terminationDate->isSameMonth($month)) return null;
+        }
+        $contractEnd = $terminationDate
+            ?? ($employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy());
         $start = $hireDate->greaterThan($monthStart) ? $hireDate : $monthStart;
         $end = $contractEnd->lessThan($monthEnd) ? $contractEnd : $monthEnd;
         if ($start->greaterThan($end)) return null;

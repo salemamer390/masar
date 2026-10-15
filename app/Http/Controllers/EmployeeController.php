@@ -86,6 +86,18 @@ class EmployeeController extends Controller
         return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary', 'employeeCardDetails'));
     }
 
+    /** Temporary diagnostic endpoint: exposes the owning company for employee IDs rendered on a page. */
+    public function companyMap(Request $request)
+    {
+        $ids = collect($request->input('ids', []))
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)->unique()->values();
+
+        return response()->json(
+            Employee::withoutGlobalScopes()->whereIn('id', $ids)->pluck('company_id', 'id')
+        );
+    }
+
     public function show(Employee $employee, Request $request)
     {
         $employee->load([

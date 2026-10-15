@@ -55,7 +55,7 @@
       <div class="salary-employee">
         <div class="salary-avatar">@if($s->employee?->profile_photo_url)<img src="{{ $s->employee->profile_photo_url }}" alt="{{ $s->employee->full_name }}">@else{{ $s->employee?->initials }}@endif</div>
         <div>
-          <strong>{{ $s->employee?->full_name }}</strong>
+          <strong data-employee-id="{{ $s->employee_id }}">{{ $s->employee?->full_name }}</strong>
           <div class="small text-muted">{{ $s->employee?->job?->title ?? '—' }} · {{ $s->employee?->department?->name ?? '—' }}</div>
         </div>
       </div>

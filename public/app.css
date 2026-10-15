@@ -3226,6 +3226,27 @@ button,
   margin-top: 2px;
   font-size: 9px;
 }
+.company-id-debug {
+  display: inline-block;
+  margin-inline-start: .45rem;
+  padding: .12rem .35rem;
+  border: 1px solid #f0b429;
+  border-radius: .35rem;
+  background: #fff8df;
+  color: #8a5a00;
+  font-size: .68em;
+  font-weight: 600;
+  direction: ltr;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* Salary structures are generated from the employee profile. They are
+   read-only here; salary changes belong to the employee profile workflow. */
+.salary-page-head [data-bs-target="#salaryModal"],
+.salary-card > .d-flex[onclick="event.stopPropagation()"],
+.salary-details-modal [data-bs-target^="#editSalary"] {
+  display: none !important;
+}
 .quick-grid a {
   border: 1px solid var(--border);
   background: #fff;
