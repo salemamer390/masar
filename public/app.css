@@ -3131,9 +3131,9 @@ button,
   .app-shell .main {
     transition: margin-right .24s ease,width .24s ease;
   }
-  .app-shell:not(.sidebar-collapsed) .sidebar-hamburger {
-    display: none !important;
-  }
+  .app-shell .sidebar-hamburger { display: inline-grid !important; }
+  .app-shell:not(.sidebar-collapsed) .topbar-sidebar-toggle { display: none !important; }
+  .app-shell.sidebar-collapsed .topbar-sidebar-toggle { display: inline-grid !important; }
   .app-shell.sidebar-collapsed .sidebar {
     width: 76px !important;
     padding-inline: 10px;
@@ -3175,9 +3175,9 @@ button,
   }
 }
 @media (max-width:800px) {
-  .app-shell .sidebar-hamburger {
-    display: none !important;
-  }
+  .app-shell .sidebar-hamburger { display: inline-grid !important; }
+  .app-shell .topbar-sidebar-toggle { display: inline-grid !important; }
+  .app-shell:has(.sidebar.open) .topbar-sidebar-toggle { display: none !important; }
 }
 .sidebar-hamburger {
   display: inline-grid !important;
@@ -3187,6 +3187,10 @@ button,
 .sidebar-hamburger i {
   font-size: 23px;
   line-height: 1;
+}
+.topbar-search-area > #menuBtn,
+.topbar-search-area > #sidebarToggleBtn {
+  display: none !important;
 }
 .content {
   animation: page-enter .18s ease-out;

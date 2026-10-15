@@ -107,6 +107,21 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
   .reference-kpi-grid--six .reference-kpi>span:last-child small{display:none!important}
 }
 
+@media(min-width:801px){
+  .topbar .topbar-tools .sidebar-hamburger{display:inline-grid!important;order:4!important}
+  .app-shell:not(.sidebar-collapsed) .topbar .topbar-tools .topbar-sidebar-toggle{display:none!important}
+  .app-shell.sidebar-collapsed .topbar .topbar-tools .topbar-sidebar-toggle{display:inline-grid!important}
+}
+
+/* Keep the notification panel clear of the fixed sidebar and aligned to its left. */
+@media(min-width:801px){
+  .topbar .notification-menu{position:fixed!important;top:76px!important;right:300px!important;left:auto!important;z-index:100!important;transform:none!important}
+  .app-shell.sidebar-collapsed .topbar .notification-menu{right:88px!important}
+}
+@media(max-width:800px){
+  .topbar .notification-menu{position:fixed!important;top:64px!important;right:10px!important;left:10px!important;width:auto!important;z-index:100!important;transform:none!important}
+}
+
 /* Dashboard mobile header: keep the user controls on one clean row. */
 @media(max-width:700px){
   body:has(.dashboard-command-bar--reference) .topbar-reference{
@@ -126,7 +141,7 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
     display:flex!important;
   }
   body:has(.dashboard-command-bar--reference) .topbar-search-area .global-search-reference{display:none!important}
-  body:has(.dashboard-command-bar--reference) .topbar-search-area #menuBtn{display:inline-flex!important;width:40px!important;height:40px!important}
+  body:has(.dashboard-command-bar--reference) .topbar-search-area #menuBtn{display:none!important}
   body:has(.dashboard-command-bar--reference) .topbar-reference .topbar-tools{
     position:absolute!important;
     inset:8px 12px auto auto!important;

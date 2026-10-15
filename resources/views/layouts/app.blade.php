@@ -227,6 +227,9 @@
   document.getElementById('menuBtn')?.addEventListener('click', function() {
     mobileSidebar?.classList.toggle('open');
   });
+   document.getElementById('topbarSidebarBtn')?.addEventListener('click', function() {
+     if (window.matchMedia('(max-width: 800px)').matches) mobileSidebar?.classList.toggle('open');
+   });
   document.querySelector('[data-sidebar-mobile-close]')?.addEventListener('click', closeMobileSidebar);
   document.querySelector('[data-sidebar-overlay]')?.addEventListener('click', closeMobileSidebar);
   document.addEventListener('keydown', event => {
@@ -253,7 +256,8 @@
     };
     applySidebarState(shell.classList.contains('sidebar-collapsed'));
 
-    toggles.forEach(btn => btn.addEventListener('click', () => {
+     toggles.forEach(btn => btn.addEventListener('click', () => {
+       if (window.matchMedia('(max-width: 800px)').matches) return;
       const collapsed = !shell.classList.contains('sidebar-collapsed');
       try { localStorage.setItem('masar_sidebar_collapsed', collapsed ? '1' : '0'); } catch (e) {}
       applySidebarState(collapsed);
