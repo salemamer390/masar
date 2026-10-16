@@ -61,18 +61,25 @@ class JobDataController extends Controller
     }
 
 
-    public function saveSnapshot(Request $request)
+    public function captureSnapshot(Carbon $month, ?int $createdBy = null): MonthlySummarySnapshot
     {
-        $data = $request->validate(['month' => ['required', 'date_format:Y-m']]);
-        $month = Carbon::createFromFormat('Y-m', $data['month'])->startOfMonth();
+        $month = $month->copy()->startOfMonth();
         $employees = Employee::with(['department', 'job', 'currentSalary'])->orderBy('id')->get();
         $rows = $this->snapshotRows($this->buildMonthlyRows($employees, $month));
 
-        MonthlySummarySnapshot::updateOrCreate(
+        return MonthlySummarySnapshot::updateOrCreate(
             ['company_id' => auth()->user()->company_id, 'summary_month' => $month->toDateString()],
-            ['rows' => $rows, 'employee_count' => count($rows), 'created_by' => auth()->id()]
+            ['rows' => $rows, 'employee_count' => count($rows), 'created_by' => $createdBy ?? auth()->id()]
         );
 
+        return back()->with('toast', 'تم حفظ سجل ملخص الشهر.');
+    }
+
+    /** Legacy endpoint kept for cached clients; the UI no longer exposes manual saving. */
+    public function saveSnapshot(Request $request)
+    {
+        $data = $request->validate(['month' => ['required', 'date_format:Y-m']]);
+        $this->captureSnapshot(Carbon::createFromFormat('Y-m', $data['month']), auth()->id());
         return back()->with('toast', 'تم حفظ سجل ملخص الشهر.');
     }
 

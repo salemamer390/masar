@@ -7,7 +7,6 @@ use App\Models\Company;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class CaptureMonthlySummary extends Command
@@ -32,7 +31,7 @@ class CaptureMonthlySummary extends Command
             }
 
             Auth::login($user);
-            $controller->saveSnapshot(Request::create('/', 'POST', ['month' => $month->format('Y-m')]));
+            $controller->captureSnapshot($month, $user->id);
             $captured++;
         }
 

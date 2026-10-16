@@ -118,7 +118,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/jobs/export', [JobDataController::class, 'export'])
         ->middleware('permission:employees.view')
         ->name('jobs.export');
-    // Kept for backward compatibility with old bookmarks; snapshots are now created automatically.
+    // Compatibility endpoint for stale compiled views; no save button is rendered.
     Route::post('/jobs/summary-history', [JobDataController::class, 'saveSnapshot'])
         ->middleware('permission:employees.view')
         ->name('jobs.summary-history.store');
