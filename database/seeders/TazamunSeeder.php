@@ -39,7 +39,7 @@ class TazamunSeeder extends Seeder
         ]);
         $permissions = [
             ['dashboard.view','View Dashboard','dashboard','view'],
-            ['employees.view','View Employees','employees','view'],['employees.create','Create Employees','employees','create'],['employees.edit','Edit Employees','employees','edit'],['employees.delete','Delete Employees','employees','delete'],
+            ['employees.view','View Employees','employees','view'],['employees.create','Create Employees','employees','create'],['employees.edit','Edit Employees','employees','edit'],['employees.delete','Delete Employees','employees','delete'],['employees.import','Import Employees','employees','import'],
             ['attendance.view','View Attendance','attendance','view'],['attendance.create','Create Attendance','attendance','create'],['attendance.edit','Edit Attendance','attendance','edit'],['attendance.delete','Delete Attendance','attendance','delete'],
             ['requests.view','View HR Requests','requests','view'],['requests.create','Create HR Requests','requests','create'],['requests.approve','Approve HR Requests','requests','approve'],['requests.delete','Delete HR Requests','requests','delete'],
             ['leaves.view','View Leaves','leaves','view'],['leaves.create','Create Leave','leaves','create'],['leaves.edit','Edit Leave','leaves','edit'],['leaves.approve','Approve Leave','leaves','approve'],['leaves.delete','Delete Leave','leaves','delete'],

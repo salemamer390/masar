@@ -10,6 +10,11 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> إعدادات بيانات الموظفين</a>@endif
+    @if(auth()->user()?->hasPermission('employees.import'))
+    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
+      <i class="bi bi-file-earmark-excel text-success"></i> استيراد من Excel
+    </button>
+    @endif
     @if(auth()->user()?->hasPermission('employees.create'))
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
       <i class="bi bi-plus-lg"></i> إضافة موظف
@@ -240,6 +245,7 @@
     </div>
   </div>
 </div>
+@include('employees.partials.import-modal')
 @endsection
 
 @push('scripts')

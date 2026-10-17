@@ -12,6 +12,9 @@
     @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus','إصدار مسير الرواتب'=>'fa-circle-dollar-to-slot'])
     <button type="button" class="dashboard-existing-action" data-short-label="{{ $shortActionLabels[$loop->index] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
   @endforeach
+  @if(auth()->user()?->hasPermission('employees.import'))
+    <button type="button" class="dashboard-import-action" data-short-label="استيراد" data-bs-toggle="modal" data-bs-target="#employeesImportModal"><i class="fa-solid fa-file-excel"></i><span>استيراد موظفين</span></button>
+  @endif
 </div>
 @if($companySubscription?->plan)
 <section class="panel mb-3 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -115,6 +118,7 @@
 <div class="modal fade" id="dashboardPayrollModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('payroll.generate') }}">@csrf<div class="modal-header"><h5>إصدار مسير رواتب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted small">سيتم إنشاء أو تحديث مسودة المسير للشهر المحدد وفق هياكل الرواتب السارية.</p><label class="form-label">شهر المسير</label><input name="month" type="month" class="form-control" value="{{ $month->format('Y-m') }}" required></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">إصدار المسير</button></div></form></div></div></div>
 @endif
 --}}
+@include('employees.partials.import-modal')
 @endsection
 
 @push('scripts')

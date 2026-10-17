@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DashboardDetailController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeImportController;
 use App\Http\Controllers\EmployeeContactController;
 use App\Http\Controllers\InsuranceController;
 use App\Http\Controllers\EditableS1Controller;
@@ -73,6 +74,15 @@ Route::middleware(['auth', 'subscription'])->group(function () {
 
     // Employees
     Route::prefix('employees')->name('employees.')->group(function () {
+        Route::get('/import/template', [EmployeeImportController::class, 'template'])
+            ->middleware('permission:employees.import')
+            ->name('import.template');
+        Route::post('/import/preview', [EmployeeImportController::class, 'preview'])
+            ->middleware('permission:employees.import')
+            ->name('import.preview');
+        Route::post('/import', [EmployeeImportController::class, 'store'])
+            ->middleware('permission:employees.import')
+            ->name('import.store');
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware('permission:employees.view')
             ->name('index');
