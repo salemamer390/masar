@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\Imports\EmployeeImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class EmployeeImportController extends Controller
 {
@@ -58,7 +57,9 @@ class EmployeeImportController extends Controller
             ], 422);
         }
 
-        $companyId = (int) (auth()->user()->company_id ?: DB::table('companies')->value('id'));
+        // A platform account must never fall back to the first company in the
+        // database: that would import data into another tenant.
+        $companyId = (int) auth()->user()->company_id;
         if ($companyId <= 0) {
             return response()->json(['success' => false, 'message' => 'لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.'], 422);
         }

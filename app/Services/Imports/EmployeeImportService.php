@@ -33,6 +33,12 @@ class EmployeeImportService
 {
     public const MAX_ROWS = 3000;
 
+    /** Columns produced by HR reports, not employee master-data inputs. */
+    private const CALCULATED_HEADERS = [
+        'سنوات الخدمة', 'مدة الخدمة', 'الرصيد المستحق', 'المستخدم', 'المتبقي', 'تنبيه',
+        'رصيد الإجازة السنوية المتبقي', 'إجمالي الإجازات', 'أيام الحضور', 'أيام الغياب',
+    ];
+
     /** Employees in these statuses do not consume the plan's employee limit (same rule as EmployeeController). */
     private const INACTIVE_STATUSES = ['منتهي الخدمة', 'موقوف', 'قيد التعيين', 'Terminated', 'Suspended', 'Pending'];
 
@@ -55,19 +61,21 @@ class EmployeeImportService
         'department' => ['القسم', ['الإدارة', 'الادارة', 'department']],
         'job' => ['الوظيفة', ['المسمى الوظيفي', 'المسمى', 'job', 'job title', 'title', 'position']],
         'branch' => ['الفرع', ['مكان العمل', 'branch', 'work location']],
-        'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'employment type', 'employment_type']],
-        'status' => ['الحالة الوظيفية', ['حالة الموظف', 'الحالة', 'status']],
+        'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'نوع الموظف', 'employment type', 'employment_type']],
+        'status' => ['الحالة الوظيفية', ['حالة الموظف', 'حالة العمل', 'employee status', 'status']],
         'hire_date' => ['تاريخ التعيين', ['تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date']],
         'contract_start_date' => ['بداية العقد', ['تاريخ بداية العقد', 'contract start', 'contract_start_date']],
         'contract_end_date' => ['نهاية العقد', ['تاريخ نهاية العقد', 'contract end', 'contract_end_date']],
         'contract_duration' => ['مدة العقد', ['contract duration', 'contract_duration']],
         'gross_salary' => ['الراتب الإجمالي', ['الراتب الاجمالي', 'اجمالي الراتب', 'إجمالي الراتب', 'الإجمالي', 'gross salary', 'gross_salary', 'gross']],
         'net_salary' => ['الراتب الصافي', ['صافي الراتب', 'الصافي', 'net salary', 'net_salary', 'net']],
-        'manager_code' => ['كود المدير المباشر', ['كود المدير', 'المدير المباشر', 'manager code', 'manager_code']],
-        'shift_start' => ['بداية الدوام', ['بدايه الدوام', 'shift start', 'shift_start']],
-        'shift_end' => ['نهاية الدوام', ['نهايه الدوام', 'shift end', 'shift_end']],
+        'manager_code' => ['كود المدير المباشر', ['كود المدير', 'manager code', 'manager_code']],
+        'manager_name' => ['اسم المدير المباشر', ['المدير المباشر', 'اسم المدير', 'manager name', 'manager_name']],
+        'shift_start' => ['بداية الدوام', ['بدايه الدوام', 'بداية دوام خاصة', 'بداية الوردية', 'وقت الحضور الرسمي', 'shift start', 'shift_start']],
+        'shift_end' => ['نهاية الدوام', ['نهايه الدوام', 'نهاية دوام خاصة', 'نهاية الوردية', 'وقت الانصراف الرسمي', 'shift end', 'shift_end']],
         'termination_type' => ['نوع انتهاء الخدمة', ['نوع إنهاء الخدمة', 'termination type', 'termination_type']],
-        'termination_date' => ['تاريخ انتهاء الخدمة', ['تاريخ إنهاء الخدمة', 'termination date', 'termination_date']],
+        'termination_date' => ['تاريخ انتهاء الخدمة', ['تاريخ إنهاء الخدمة', 'تاريخ ترك العمل', 'تاريخ الخروج', 'آخر يوم عمل', 'تاريخ الاستقالة', 'termination date', 'termination_date']],
+        'manual_annual_balance' => ['رصيد الإجازة السنوية اليدوي', ['رصيد سنوي يدوي (اختياري)', 'رصيد إجازة سنوية', 'رصيد الإجازات', 'manual annual balance', 'manual_annual_balance']],
         'notes' => ['ملاحظات', ['ملاحظة', 'notes', 'note']],
     ];
 
@@ -160,10 +168,22 @@ class EmployeeImportService
                 }
             }
             $infos[$index] = ['header_row' => $headerRow, 'map' => $map, 'entries' => $entries, 'used' => $used, 'rows' => $dataRows, 'matched' => $headerRow !== null];
-            $result['sheets'][] = ['index' => $index, 'name' => $sheet['name'], 'rows' => $headerRow !== null ? $dataRows : count($sheet['rows']), 'matched' => $headerRow !== null];
         }
 
-        $candidates = array_values(array_keys(array_filter($infos, static fn (array $info): bool => $info['matched'])));
+        $multipleSheets = count($sheets) > 1;
+        foreach ($infos as $index => $info) {
+            $eligible = $info['matched'] && (!$multipleSheets || $this->isEmployeeDataSheet($info['used']));
+            $infos[$index]['eligible'] = $eligible;
+            $result['sheets'][] = [
+                'index' => $index,
+                'name' => $sheets[$index]['name'],
+                'rows' => $info['matched'] ? $info['rows'] : count($sheets[$index]['rows']),
+                'matched' => $info['matched'],
+                'eligible' => $eligible,
+            ];
+        }
+
+        $candidates = array_values(array_keys(array_filter($infos, static fn (array $info): bool => !empty($info['eligible']))));
         $result['merge_available'] = count($candidates) > 1;
 
         // No sheet has a recognisable "full name" header: let the user map columns manually.
@@ -211,9 +231,8 @@ class EmployeeImportService
                 $usage[$field] = $source;
             }
         }
-        foreach ($this->unmatchedColumns($sheets, $infos, $aliases, $manual, false) as $key => $column) {
-            $columns[$key] ??= $column;
-        }
+        // Once an employee sheet has been selected, do not offer title rows
+        // from dashboard/report sheets as fields to map.
         $result['columns'] = array_values($columns);
         $result['field_usage'] = $usage;
         $result['unknown_columns'] = array_values(array_map(static fn (array $c): string => $c['header'], array_filter($columns, static fn (array $c): bool => $c['field'] === null)));
@@ -287,6 +306,22 @@ class EmployeeImportService
         return $aliases;
     }
 
+    /** An employee sheet needs a name plus at least one master-data identity field. */
+    private function isEmployeeDataSheet(array $used): bool
+    {
+        if (!isset($used['full_name'])) {
+            return false;
+        }
+
+        foreach (['national_id', 'hire_date', 'job', 'employment_type', 'phone', 'insurance_number'] as $marker) {
+            if (isset($used[$marker])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Keeps only [normalised header => known field] pairs (a field can be used once).
      *
@@ -332,6 +367,9 @@ class EmployeeImportService
             if ($normalized === '') {
                 continue;
             }
+            if ($this->isCalculatedHeader($normalized)) {
+                continue;
+            }
             $field = $aliases[$normalized] ?? null;
             if ($field !== null && !isset($used[$field])) {
                 $map[$column] = $field;
@@ -351,6 +389,17 @@ class EmployeeImportService
         }
 
         return [$map, $used, $entries];
+    }
+
+    private function isCalculatedHeader(string $normalized): bool
+    {
+        foreach (self::CALCULATED_HEADERS as $header) {
+            if ($normalized === $this->key($header)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -495,10 +544,11 @@ class EmployeeImportService
     {
         $employees = Employee::withoutGlobalScopes()
             ->where('company_id', $companyId)
-            ->get(['id', 'employee_code', 'national_id', 'status_id']);
+            ->get(['id', 'employee_code', 'national_id', 'full_name', 'status_id']);
 
         $byNid = [];
         $byCode = [];
+        $byName = [];
         $byId = [];
         foreach ($employees as $employee) {
             $id = (int) $employee->id;
@@ -508,6 +558,11 @@ class EmployeeImportService
             }
             if ($employee->employee_code !== null && $employee->employee_code !== '') {
                 $byCode[mb_strtolower((string) $employee->employee_code)] = $id;
+            }
+            $nameKey = $this->key((string) $employee->full_name);
+            if ($nameKey !== '') {
+                // null explicitly means the name is ambiguous and cannot be used for linking.
+                $byName[$nameKey] = array_key_exists($nameKey, $byName) ? null : $id;
             }
         }
 
@@ -533,6 +588,7 @@ class EmployeeImportService
         return [
             'byNid' => $byNid,
             'byCode' => $byCode,
+            'byName' => $byName,
             'byId' => $byId,
             'statuses' => $statuses,
             'statusNameById' => $statusNameById,
@@ -745,6 +801,14 @@ class EmployeeImportService
                 $data['manager_code'] = $managerCode;
             }
         }
+        if ($get('manager_name') !== '') {
+            $managerName = $this->cleanText($get('manager_name'));
+            if (mb_strlen($managerName) > 255) {
+                $errors[] = 'اسم المدير المباشر أطول من 255 حرفًا.';
+            } else {
+                $data['manager_name'] = $managerName;
+            }
+        }
 
         // ---- status / termination --------------------------------------
         $statusName = null;
@@ -849,6 +913,17 @@ class EmployeeImportService
             }
         }
 
+        if ($get('manual_annual_balance') !== '') {
+            $balance = $attempt('رصيد الإجازة السنوية اليدوي', fn () => $this->parseMoney($get('manual_annual_balance')));
+            if ($balance !== null) {
+                if ($balance < 0 || $balance > 365) {
+                    $errors[] = 'رصيد الإجازة السنوية اليدوي يجب أن يكون بين 0 و365 يومًا.';
+                } else {
+                    $data['manual_annual_balance'] = round($balance, 2);
+                }
+            }
+        }
+
         // ---- salary -----------------------------------------------------
         $gross = $get('gross_salary') !== '' ? $attempt('الراتب الإجمالي', fn () => $this->parseMoney($get('gross_salary'))) : null;
         $net = $get('net_salary') !== '' ? $attempt('الراتب الصافي', fn () => $this->parseMoney($get('net_salary'))) : null;
@@ -914,19 +989,34 @@ class EmployeeImportService
     private function checkManagers(array &$rows, array $ctx): void
     {
         $fileCodes = [];
+        $fileNames = [];
         foreach ($rows as $row) {
             if ($row['action'] !== 'error' && !empty($row['data']['employee_code'])) {
                 $fileCodes[mb_strtolower((string) $row['data']['employee_code'])] = true;
             }
+            if ($row['action'] !== 'error' && !empty($row['data']['full_name'])) {
+                $key = $this->key((string) $row['data']['full_name']);
+                $fileNames[$key] = array_key_exists($key, $fileNames) ? false : true;
+            }
         }
 
         foreach ($rows as $index => $row) {
-            if ($row['action'] === 'error' || empty($row['data']['manager_code'])) {
+            if ($row['action'] === 'error') {
                 continue;
             }
-            $managerCode = mb_strtolower((string) $row['data']['manager_code']);
-            if (!isset($ctx['byCode'][$managerCode]) && !isset($fileCodes[$managerCode])) {
-                $rows[$index]['warnings'][] = 'كود المدير المباشر «' . $row['data']['manager_code'] . '» غير موجود؛ لن يُربط المدير.';
+            if (!empty($row['data']['manager_code'])) {
+                $managerCode = mb_strtolower((string) $row['data']['manager_code']);
+                if (!isset($ctx['byCode'][$managerCode]) && !isset($fileCodes[$managerCode])) {
+                    $rows[$index]['warnings'][] = 'كود المدير المباشر «' . $row['data']['manager_code'] . '» غير موجود؛ لن يُربط المدير.';
+                }
+                continue;
+            }
+            if (!empty($row['data']['manager_name'])) {
+                $managerName = $this->key((string) $row['data']['manager_name']);
+                $existing = $ctx['byName'][$managerName] ?? null;
+                if ($existing === null && !($fileNames[$managerName] ?? false)) {
+                    $rows[$index]['warnings'][] = 'اسم المدير المباشر «' . $row['data']['manager_name'] . '» غير موجود أو غير فريد؛ لن يُربط المدير.';
+                }
             }
         }
     }
@@ -1061,8 +1151,14 @@ class EmployeeImportService
                 }
 
                 $report[$outcome['result']]++;
-                if (!empty($row['data']['manager_code'])) {
-                    $managerLinks[] = ['id' => $outcome['id'], 'code' => (string) $row['data']['manager_code'], 'line' => $row['line'], 'name' => $row['name']];
+                if (!empty($row['data']['manager_code']) || !empty($row['data']['manager_name'])) {
+                    $managerLinks[] = [
+                        'id' => $outcome['id'],
+                        'code' => (string) ($row['data']['manager_code'] ?? ''),
+                        'manager_name' => (string) ($row['data']['manager_name'] ?? ''),
+                        'line' => $row['line'],
+                        'name' => $row['name'],
+                    ];
                 }
             }
 
@@ -1234,6 +1330,7 @@ class EmployeeImportService
             'termination_type' => $d['termination_type'] ?? null,
             'shift_start' => $d['shift_start'] ?? null,
             'shift_end' => $d['shift_end'] ?? null,
+            'manual_annual_balance' => $d['manual_annual_balance'] ?? null,
             'notes' => $d['notes'] ?? null,
             'gross_salary' => $gross,
         ];
@@ -1276,7 +1373,7 @@ class EmployeeImportService
         }
 
         $changes = [];
-        foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'employment_type_id', 'termination_type', 'termination_date'] as $field) {
+        foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'manual_annual_balance', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'employment_type_id', 'termination_type', 'termination_date'] as $field) {
             if (array_key_exists($field, $d)) {
                 $changes[$field] = $d[$field];
             }
@@ -1367,7 +1464,7 @@ class EmployeeImportService
     }
 
     /**
-     * @param array<int, array{id: int, code: string, line: int, name: string}> $links
+     * @param array<int, array{id: int, code: string, manager_name: string, line: int, name: string}> $links
      * @param array<string, mixed> $report
      */
     private function linkManagers(array $links, int $companyId, array &$report): void
@@ -1377,15 +1474,23 @@ class EmployeeImportService
         }
 
         $codeToId = [];
-        $employees = Employee::withoutGlobalScopes()->where('company_id', $companyId)->get(['id', 'employee_code']);
+        $nameToId = [];
+        $employees = Employee::withoutGlobalScopes()->where('company_id', $companyId)->get(['id', 'employee_code', 'full_name']);
         foreach ($employees as $employee) {
             $codeToId[mb_strtolower((string) $employee->employee_code)] = (int) $employee->id;
+            $nameKey = $this->key((string) $employee->full_name);
+            if ($nameKey !== '') {
+                $nameToId[$nameKey] = array_key_exists($nameKey, $nameToId) ? null : (int) $employee->id;
+            }
         }
 
         foreach ($links as $link) {
-            $managerId = $codeToId[mb_strtolower($link['code'])] ?? null;
+            $managerId = $link['code'] !== ''
+                ? ($codeToId[mb_strtolower($link['code'])] ?? null)
+                : ($nameToId[$this->key($link['manager_name'])] ?? null);
             if ($managerId === null) {
-                $report['warnings'][] = ['line' => $link['line'], 'name' => $link['name'], 'messages' => ['كود المدير المباشر «' . $link['code'] . '» غير موجود؛ لم يُربط المدير.']];
+                $reference = $link['code'] !== '' ? 'كود المدير المباشر «' . $link['code'] . '»' : 'اسم المدير المباشر «' . $link['manager_name'] . '»';
+                $report['warnings'][] = ['line' => $link['line'], 'name' => $link['name'], 'messages' => [$reference . ' غير موجود أو غير فريد؛ لم يُربط المدير.']];
                 continue;
             }
             if ($managerId === $link['id']) {

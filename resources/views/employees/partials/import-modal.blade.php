@@ -184,14 +184,14 @@
         const sheets = data.sheets || [];
         if (sheets.length < 2 || data.needs_mapping) { return ''; }
         const selected = String(data.selected_sheet);
-        const matched = sheets.filter((sheet) => sheet.matched);
+        const matched = sheets.filter((sheet) => sheet.eligible);
         let html = '<div class="border rounded p-2 mb-3"><div class="fw-semibold mb-2"><i class="bi bi-layers"></i> الملف يحتوي على ' + num(sheets.length) + ' ورقات — اختر ما يُستورد:</div>';
         sheets.forEach((sheet) => {
             const value = String(sheet.index);
-            const disabled = sheet.matched ? '' : ' disabled';
-            const hint = sheet.matched
+            const disabled = sheet.eligible ? '' : ' disabled';
+            const hint = sheet.eligible
                 ? 'يُستورد الموظفون الموجودون في هذه الورقة فقط، وتُتجاهل باقي الأوراق.'
-                : 'لا تحتوي على عمود «الاسم الكامل» فلن تُستورد (ورقة غلاف أو ملخص مثلًا).';
+                : 'ليست ورقة بيانات موظفين: يلزم الاسم الكامل ومعه بيانات تعريفية مثل الرقم القومي أو تاريخ التعيين.';
             html += '<div class="form-check mb-1"><input class="form-check-input" type="radio" name="import_sheet" id="importSheet' + esc(value) + '" value="' + esc(value) + '"' + (selected === value ? ' checked' : '') + disabled + '>' +
                 '<label class="form-check-label" for="importSheet' + esc(value) + '">ورقة «' + esc(sheet.name) + '» فقط <span class="badge text-bg-light border">' + num(sheet.rows) + ' صف</span></label>' +
                 '<div class="form-text mt-0">' + hint + '</div></div>';
