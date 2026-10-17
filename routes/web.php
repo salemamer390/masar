@@ -80,6 +80,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::post('/import/preview', [EmployeeImportController::class, 'preview'])
             ->middleware('permission:employees.import')
             ->name('import.preview');
+        Route::post('/import/rejected', [EmployeeImportController::class, 'rejected'])
+            ->middleware('permission:employees.import')
+            ->name('import.rejected');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware('permission:employees.import')
             ->name('import.store');

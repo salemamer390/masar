@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Services\Imports\EmployeeImportService;
+use App\Services\Imports\XlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EmployeeImportController extends Controller
 {
-    public function __construct(private readonly EmployeeImportService $service)
-    {
+    public function __construct(
+        private readonly EmployeeImportService $service,
+        private readonly XlsxWriter $writer,
+    ) {
     }
 
     /** Download the ready-made Excel template. */
@@ -24,66 +27,24 @@ class EmployeeImportController extends Controller
     /** Step 1: validate the file and report what would happen. Nothing is written. */
     public function preview(Request $request): JsonResponse
     {
-        return $this->process($request, false);
+        $prepared = $this->prepare($request);
+        if ($prepared instanceof JsonResponse) {
+            return $prepared;
+        }
+        [$analysis] = $prepared;
+
+        return response()->json(['success' => true] + $this->payload($analysis));
     }
 
     /** Step 2: import the valid rows. */
     public function store(Request $request): JsonResponse
     {
-        return $this->process($request, true);
-    }
-
-    private function process(Request $request, bool $commit): JsonResponse
-    {
-        $request->validate([
-            'file' => ['required', 'file', 'max:5120'],
-            'duplicates' => ['nullable', 'in:update,skip'],
-            'sheet' => ['nullable', 'string', 'max:10'],
-            'mappings' => ['nullable', 'string', 'max:20000'],
-            'ack_dates' => ['nullable', 'boolean'],
-        ], [
-            'file.required' => 'اختر ملف Excel أو CSV أولًا.',
-            'file.file' => 'الملف المرفوع غير صالح.',
-            'file.max' => 'حجم الملف يجب ألا يتجاوز 5 ميجابايت.',
-            'file.uploaded' => 'تعذر رفع الملف. تحقق من حجمه (الحد 5 ميجابايت) وحاول مرة أخرى.',
-        ]);
-
-        $file = $request->file('file');
-        $extension = strtolower((string) $file->getClientOriginalExtension());
-        if (!in_array($extension, ['xlsx', 'csv'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'يجب أن يكون الملف بصيغة xlsx أو csv. لتحويل ملف xls قديم: افتحه في Excel ثم احفظه باسم «Excel Workbook (.xlsx)».',
-            ], 422);
+        $prepared = $this->prepare($request);
+        if ($prepared instanceof JsonResponse) {
+            return $prepared;
         }
-
-        // A platform account must never fall back to the first company in the
-        // database: that would import data into another tenant.
-        $companyId = (int) auth()->user()->company_id;
-        if ($companyId <= 0) {
-            return response()->json(['success' => false, 'message' => 'لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.'], 422);
-        }
-
-        $mappings = json_decode((string) $request->input('mappings', '{}'), true);
-        $analysis = $this->service->analyze(
-            $file->getRealPath(),
-            $extension,
-            $companyId,
-            (string) $request->input('duplicates', 'update'),
-            [
-                'sheet' => (string) $request->input('sheet', 'auto'),
-                'mappings' => is_array($mappings) ? $mappings : [],
-            ]
-        );
-
-        if ($analysis['file_errors'] !== []) {
-            return response()->json(['success' => false, 'message' => $analysis['file_errors'][0]], 422);
-        }
-
+        [$analysis, $companyId] = $prepared;
         $payload = $this->payload($analysis);
-        if (!$commit) {
-            return response()->json(['success' => true] + $payload);
-        }
 
         if ($analysis['needs_mapping']) {
             return response()->json(['success' => false, 'message' => 'اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.'] + $payload, 422);
@@ -107,26 +68,87 @@ class EmployeeImportController extends Controller
         ] + $payload);
     }
 
+    /** Excel file with the rejected rows (original values + reason) ready to be fixed and re-uploaded. */
+    public function rejected(Request $request)
+    {
+        $prepared = $this->prepare($request);
+        if ($prepared instanceof JsonResponse) {
+            return $prepared;
+        }
+        [$analysis] = $prepared;
+
+        if (($analysis['summary']['error'] ?? 0) === 0) {
+            return response()->json(['success' => false, 'message' => 'لا توجد صفوف مرفوضة.'], 422);
+        }
+
+        [$headers, $rows] = $this->service->rejectedSheet($analysis);
+        $path = tempnam(sys_get_temp_dir(), 'rej');
+        $this->writer->write($path, $headers, $rows);
+
+        return response()->download($path, 'rejected-employees.xlsx', ['Cache-Control' => 'no-store'])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Validates the request and analyses the uploaded file.
+     *
+     * @return array{0: array<string, mixed>, 1: int}|JsonResponse
+     */
+    private function prepare(Request $request): array|JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:5120'],
+            'duplicates' => ['nullable', 'in:update,skip'],
+            'sheet' => ['nullable', 'string', 'max:10'],
+            'mappings' => ['nullable', 'string', 'max:20000'],
+            'ack_dates' => ['nullable', 'boolean'],
+        ], [
+            'file.required' => 'اختر ملف Excel أو CSV أولًا.',
+            'file.file' => 'الملف المرفوع غير صالح.',
+            'file.max' => 'حجم الملف يجب ألا يتجاوز 5 ميجابايت.',
+            'file.uploaded' => 'تعذر رفع الملف. تحقق من حجمه (الحد 5 ميجابايت) وحاول مرة أخرى.',
+        ]);
+
+        $file = $request->file('file');
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if (!in_array($extension, ['xlsx', 'csv'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'يجب أن يكون الملف بصيغة xlsx أو csv. لتحويل ملف xls قديم: افتحه في Excel ثم احفظه باسم «Excel Workbook (.xlsx)».',
+            ], 422);
+        }
+
+        // Never infer a company for a platform account. Importing into the
+        // first company in the database can mix tenants' employee data.
+        $companyId = (int) auth()->user()->company_id;
+        if ($companyId <= 0) {
+            return response()->json(['success' => false, 'message' => 'لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.'], 422);
+        }
+
+        $mappings = json_decode((string) $request->input('mappings', '{}'), true);
+        $analysis = $this->service->analyze(
+            $file->getRealPath(),
+            $extension,
+            $companyId,
+            (string) $request->input('duplicates', 'update'),
+            [
+                'sheet' => (string) $request->input('sheet', 'auto'),
+                'mappings' => is_array($mappings) ? $mappings : [],
+            ]
+        );
+
+        if ($analysis['file_errors'] !== []) {
+            return response()->json(['success' => false, 'message' => $analysis['file_errors'][0]], 422);
+        }
+
+        return [$analysis, $companyId];
+    }
+
     /**
      * @param array<string, mixed> $analysis
      * @return array<string, mixed>
      */
     private function payload(array $analysis): array
     {
-        $rows = $analysis['rows'];
-        $issues = [];
-        foreach ($rows as $row) {
-            if ($row['errors'] !== [] || $row['warnings'] !== []) {
-                $issues[] = [
-                    'line' => $row['line'],
-                    'sheet' => $row['sheet'],
-                    'name' => $row['name'],
-                    'type' => $row['errors'] !== [] ? 'error' : 'warning',
-                    'messages' => array_merge($row['errors'], $row['warnings']),
-                ];
-            }
-        }
-
         $fields = [];
         foreach (EmployeeImportService::COLUMNS as $key => [$label]) {
             $fields[] = ['key' => $key, 'label' => $label];
@@ -151,9 +173,9 @@ class EmployeeImportController extends Controller
                 'name' => $row['name'],
                 'code' => $row['code'],
                 'action' => $row['action'],
-                'messages' => array_merge($row['errors'], $row['warnings']),
-            ], array_slice($rows, 0, 150)),
-            'issues' => array_slice($issues, 0, 1500),
+                'errors' => $row['errors'],
+                'warnings' => $row['warnings'],
+            ], $analysis['rows']),
         ];
     }
 }
