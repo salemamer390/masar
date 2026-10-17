@@ -1,5 +1,3 @@
-@php($canImportEmployees = auth()->user()?->hasPermission('employees.import'))
-@if($canImportEmployees)
 <div class="modal fade" id="employeesImportModal" tabindex="-1" aria-labelledby="employeesImportTitle" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
         <div class="modal-content">
@@ -128,6 +126,7 @@
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const num = (value) => new Intl.NumberFormat('en-US').format(Number(value) || 0);
     const ackBox = () => q('#importAckDates');
+    const updateAckBox = () => q('#importAckUpdates');
 
     function showAlert(message) {
         alertBox.textContent = message || '';
@@ -156,7 +155,8 @@
         if (!data) { btn.commit.disabled = true; return; }
         const needsAck = (data.summary.defaulted_dates || 0) > 0;
         const acknowledged = !needsAck || (ackBox() && ackBox().checked);
-        btn.commit.disabled = busy || data.needs_mapping || importableCount(data) === 0 || (data.capacity && data.capacity.exceeded) || !acknowledged;
+        const updatesAcknowledged = !(data.summary.update || 0) || (updateAckBox() && updateAckBox().checked);
+        btn.commit.disabled = busy || data.needs_mapping || importableCount(data) === 0 || (data.capacity && data.capacity.exceeded) || !acknowledged || !updatesAcknowledged;
     }
 
     function setBusy(isBusy, button, label) {
@@ -177,6 +177,7 @@
         body.append('sheet', String(state.sheet));
         body.append('mappings', JSON.stringify(state.mappings));
         body.append('ack_dates', withAck && ackBox() && ackBox().checked ? '1' : '0');
+        body.append('ack_updates', withAck && updateAckBox() && updateAckBox().checked ? '1' : '0');
         return body;
     }
 
@@ -305,16 +306,16 @@
         const sheets = data.sheets || [];
         if (data.needs_mapping || sheets.length < 2 || !data.merge_available) { return ''; }
         const selected = String(data.selected_sheet);
-        const matched = sheets.filter((sheet) => sheet.matched);
+        const matched = sheets.filter((sheet) => sheet.eligible);
         let html = '<div class="border border-warning rounded p-2 mb-2"><div class="fw-semibold mb-1"><i class="bi bi-layers"></i> أي ورقة تريد استيرادها؟</div>' +
             '<div class="form-text mb-2">الملف يحتوي على ' + num(sheets.length) + ' ورقات، وفيه أكثر من ورقة بها بيانات موظفين.</div>';
         sheets.forEach((sheet) => {
             const value = String(sheet.index);
-            const hint = sheet.matched
+            const hint = sheet.eligible
                 ? 'يُستورد الموظفون الموجودون في هذه الورقة فقط، وتُتجاهل باقي الأوراق.'
-                : 'لا تحتوي على عمود «الاسم الكامل» فلن تُستورد (ورقة غلاف أو ملخص مثلًا).';
+                : 'ليست ورقة بيانات موظفين: يلزم الاسم الكامل ومعه بيانات تعريفية مثل الرقم القومي أو تاريخ التعيين.';
             html += '<div class="form-check mb-1"><input class="form-check-input" type="radio" name="import_sheet" id="importSheet' + esc(value) + '" value="' + esc(value) + '"' +
-                (selected === value ? ' checked' : '') + (sheet.matched ? '' : ' disabled') + '>' +
+                (selected === value ? ' checked' : '') + (sheet.eligible ? '' : ' disabled') + '>' +
                 '<label class="form-check-label" for="importSheet' + esc(value) + '">ورقة «' + esc(sheet.name) + '» فقط <span class="badge text-bg-light border">' + num(sheet.rows) + ' صف</span></label>' +
                 '<div class="form-text mt-0">' + hint + '</div></div>';
         });
@@ -362,6 +363,14 @@
             '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="importAckDates"><label class="form-check-label fw-semibold" for="importAckDates">أفهم ذلك وأوافق على اعتماد تاريخ اليوم</label></div></div>';
     }
 
+    function updateAckCard(data) {
+        const count = data.summary.update || 0;
+        if (!count) { return ''; }
+        return '<div class="border border-primary rounded p-2 mb-2"><div class="fw-semibold mb-1"><i class="bi bi-arrow-repeat text-primary"></i> تحديث موظفين موجودين</div>' +
+            '<div class="small">سيتم تحديث بيانات ' + num(count) + ' موظف موجود بحسب الرقم القومي أو الكود. الخلايا الفارغة لا تمسح البيانات الحالية.</div>' +
+            '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="importAckUpdates"><label class="form-check-label fw-semibold" for="importAckUpdates">أراجع ذلك وأوافق على تحديث البيانات</label></div></div>';
+    }
+
     // ---- 3) information -----------------------------------------------------
     function infoHtml(data, mappingInDecisions) {
         let html = '';
@@ -380,7 +389,7 @@
         const sheets = data.sheets || [];
         if (sheets.length > 1 && !data.needs_mapping && !data.merge_available) {
             html += detail('<i class="bi bi-layers"></i> تم اختيار ورقة تلقائيًا',
-                sheets.map((sheet) => '<div>' + (sheet.matched ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + 'ورقة «' + esc(sheet.name) + '» — ' + (sheet.matched ? 'تُستورد (' + num(sheet.rows) + ' صف)' : 'لا يوجد بها عمود الاسم، تم تجاهلها') + '</div>').join(''), false);
+                sheets.map((sheet) => '<div>' + (sheet.eligible ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + 'ورقة «' + esc(sheet.name) + '» — ' + (sheet.eligible ? 'مؤهلة للاستيراد (' + num(sheet.rows) + ' صف)' : 'ليست ورقة بيانات موظفين وتم تجاهلها') + '</div>').join(''), false);
         }
         if (!mappingInDecisions) { html += mappingCard(data, false); }
         return html;
@@ -432,8 +441,8 @@
         box.verdict.innerHTML = verdictHtml(data);
         const suggestions = (data.columns || []).some((col) => !col.field && col.suggestion);
         const mappingInDecisions = data.needs_mapping || suggestions;
-        const decisions = sheetsCard(data) + (mappingInDecisions ? mappingCard(data, true) : '') + ackCard(data);
-        const count = (sheetsCard(data) ? 1 : 0) + (mappingInDecisions ? 1 : 0) + (data.summary.defaulted_dates ? 1 : 0);
+        const decisions = sheetsCard(data) + (mappingInDecisions ? mappingCard(data, true) : '') + updateAckCard(data) + ackCard(data);
+        const count = (sheetsCard(data) ? 1 : 0) + (mappingInDecisions ? 1 : 0) + (data.summary.update ? 1 : 0) + (data.summary.defaulted_dates ? 1 : 0);
         box.decisions.innerHTML = decisions ? '<div class="fw-semibold mb-2"><i class="bi bi-hand-index"></i> قرارات مطلوبة (' + count + ')</div>' + decisions : '';
         box.info.innerHTML = infoHtml(data, mappingInDecisions);
 
@@ -517,7 +526,7 @@
             const key = target.getAttribute('data-map-key');
             if (target.value) { state.mappings[key] = target.value; } else { delete state.mappings[key]; }
             runPreview(null, '', true);
-        } else if (target.id === 'importAckDates') {
+        } else if (target.id === 'importAckDates' || target.id === 'importAckUpdates') {
             updateCommitState();
         }
     }
@@ -585,4 +594,3 @@
 })();
 </script>
 @endpush
-@endif

@@ -59,6 +59,10 @@ class EmployeeImportController extends Controller
             return response()->json(['success' => false, 'message' => 'أكّد موافقتك على اعتماد تاريخ اليوم كتاريخ انتهاء خدمة للموظفين غير المحدَّد لهم تاريخ.'] + $payload, 422);
         }
 
+        if (($analysis['summary']['update'] ?? 0) > 0 && !$request->boolean('ack_updates')) {
+            return response()->json(['success' => false, 'message' => 'يجب تأكيد تحديث بيانات الموظفين الموجودين مسبقًا.'] + $payload, 422);
+        }
+
         $result = $this->service->commit($analysis, $companyId);
 
         return response()->json([
@@ -101,6 +105,7 @@ class EmployeeImportController extends Controller
             'sheet' => ['nullable', 'string', 'max:10'],
             'mappings' => ['nullable', 'string', 'max:20000'],
             'ack_dates' => ['nullable', 'boolean'],
+            'ack_updates' => ['nullable', 'boolean'],
         ], [
             'file.required' => 'اختر ملف Excel أو CSV أولًا.',
             'file.file' => 'الملف المرفوع غير صالح.',
@@ -175,7 +180,7 @@ class EmployeeImportController extends Controller
                 'action' => $row['action'],
                 'errors' => $row['errors'],
                 'warnings' => $row['warnings'],
-            ], $analysis['rows']),
+            ], array_slice($analysis['rows'], 0, 150)),
         ];
     }
 }

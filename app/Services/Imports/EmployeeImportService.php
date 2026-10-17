@@ -227,9 +227,8 @@ class EmployeeImportService
                 $usage[$field] = $source;
             }
         }
-        foreach ($this->unmatchedColumns($sheets, $infos, $aliases, $manual, false) as $key => $column) {
-            $columns[$key] ??= $column;
-        }
+        // Once a valid employee sheet is selected, title rows from other
+        // workbook sheets are irrelevant and must not appear as unknown fields.
         $result['columns'] = array_values($columns);
         $result['field_usage'] = $usage;
         $result['unknown_columns'] = array_values(array_map(static fn (array $c): string => $c['header'], array_filter($columns, static fn (array $c): bool => $c['field'] === null)));
@@ -1202,8 +1201,14 @@ class EmployeeImportService
                 }
 
                 $report[$outcome['result']]++;
-                if (!empty($row['data']['manager_code'])) {
-                    $managerLinks[] = ['id' => $outcome['id'], 'code' => (string) $row['data']['manager_code'], 'line' => $row['line'], 'name' => $row['name']];
+                if (!empty($row['data']['manager_code']) || !empty($row['data']['manager_name'])) {
+                    $managerLinks[] = [
+                        'id' => $outcome['id'],
+                        'code' => (string) ($row['data']['manager_code'] ?? ''),
+                        'manager_name' => (string) ($row['data']['manager_name'] ?? ''),
+                        'line' => $row['line'],
+                        'name' => $row['name'],
+                    ];
                 }
             }
 
@@ -1375,6 +1380,7 @@ class EmployeeImportService
             'termination_type' => $d['termination_type'] ?? null,
             'shift_start' => $d['shift_start'] ?? null,
             'shift_end' => $d['shift_end'] ?? null,
+            'manual_annual_balance' => $d['manual_annual_balance'] ?? null,
             'notes' => $d['notes'] ?? null,
             'gross_salary' => $gross,
         ];
@@ -1417,7 +1423,7 @@ class EmployeeImportService
         }
 
         $changes = [];
-        foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'employment_type_id', 'termination_type', 'termination_date'] as $field) {
+        foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'manual_annual_balance', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'employment_type_id', 'termination_type', 'termination_date'] as $field) {
             if (array_key_exists($field, $d)) {
                 $changes[$field] = $d[$field];
             }
@@ -1508,7 +1514,7 @@ class EmployeeImportService
     }
 
     /**
-     * @param array<int, array{id: int, code: string, line: int, name: string}> $links
+     * @param array<int, array{id: int, code: string, manager_name: string, line: int, name: string}> $links
      * @param array<string, mixed> $report
      */
     private function linkManagers(array $links, int $companyId, array &$report): void
@@ -1518,15 +1524,23 @@ class EmployeeImportService
         }
 
         $codeToId = [];
-        $employees = Employee::withoutGlobalScopes()->where('company_id', $companyId)->get(['id', 'employee_code']);
+        $nameToId = [];
+        $employees = Employee::withoutGlobalScopes()->where('company_id', $companyId)->get(['id', 'employee_code', 'full_name']);
         foreach ($employees as $employee) {
             $codeToId[mb_strtolower((string) $employee->employee_code)] = (int) $employee->id;
+            $nameKey = $this->key((string) $employee->full_name);
+            if ($nameKey !== '') {
+                $nameToId[$nameKey] = array_key_exists($nameKey, $nameToId) ? null : (int) $employee->id;
+            }
         }
 
         foreach ($links as $link) {
-            $managerId = $codeToId[mb_strtolower($link['code'])] ?? null;
+            $managerId = $link['code'] !== ''
+                ? ($codeToId[mb_strtolower($link['code'])] ?? null)
+                : ($nameToId[$this->key($link['manager_name'])] ?? null);
             if ($managerId === null) {
-                $report['warnings'][] = ['line' => $link['line'], 'name' => $link['name'], 'messages' => ['كود المدير المباشر «' . $link['code'] . '» غير موجود؛ لم يُربط المدير.']];
+                $reference = $link['code'] !== '' ? 'كود المدير المباشر «' . $link['code'] . '»' : 'اسم المدير المباشر «' . $link['manager_name'] . '»';
+                $report['warnings'][] = ['line' => $link['line'], 'name' => $link['name'], 'messages' => [$reference . ' غير موجود أو غير فريد؛ لم يُربط المدير.']];
                 continue;
             }
             if ($managerId === $link['id']) {
