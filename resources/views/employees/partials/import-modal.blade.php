@@ -88,6 +88,7 @@
     const steps = { upload: q('[data-import-step="upload"]'), preview: q('[data-import-step="preview"]'), result: q('[data-import-step="result"]') };
     const fileInput = q('#employeesImportFile');
     const alertBox = q('[data-import-alert]');
+    const extraBox = q('[data-import-extra]');
     const btn = {
         cancel: q('[data-import-cancel]'), back: q('[data-import-back]'), preview: q('[data-import-preview]'),
         commit: q('[data-import-commit]'), finish: q('[data-import-finish]'), report: q('[data-import-report]'),
@@ -95,9 +96,12 @@
     };
     let busy = false;
     let issues = [];
+    let lastData = null;
+    let state = { sheet: 'auto', mappings: {} };
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const num = (value) => new Intl.NumberFormat('en-US').format(Number(value) || 0);
+    const ackBox = () => q('#importAckDates');
 
     function showAlert(message) {
         alertBox.textContent = message || '';
@@ -114,20 +118,33 @@
         btn.report.hidden = !(name !== 'upload' && issues.length > 0);
     }
 
-    function setBusy(state, button, label) {
-        busy = state;
-        [btn.back, btn.preview, btn.commit, btn.cancel, btn.close].forEach((el) => { if (el) { el.disabled = state; } });
-        if (button) {
-            const target = button.querySelector('span') || button;
-            if (state) { button.dataset.label = target.textContent; target.textContent = label; }
-            else if (button.dataset.label) { target.textContent = button.dataset.label; }
-        }
+    function updateCommitState() {
+        const data = lastData;
+        if (!data) { btn.commit.disabled = true; return; }
+        const importable = (data.summary.create || 0) + (data.summary.update || 0);
+        const needsAck = (data.summary.defaulted_dates || 0) > 0;
+        const acknowledged = !needsAck || (ackBox() && ackBox().checked);
+        btn.commit.disabled = busy || data.needs_mapping || importable === 0 || (data.capacity && data.capacity.exceeded) || !acknowledged;
     }
 
-    async function send(url) {
+    function setBusy(state_, button, label) {
+        busy = state_;
+        [btn.back, btn.preview, btn.cancel, btn.close].forEach((el) => { if (el) { el.disabled = state_; } });
+        if (button) {
+            const target = button.querySelector('span') || button;
+            if (state_) { button.dataset.label = target.textContent; target.textContent = label; }
+            else if (button.dataset.label) { target.textContent = button.dataset.label; }
+        }
+        updateCommitState();
+    }
+
+    async function send(url, withAck) {
         const body = new FormData();
         body.append('file', fileInput.files[0]);
         body.append('duplicates', q('input[name="import_duplicates"]:checked')?.value || 'update');
+        body.append('sheet', String(state.sheet));
+        body.append('mappings', JSON.stringify(state.mappings));
+        body.append('ack_dates', withAck && ackBox() && ackBox().checked ? '1' : '0');
         let response;
         try {
             response = await fetch(url, {
@@ -163,14 +180,75 @@
         return '<div class="col-6 col-md"><div class="border rounded p-2 text-center"><div class="fs-4 fw-bold text-' + tone + '">' + num(value) + '</div><div class="small text-muted">' + label + '</div></div></div>';
     }
 
+    function sheetsBlock(data) {
+        const sheets = data.sheets || [];
+        if (sheets.length < 2 || data.needs_mapping) { return ''; }
+        const selected = String(data.selected_sheet);
+        const matched = sheets.filter((sheet) => sheet.matched);
+        let html = '<div class="border rounded p-2 mb-3"><div class="fw-semibold mb-2"><i class="bi bi-layers"></i> الملف يحتوي على ' + num(sheets.length) + ' ورقات — اختر ما يُستورد:</div>';
+        sheets.forEach((sheet) => {
+            const value = String(sheet.index);
+            const disabled = sheet.matched ? '' : ' disabled';
+            const hint = sheet.matched
+                ? 'يُستورد الموظفون الموجودون في هذه الورقة فقط، وتُتجاهل باقي الأوراق.'
+                : 'لا تحتوي على عمود «الاسم الكامل» فلن تُستورد (ورقة غلاف أو ملخص مثلًا).';
+            html += '<div class="form-check mb-1"><input class="form-check-input" type="radio" name="import_sheet" id="importSheet' + esc(value) + '" value="' + esc(value) + '"' + (selected === value ? ' checked' : '') + disabled + '>' +
+                '<label class="form-check-label" for="importSheet' + esc(value) + '">ورقة «' + esc(sheet.name) + '» فقط <span class="badge text-bg-light border">' + num(sheet.rows) + ' صف</span></label>' +
+                '<div class="form-text mt-0">' + hint + '</div></div>';
+        });
+        if (data.merge_available) {
+            const total = matched.reduce((sum, sheet) => sum + (Number(sheet.rows) || 0), 0);
+            html += '<div class="form-check mt-2 pt-2 border-top"><input class="form-check-input" type="radio" name="import_sheet" id="importSheetAll" value="all"' + (selected === 'all' ? ' checked' : '') + '>' +
+                '<label class="form-check-label fw-semibold" for="importSheetAll">دمج كل الأوراق المطابقة (' + num(matched.length) + ' ورقات — ' + num(total) + ' صف)</label>' +
+                '<div class="form-text mt-0">يجمع الموظفين من كل الأوراق التي بها عمود الاسم في استيراد واحد، ويكتشف التكرار بين الأوراق. مناسب إذا كانت كل ورقة تخص فرعًا أو قسمًا.</div></div>';
+        }
+        return html + '</div>';
+    }
+
+    function mappingBlock(data) {
+        const columns = data.columns || [];
+        if (!columns.length) { return ''; }
+        const usage = data.field_usage || {};
+        const fields = data.fields || [];
+        const intro = data.needs_mapping
+            ? '<div class="alert alert-danger py-2 small mb-2">لم يتم التعرف على عمود الأسماء. اختر العمود الذي يحتوي أسماء الموظفين واربطه بالحقل «الاسم الكامل» للمتابعة.</div>'
+            : '<div class="small mb-2">هذه الأعمدة لم يتعرف عليها النظام تلقائيًا. اربط كل عمود بالحقل المناسب لتُستورد بياناته، أو اتركه على «تجاهل».</div>';
+        let rows = '';
+        columns.forEach((col) => {
+            const options = ['<option value="">تجاهل هذا العمود</option>'].concat(fields.map((field) => {
+                const takenBy = usage[field.key];
+                const disabled = takenBy !== undefined && takenBy !== col.key ? ' disabled' : '';
+                const selected = col.field === field.key ? ' selected' : '';
+                return '<option value="' + esc(field.key) + '"' + selected + disabled + '>' + esc(field.label) + (disabled ? ' (مربوط بعمود آخر)' : '') + '</option>';
+            })).join('');
+            const suggestion = (!col.field && col.suggestion)
+                ? '<div class="small text-warning-emphasis mt-1">هل تقصد «' + esc(col.suggestion_label) + '»؟ <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-map-confirm="' + esc(col.key) + '" data-map-field="' + esc(col.suggestion) + '">نعم، اربطه</button></div>'
+                : '';
+            rows += '<tr><td class="align-top"><strong>' + esc(col.header) + '</strong>' + (col.sheet ? '<div class="text-muted small">في ورقة: ' + esc(col.sheet) + '</div>' : '') + suggestion + '</td><td style="min-width:200px"><select class="form-select form-select-sm" data-map-key="' + esc(col.key) + '">' + options + '</select></td></tr>';
+        });
+        return '<div class="border rounded p-2 mb-3"><div class="fw-semibold mb-1"><i class="bi bi-diagram-3"></i> مطابقة الأعمدة</div>' + intro +
+            '<div class="table-responsive"><table class="table table-sm align-middle mb-1"><thead class="table-light"><tr><th>العمود في ملفك</th><th>يقابل الحقل</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+            '<div class="form-text">لا يُربط أي عمود إلا بعد تأكيدك؛ الاقتراحات للمساعدة فقط، والأعمدة المتروكة على «تجاهل» لا تُستورد بياناتها.</div></div>';
+    }
+
+    function ackBlock(data) {
+        const count = (data.summary.defaulted_dates || 0);
+        if (!count) { return ''; }
+        return '<div class="alert alert-warning py-2 small"><div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle-fill"></i> تنبيه: تاريخ انتهاء الخدمة</div>' +
+            num(count) + ' موظف حالتهم «منتهي الخدمة / موقوف» (استقالة أو فصل أو إيقاف) ولم يُحدَّد لهم تاريخ انتهاء خدمة، فسيعتمد النظام تاريخ اليوم (' + esc(data.today) + ') لهم. ' +
+            'الأفضل إضافة عمود «تاريخ انتهاء الخدمة» وإعادة رفع الملف.' +
+            '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="importAckDates"><label class="form-check-label fw-semibold" for="importAckDates">أفهم ذلك وأوافق على اعتماد تاريخ اليوم</label></div></div>';
+    }
+
     function renderPreview(data) {
+        lastData = data;
         const s = data.summary;
         issues = data.issues || [];
         q('[data-import-stats]').innerHTML =
             stat('صفوف الملف', s.total, 'dark') + stat('موظفون جدد', s.create, 'success') + stat('سيتم تحديثهم', s.update, 'primary') +
             stat('تخطي', s.skip, 'secondary') + stat('بها أخطاء', s.error, 'danger');
 
-        let extra = '';
+        let extra = sheetsBlock(data) + mappingBlock(data);
         if (data.capacity) {
             const c = data.capacity;
             extra += c.exceeded
@@ -182,17 +260,18 @@
         if (created.length) {
             extra += '<div class="alert alert-info py-2 small">سيتم إنشاء تلقائي لـ: ' + created.map((x) => num(x[1].length) + ' ' + x[0] + ' (' + x[1].slice(0, 5).map(esc).join('، ') + (x[1].length > 5 ? '…' : '') + ')').join(' — ') + '.</div>';
         }
-        if (data.unknown_columns && data.unknown_columns.length) {
-            extra += '<div class="alert alert-warning py-2 small">أعمدة لم يتم التعرف عليها وسيتم تجاهلها: ' + data.unknown_columns.map(esc).join('، ') + '.</div>';
-        }
         if (s.error > 0) {
             extra += '<div class="alert alert-warning py-2 small">الصفوف التي بها أخطاء لن تُستورد، وسيتم استيراد الصفوف السليمة فقط. راجع الملاحظات أدناه أو حمّل التقرير.</div>';
         }
-        q('[data-import-extra]').innerHTML = extra;
+        extra += ackBlock(data);
+        extraBox.innerHTML = extra;
 
+        const tableWrap = q('[data-import-rows]').closest('.table-responsive');
+        tableWrap.hidden = !!data.needs_mapping;
         q('[data-import-rows]').innerHTML = (data.rows || []).map((row) => {
             const messages = (row.messages || []).map((m) => '<div class="' + (row.action === 'error' ? 'text-danger' : 'text-warning-emphasis') + ' small">' + esc(m) + '</div>').join('');
-            return '<tr><td>' + esc(row.line) + '</td><td>' + esc(row.name || '—') + '</td><td>' + (actionBadge[row.action] || '') + '</td><td>' + messages + '</td></tr>';
+            const sheet = row.sheet ? '<div class="text-muted small">ورقة: ' + esc(row.sheet) + '</div>' : '';
+            return '<tr><td>' + esc(row.line) + '</td><td>' + esc(row.name || '—') + sheet + '</td><td>' + (actionBadge[row.action] || '') + '</td><td>' + messages + '</td></tr>';
         }).join('');
         q('[data-import-truncated]').textContent = s.total > (data.rows || []).length ? 'يعرض أول ' + (data.rows || []).length + ' صف فقط من ' + num(s.total) + '. التقرير الكامل للأخطاء متاح للتحميل.' : '';
 
@@ -200,7 +279,7 @@
         const commitLabel = btn.commit.querySelector('span');
         commitLabel.textContent = 'تأكيد استيراد ' + num(importable) + ' صف';
         btn.commit.dataset.label = commitLabel.textContent;
-        btn.commit.disabled = importable === 0 || (data.capacity && data.capacity.exceeded);
+        updateCommitState();
     }
 
     function renderResult(data) {
@@ -212,8 +291,8 @@
 
         const failed = r.failed || [];
         const warnings = r.warnings || [];
-        failed.forEach((item) => issues.push({ line: item.line, name: item.name, type: 'error', messages: item.messages }));
-        warnings.forEach((item) => issues.push({ line: item.line, name: item.name, type: 'warning', messages: item.messages }));
+        failed.forEach((item) => issues.push({ line: item.line, sheet: null, name: item.name, type: 'error', messages: item.messages }));
+        warnings.forEach((item) => issues.push({ line: item.line, sheet: null, name: item.name, type: 'warning', messages: item.messages }));
 
         let html = '';
         if (data.summary && data.summary.error > 0) {
@@ -229,8 +308,8 @@
     }
 
     function downloadReport() {
-        const rows = [['رقم الصف في الملف', 'الاسم', 'النوع', 'الملاحظات']];
-        issues.forEach((item) => rows.push([item.line, item.name, item.type === 'error' ? 'خطأ' : 'تنبيه', (item.messages || []).join(' | ')]));
+        const rows = [['الورقة', 'رقم الصف في الملف', 'الاسم', 'النوع', 'الملاحظات']];
+        issues.forEach((item) => rows.push([item.sheet || '', item.line, item.name, item.type === 'error' ? 'خطأ' : 'تنبيه', (item.messages || []).join(' | ')]));
         const csv = rows.map((row) => row.map((cell) => '"' + String(cell ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
         const link = document.createElement('a');
@@ -245,45 +324,70 @@
     function reset() {
         fileInput.value = '';
         issues = [];
+        lastData = null;
+        state = { sheet: 'auto', mappings: {} };
+        extraBox.innerHTML = '';
         showAlert('');
         showStep('upload');
     }
 
-    btn.preview.addEventListener('click', async () => {
+    async function runPreview(button, label, stayOnPreview) {
         if (busy) { return; }
         showAlert('');
         const file = fileInput.files[0];
         if (!file) { showAlert('اختر ملف Excel أو CSV أولًا.'); return; }
         if (!/\.(xlsx|csv)$/i.test(file.name)) { showAlert('يجب أن يكون الملف بصيغة xlsx أو csv.'); return; }
         if (file.size > 5 * 1024 * 1024) { showAlert('حجم الملف يجب ألا يتجاوز 5 ميجابايت.'); return; }
-        setBusy(true, btn.preview, 'جارٍ فحص الملف...');
+        setBusy(true, button, label);
         try {
-            const data = await send(urls.preview);
+            const data = await send(urls.preview, false);
             renderPreview(data);
             showStep('preview');
         } catch (error) {
             showAlert(error.message);
+            if (stayOnPreview) { showStep('preview'); }
         } finally {
-            setBusy(false, btn.preview);
+            setBusy(false, button);
+        }
+    }
+
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {} }; lastData = null; });
+    btn.preview.addEventListener('click', () => runPreview(btn.preview, 'جارٍ فحص الملف...', false));
+    btn.back.addEventListener('click', () => { if (!busy) { showAlert(''); showStep('upload'); } });
+
+    extraBox.addEventListener('change', (event) => {
+        const target = event.target;
+        if (target.matches('input[name="import_sheet"]')) {
+            state.sheet = target.value;
+            runPreview(null, '', true);
+        } else if (target.matches('select[data-map-key]')) {
+            const key = target.getAttribute('data-map-key');
+            if (target.value) { state.mappings[key] = target.value; } else { delete state.mappings[key]; }
+            runPreview(null, '', true);
+        } else if (target.id === 'importAckDates') {
+            updateCommitState();
         }
     });
-
-    btn.back.addEventListener('click', () => { if (!busy) { showAlert(''); showStep('upload'); } });
+    extraBox.addEventListener('click', (event) => {
+        const confirmBtn = event.target.closest('[data-map-confirm]');
+        if (!confirmBtn) { return; }
+        state.mappings[confirmBtn.getAttribute('data-map-confirm')] = confirmBtn.getAttribute('data-map-field');
+        runPreview(null, '', true);
+    });
 
     btn.commit.addEventListener('click', async () => {
         if (busy) { return; }
         showAlert('');
         setBusy(true, btn.commit, 'جارٍ الاستيراد...');
         try {
-            const data = await send(urls.commit);
+            const data = await send(urls.commit, true);
             renderResult(data);
             showStep('result');
-            if (typeof showToast === 'function') { showToast(data.message || 'تم الاستيراد بنجاح', 'success'); }
+            if (typeof showToast === 'function') { showToast(data.message || 'تم الاستيراد بنجاح'); }
         } catch (error) {
             showAlert(error.message);
         } finally {
             setBusy(false, btn.commit);
-            if (!steps.preview.hidden) { btn.commit.disabled = false; }
         }
     });
 

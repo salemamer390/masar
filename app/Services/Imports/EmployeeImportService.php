@@ -113,68 +113,141 @@ class EmployeeImportService
     // =====================================================================
 
     /**
+     * @param array{sheet?: string, mappings?: mixed} $options
+     *        sheet: "auto" | "all" | worksheet index; mappings: [normalised header key => field key]
      * @return array<string, mixed>
      */
-    public function analyze(string $path, string $extension, int $companyId, string $duplicates = 'update'): array
+    public function analyze(string $path, string $extension, int $companyId, string $duplicates = 'update', array $options = []): array
     {
         $duplicates = $duplicates === 'skip' ? 'skip' : 'update';
+        $manual = $this->sanitizeMappings($options['mappings'] ?? []);
+        $choice = (string) ($options['sheet'] ?? 'auto');
+
         $result = [
             'file_errors' => [],
             'unknown_columns' => [],
+            'columns' => [],
+            'field_usage' => [],
+            'needs_mapping' => false,
+            'sheets' => [],
+            'selected_sheet' => null,
+            'merge_available' => false,
             'rows' => [],
-            'summary' => ['total' => 0, 'create' => 0, 'update' => 0, 'skip' => 0, 'error' => 0, 'warnings' => 0],
+            'summary' => ['total' => 0, 'create' => 0, 'update' => 0, 'skip' => 0, 'error' => 0, 'warnings' => 0, 'defaulted_dates' => 0],
             'capacity' => null,
             'new_lookups' => ['departments' => [], 'jobs' => [], 'branches' => []],
             'duplicates' => $duplicates,
         ];
 
         try {
-            $sheet = $this->reader->read($path, $extension);
+            $sheets = $this->reader->readAll($path, $extension);
         } catch (RuntimeException $exception) {
             $result['file_errors'][] = $exception->getMessage();
 
             return $result;
         }
 
-        [$headerRow, $columnMap, $unknown] = $this->detectHeader($sheet);
-        if ($headerRow === null) {
-            $result['file_errors'][] = 'لم يتم العثور على صف العناوين. تأكد من وجود عمود «الاسم الكامل» في الصف الأول، أو حمّل النموذج الجاهز واستخدمه.';
+        $aliases = $this->aliasMap();
+        $infos = [];
+        foreach ($sheets as $index => $sheet) {
+            [$headerRow, $map, $entries, $used] = $this->detectHeader($sheet['rows'], $aliases, $manual);
+            $dataRows = 0;
+            if ($headerRow !== null) {
+                foreach (array_keys($sheet['rows']) as $rowNumber) {
+                    if ($rowNumber > $headerRow) {
+                        $dataRows++;
+                    }
+                }
+            }
+            $infos[$index] = ['header_row' => $headerRow, 'map' => $map, 'entries' => $entries, 'used' => $used, 'rows' => $dataRows, 'matched' => $headerRow !== null];
+            $result['sheets'][] = ['index' => $index, 'name' => $sheet['name'], 'rows' => $headerRow !== null ? $dataRows : count($sheet['rows']), 'matched' => $headerRow !== null];
+        }
+
+        $candidates = array_values(array_keys(array_filter($infos, static fn (array $info): bool => $info['matched'])));
+        $result['merge_available'] = count($candidates) > 1;
+
+        // No sheet has a recognisable "full name" header: let the user map columns manually.
+        if ($candidates === []) {
+            $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual, false);
+            if ($columns === []) {
+                $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual, true);
+            }
+            if ($columns === []) {
+                $hasRows = false;
+                foreach ($sheets as $sheet) {
+                    $hasRows = $hasRows || $sheet['rows'] !== [];
+                }
+                $result['file_errors'][] = $hasRows
+                    ? 'لم يتم العثور على عمود «الاسم الكامل» في الملف. أضف عمودًا بهذا الاسم أو حمّل النموذج الجاهز.'
+                    : 'الملف لا يحتوي على أي بيانات.';
+
+                return $result;
+            }
+            $result['needs_mapping'] = true;
+            $result['columns'] = array_values($columns);
+            $result['unknown_columns'] = array_values(array_map(static fn (array $c): string => $c['header'], $columns));
 
             return $result;
         }
-        $result['unknown_columns'] = $unknown;
 
-        $dataRows = [];
-        foreach ($sheet as $rowNumber => $cells) {
-            if ($rowNumber <= $headerRow) {
-                continue;
-            }
-            $record = [];
-            foreach ($columnMap as $column => $key) {
-                $record[$key] = isset($cells[$column]) ? trim((string) $cells[$column]) : '';
-            }
-            if (implode('', $record) === '') {
-                continue;
-            }
-            $dataRows[$rowNumber] = $record;
+        if ($choice === 'all' && count($candidates) > 1) {
+            $selected = $candidates;
+            $result['selected_sheet'] = 'all';
+        } elseif (ctype_digit($choice) && in_array((int) $choice, $candidates, true)) {
+            $selected = [(int) $choice];
+            $result['selected_sheet'] = (int) $choice;
+        } else {
+            $selected = [$candidates[0]];
+            $result['selected_sheet'] = $candidates[0];
         }
 
-        if ($dataRows === []) {
-            $result['file_errors'][] = 'لا توجد صفوف بيانات أسفل صف العناوين.';
-
-            return $result;
+        $columns = [];
+        $usage = [];
+        foreach ($selected as $index) {
+            foreach ($this->columnList($infos[$index]['entries'], $aliases, $infos[$index]['used']) as $column) {
+                $columns[$column['key']] ??= $column;
+            }
+            foreach ($infos[$index]['used'] as $field => $source) {
+                $usage[$field] = $source;
+            }
         }
-        if (count($dataRows) > self::MAX_ROWS) {
-            $result['file_errors'][] = 'عدد الصفوف (' . count($dataRows) . ') أكبر من الحد المسموح في الملف الواحد (' . self::MAX_ROWS . '). قسّم الملف إلى أكثر من ملف.';
-
-            return $result;
+        foreach ($this->unmatchedColumns($sheets, $infos, $aliases, $manual, false) as $key => $column) {
+            $columns[$key] ??= $column;
         }
+        $result['columns'] = array_values($columns);
+        $result['field_usage'] = $usage;
+        $result['unknown_columns'] = array_values(array_map(static fn (array $c): string => $c['header'], array_filter($columns, static fn (array $c): bool => $c['field'] === null)));
 
         $context = $this->loadContext($companyId);
         $seen = ['nid' => [], 'code' => []];
         $rows = [];
-        foreach ($dataRows as $line => $record) {
-            $rows[] = $this->analyzeRow($record, (int) $line, $context, $duplicates, $seen);
+        $label = count($sheets) > 1;
+        foreach ($selected as $index) {
+            $info = $infos[$index];
+            foreach ($sheets[$index]['rows'] as $rowNumber => $cells) {
+                if ($rowNumber <= $info['header_row']) {
+                    continue;
+                }
+                $record = [];
+                foreach ($info['map'] as $column => $key) {
+                    $record[$key] = isset($cells[$column]) ? trim((string) $cells[$column]) : '';
+                }
+                if (implode('', $record) === '') {
+                    continue;
+                }
+                if (count($rows) >= self::MAX_ROWS) {
+                    $result['file_errors'][] = 'عدد الصفوف أكبر من الحد المسموح في عملية الاستيراد الواحدة (' . self::MAX_ROWS . '). قسّم الملف أو اختر ورقة واحدة.';
+
+                    return $result;
+                }
+                $rows[] = $this->analyzeRow($record, (int) $rowNumber, $context, $duplicates, $seen, $label ? $sheets[$index]['name'] : null);
+            }
+        }
+
+        if ($rows === []) {
+            $result['file_errors'][] = 'لا توجد صفوف بيانات أسفل صف العناوين.';
+
+            return $result;
         }
 
         $this->checkManagers($rows, $context);
@@ -185,6 +258,9 @@ class EmployeeImportService
             $summary[$row['action']]++;
             if ($row['warnings'] !== []) {
                 $summary['warnings']++;
+            }
+            if (!empty($row['defaulted_date']) && in_array($row['action'], ['create', 'update'], true)) {
+                $summary['defaulted_dates']++;
             }
         }
 
@@ -197,10 +273,9 @@ class EmployeeImportService
     }
 
     /**
-     * @param array<int, array<int, string>> $sheet
-     * @return array{0: ?int, 1: array<int, string>, 2: array<int, string>}
+     * @return array<string, string> normalised header alias => field key
      */
-    private function detectHeader(array $sheet): array
+    private function aliasMap(): array
     {
         $aliases = [];
         foreach (self::COLUMNS as $key => [$label, $extra]) {
@@ -209,33 +284,208 @@ class EmployeeImportService
             }
         }
 
-        $scanned = 0;
-        foreach ($sheet as $rowNumber => $cells) {
-            if (++$scanned > 15) {
-                break;
+        return $aliases;
+    }
+
+    /**
+     * Keeps only [normalised header => known field] pairs (a field can be used once).
+     *
+     * @return array<string, string>
+     */
+    private function sanitizeMappings(mixed $input): array
+    {
+        if (!is_array($input)) {
+            return [];
+        }
+        $clean = [];
+        $taken = [];
+        foreach ($input as $header => $field) {
+            $header = (string) $header;
+            if (!is_string($field) || !isset(self::COLUMNS[$field]) || isset($taken[$field]) || $header === '') {
+                continue;
             }
-            $map = [];
-            $used = [];
-            $unknown = [];
-            foreach ($cells as $column => $value) {
-                $normalized = $this->key((string) $value);
-                if ($normalized === '') {
-                    continue;
-                }
-                $key = $aliases[$normalized] ?? null;
-                if ($key !== null && !isset($used[$key])) {
-                    $map[$column] = $key;
-                    $used[$key] = true;
-                } else {
-                    $unknown[] = $this->cleanText((string) $value);
-                }
+            $clean[$header] = $field;
+            $taken[$field] = true;
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Maps one header row. Built-in aliases win; manual mappings only apply to
+     * headers the system did not recognise.
+     *
+     * @param array<int, string> $cells
+     * @param array<string, string> $aliases
+     * @param array<string, string> $manual
+     * @return array{0: array<int, string>, 1: array<string, string>, 2: array<int, array<string, mixed>>}
+     *         [column => field, field => source ("auto" or header key), unmatched header entries]
+     */
+    private function mapRow(array $cells, array $aliases, array $manual): array
+    {
+        $map = [];
+        $used = [];
+        $entries = [];
+
+        foreach ($cells as $column => $value) {
+            $normalized = $this->key((string) $value);
+            if ($normalized === '') {
+                continue;
             }
-            if (isset($used['full_name'])) {
-                return [(int) $rowNumber, $map, array_slice($unknown, 0, 15)];
+            $field = $aliases[$normalized] ?? null;
+            if ($field !== null && !isset($used[$field])) {
+                $map[$column] = $field;
+                $used[$field] = 'auto';
+                continue;
+            }
+            $entries[] = ['key' => $normalized, 'header' => $this->cleanText((string) $value), 'column' => $column, 'field' => null];
+        }
+
+        foreach ($entries as $position => $entry) {
+            $field = $manual[$entry['key']] ?? null;
+            if ($field !== null && !isset($used[$field])) {
+                $map[$entry['column']] = $field;
+                $used[$field] = $entry['key'];
+                $entries[$position]['field'] = $field;
             }
         }
 
-        return [null, [], []];
+        return [$map, $used, $entries];
+    }
+
+    /**
+     * @param array<int, array<int, string>> $rows
+     * @param array<string, string> $aliases
+     * @param array<string, string> $manual
+     * @return array{0: ?int, 1: array<int, string>, 2: array<int, array<string, mixed>>, 3: array<string, string>}
+     */
+    private function detectHeader(array $rows, array $aliases, array $manual): array
+    {
+        $scanned = 0;
+        foreach ($rows as $rowNumber => $cells) {
+            if (++$scanned > 15) {
+                break;
+            }
+            [$map, $used, $entries] = $this->mapRow($cells, $aliases, $manual);
+            if (isset($used['full_name'])) {
+                return [(int) $rowNumber, $map, $entries, $used];
+            }
+        }
+
+        return [null, [], [], []];
+    }
+
+    /**
+     * Columns the user may want to map, with a "did you mean" suggestion that is
+     * never applied until the user confirms it.
+     *
+     * @param array<int, array<string, mixed>> $entries
+     * @param array<string, string> $aliases
+     * @param array<string, string> $used
+     * @return array<int, array<string, mixed>>
+     */
+    private function columnList(array $entries, array $aliases, array $used, ?string $sheet = null): array
+    {
+        $list = [];
+        foreach ($entries as $entry) {
+            $suggestion = $entry['field'] === null ? $this->suggestField((string) $entry['key'], $aliases, $used) : null;
+            $list[] = [
+                'key' => (string) $entry['key'],
+                'header' => (string) $entry['header'],
+                'field' => $entry['field'],
+                'suggestion' => $suggestion,
+                'suggestion_label' => $suggestion !== null ? self::COLUMNS[$suggestion][0] : null,
+                'sheet' => $sheet,
+            ];
+        }
+
+        return $list;
+    }
+
+    /**
+     * Header-like first rows of worksheets that were not recognised, so the user can
+     * map their columns too (single-cell rows such as cover-page titles are skipped).
+     *
+     * @param array<int, array{name: string, rows: array<int, array<int, string>>}> $sheets
+     * @param array<int, array<string, mixed>> $infos
+     * @param array<string, string> $aliases
+     * @param array<string, string> $manual
+     * @return array<string, array<string, mixed>> keyed by normalised header
+     */
+    private function unmatchedColumns(array $sheets, array $infos, array $aliases, array $manual, bool $force): array
+    {
+        $columns = [];
+        foreach ($sheets as $index => $sheet) {
+            if (($infos[$index]['matched'] ?? false) || $sheet['rows'] === []) {
+                continue;
+            }
+            $firstRow = reset($sheet['rows']);
+            if (!is_array($firstRow) || (!$force && count($firstRow) < 2)) {
+                continue;
+            }
+            [, $used, $entries] = $this->mapRow($firstRow, $aliases, $manual);
+            foreach ($this->columnList($entries, $aliases, $used, $sheet['name']) as $column) {
+                $columns[$column['key']] ??= $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @param array<string, string> $aliases
+     * @param array<string, string> $used
+     */
+    private function suggestField(string $key, array $aliases, array $used): ?string
+    {
+        $length = mb_strlen($key);
+        if ($length < 3) {
+            return null;
+        }
+
+        $best = null;
+        $bestScore = 0.0;
+        foreach ($aliases as $alias => $field) {
+            if (isset($used[$field])) {
+                continue;
+            }
+            $aliasLength = mb_strlen((string) $alias);
+            if ($aliasLength >= 4 && (str_contains($key, (string) $alias) || str_contains((string) $alias, $key))) {
+                $score = 0.8 + 0.2 * (min($length, $aliasLength) / max($length, $aliasLength));
+            } else {
+                $score = $this->similarity($key, (string) $alias);
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $field;
+            }
+        }
+
+        return $bestScore >= 0.70 ? $best : null;
+    }
+
+    /** Character-level Levenshtein similarity in [0, 1] (multibyte safe). */
+    private function similarity(string $a, string $b): float
+    {
+        $x = mb_str_split($a);
+        $y = mb_str_split($b);
+        $n = count($x);
+        $m = count($y);
+        if ($n === 0 || $m === 0) {
+            return 0.0;
+        }
+
+        $previous = range(0, $m);
+        for ($i = 1; $i <= $n; $i++) {
+            $current = [$i];
+            for ($j = 1; $j <= $m; $j++) {
+                $cost = $x[$i - 1] === $y[$j - 1] ? 0 : 1;
+                $current[$j] = min($previous[$j] + 1, $current[$j - 1] + 1, $previous[$j - 1] + $cost);
+            }
+            $previous = $current;
+        }
+
+        return 1 - $previous[$m] / max($n, $m);
     }
 
     /**
@@ -318,7 +568,7 @@ class EmployeeImportService
      * @param array{nid: array<string, int>, code: array<string, int>} $seen
      * @return array<string, mixed>
      */
-    private function analyzeRow(array $raw, int $line, array $ctx, string $duplicates, array &$seen): array
+    private function analyzeRow(array $raw, int $line, array $ctx, string $duplicates, array &$seen, ?string $sheetName = null): array
     {
         $errors = [];
         $warnings = [];
@@ -499,6 +749,7 @@ class EmployeeImportService
         // ---- status / termination --------------------------------------
         $statusName = null;
         $impliedType = null;
+        $defaultedDate = false;
         if ($get('status') !== '') {
             $resolved = $this->resolveStatus($get('status'), $ctx);
             if ($resolved === null) {
@@ -537,10 +788,19 @@ class EmployeeImportService
                 } else {
                     $data['termination_type'] = $type;
                     $data['termination_date'] = $terminationDate ?? date('Y-m-d');
+                    if ($terminationDate === null && $get('termination_date') === '') {
+                        $defaultedDate = true;
+                    }
                 }
             } elseif ($kind === 'suspended') {
                 $data['termination_type'] = null;
                 $data['termination_date'] = $terminationDate ?? date('Y-m-d');
+                if ($terminationDate === null && $get('termination_date') === '') {
+                    $defaultedDate = true;
+                }
+            }
+            if ($defaultedDate) {
+                $warnings[] = 'لم يُحدَّد تاريخ انتهاء الخدمة؛ سيُعتمد تاريخ اليوم (' . date('d/m/Y') . ').';
             }
         }
 
@@ -638,6 +898,8 @@ class EmployeeImportService
             'national_id' => $nid !== '' ? $nid : null,
             'action' => $action,
             'existing_id' => $existingId,
+            'sheet' => $sheetName,
+            'defaulted_date' => $defaultedDate,
             'final_status' => $finalStatus,
             'data' => $data,
             'errors' => $errors,

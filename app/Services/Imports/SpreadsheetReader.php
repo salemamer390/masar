@@ -30,9 +30,12 @@ class SpreadsheetReader
     }
 
     /**
-     * @return array<int, array<int, string>>
+     * Every visible worksheet: [['name' => string, 'rows' => [excelRow => [col => value]]], ...].
+     * CSV files are returned as a single sheet named "CSV".
+     *
+     * @return array<int, array{name: string, rows: array<int, array<int, string>>}>
      */
-    public function read(string $path, string $extension): array
+    public function readAll(string $path, string $extension): array
     {
         $extension = strtolower($extension);
 
@@ -40,14 +43,27 @@ class SpreadsheetReader
             return $this->readXlsx($path);
         }
         if ($extension === 'csv') {
-            return $this->readCsv($path);
+            return [['name' => 'CSV', 'rows' => $this->readCsv($path)]];
         }
 
         throw new RuntimeException('نوع الملف غير مدعوم. استخدم ملف Excel بصيغة xlsx أو ملف CSV.');
     }
 
+    /**
+     * First visible worksheet only (kept for backward compatibility).
+     *
+     * @return array<int, array<int, string>>
+     */
+    public function read(string $path, string $extension): array
+    {
+        return $this->readAll($path, $extension)[0]['rows'] ?? [];
+    }
+
     // ------------------------------------------------------------------ XLSX
 
+    /**
+     * @return array<int, array{name: string, rows: array<int, array<int, string>>}>
+     */
     private function readXlsx(string $path): array
     {
         if (!class_exists(ZipArchive::class)) {
@@ -60,18 +76,34 @@ class SpreadsheetReader
         }
 
         try {
-            $sheetPath = $this->firstSheetPath($zip);
+            $sheetList = $this->sheetList($zip);
             $date1904 = $this->usesDate1904($zip);
             $shared = $this->sharedStrings($zip);
             $dateStyles = $this->dateStyles($zip);
 
-            return $this->readSheet($zip, $sheetPath, $shared, $dateStyles, $date1904);
+            $sheets = [];
+            $totalRows = 0;
+            foreach ($sheetList as $sheet) {
+                $rows = $this->readSheet($zip, $sheet['path'], $shared, $dateStyles, $date1904);
+                $totalRows += count($rows);
+                if ($totalRows > $this->maxRows * 2) {
+                    throw new RuntimeException('الملف كبير جدًا (إجمالي الصفوف في كل الأوراق يتجاوز ' . ($this->maxRows * 2) . ' صف). قسّمه إلى أكثر من ملف.');
+                }
+                $sheets[] = ['name' => $sheet['name'], 'rows' => $rows];
+            }
+
+            return $sheets;
         } finally {
             $zip->close();
         }
     }
 
-    private function firstSheetPath(ZipArchive $zip): string
+    /**
+     * Visible worksheets in workbook order.
+     *
+     * @return array<int, array{name: string, path: string}>
+     */
+    private function sheetList(ZipArchive $zip): array
     {
         $workbook = $this->loadDom($zip, 'xl/workbook.xml');
         if ($workbook === null) {
@@ -88,6 +120,7 @@ class SpreadsheetReader
             }
         }
 
+        $list = [];
         $sheets = [];
         $this->collect($workbook->documentElement, 'sheet', $sheets);
         foreach ($sheets as $sheet) {
@@ -95,23 +128,30 @@ class SpreadsheetReader
             if ($state === 'hidden' || $state === 'veryHidden') {
                 continue;
             }
-            $relationshipId = $sheet->getAttributeNS(self::NS_REL, 'id');
-            $target = $targets[$relationshipId] ?? '';
+            $target = $targets[$sheet->getAttributeNS(self::NS_REL, 'id')] ?? '';
             if ($target === '') {
                 continue;
             }
             $target = ltrim($target, '/');
             $full = str_starts_with($target, 'xl/') ? $target : 'xl/' . $target;
-            if ($zip->locateName($full) !== false) {
-                return $full;
+            if ($zip->locateName($full) === false) {
+                continue;
+            }
+            $name = trim($sheet->getAttribute('name'));
+            $list[] = ['name' => $name !== '' ? $name : 'Sheet' . (count($list) + 1), 'path' => $full];
+            if (count($list) >= 30) {
+                break;
             }
         }
 
-        if ($zip->locateName('xl/worksheets/sheet1.xml') !== false) {
-            return 'xl/worksheets/sheet1.xml';
+        if ($list === [] && $zip->locateName('xl/worksheets/sheet1.xml') !== false) {
+            $list[] = ['name' => 'Sheet1', 'path' => 'xl/worksheets/sheet1.xml'];
+        }
+        if ($list === []) {
+            throw new RuntimeException('ملف Excel غير صالح: لا توجد ورقة بيانات ظاهرة.');
         }
 
-        throw new RuntimeException('ملف Excel غير صالح: لا توجد ورقة بيانات ظاهرة.');
+        return $list;
     }
 
     private function usesDate1904(ZipArchive $zip): bool

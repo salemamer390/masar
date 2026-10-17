@@ -39,6 +39,9 @@ class EmployeeImportController extends Controller
         $request->validate([
             'file' => ['required', 'file', 'max:5120'],
             'duplicates' => ['nullable', 'in:update,skip'],
+            'sheet' => ['nullable', 'string', 'max:10'],
+            'mappings' => ['nullable', 'string', 'max:20000'],
+            'ack_dates' => ['nullable', 'boolean'],
         ], [
             'file.required' => 'اختر ملف Excel أو CSV أولًا.',
             'file.file' => 'الملف المرفوع غير صالح.',
@@ -60,7 +63,17 @@ class EmployeeImportController extends Controller
             return response()->json(['success' => false, 'message' => 'لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.'], 422);
         }
 
-        $analysis = $this->service->analyze($file->getRealPath(), $extension, $companyId, (string) $request->input('duplicates', 'update'));
+        $mappings = json_decode((string) $request->input('mappings', '{}'), true);
+        $analysis = $this->service->analyze(
+            $file->getRealPath(),
+            $extension,
+            $companyId,
+            (string) $request->input('duplicates', 'update'),
+            [
+                'sheet' => (string) $request->input('sheet', 'auto'),
+                'mappings' => is_array($mappings) ? $mappings : [],
+            ]
+        );
 
         if ($analysis['file_errors'] !== []) {
             return response()->json(['success' => false, 'message' => $analysis['file_errors'][0]], 422);
@@ -71,11 +84,17 @@ class EmployeeImportController extends Controller
             return response()->json(['success' => true] + $payload);
         }
 
+        if ($analysis['needs_mapping']) {
+            return response()->json(['success' => false, 'message' => 'اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.'] + $payload, 422);
+        }
         if (!empty($analysis['capacity']['exceeded'])) {
             return response()->json(['success' => false, 'message' => 'عدد الموظفين بعد الاستيراد يتجاوز حد باقتك. عدّل الملف أو رقّ الباقة.'] + $payload, 422);
         }
         if (($analysis['summary']['create'] + $analysis['summary']['update']) === 0) {
             return response()->json(['success' => false, 'message' => 'لا توجد صفوف صالحة للاستيراد.'] + $payload, 422);
+        }
+        if ($analysis['summary']['defaulted_dates'] > 0 && !$request->boolean('ack_dates')) {
+            return response()->json(['success' => false, 'message' => 'أكّد موافقتك على اعتماد تاريخ اليوم كتاريخ انتهاء خدمة للموظفين غير المحدَّد لهم تاريخ.'] + $payload, 422);
         }
 
         $result = $this->service->commit($analysis, $companyId);
@@ -99,6 +118,7 @@ class EmployeeImportController extends Controller
             if ($row['errors'] !== [] || $row['warnings'] !== []) {
                 $issues[] = [
                     'line' => $row['line'],
+                    'sheet' => $row['sheet'],
                     'name' => $row['name'],
                     'type' => $row['errors'] !== [] ? 'error' : 'warning',
                     'messages' => array_merge($row['errors'], $row['warnings']),
@@ -106,13 +126,27 @@ class EmployeeImportController extends Controller
             }
         }
 
+        $fields = [];
+        foreach (EmployeeImportService::COLUMNS as $key => [$label]) {
+            $fields[] = ['key' => $key, 'label' => $label];
+        }
+
         return [
             'summary' => $analysis['summary'],
             'capacity' => $analysis['capacity'],
             'new_lookups' => $analysis['new_lookups'],
             'unknown_columns' => $analysis['unknown_columns'],
+            'sheets' => $analysis['sheets'],
+            'selected_sheet' => $analysis['selected_sheet'],
+            'merge_available' => $analysis['merge_available'],
+            'needs_mapping' => $analysis['needs_mapping'],
+            'columns' => $analysis['columns'],
+            'field_usage' => (object) $analysis['field_usage'],
+            'fields' => $fields,
+            'today' => date('d/m/Y'),
             'rows' => array_map(static fn (array $row): array => [
                 'line' => $row['line'],
+                'sheet' => $row['sheet'],
                 'name' => $row['name'],
                 'code' => $row['code'],
                 'action' => $row['action'],
