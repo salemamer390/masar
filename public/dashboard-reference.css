@@ -160,3 +160,30 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 .dashboard-reference-layout .unified-request-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
 .dashboard-reference-layout .unified-request-copy b{color:#0f172a;font-size:12px;font-weight:700;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dashboard-reference-layout .unified-request-copy small{color:#64748b;font-size:10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Keep the six dashboard summaries compact and visually grouped. */
+.reference-kpi-grid--six .reference-kpi {
+  min-height: 88px !important;
+  padding: 12px 13px !important;
+  gap: 9px !important;
+}
+.reference-kpi-grid--six .reference-kpi-icon {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  flex-basis: 40px !important;
+  font-size: 18px !important;
+}
+.reference-kpi-grid--six .reference-kpi b { font-size: 10px !important; line-height: 1.35 !important; }
+.reference-kpi-grid--six .reference-kpi strong { font-size: 22px !important; margin: 2px 0 !important; }
+
+/* Keep dashboard KPI cards on one row at every viewport; narrow screens can
+   scroll the row horizontally without compressing its content. */
+.reference-kpi-grid--six {
+  grid-template-columns: repeat(6, minmax(130px, 1fr)) !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+.reference-kpi-grid--six > * { min-width: 130px; }

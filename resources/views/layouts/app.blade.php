@@ -277,6 +277,34 @@
     showToast(isDark ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح');
   });
 
+  // Summary-card visibility is a presentation preference only. It never
+  // changes, filters, or removes any database data.
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('cardsVisibilityToggle');
+    if (!toggle) return;
+    const cardGroups = '.stat-grid.compact, .employee-kpi-grid, .reference-kpi-grid--six, .payroll-employee-kpi-grid';
+    if (!document.querySelector(cardGroups)) {
+      toggle.hidden = true;
+      return;
+    }
+    const setCardsVisible = (visible) => {
+      document.body.classList.toggle('masar-cards-hidden', !visible);
+      toggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      toggle.setAttribute('aria-label', visible ? 'إخفاء الكروت' : 'إظهار الكروت');
+      toggle.title = visible ? 'إخفاء الكروت' : 'إظهار الكروت';
+      const icon = toggle.querySelector('i');
+      if (icon) icon.className = visible ? 'bi bi-eye-slash' : 'bi bi-eye';
+    };
+    let visible = true;
+    try { visible = localStorage.getItem('masar_summary_cards_visible') !== '0'; } catch (e) {}
+    setCardsVisible(visible);
+    toggle.addEventListener('click', () => {
+      const next = document.body.classList.contains('masar-cards-hidden');
+      try { localStorage.setItem('masar_summary_cards_visible', next ? '1' : '0'); } catch (e) {}
+      setCardsVisible(next);
+    });
+  });
+
   // CSRF setup for Fetch API
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
