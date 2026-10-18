@@ -16,6 +16,10 @@ class UserController extends Controller
     public function index()
     {
         $query = User::with(['role', 'company', 'directPermissions']);
+        $query->where(function ($builder): void {
+            $builder->whereDoesntHave('role')
+                ->orWhereHas('role', fn ($roleQuery) => $roleQuery->where('name', '!=', 'company_manager'));
+        });
         if (!auth()->user()->isSuperAdmin()) $query->where('company_id', auth()->user()->company_id);
         $users = $query->paginate(20);
         $roles = $this->rolesForActor()->when(!auth()->user()->isSuperAdmin(), fn ($query) => $query->where('id', '!=', 1))->get();
@@ -92,6 +96,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $this->ensureUserCanBeManaged($user);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'role_id' => ['required', 'exists:roles,id'],
@@ -165,6 +170,7 @@ class UserController extends Controller
     private function ensureUserCanBeManaged(User $user): void
     {
         $actor = auth()->user();
+        $user->loadMissing('role');
         if (!$actor->isSuperAdmin() && (int) $user->company_id !== (int) $actor->company_id) {
             abort(403);
         }
@@ -173,6 +179,9 @@ class UserController extends Controller
         }
         if ($user->isSuperAdmin()) {
             abort(403, 'لا يمكن تعديل أو حذف حساب مدير المنصة من هنا.');
+        }
+        if ($user->role?->name === 'company_manager') {
+            abort(422, 'حساب مدير الشركة هو مالك الشركة ولا يمكن تعديله أو إيقافه أو حذفه.');
         }
     }
 
