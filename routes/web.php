@@ -52,6 +52,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     });
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::get('/access-denied', fn () => view('errors.access-denied'))->name('access.denied');
     Route::get('/company/account', [CompanyAccountController::class, 'index'])
         ->middleware('permission:users.view')
         ->name('company.account');
