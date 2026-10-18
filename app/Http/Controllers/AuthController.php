@@ -5,6 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use App\Models\Company;
+use App\Models\Role;
+use App\Models\Permission;
+use App\Models\SubscriptionPlan;
+use App\Models\User;
 use App\Models\CompanySubscription;
 
 class AuthController extends Controller
@@ -61,6 +69,73 @@ class AuthController extends Controller
         return back()->withErrors([
             'email' => 'البيانات المدخلة غير صحيحة، يرجى المحاولة مرة أخرى.',
         ])->onlyInput('email');
+    }
+
+    public function registerCompany(Request $request)
+    {
+        $data = $request->validate([
+            'company_name' => ['required', 'string', 'max:190'],
+            'owner_name' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'phone' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $plan = SubscriptionPlan::query()
+            ->where('employee_limit', 20)
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->first();
+
+        if (!$plan) {
+            return back()->withErrors(['registration' => 'الباقة الافتراضية لحد 20 موظف غير متاحة حاليًا.'])->withInput();
+        }
+
+        $user = DB::transaction(function () use ($data, $plan): User {
+            $baseSlug = Str::slug($data['company_name']) ?: 'company';
+            $slug = $baseSlug;
+            $suffix = 1;
+            while (Company::where('slug', $slug)->exists()) {
+                $slug = $baseSlug . '-' . $suffix++;
+            }
+
+            $company = Company::create([
+                'name' => $data['company_name'],
+                'slug' => $slug,
+                'email' => $data['email'],
+                'phone' => $data['phone'] ?? null,
+                'status' => 'active',
+            ]);
+
+            CompanySubscription::create([
+                'company_id' => $company->id,
+                'subscription_plan_id' => $plan->id,
+                'status' => 'active',
+                'starts_at' => today(),
+                'ends_at' => null,
+                'trial_days' => 0,
+            ]);
+
+            $role = Role::firstOrCreate(
+                ['company_id' => $company->id, 'name' => 'company_manager'],
+                ['display_name' => 'مدير الشركة', 'description' => 'مالك الشركة ومدير حساباتها وصلاحياتها.']
+            );
+            $role->permissions()->sync(Permission::query()->pluck('id')->all());
+
+            return User::create([
+                'name' => $data['owner_name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role_id' => $role->id,
+                'company_id' => $company->id,
+                'is_active' => true,
+            ]);
+        });
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->route('dashboard')->with('toast', 'تم إنشاء الشركة وحساب مديرها وتفعيل باقة 20 موظف بنجاح.');
     }
 
     public function logout(Request $request)

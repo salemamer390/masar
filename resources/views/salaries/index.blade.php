@@ -22,7 +22,8 @@
   <button class="btn btn-primary"><i class="bi bi-funnel"></i> تصفية</button><a href="{{ route('salaries.index') }}" class="btn btn-light">مسح</a>
 </form>
 
-<div class="panel mb-3">
+{{-- منهج الحساب مخفي مؤقتًا من الواجهة، مع الإبقاء على المنطق الحسابي فعالًا. --}}
+<div class="panel mb-3 salary-calculation-method" hidden>
   <div class="panel-head"><div><h3>منهج الحساب</h3><span>القيم التالية ثابتة طبقاً لمنطق حاسبة الرواتب المعتمدة.</span></div></div>
   <div class="salary-detail-grid">
     <div><span>الراتب المدخل</span><strong>الراتب الصافي</strong></div>

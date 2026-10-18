@@ -100,10 +100,38 @@
     </button>
   </form>
 
+  <div class="text-center mt-3">
+    <button type="button" class="btn btn-link text-decoration-none" data-bs-toggle="modal" data-bs-target="#companyRegistrationModal">
+      <i class="bi bi-building-add me-1"></i> تسجيل شركة جديدة
+    </button>
+  </div>
+
+  <div class="modal fade" id="companyRegistrationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+      <form action="{{ route('register.company') }}" method="POST">
+        @csrf
+        <div class="modal-header"><h5 class="modal-title">تسجيل شركة جديدة</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
+        <div class="modal-body">
+          <p class="text-muted small">سيتم إنشاء حساب مدير الشركة وتفعيل باقة 20 موظف تلقائيًا.</p>
+          <div class="mb-3"><label class="form-label">اسم الشركة</label><input name="company_name" class="form-control" value="{{ old('company_name') }}" required></div>
+          <div class="mb-3"><label class="form-label">اسم مدير الشركة</label><input name="owner_name" class="form-control" value="{{ old('owner_name') }}" required></div>
+          <div class="mb-3"><label class="form-label">البريد الإلكتروني</label><input type="email" name="email" class="form-control" value="{{ old('email') }}" required autocomplete="email"></div>
+          <div class="mb-3"><label class="form-label">رقم الهاتف <small class="text-muted">(اختياري)</small></label><input name="phone" class="form-control" value="{{ old('phone') }}"></div>
+          <div class="row g-2"><div class="col-md-6"><label class="form-label">كلمة المرور</label><input type="password" name="password" class="form-control" required minlength="8" autocomplete="new-password"></div><div class="col-md-6"><label class="form-label">تأكيد كلمة المرور</label><input type="password" name="password_confirmation" class="form-control" required minlength="8" autocomplete="new-password"></div></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i> إنشاء الحساب</button></div>
+      </form>
+    </div></div>
+  </div>
+
   <div class="mt-4 pt-3 border-top text-center">
     <small class="text-muted">نظام إدارة الموارد البشرية MASAR HR</small>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+@if($errors->has('registration') || old('company_name'))
+<script>document.addEventListener('DOMContentLoaded',function(){bootstrap.Modal.getOrCreateInstance(document.getElementById('companyRegistrationModal')).show();});</script>
+@endif
 </body>
 </html>
