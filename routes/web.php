@@ -75,12 +75,16 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     // Employees
     Route::prefix('employees')->name('employees.')->group(function () {
         Route::get('/import/template', [EmployeeImportController::class, 'template'])
+            ->middleware('permission:employees.import')
             ->name('import.template');
         Route::post('/import/preview', [EmployeeImportController::class, 'preview'])
+            ->middleware('permission:employees.import')
             ->name('import.preview');
         Route::post('/import/rejected', [EmployeeImportController::class, 'rejected'])
+            ->middleware('permission:employees.import')
             ->name('import.rejected');
         Route::post('/import', [EmployeeImportController::class, 'store'])
+            ->middleware('permission:employees.import')
             ->name('import.store');
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware('permission:employees.view')
@@ -150,7 +154,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:attendance.edit')
             ->name('update');
         Route::delete('/{attendance}', [AttendanceController::class, 'destroy'])
-            ->middleware('permission:attendance.edit')
+            ->middleware('permission:attendance.delete')
             ->name('destroy');
         Route::patch('/{attendance}/approve', [AttendanceController::class, 'approve'])
             ->middleware('permission:attendance.edit')
