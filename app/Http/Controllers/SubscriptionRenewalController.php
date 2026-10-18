@@ -20,7 +20,9 @@ class SubscriptionRenewalController extends Controller
         abort_unless($user?->company_id, 403);
         abort_unless($user->role?->name === 'hr_manager', 403, 'طلب التجديد متاح لمدير الشركة فقط.');
         $data = $request->validate([
+            'request_type' => ['required', 'in:renewal,upgrade,change'],
             'plan_id' => ['required', 'exists:subscription_plans,id'],
+            'billing_period' => ['required', 'in:monthly,yearly'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
         abort_if(SubscriptionRenewalRequest::where('company_id', $user->company_id)->where('status', 'pending')->exists(), 422, 'يوجد طلب تجديد أو ترقية قيد المراجعة بالفعل.');
@@ -30,10 +32,10 @@ class SubscriptionRenewalController extends Controller
             'company_id' => $user->company_id,
             'subscription_plan_id' => $plan->id,
             'requested_by' => $user->id,
-            'request_type' => 'renewal',
+            'request_type' => $data['request_type'],
             'status' => 'pending',
             'amount' => $plan->price,
-            'billing_period' => $plan->billing_period,
+            'billing_period' => $data['billing_period'],
             'note' => $data['note'] ?? null,
         ]);
         User::whereHas('role', fn ($query) => $query->where('name', 'super_admin'))

@@ -1,52 +1,33 @@
 @extends('layouts.app')
+
 @section('title', 'حساب الشركة')
+
+@push('styles')
+<style>
+.company-account-page{display:grid;gap:18px}.company-account-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.company-account-hero h1{margin:0;font-size:clamp(22px,3vw,30px)}.company-account-hero p{margin:6px 0 0;color:var(--color-text-secondary);font-size:12px}.company-account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.company-account-card{height:100%;padding:20px;border:1px solid var(--color-border);border-radius:16px;background:var(--color-card-bg);box-shadow:var(--ui-shadow);min-width:0}.company-account-card__heading{display:flex;align-items:center;gap:10px;margin-bottom:16px;color:var(--color-primary-dark)}.company-account-card__heading i{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--color-primary-soft);color:var(--color-primary);font-size:18px}.company-account-card__heading h2{margin:0;font-size:16px}.company-account-card__heading small{display:block;margin-top:3px;color:var(--color-text-secondary);font-size:10px}.account-progress{height:10px;overflow:hidden;border-radius:99px;background:#edf1f7}.account-progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#1769e0,#55a1ff)}.account-usage{display:flex;justify-content:space-between;align-items:end;gap:12px;margin:14px 0 8px}.account-usage strong{font-size:28px;color:var(--color-primary-dark);line-height:1}.account-usage span{font-size:11px;color:var(--color-text-secondary)}.account-mini-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:16px}.account-mini-stat{padding:10px;border:1px solid var(--color-border);border-radius:11px;background:var(--color-page-bg);font-size:11px}.account-mini-stat b{display:block;margin-top:4px;color:var(--color-primary-dark);font-size:14px}.account-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.account-detail{padding:11px;border-radius:11px;background:var(--color-page-bg);font-size:10px;color:var(--color-text-secondary)}.account-detail strong{display:block;margin-top:5px;color:var(--color-primary-dark);font-size:12px}.account-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}.company-account-lower{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px}.company-account-panel{overflow:hidden;border:1px solid var(--color-border);border-radius:16px;background:var(--color-card-bg);box-shadow:var(--ui-shadow)}.company-account-panel__head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--color-border)}.company-account-panel__head h2{margin:0;color:var(--color-primary-dark);font-size:16px}.company-account-panel__head span{color:var(--color-text-secondary);font-size:10px}.company-account-panel .table{margin:0}@media(max-width:1050px){.company-account-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.company-account-grid>.company-account-card:last-child{grid-column:1/-1}}@media(max-width:760px){.company-account-grid,.company-account-lower{grid-template-columns:1fr}.company-account-grid>.company-account-card:last-child{grid-column:auto}.company-account-hero .btn{width:100%}.company-account-panel__head{align-items:flex-start;flex-direction:column}.company-account-panel .table{min-width:620px}}
+</style>
+@endpush
+
 @section('content')
-<div class="page-head">
-    <div>
-        <h1>حساب الشركة</h1>
-        <p>ملخص الاشتراك والاستخدام وحسابات فريق الموارد البشرية.</p>
+@php
+    $limit = max((int) ($subscription?->plan?->employee_limit ?? 0), 0);
+    $usagePercent = $limit > 0 ? min(100, round(($employeeCount / $limit) * 100)) : 0;
+    $remaining = max($limit - $employeeCount, 0);
+@endphp
+<div class="company-account-page">
+    <div class="company-account-hero page-head"><div><h1>حساب الشركة</h1><p>ملخص الاشتراك والاستخدام وحسابات فريق الموارد البشرية.</p></div><a class="btn btn-primary" href="{{ route('users.index') }}"><i class="bi bi-people ms-1"></i> إدارة حسابات HR</a></div>
+    @if($subscription?->plan)
+    <div class="company-account-grid">
+        <section class="company-account-card"><div class="company-account-card__heading"><i class="bi bi-bar-chart-line"></i><div><h2>استخدام الباقة</h2><small>عدد الموظفين الحالي مقارنة بالحد المسموح</small></div></div><div class="account-usage"><strong>{{ format_number($employeeCount) }}</strong><span>من {{ format_number($limit) }} موظف</span></div><div class="account-progress" role="progressbar" aria-valuenow="{{ $usagePercent }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ $usagePercent }}%"></span></div><div class="account-mini-stats"><div class="account-mini-stat">المستخدمون<b>{{ $usagePercent }}%</b></div><div class="account-mini-stat">المتاح<b>{{ format_number($remaining) }}</b></div></div></section>
+        <section class="company-account-card"><div class="company-account-card__heading"><i class="bi bi-box-seam"></i><div><h2>الاشتراك الحالي</h2><small>بيانات الباقة المرتبطة بالشركة</small></div></div><div class="account-details"><div class="account-detail">الباقة<strong>{{ $subscription->plan->name }}</strong></div><div class="account-detail">الحالة<strong>{{ $subscription->status === 'trial' ? 'فترة تجريبية' : 'نشط' }}</strong></div><div class="account-detail">تاريخ البداية<strong>{{ $subscription->starts_at?->format('d/m/Y') ?? '—' }}</strong></div><div class="account-detail">تاريخ الانتهاء<strong>{{ $subscription->ends_at?->format('d/m/Y') ?? 'بدون تاريخ انتهاء' }}</strong></div></div><div class="account-actions"><button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#subscriptionDetailsModal">تفاصيل الباقة</button></div></section>
+        <section class="company-account-card"><div class="company-account-card__heading"><i class="bi bi-arrow-repeat"></i><div><h2>طلب تجديد أو تغيير الباقة</h2><small>إرسال الطلب للمراجعة</small></div></div>@if(auth()->user()?->role?->name === 'hr_manager') @if($renewals->contains('status', 'pending'))<div class="alert alert-info mb-0">يوجد طلب قيد المراجعة حاليًا.</div>@else<form method="POST" action="{{ route('company.renewals.store') }}" class="d-grid gap-2">@csrf<label class="form-label mb-0">نوع الطلب</label><select name="request_type" class="form-select" required><option value="renewal">تجديد الاشتراك</option><option value="upgrade">ترقية الباقة</option><option value="change">تغيير الباقة</option></select><label class="form-label mb-0 mt-1">الباقة المطلوبة</label><select name="plan_id" class="form-select" required>@foreach($plans as $plan)<option value="{{ $plan->id }}" @selected($subscription->subscription_plan_id === $plan->id)>{{ $plan->name }} — {{ number_format($plan->price, 2) }} ج.م</option>@endforeach</select><label class="form-label mb-0 mt-1">دورة الفوترة</label><select name="billing_period" class="form-select" required><option value="monthly">شهري</option><option value="yearly">سنوي</option></select><label class="form-label mb-0 mt-1">ملاحظة <small class="text-muted">(اختياري)</small></label><input name="note" class="form-control" maxlength="1000" placeholder="أضف ملاحظة للطلب"><button class="btn btn-primary mt-2"><i class="bi bi-send ms-1"></i> إرسال الطلب</button></form>@endif @else<p class="text-muted mb-0">يمكن لمدير الشركة إرسال طلب التجديد أو تغيير الباقة.</p>@endif</section>
     </div>
-    <a class="btn btn-primary" href="{{ route('users.index') }}">إدارة حسابات HR</a>
+    @else<div class="alert alert-warning">لا يوجد اشتراك مرتبط بالشركة حاليًا.</div>@endif
+    <div class="company-account-lower">
+        <section class="company-account-panel"><div class="company-account-panel__head"><div><h2>سجل طلبات الاشتراك</h2><span>آخر الطلبات المسجلة للشركة</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>نوع الطلب</th><th>الباقة</th><th>القيمة</th><th>الدورة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>@forelse($renewals as $renewal)<tr><td>{{ ['renewal'=>'تجديد','upgrade'=>'ترقية','change'=>'تغيير'][$renewal->request_type] ?? $renewal->request_type }}</td><td>{{ $renewal->plan?->name ?? '—' }}</td><td>{{ number_format($renewal->amount, 2) }} ج.م</td><td>{{ $renewal->billing_period === 'yearly' ? 'سنوي' : 'شهري' }}</td><td>{{ ['pending'=>'قيد المراجعة','approved'=>'معتمد','rejected'=>'مرفوض'][$renewal->status] ?? $renewal->status }}</td><td>{{ $renewal->created_at->format('d/m/Y') }}</td></tr>@empty<tr><td colspan="6" class="text-center text-muted">لا توجد طلبات سابقة.</td></tr>@endforelse</tbody></table></div></section>
+        <section class="company-account-panel"><div class="company-account-panel__head"><div><h2>حسابات الشركة</h2><span>المستخدمون المرتبطون بهذه الشركة</span></div><a class="btn btn-outline-primary btn-sm" href="{{ route('users.index') }}">إدارة الحسابات</a></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th></tr></thead><tbody>@forelse($users as $account)<tr><td>{{ $account->name }}</td><td>{{ $account->role?->display_name ?? $account->role?->name ?? '—' }}</td><td>{{ $account->is_active ? 'نشط' : 'موقوف' }}</td></tr>@empty<tr><td colspan="3" class="text-center text-muted">لا توجد حسابات.</td></tr>@endforelse</tbody></table></div></section>
+    </div>
 </div>
-
-@if($subscription?->plan)
-<div class="row g-3 mb-4">
-    <div class="col-md-4"><div class="panel p-3"><small class="text-muted d-block">الباقة الحالية</small><strong>{{ $subscription->plan->name }}</strong></div></div>
-    <div class="col-md-4"><div class="panel p-3"><small class="text-muted d-block">الموظفون المستخدمون</small><strong>{{ format_number($employeeCount) }} من {{ format_number($subscription->plan->employee_limit) }}</strong></div></div>
-    <div class="col-md-4"><div class="panel p-3"><small class="text-muted d-block">حالة الاشتراك</small><strong>{{ $subscription->status === 'trial' ? 'فترة تجريبية' : 'نشط' }}</strong><span class="d-block small text-muted">{{ $subscription->ends_at ? 'ينتهي في '.$subscription->ends_at->format('d/m/Y') : 'بدون تاريخ انتهاء' }}</span></div></div>
-</div>
-@else
-<div class="alert alert-warning">لا يوجد اشتراك مرتبط بالشركة حاليًا.</div>
-@endif
-
-@if(auth()->user()?->role?->name === 'hr_manager')
-<div class="panel mb-4">
-    <div class="panel-head"><div><h3>تجديد أو تغيير الباقة</h3><span>أرسل الطلب، وسيعتمده مدير المنصة بعد مراجعة السداد.</span></div></div>
-    @if($renewals->contains('status', 'pending'))
-        <div class="p-3 text-muted">يوجد طلب قيد المراجعة حاليًا.</div>
-    @else
-        <form method="POST" action="{{ route('company.renewals.store') }}" class="p-3 row g-3">@csrf
-            <div class="col-md-4"><label class="form-label">الباقة المطلوبة</label><select name="plan_id" class="form-select" required>@foreach($plans as $plan)<option value="{{ $plan->id }}" @selected($subscription?->subscription_plan_id === $plan->id)>{{ $plan->name }} — {{ number_format($plan->price, 2) }} ج.م / {{ $plan->billing_period === 'yearly' ? 'سنة' : 'شهر' }}</option>@endforeach</select></div>
-            <div class="col-md-6"><label class="form-label">ملاحظة للسداد أو الطلب <small class="text-muted">(اختياري)</small></label><input name="note" class="form-control" maxlength="1000"></div>
-            <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">إرسال الطلب</button></div>
-        </form>
-    @endif
-</div>
-@endif
-
-<div class="panel table-panel mb-4">
-    <div class="panel-head"><div><h3>سجل طلبات الاشتراك</h3></div></div>
-    <div class="table-responsive"><table class="table"><thead><tr><th>الباقة</th><th>القيمة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>@forelse($renewals as $renewal)<tr><td>{{ $renewal->plan?->name }}</td><td>{{ number_format($renewal->amount, 2) }} ج.م</td><td>{{ ['pending'=>'قيد المراجعة','approved'=>'معتمد','rejected'=>'مرفوض'][$renewal->status] ?? $renewal->status }}</td><td>{{ $renewal->created_at->format('d/m/Y') }}</td></tr>@empty<tr><td colspan="4" class="text-center text-muted">لا توجد طلبات سابقة.</td></tr>@endforelse</tbody></table></div>
-</div>
-
-<div class="panel table-panel">
-    <div class="panel-head"><div><h3>حسابات الشركة</h3><span>يمكن لمدير الشركة تعديل الحسابات والصلاحيات من شاشة حسابات HR.</span></div></div>
-    <div class="table-responsive"><table class="table align-middle"><thead><tr><th>الاسم</th><th>البريد الإلكتروني</th><th>الدور</th><th>الحالة</th></tr></thead><tbody>
-    @forelse($users as $account)
-        <tr><td>{{ $account->name }}</td><td>{{ $account->email }}</td><td>{{ $account->role?->display_name ?? $account->role?->name ?? '—' }}</td><td>{{ $account->is_active ? 'نشط' : 'موقوف' }}</td></tr>
-    @empty
-        <tr><td colspan="4" class="text-center text-muted">لا توجد حسابات.</td></tr>
-    @endforelse
-    </tbody></table></div>
-</div>
+@if($subscription?->plan)<div class="modal fade" id="subscriptionDetailsModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">تفاصيل الباقة</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-6">اسم الباقة</dt><dd class="col-6">{{ $subscription->plan->name }}</dd><dt class="col-6">حد الموظفين</dt><dd class="col-6">{{ format_number($limit) }}</dd><dt class="col-6">الفترة</dt><dd class="col-6">{{ $subscription->plan->billing_period === 'yearly' ? 'سنوية' : 'شهرية' }}</dd><dt class="col-6">السعر</dt><dd class="col-6">{{ number_format($subscription->plan->price, 2) }} ج.م</dd></dl></div></div></div></div>@endif
+<p class="text-muted small mt-2 mb-0">يتم عرض تفاصيل الباقة الحالية من بيانات الاشتراك الفعلية.</p>
 @endsection
