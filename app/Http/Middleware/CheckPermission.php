@@ -11,20 +11,11 @@ class CheckPermission
     public function handle(Request $request, Closure $next, string $permission): Response
     {
         $user = $request->user();
-
-        if (!$user) {
-            return redirect()->route('login');
-        }
-
-        if ($user->hasPermission($permission)) {
-            return $next($request);
-        }
+        if (!$user) return redirect()->route('login');
+        if ($user->hasPermission($permission)) return $next($request);
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'غير مصرح بتنفيذ هذا الإجراء.',
-            ], 403);
+            return response()->json(['success' => false, 'message' => 'غير مصرح بتنفيذ هذا الإجراء.'], 403);
         }
 
         $fallback = $this->allowedFallback($request);
@@ -53,12 +44,8 @@ class CheckPermission
         ];
 
         foreach ($candidates as [$requiredPermission, $routeName]) {
-            if ($routeName === $currentRoute || !$user->hasPermission($requiredPermission)) {
-                continue;
-            }
-            if ($routeName === 'dashboard' && $user->role?->name === 'employee') {
-                continue;
-            }
+            if ($routeName === $currentRoute || !$user->hasPermission($requiredPermission)) continue;
+            if ($routeName === 'dashboard' && $user->role?->name === 'employee') continue;
             return $routeName;
         }
 

@@ -275,10 +275,10 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:payroll.lock')
             ->name('runs.lock');
         Route::delete('/runs/{payrollRun}', [PayrollController::class, 'destroyRun'])
-            ->middleware('permission:payroll.create')
+            ->middleware('permission:payroll.edit')
             ->name('runs.destroy');
         Route::post('/{payrollRecord}/approve', [PayrollController::class, 'approve'])
-            ->middleware('permission:payroll.edit')
+            ->middleware('permission:payroll.approve')
             ->name('approve');
         Route::put('/{payrollRecord}/inputs', [PayrollController::class, 'updateInputs'])
             ->middleware('permission:payroll.edit')
