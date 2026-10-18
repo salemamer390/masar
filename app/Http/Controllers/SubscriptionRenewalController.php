@@ -48,6 +48,13 @@ class SubscriptionRenewalController extends Controller
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected']]);
         abort_if($renewal->status !== 'pending', 422, 'تمت معالجة هذا الطلب بالفعل.');
+        if ($data['status'] === 'approved') {
+            abort_unless(
+                SubscriptionPlan::whereKey($renewal->subscription_plan_id)->where('is_active', true)->exists(),
+                422,
+                'لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.'
+            );
+        }
 
         DB::transaction(function () use ($renewal, $data, $request): void {
             $renewal->update([

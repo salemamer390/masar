@@ -20,17 +20,20 @@ class SubscriptionPlanController extends Controller
         $plans = SubscriptionPlan::orderBy('sort_order')->orderBy('employee_limit')->get();
         $companies = Company::with(['subscriptions.plan'])->latest()->get();
         $renewalRequests = SubscriptionRenewalRequest::with(['company', 'plan', 'requester'])->latest()->get();
+        $latestSubscriptions = $companies->mapWithKeys(fn ($company) => [
+            $company->id => $company->subscriptions->sortByDesc('id')->first(),
+        ])->filter();
+        $activeSubscriptionRecords = $latestSubscriptions->filter(
+            fn ($subscription) => in_array($subscription->status, ['trial', 'active'], true)
+        );
         $activeCompanies = Company::where('status', 'active')->count();
-        $activeSubscriptions = CompanySubscription::whereIn('status', ['trial', 'active'])->count();
-        $expiringSubscriptions = CompanySubscription::whereIn('status', ['trial', 'active'])
-            ->whereNotNull('ends_at')
-            ->whereBetween('ends_at', [today(), today()->copy()->addDays(30)])
+        $activeSubscriptions = $activeSubscriptionRecords->count();
+        $expiringSubscriptions = $activeSubscriptionRecords
+            ->filter(fn ($subscription) => $subscription->ends_at && $subscription->ends_at->between(today(), today()->copy()->addDays(30)))
             ->count();
         $pendingRenewals = $renewalRequests->where('status', 'pending')->count();
         $approvedRevenue = $renewalRequests->where('status', 'approved')->sum(fn ($request) => (float) $request->amount);
-        $companiesByPlan = CompanySubscription::with('plan')
-            ->whereIn('status', ['trial', 'active'])
-            ->get()
+        $companiesByPlan = $activeSubscriptionRecords
             ->groupBy(fn ($subscription) => $subscription->plan?->name ?? 'بدون باقة')
             ->map->count();
         $subscriptionActivity = ActivityLog::with('user')
@@ -54,9 +57,13 @@ class SubscriptionPlanController extends Controller
     public function update(Request $request, SubscriptionPlan $plan)
     {
         $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','hr_user_limit'=>'nullable|integer|min:0|max:1000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string','is_active'=>'nullable|boolean']);
+        $isActive = (bool) ($data['is_active'] ?? false);
+        if (!$isActive && $plan->is_active && $plan->subscriptions()->whereIn('status', ['trial', 'active'])->exists()) {
+            return back()->withErrors(['is_active' => 'لا يمكن إيقاف باقة مرتبطة باشتراكات نشطة.'])->withInput();
+        }
         $data['hr_user_limit'] = $data['hr_user_limit'] ?? 5;
         $data['features'] = collect(preg_split('/[,\n]+/', (string) ($data['features'] ?? '')))->map(fn($v)=>trim($v))->filter()->values()->all();
-        $plan->update($data + ['is_active'=>(bool)($data['is_active'] ?? false)]);
+        $plan->update($data + ['is_active' => $isActive]);
         return back()->with('toast','تم تحديث الباقة بنجاح.');
     }
     public function storeCompany(Request $request)
@@ -71,10 +78,17 @@ class SubscriptionPlanController extends Controller
             'admin_email'=>'required|email|max:190|unique:users,email',
             'admin_password'=>'required|string|min:6',
         ]);
+        $plan = SubscriptionPlan::query()
+            ->whereKey($data['plan_id'])
+            ->where('is_active', true)
+            ->first();
+        if (!$plan) {
+            return back()->withErrors(['plan_id' => 'الباقة المختارة غير نشطة حاليًا.'])->withInput();
+        }
         $company = null;
-        DB::transaction(function () use ($data, &$company): void {
+        DB::transaction(function () use ($data, $plan, &$company): void {
             $company = Company::create(['name'=>$data['name'],'slug'=>Str::slug($data['name']).'-'.Str::random(5),'email'=>$data['email'] ?? null,'phone'=>$data['phone'] ?? null]);
-            CompanySubscription::create(['company_id'=>$company->id,'subscription_plan_id'=>$data['plan_id'],'status'=>($data['trial_days'] ?? 0) > 0 ? 'trial' : 'active','starts_at'=>today(),'ends_at'=>($data['trial_days'] ?? 0) > 0 ? today()->addDays((int)$data['trial_days']) : null,'trial_days'=>$data['trial_days'] ?? 0]);
+            CompanySubscription::create(['company_id'=>$company->id,'subscription_plan_id'=>$plan->id,'status'=>($data['trial_days'] ?? 0) > 0 ? 'trial' : 'active','starts_at'=>today(),'ends_at'=>($data['trial_days'] ?? 0) > 0 ? today()->addDays((int)$data['trial_days']) : null,'trial_days'=>$data['trial_days'] ?? 0]);
             $role = Role::firstOrCreate(
                 ['company_id' => $company->id, 'name' => 'company_manager'],
                 ['display_name' => 'Company manager', 'description' => 'مدير الشركة وإدارة مستخدميها وأدوارها.'],
@@ -89,14 +103,8 @@ class SubscriptionPlanController extends Controller
                 'company_id' => $company->id,
                 'is_active' => true,
             ]);
-            $sourceId = Company::whereKeyNot($company->id)->oldest('id')->value('id');
             // بيانات المنشأة التأمينية خاصة بكل شركة، لذلك تبدأ الشركة الجديدة
             // بدون بيانات منشأة موروثة من شركة أخرى.
-            foreach (['payroll_calculation_settings','payroll_allowance_settings','leave_policy_settings','hr_operational_settings','hr_holidays'] as $table) {
-                if (!$sourceId) continue;
-                $rows = DB::table($table)->where('company_id',$sourceId)->get();
-                foreach ($rows as $row) { $copy=(array)$row; unset($copy['id']); $copy['company_id']=$company->id; $copy['created_at']=now(); $copy['updated_at']=now(); DB::table($table)->insert($copy); }
-            }
         });
         ActivityLog::record('subscription_company_create', "تم إنشاء شركة جديدة: {$company->name}.", $company, null, $company->toArray(), 'subscriptions');
         return back()->with('toast','تم إنشاء الشركة والاشتراك بنجاح.');
@@ -105,7 +113,16 @@ class SubscriptionPlanController extends Controller
     {
         $data = $request->validate(['plan_id'=>'required|exists:subscription_plans,id','status'=>'required|in:trial,active,suspended,expired','ends_at'=>'nullable|date','trial_days'=>'nullable|integer|min:0|max:365']);
         $subscription = $company->subscriptions()->latest('id')->first();
+        $plan = SubscriptionPlan::query()->whereKey($data['plan_id'])->first();
+        $changingPlan = !$subscription || (int) $subscription->subscription_plan_id !== (int) $data['plan_id'];
+        if (!$plan || ($changingPlan && !$plan->is_active)) {
+            return back()->withErrors(['plan_id' => 'لا يمكن ربط الشركة بباقة غير نشطة.'])->withInput();
+        }
         if (!$subscription) $subscription = new CompanySubscription(['company_id'=>$company->id, 'starts_at'=>today()]);
+        $startsAt = $subscription->starts_at ? $subscription->starts_at->copy()->startOfDay() : today();
+        if (!empty($data['ends_at']) && \Illuminate\Support\Carbon::parse($data['ends_at'])->startOfDay()->lt($startsAt)) {
+            return back()->withErrors(['ends_at' => 'تاريخ الانتهاء لا يمكن أن يسبق تاريخ بداية الاشتراك.'])->withInput();
+        }
         $subscription->fill(['subscription_plan_id'=>$data['plan_id'],'status'=>$data['status'],'ends_at'=>$data['ends_at'] ?? null,'trial_days'=>$data['trial_days'] ?? 0]);
         $subscription->save();
         ActivityLog::record('subscription_update', "تم تحديث اشتراك الشركة: {$company->name}.", $subscription, null, $subscription->toArray(), 'subscriptions');
