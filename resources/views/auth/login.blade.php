@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>تسجيل الدخول — Tazamun HR</title>
+  <title>تسجيل الدخول — MASAR HR</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -46,16 +46,18 @@
       margin-bottom: 12px;
       box-shadow: 0 8px 20px rgba(23, 105, 224, 0.3);
     }
+    .login-brand-logo { background:#fff; padding:6px; overflow:hidden; }
+    .login-brand-logo img { width:100%; height:100%; object-fit:contain; display:block; }
   </style>
 </head>
 <body>
 
 <div class="login-card">
   <div class="login-brand">
-    <div class="login-brand-icon">
-      <i class="bi bi-buildings-fill"></i>
+    <div class="login-brand-icon login-brand-logo">
+      <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
     </div>
-    <h1 class="h4 fw-bold mb-1">Tazamun HR</h1>
+    <h1 class="h4 fw-bold mb-1">مسار — MASAR HR</h1>
     <p class="text-muted small mb-0">نظام إدارة الموارد البشرية وشؤون العاملين</p>
   </div>
 
@@ -97,7 +99,7 @@
   </form>
 
   <div class="mt-4 pt-3 border-top text-center">
-    <small class="text-muted">النظام متصل بقاعدة بيانات tazamun_hr الحقيقية</small>
+    <small class="text-muted">نظام إدارة الموارد البشرية MASAR HR</small>
   </div>
 </div>
 

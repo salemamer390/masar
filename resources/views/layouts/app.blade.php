@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>{{ config('app.name', 'Tazamun HR') }} — @yield('title', 'إدارة الموارد البشرية')</title>
+  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', 'إدارة الموارد البشرية')</title>
   
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -295,14 +295,14 @@
 
   // Dark mode toggle with persistence
   const themeBtn = document.getElementById('themeToggleBtn');
-  if (localStorage.getItem('tazamun_theme') === 'dark') {
+  if (localStorage.getItem('masar_theme') === 'dark') {
     document.body.classList.add('preview-dark');
   }
 
   themeBtn?.addEventListener('click', function() {
     document.body.classList.toggle('preview-dark');
     const isDark = document.body.classList.contains('preview-dark');
-    localStorage.setItem('tazamun_theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('masar_theme', isDark ? 'dark' : 'light');
     showToast(isDark ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح');
   });
 
