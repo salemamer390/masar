@@ -243,7 +243,36 @@
     // تلميح باسم الصفحة عند مرور الماوس على الأيقونة وهي في وضع الشريط
     document.querySelectorAll('.sidebar .nav-item').forEach(link => {
       const label = link.querySelector('span')?.textContent.trim();
-      if (label && !link.title) link.title = label;
+      if (label) {
+        link.dataset.tooltip = label;
+        if (!link.title) link.title = label;
+      }
+    });
+
+    // Render collapsed-sidebar tooltips in the document body so they are not
+    // clipped by the sidebar's scroll container.
+    let sidebarTooltip;
+    const hideSidebarTooltip = () => {
+      sidebarTooltip?.remove();
+      sidebarTooltip = null;
+    };
+    document.querySelectorAll('.sidebar .nav-item').forEach(link => {
+      const showSidebarTooltip = () => {
+        if (!shell.classList.contains('sidebar-collapsed') || !link.dataset.tooltip) return;
+        hideSidebarTooltip();
+        sidebarTooltip = document.createElement('div');
+        sidebarTooltip.className = 'sidebar-tooltip';
+        sidebarTooltip.textContent = link.dataset.tooltip;
+        document.body.appendChild(sidebarTooltip);
+        const rect = link.getBoundingClientRect();
+        sidebarTooltip.style.top = `${rect.top + rect.height / 2}px`;
+        sidebarTooltip.style.right = `${window.innerWidth - rect.left + 10}px`;
+        requestAnimationFrame(() => sidebarTooltip?.classList.add('is-visible'));
+      };
+      link.addEventListener('mouseenter', showSidebarTooltip);
+      link.addEventListener('focusin', showSidebarTooltip);
+      link.addEventListener('mouseleave', hideSidebarTooltip);
+      link.addEventListener('focusout', hideSidebarTooltip);
     });
 
     const applySidebarState = (collapsed) => {

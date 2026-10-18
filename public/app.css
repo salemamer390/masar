@@ -5060,6 +5060,77 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   .app-shell .sidebar.open + .sidebar-overlay { display: block; }
 }
 
+/* Light sidebar theme with a distinct color for each module icon. */
+.app-shell .sidebar {
+  background: #fff;
+  color: #334155;
+  border-left: 1px solid #e5eaf2;
+  box-shadow: -4px 0 18px rgba(15, 23, 42, .06);
+}
+.app-shell .brand { border-bottom-color: #e8edf4; }
+.app-shell .brand-icon { background: #eaf2ff; color: #1769e0; }
+.app-shell .brand-title { color: #12203a; }
+.app-shell .brand small { color: #71809a; }
+.app-shell .sidebar-collapse-btn {
+  border-color: #c9d8ee;
+  background: #eef5ff;
+  color: #1769e0;
+}
+.app-shell .sidebar-collapse-btn:hover,
+.app-shell .sidebar-collapse-btn:focus-visible {
+  background: #dceaff;
+  border-color: #9fc1f5;
+  color: #0f5dcc;
+}
+.app-shell .side-section { color: #8491a6; }
+.app-shell .nav-item { color: #52617a; }
+.app-shell .nav-item:hover { background: #f3f7fd; color: #12203a; }
+.app-shell .nav-item.active { background: #1769e0; color: #fff; box-shadow: 0 7px 18px rgba(23,105,224,.20); }
+.app-shell .nav-item.active i { color: #fff !important; }
+.app-shell .nav-item i { transition: color .18s ease; }
+.app-shell .nav-item .bi-speedometer2 { color: #2563eb; }
+.app-shell .nav-item .bi-people-fill,
+.app-shell .nav-item .bi-person-gear { color: #0891b2; }
+.app-shell .nav-item .bi-calendar4-week,
+.app-shell .nav-item .bi-calendar3 { color: #7c3aed; }
+.app-shell .nav-item .bi-clock-history { color: #ea580c; }
+.app-shell .nav-item .bi-calendar2-check-fill { color: #16a34a; }
+.app-shell .nav-item .bi-exclamation-octagon-fill { color: #dc2626; }
+.app-shell .nav-item .bi-file-earmark-text-fill { color: #9333ea; }
+.app-shell .nav-item .bi-cash-stack { color: #059669; }
+.app-shell .nav-item .bi-shield-check { color: #0f766e; }
+.app-shell .nav-item .bi-arrow-left-right { color: #d97706; }
+.app-shell .nav-item .bi-sliders2 { color: #4f46e5; }
+.app-shell .nav-item .bi-bar-chart-fill { color: #0284c7; }
+.app-shell .nav-item .bi-gear-fill { color: #64748b; }
+.app-shell .nav-item .bi-shield-lock { color: #be123c; }
+.app-shell .nav-item .bi-boxes { color: #c2410c; }
+.app-shell .nav-item .bi-building { color: #0d9488; }
+.app-shell .sidebar-bottom { border-top-color: #e8edf4; }
+.app-shell .system-status { color: #64748b; background: #f6f8fb; }
+
+/* Tooltip shown only while the desktop sidebar is collapsed. It is appended
+   to the document body, so sidebar scrolling never clips it. */
+.sidebar-tooltip {
+  position: fixed;
+  z-index: 1100;
+  transform: translateY(-50%) translateX(4px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: #12203a;
+  color: #fff;
+  font: 600 11px/1.2 Cairo, Arial, sans-serif;
+  box-shadow: 0 7px 18px rgba(15,23,42,.18);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.sidebar-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
 /* Keep summary cards on one row at every viewport. On narrow screens the
    row scrolls horizontally instead of shrinking the contents into a glitch. */
 .stat-grid.compact,
