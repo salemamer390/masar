@@ -503,10 +503,18 @@
 </div>
 
 @if(auth()->user()?->hasPermission('employees.edit'))
-<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}" class="employee-master-form" enctype="multipart/form-data">@csrf @method('PUT')
+<div class="modal fade" id="employeeMasterModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content"><form method="POST" action="{{ route('employees.update', $employee) }}" class="employee-master-form" data-termination-type="{{ $employee->termination_type }}" data-termination-date="{{ $employee->termination_date?->format('Y-m-d') }}" enctype="multipart/form-data">@csrf @method('PUT')
 <div class="modal-header"><h5 class="modal-title">تعديل ملف الموظف: {{ $employee->full_name }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
 <input type="hidden" name="salary_source" id="employee_edit_salary_source" value=""><input type="hidden" name="salary_value" id="employee_edit_salary_value" value="">
 <div class="modal-body">
+<section class="panel employee-termination-panel mb-3" id="employeeMasterTerminationPanel">
+  <div class="panel-head"><div><h3><i class="bi bi-person-x"></i> بيانات انتهاء الخدمة</h3><span>تُستخدم فقط عند الاستقالة أو الفصل، وتُلغى تلقائيًا عند إعادة الحالة إلى نشط.</span></div></div>
+  <div class="employee-termination-fields">
+    <div class="employee-termination-field"><label class="form-label" for="employee_master_termination_type">نوع انتهاء الخدمة</label><select id="employee_master_termination_type" name="termination_type" class="form-select"><option value="">—</option><option value="resignation" @selected(old('termination_type',$employee->termination_type)==='resignation')>استقالة</option><option value="dismissal" @selected(old('termination_type',$employee->termination_type)==='dismissal')>فصل</option></select></div>
+    <div class="employee-termination-field"><label class="form-label" for="employee_master_termination_date">تاريخ انتهاء الخدمة</label><input id="employee_master_termination_date" type="date" name="termination_date" class="form-control" value="{{ old('termination_date',$employee->termination_date?->format('Y-m-d')) }}"></div>
+    <div class="employee-termination-alert"><div class="alert alert-warning py-2 px-3 mb-0 d-none" id="employeeMasterActiveWarning"><i class="bi bi-exclamation-triangle-fill"></i> اختيار «نشط» يلغي بيانات انتهاء الخدمة السابقة عند الحفظ.</div></div>
+  </div>
+</section>
 <div class="panel mb-3"><div class="panel-head"><div><h3>البيانات الشخصية</h3><span>مصدرها جدول الموظفين وتفاصيل الملف.</span></div></div><div class="p-3 row g-3">
 <div class="col-md-3"><label class="form-label">الصورة الشخصية</label><input name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp" class="form-control"><small class="text-muted">صورة JPG أو PNG أو WEBP حتى 5 ميجابايت.</small></div>
 <div class="col-md-4"><label class="form-label">الاسم الكامل</label><input name="full_name" class="form-control" value="{{ old('full_name',$employee->full_name) }}" required></div><div class="col-md-3"><label class="form-label">الاسم الأول</label><input name="first_name" class="form-control" value="{{ old('first_name',$employee->first_name) }}"></div><div class="col-md-3"><label class="form-label">الاسم الأوسط</label><input name="middle_name" class="form-control" value="{{ old('middle_name',$employee->middle_name) }}"></div><div class="col-md-2"><label class="form-label">اسم العائلة</label><input name="last_name" class="form-control" value="{{ old('last_name',$employee->last_name) }}"></div>
@@ -527,6 +535,77 @@
 @endif
 
 @if(auth()->user()?->hasPermission('employees.edit'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.querySelector('#employeeMasterModal form.employee-master-form');
+  const status = form?.querySelector('select[name="status_id"]');
+  if (!form || !status) return;
+  let type = form.querySelector('select[name="termination_type"]');
+  let date = form.querySelector('input[name="termination_date"]');
+  // Fallback for cached/older markup: create the fields directly inside the
+  // edit-file modal so the feature cannot disappear from the UI.
+  if (!type || !date) {
+    const row = form.querySelector('.modal-body .panel:nth-of-type(2) .p-3.row') || form.querySelector('.modal-body .p-3.row');
+    if (!row) return;
+    const block = document.createElement('div');
+    block.className = 'row g-3 employee-termination-fallback';
+    block.innerHTML = '<div class="col-md-3"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation">استقالة</option><option value="dismissal">فصل</option></select></div><div class="col-md-3"><label class="form-label">تاريخ انتهاء الخدمة</label><input type="date" name="termination_date" class="form-control"></div>';
+    row.appendChild(block);
+    type = block.querySelector('[name="termination_type"]');
+    date = block.querySelector('[name="termination_date"]');
+    type.value = form.dataset.terminationType || '';
+    date.value = form.dataset.terminationDate || '';
+  }
+
+  const warning = document.createElement('div');
+  warning.className = 'alert alert-warning d-none mt-2 mb-0 py-2';
+  warning.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> عند حفظ الحالة «نشط»، سيُلغي النظام نوع وتاريخ انتهاء الخدمة السابقين.';
+  const fieldsRow = type.closest('.col-md-3')?.parentElement;
+  if (fieldsRow) {
+    const heading = document.createElement('div');
+    heading.className = 'col-12 employee-termination-heading';
+    heading.innerHTML = '<strong><i class="bi bi-person-x"></i> بيانات انتهاء الخدمة</strong><small>تُستخدم فقط عند الاستقالة أو الفصل، وتُلغى تلقائيًا عند إعادة الحالة إلى نشط.</small>';
+    fieldsRow.insertBefore(heading, type.closest('.col-md-3'));
+    fieldsRow.appendChild(warning);
+  }
+
+  const isActive = () => ['active', 'نشط'].includes((status.selectedOptions[0]?.textContent || '').trim().toLowerCase());
+  const sync = () => {
+    const active = isActive();
+    warning.classList.toggle('d-none', !active || (!type.value && !date.value));
+    if (active) {
+      type.value = '';
+      date.value = '';
+    }
+  };
+  status.addEventListener('change', sync);
+  sync();
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.querySelector('#employeeMasterModal form.employee-master-form');
+  if (!form) return;
+  // The dedicated panel at the top is the canonical edit-file control. Hide
+  // the legacy duplicates further down in the long employment row.
+  ['termination_type', 'termination_date'].forEach(function (name) {
+    [...form.querySelectorAll('[name="' + name + '"]')].slice(1).forEach(function (field) {
+      field.closest('.col-md-3, .col-6')?.classList.add('d-none');
+    });
+  });
+  const status = form.querySelector('select[name="status_id"]');
+  const warning = document.getElementById('employeeMasterActiveWarning');
+  const type = form.querySelector('select[name="termination_type"]');
+  const date = form.querySelector('input[name="termination_date"]');
+  const syncWarning = function () {
+    const active = ['active', 'نشط'].includes((status?.selectedOptions[0]?.textContent || '').trim().toLowerCase());
+    warning?.classList.toggle('d-none', !active || (!form.dataset.terminationType && !form.dataset.terminationDate));
+    if (active) { if (type) type.value = ''; if (date) date.value = ''; }
+  };
+  status?.addEventListener('change', syncWarning);
+  syncWarning();
+});
+</script>
 <div class="modal fade" id="employeeStatusModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
     <form method="POST" action="{{ route('employees.update', $employee) }}" id="employeeStatusForm">

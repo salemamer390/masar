@@ -320,6 +320,7 @@ class EmployeeController extends Controller
             'profile.military_status' => ['nullable', 'string', 'max:100'],
         ]);
 
+        $hadTerminationDetails = filled($employee->termination_type) || filled($employee->termination_date);
         $this->ensureOwnedEmployeeReferences($validated, $employee);
         $validated = $this->applyTerminationDetails($request, $validated, $employee);
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
@@ -398,6 +399,12 @@ class EmployeeController extends Controller
             }
         });
         $employee->refresh();
+        $terminationDetailsCleared = $hadTerminationDetails
+            && blank($employee->termination_type)
+            && blank($employee->termination_date);
+        $successMessage = $terminationDetailsCleared
+            ? 'تمت إعادة الموظف إلى حالة نشط وإلغاء نوع وتاريخ انتهاء الخدمة السابقين.'
+            : 'تم تحديث بيانات الموظف.';
         ActivityLog::record(
             'employee_update_snapshot',
             'Employee change snapshot.',
@@ -411,12 +418,12 @@ class EmployeeController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تحديث بيانات الموظف.',
+                'message' => $successMessage,
                 'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
 
-        return back()->with('toast', 'تم تحديث بيانات الموظف');
+        return back()->with('toast', $successMessage);
     }
 
     private function ensureEmployeeCapacity(?int $companyId): void
@@ -446,7 +453,11 @@ class EmployeeController extends Controller
         $isSuspended = in_array($statusName, ['Suspended', 'موقوف'], true);
 
         if (! $isTerminated && ! $isSuspended) {
-            unset($validated['termination_type'], $validated['termination_date']);
+            // Returning an employee to an active/non-terminal status must not
+            // leave an old resignation/dismissal date behind. A stale date
+            // would otherwise make payroll treat an active employee as ended.
+            $validated['termination_type'] = null;
+            $validated['termination_date'] = null;
             return $validated;
         }
 

@@ -5131,6 +5131,76 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   transform: translateY(-50%) translateX(0);
 }
 
+.employee-termination-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--color-primary-dark);
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+}
+.employee-termination-heading strong { display: inline-flex; align-items: center; gap: 6px; }
+.employee-termination-heading strong i { color: var(--color-danger); }
+.employee-termination-heading small { color: var(--color-text-secondary); font-size: 10px; }
+.employee-termination-panel {
+  border-color: #fed7aa;
+  background: #fffaf5;
+}
+.employee-termination-panel .panel-head {
+  min-height: auto;
+  padding: 13px 16px;
+  border-bottom-color: #fde5cf;
+}
+.employee-termination-panel .panel-head h3 { color: #9a3412; }
+.employee-termination-panel .panel-head h3 i { color: #ea580c; }
+.employee-termination-fields {
+  display: grid !important;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(260px, 1.35fr);
+  gap: 14px;
+  padding: 16px;
+  align-items: end;
+  min-height: 92px;
+}
+.employee-termination-field,
+.employee-termination-alert {
+  display: block !important;
+  min-width: 0;
+}
+.employee-termination-field .form-label {
+  display: block !important;
+  margin-bottom: 6px;
+  color: var(--color-primary-dark);
+  font-weight: 700;
+}
+.employee-termination-field .form-select,
+.employee-termination-field .form-control {
+  display: block !important;
+  width: 100% !important;
+  min-height: 42px;
+}
+#employeeMasterModal #employeeMasterTerminationPanel [name="termination_type"],
+#employeeMasterModal #employeeMasterTerminationPanel [name="termination_date"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.employee-termination-field .form-label,
+.employee-termination-field,
+.employee-termination-alert {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.employee-termination-alert .alert {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+@media (max-width: 700px) {
+  .employee-termination-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .employee-termination-fields { grid-template-columns: 1fr; }
+}
+
 /* Keep summary cards on one row at every viewport. On narrow screens the
    row scrolls horizontally instead of shrinking the contents into a glitch. */
 .stat-grid.compact,
