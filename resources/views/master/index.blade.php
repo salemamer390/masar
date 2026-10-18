@@ -28,7 +28,7 @@
                             <span>{{$item->is_required?'مطلوب لكل موظف':'حسب الحاجة'}}</span>
                             <div class="d-flex align-items-center justify-content-end gap-2">
                                 <em>{{$item->is_active?'نشط':'غير نشط'}}</em>
-                                @if(auth()->user()?->hasPermission('roles.edit'))
+                                @if(auth()->user()?->hasPermission('roles.edit') && $item->is_active)
                                     <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editDocumentType{{$item->id}}"><i class="bi bi-pencil-square"></i> تعديل</button>
                                     <form method="POST" action="{{route('master.documents.destroy',$item)}}" onsubmit="return confirm('هل تريد حذف نوع المستند: {{$item->name}}؟')">
                                         @csrf @method('DELETE')
@@ -43,7 +43,20 @@
                 @endforeach
             @else
                 @forelse($items as $item)
-                    <div class="master-row"><b>{{$item->{$currentMeta['name_col']}??'—'}}</b><span>{{$item->{$currentMeta['code_col']}??'—'}}</span><em>نشط</em></div>
+                    <div class="master-row">
+                        <b>{{$item->{$currentMeta['name_col']}??'—'}}</b>
+                        <span>{{$item->{$currentMeta['code_col']}??'—'}}</span>
+                        <em>{{($item->is_active ?? true) ? 'نشط' : 'غير نشط'}}</em>
+                        @if(auth()->user()?->hasPermission('roles.edit') && ($item->is_active ?? true))
+                            <div class="master-row-actions">
+                                <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editMaster{{$item->id}}" title="تعديل"><i class="bi bi-pencil-square"></i> تعديل</button>
+                                <form method="POST" action="{{route('master.destroy', [$type, $item->id])}}" onsubmit="return confirm('هل تريد حذف هذا العنصر؟')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
                 @empty
                     <div class="text-center text-muted py-5">لا توجد عناصر.</div>
                 @endforelse
@@ -83,6 +96,25 @@
                         <label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="required" value="1" @checked($item->is_required)><span class="form-check-label">مستند مطلوب لكل موظف</span></label>
                     </div>
                     <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديلات</button></div>
+                </form>
+            </div></div>
+        </div>
+    @endforeach
+@endif
+
+@if($type !== 'documents' && auth()->user()?->hasPermission('roles.edit'))
+    @foreach($items as $item)
+        <div class="modal fade" id="editMaster{{$item->id}}" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <form method="POST" action="{{route('master.update', [$type, $item->id])}}">@csrf @method('PUT')
+                    <div class="modal-header"><h5>تعديل العنصر</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <label class="form-label">الاسم</label>
+                        <input name="name" class="form-control" value="{{$item->{$currentMeta['name_col']} ?? ''}}" required>
+                        <label class="form-label mt-3">الكود / البيان الإضافي</label>
+                        <input name="code" class="form-control" value="{{$item->{$currentMeta['code_col']} ?? ''}}">
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div>
                 </form>
             </div></div>
         </div>

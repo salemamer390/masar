@@ -1162,11 +1162,20 @@ select {
 }
 .master-row {
   display: grid;
-  grid-template-columns: 1fr 140px 80px;
+  grid-template-columns: minmax(0, 1fr) 140px 80px auto;
   align-items: center;
   border-bottom: 1px solid #edf1f5;
   padding: 14px 8px;
 }
+.master-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+.master-row-actions form { margin: 0; }
+.master-row-actions .btn { min-width: 32px; }
 .master-row b {
   font-size: 12px;
 }

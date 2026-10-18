@@ -363,6 +363,14 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::delete('/documents/{documentType}', [MasterDataController::class, 'destroyDocument'])
             ->middleware('permission:roles.edit')
             ->name('documents.destroy');
+        Route::put('/{type}/{item}', [MasterDataController::class, 'update'])
+            ->middleware('permission:roles.edit')
+            ->whereNumber('item')
+            ->name('update');
+        Route::delete('/{type}/{item}', [MasterDataController::class, 'destroy'])
+            ->middleware('permission:roles.edit')
+            ->whereNumber('item')
+            ->name('destroy');
     });
 
     // Reports

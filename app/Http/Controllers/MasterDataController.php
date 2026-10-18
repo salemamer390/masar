@@ -15,6 +15,7 @@ use App\Models\PenaltyType;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Schema;
 
 class MasterDataController extends Controller
 {
@@ -220,6 +221,47 @@ class MasterDataController extends Controller
         }
 
         return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم تعديل نوع المستند بنجاح');
+    }
+
+    public function update(Request $request, string $type, int $item)
+    {
+        $meta = $this->getMeta();
+        abort_if(!isset($meta[$type]) || $type === 'documents', 404);
+        $currentMeta = $meta[$type];
+        $model = $currentMeta['model']::query()->findOrFail($item);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'code' => ['nullable', 'string', 'max:100'],
+        ]);
+        $data = [$currentMeta['name_col'] => $validated['name']];
+        if ($type === 'jobs') $data['job_code'] = $validated['code'] ?: null;
+        if ($type === 'branches') $data['address'] = $validated['code'] ?: null;
+        if ($type === 'leavetypes') $data['default_days'] = $validated['code'] === '' ? null : (float) $validated['code'];
+        $model->update($data);
+        ActivityLog::record('master_update', "تم تعديل عنصر من قائمة {$currentMeta['title']}: {$validated['name']}", $model);
+        return redirect()->route('master.index', ['type' => $type])->with('toast', 'تم حفظ التعديل بنجاح');
+    }
+
+    public function destroy(Request $request, string $type, int $item)
+    {
+        $meta = $this->getMeta();
+        abort_if(!isset($meta[$type]) || $type === 'documents', 404);
+        $currentMeta = $meta[$type];
+        $model = $currentMeta['model']::query()->findOrFail($item);
+        $name = (string) ($model->{$currentMeta['name_col']} ?? '');
+        if (Schema::hasColumn($model->getTable(), 'is_active')) {
+            $model->forceFill(['is_active' => false])->save();
+            $message = 'تم إيقاف العنصر بنجاح';
+        } else {
+            try {
+                $model->delete();
+                $message = 'تم حذف العنصر بنجاح';
+            } catch (\Throwable) {
+                return back()->withErrors(['master' => 'لا يمكن حذف هذا العنصر لأنه مستخدم في بيانات أخرى.']);
+            }
+        }
+        ActivityLog::record('master_delete', "تم حذف/إيقاف عنصر من قائمة {$currentMeta['title']}: {$name}", $model);
+        return redirect()->route('master.index', ['type' => $type])->with('toast', $message);
     }
 
     public function destroyDocument(Request $request, DocumentType $documentType)
