@@ -12,12 +12,36 @@ class RoleController extends Controller
     public function index()
     {
         $actor = auth()->user();
-        $roles = Role::with('permissions')
+        $roles = Role::with('permissions')->withCount('users')
             ->when(!$actor->isSuperAdmin(), fn ($query) => $query->where('company_id', $actor->company_id))
             ->orderByRaw("CASE WHEN name = 'company_manager' THEN 0 ELSE 1 END")
             ->orderBy('display_name')
             ->get();
         $permissions = Permission::orderBy('module')->orderBy('display_name')->get()->groupBy('module');
+
+        $roleLabels = config('authorization.roles', []);
+        $roleDescriptions = config('authorization.role_descriptions', []);
+        $moduleLabels = config('authorization.modules', []);
+        $actionLabels = config('authorization.actions', []);
+        $rolePayload = $roles->map(fn (Role $role) => [
+            'id' => $role->id,
+            'key' => $role->name,
+            'name' => $roleLabels[$role->name] ?? $role->display_name,
+            'description' => $roleDescriptions[$role->name] ?? $role->description,
+            'users' => $role->users_count ?? 0,
+            'system' => $role->id === 1 || $role->company_id === null,
+            'company_manager' => $role->name === 'company_manager',
+            'permission_ids' => $role->permissions->pluck('id')->values()->all(),
+        ])->values()->all();
+        $permissionPayload = $permissions->map(fn ($items, $module) => [
+            'key' => $module,
+            'name' => $moduleLabels[$module] ?? $module,
+            'items' => $items->map(fn (Permission $permission) => [
+                'id' => $permission->id,
+                'key' => $permission->name,
+                'name' => ($moduleLabels[$permission->module] ?? $permission->module).' - '.($actionLabels[$permission->action] ?? $permission->display_name),
+            ])->values()->all(),
+        ])->values()->all();
 
         return view('roles.index', [
             'roles' => $roles,
@@ -25,6 +49,8 @@ class RoleController extends Controller
             'roleLabels' => config('authorization.roles', []),
             'moduleLabels' => config('authorization.modules', []),
             'actionLabels' => config('authorization.actions', []),
+            'rolePayload' => $rolePayload,
+            'permissionPayload' => $permissionPayload,
         ]);
     }
 
@@ -57,8 +83,17 @@ class RoleController extends Controller
                 : back()->with('toast', 'لا يمكن تعديل صلاحيات مدير النظام.');
         }
 
-        $permissions = $request->input('permissions', []);
+        $data = $request->validate([
+            'display_name' => ['nullable', 'string', 'max:150'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['integer', 'exists:permissions,id'],
+        ]);
+        $permissions = $data['permissions'] ?? [];
         if ($role->name === 'company_manager') $permissions = Permission::query()->pluck('id')->all();
+        if (array_key_exists('display_name', $data) && $role->id !== 1) $role->display_name = $data['display_name'];
+        if (array_key_exists('description', $data) && $role->id !== 1) $role->description = $data['description'];
+        $role->save();
         $role->permissions()->sync($permissions);
         ActivityLog::record('role_update', "تم تحديث صلاحيات الدور: {$role->display_name}.", $role);
 
