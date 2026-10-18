@@ -12,6 +12,11 @@ class Role extends Model
         'name',
         'display_name',
         'description',
+        'company_id',
+    ];
+
+    protected $casts = [
+        'company_id' => 'integer',
     ];
 
     public function permissions(): BelongsToMany

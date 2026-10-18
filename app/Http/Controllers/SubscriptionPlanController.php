@@ -5,6 +5,7 @@ use App\Models\CompanySubscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionRenewalRequest;
 use App\Models\Role;
+use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -74,13 +75,17 @@ class SubscriptionPlanController extends Controller
         DB::transaction(function () use ($data, &$company): void {
             $company = Company::create(['name'=>$data['name'],'slug'=>Str::slug($data['name']).'-'.Str::random(5),'email'=>$data['email'] ?? null,'phone'=>$data['phone'] ?? null]);
             CompanySubscription::create(['company_id'=>$company->id,'subscription_plan_id'=>$data['plan_id'],'status'=>($data['trial_days'] ?? 0) > 0 ? 'trial' : 'active','starts_at'=>today(),'ends_at'=>($data['trial_days'] ?? 0) > 0 ? today()->addDays((int)$data['trial_days']) : null,'trial_days'=>$data['trial_days'] ?? 0]);
-            $roleId = Role::where('name', 'hr_manager')->value('id');
-            if (!$roleId) throw new \RuntimeException('دور مدير الموارد البشرية غير موجود.');
+            $role = Role::firstOrCreate(
+                ['company_id' => $company->id, 'name' => 'company_manager'],
+                ['display_name' => 'Company manager', 'description' => 'مدير الشركة وإدارة مستخدميها وأدوارها.'],
+            );
+            $role->permissions()->sync(Permission::query()->pluck('id')->all());
+            $this->createDefaultCompanyRoles($company->id);
             User::create([
                 'name' => $data['admin_name'],
                 'email' => $data['admin_email'],
                 'password' => Hash::make($data['admin_password']),
-                'role_id' => $roleId,
+                'role_id' => $role->id,
                 'company_id' => $company->id,
                 'is_active' => true,
             ]);
@@ -144,5 +149,31 @@ class SubscriptionPlanController extends Controller
         );
 
         return back()->with('toast', "تم إرسال الإشعار إلى {$recipients->count()} مستخدم.");
+    }
+
+    private function createDefaultCompanyRoles(int $companyId): void
+    {
+        $roleDefinitions = [
+            'hr_manager' => ['مدير الموارد البشرية', ['dashboard.view', 'employees.view', 'employees.create', 'employees.edit', 'attendance.view', 'attendance.create', 'attendance.edit', 'leaves.view', 'leaves.create', 'leaves.edit', 'leaves.approve', 'documents.view', 'documents.upload', 'insurance.view', 'insurance.edit', 'penalties.view', 'penalties.create', 'penalties.edit', 'movements.view', 'movements.create', 'movements.edit', 'reports.view', 'reports.print', 'reports.export_excel', 'requests.view', 'requests.create', 'requests.approve', 'salary.view', 'payroll.view', 'payroll.export']],
+            'hr_specialist' => ['أخصائي موارد بشرية', ['dashboard.view', 'employees.view', 'employees.create', 'employees.edit', 'attendance.view', 'attendance.create', 'attendance.edit', 'leaves.view', 'leaves.create', 'leaves.edit', 'documents.view', 'documents.upload', 'insurance.view', 'penalties.view', 'penalties.create', 'movements.view', 'movements.create', 'movements.edit', 'reports.view', 'requests.view', 'requests.create']],
+            'recruitment' => ['مسؤول التوظيف', ['dashboard.view', 'employees.view', 'employees.create', 'employees.edit', 'documents.view', 'documents.upload', 'requests.view', 'requests.create', 'reports.view']],
+            'payroll' => ['مسؤول الرواتب', ['dashboard.view', 'employees.view', 'salary.view', 'salary.create', 'salary.edit', 'payroll.view', 'payroll.create', 'payroll.edit', 'payroll.approve', 'payroll.export', 'reports.view', 'reports.print', 'reports.export_excel', 'insurance.view']],
+            'attendance_leaves' => ['مسؤول الحضور والإجازات', ['dashboard.view', 'employees.view', 'attendance.view', 'attendance.create', 'attendance.edit', 'attendance.delete', 'leaves.view', 'leaves.create', 'leaves.edit', 'leaves.approve', 'leaves.delete', 'reports.view']],
+            'department_manager' => ['مدير قسم', ['dashboard.view', 'employees.view', 'attendance.view', 'leaves.view', 'leaves.approve', 'requests.view', 'requests.create', 'requests.approve', 'reports.view']],
+            'accountant' => ['المحاسب', ['dashboard.view', 'employees.view', 'salary.view', 'payroll.view', 'payroll.export', 'reports.view', 'reports.print', 'reports.export_excel']],
+            'employee' => ['الموظف', ['dashboard.view', 'employees.view', 'attendance.view', 'leaves.view', 'leaves.create', 'documents.view', 'requests.view', 'requests.create']],
+            'viewer' => ['مراجع للقراءة فقط', Permission::query()->whereIn('action', ['view', 'print', 'export', 'export_excel'])->pluck('name')->all()],
+        ];
+
+        $permissionNames = collect($roleDefinitions)->flatMap(fn (array $definition) => $definition[1])->unique()->values();
+        $permissionIds = Permission::query()->whereIn('name', $permissionNames)->pluck('id', 'name');
+        foreach ($roleDefinitions as $name => [$displayName, $permissions]) {
+            $role = Role::firstOrCreate(
+                ['company_id' => $companyId, 'name' => $name],
+                ['display_name' => $displayName, 'description' => "دور افتراضي داخل الشركة: {$displayName}"],
+            );
+            $role->update(['display_name' => $displayName]);
+            $role->permissions()->sync(collect($permissions)->map(fn (string $permission) => $permissionIds[$permission] ?? null)->filter()->values()->all());
+        }
     }
 }

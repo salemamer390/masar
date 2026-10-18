@@ -72,6 +72,13 @@ class User extends Authenticatable
             $this->load('role.permissions');
         }
 
+        // Company manager is a system role with the complete company scope.
+        // Older accounts may still have a few direct permissions attached;
+        // those must not accidentally replace the role's permission set.
+        if ($this->role?->name === 'company_manager') {
+            return $this->role->permissions->contains('name', $permissionName);
+        }
+
         if ($this->directPermissions()->exists()) {
             return $this->directPermissions()->where('name', $permissionName)->exists();
         }

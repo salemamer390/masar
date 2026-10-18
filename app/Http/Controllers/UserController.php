@@ -18,7 +18,7 @@ class UserController extends Controller
         $query = User::with(['role', 'company', 'directPermissions']);
         if (!auth()->user()->isSuperAdmin()) $query->where('company_id', auth()->user()->company_id);
         $users = $query->paginate(20);
-        $roles = auth()->user()->isSuperAdmin() ? Role::all() : Role::where('id', '!=', 1)->get();
+        $roles = $this->rolesForActor()->when(!auth()->user()->isSuperAdmin(), fn ($query) => $query->where('id', '!=', 1))->get();
         $companies = auth()->user()->isSuperAdmin() ? Company::where('status','active')->orderBy('name')->get() : collect([auth()->user()->company])->filter();
         $permissions = Permission::orderBy('module')->orderBy('display_name')->get()->groupBy('module');
         $permissionGroups = $permissions->map(function ($items, $module) {
@@ -60,10 +60,12 @@ class UserController extends Controller
             'role_id.required' => 'الدور مطلوب.',
         ]);
         if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, 'لا يمكن منح صلاحية مدير المنصة.');
+        $this->rolesForActor()->whereKey($validated['role_id'])->firstOrFail();
         $this->authorizePermissionAssignment($validated);
 
         $companyId = auth()->user()->isSuperAdmin() ? ($validated['company_id'] ?? null) : auth()->user()->company_id;
         if (!$companyId) return back()->withErrors(['company_id' => 'يجب ربط المستخدم بشركة قبل إنشاء الحساب.'])->withInput();
+        $this->ensureRoleBelongsToCompany((int) $validated['role_id'], (int) $companyId);
         if (!auth()->user()->isSuperAdmin()) $this->ensureHrCapacity($companyId);
         $user = User::create([
             'name' => $validated['name'],
@@ -93,9 +95,11 @@ class UserController extends Controller
             'permissions.*' => ['exists:permissions,id'],
         ]);
         if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, 'لا يمكن منح صلاحية مدير المنصة.');
+        $this->rolesForActor()->whereKey($validated['role_id'])->firstOrFail();
         $this->authorizePermissionAssignment($validated);
 
         $user->name = $validated['name'];
+        $this->ensureRoleBelongsToCompany((int) $validated['role_id'], (int) $user->company_id);
         $user->role_id = $validated['role_id'];
         if (!auth()->user()->isSuperAdmin() && (int) $user->company_id !== (int) auth()->user()->company_id) abort(403);
         $user->is_active = $request->has('is_active');
@@ -129,7 +133,22 @@ class UserController extends Controller
         $allowed = Permission::all()->filter(fn (Permission $permission) => $actor->hasPermission($permission->name))->pluck('id')->map(fn ($id) => (int) $id);
         $requested = collect($validated['permissions'] ?? [])->map(fn ($id) => (int) $id);
         abort_if($requested->diff($allowed)->isNotEmpty(), 403, 'لا يمكنك منح صلاحية لا تملكها.');
-        $rolePermissions = Role::with('permissions')->findOrFail($validated['role_id'])->permissions->pluck('id')->map(fn ($id) => (int) $id);
+        $rolePermissions = $this->rolesForActor()->with('permissions')->findOrFail($validated['role_id'])->permissions->pluck('id')->map(fn ($id) => (int) $id);
         abort_if($rolePermissions->diff($allowed)->isNotEmpty(), 403, 'لا يمكنك تعيين دور يتضمن صلاحيات أعلى من صلاحياتك.');
+    }
+
+    private function ensureRoleBelongsToCompany(int $roleId, int $companyId): void
+    {
+        $roleCompanyId = Role::whereKey($roleId)->value('company_id');
+        abort_if($roleCompanyId === null || (int) $roleCompanyId !== $companyId, 422,
+            'لا يمكن تعيين دور تابع لشركة أخرى لهذا المستخدم.');
+    }
+
+    private function rolesForActor()
+    {
+        $actor = auth()->user();
+        return Role::query()->when(!$actor->isSuperAdmin(), function ($query) use ($actor): void {
+            $query->where('company_id', $actor->company_id);
+        });
     }
 }
