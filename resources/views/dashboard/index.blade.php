@@ -190,6 +190,16 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
 @push('scripts')
 <script>
 document.querySelectorAll('#dashboard-latest-requests form').forEach(form => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ التنفيذ'; });
+(function () {
+  const stateKey = 'masarDashboardBoundary';
+  const keepDashboard = () => {
+    const state = Object.assign({}, history.state || {}, { [stateKey]: true });
+    history.pushState(state, document.title, window.location.href);
+  };
+  if (!history.state?.[stateKey]) keepDashboard();
+  window.addEventListener('popstate', () => keepDashboard());
+})();
+
 document.addEventListener('masar:success', event => {
   const form = event.target;
   if (form instanceof HTMLFormElement && form.dataset.dashboardAction === 'true') {

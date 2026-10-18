@@ -133,5 +133,12 @@
 @if($errors->has('registration') || old('company_name'))
 <script>document.addEventListener('DOMContentLoaded',function(){bootstrap.Modal.getOrCreateInstance(document.getElementById('companyRegistrationModal')).show();});</script>
 @endif
+<script>
+window.addEventListener('pageshow', function (event) {
+  if (!event.persisted) return;
+  const modal = document.getElementById('companyRegistrationModal');
+  if (modal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
+});
+</script>
 </body>
 </html>
