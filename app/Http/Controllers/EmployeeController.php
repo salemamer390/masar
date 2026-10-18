@@ -368,7 +368,7 @@ class EmployeeController extends Controller
             }
         }
         $movementChanged = $statusChanged || $changedFields !== [];
-        DB::transaction(function () use ($employee, $validated, $profileData, $salaryChanged, $movementChanged, $statusChanged, $oldStatusId, $changedFields): void {
+        DB::transaction(function () use ($employee, $validated, $profileData, $salaryChanged, $movementChanged, $statusChanged, $oldStatusId, $changedFields, $hadTerminationDetails): void {
             $employee->update($validated);
             $employee->profileDetail()->updateOrCreate([], $profileData);
             if ($salaryChanged) {
@@ -387,13 +387,15 @@ class EmployeeController extends Controller
                     'Active', 'نشط' => 'عودة إلى العمل',
                     default => $fresh->status?->name ?? 'تغيير الحالة',
                 };
+                $isActiveStatus = in_array($fresh->status?->name, ['Active', 'نشط'], true);
+                $isReactivation = $isActiveStatus && ($statusChanged || $hadTerminationDetails);
                 MovementRecord::create([
                     'employee_id' => $fresh->id,
                     'movement_type_id' => $movementType->id,
-                    'movement_date' => $fresh->termination_date ?? today(),
+                    'movement_date' => $isReactivation ? today() : ($fresh->termination_date ?? today()),
                     'reason' => $statusChanged ? 'تغيير حالة الموظف: '.$statusLabel : 'تحديث بيانات الموظف الوظيفية',
                     'old_values' => ['status_id' => $oldStatusId, 'changes' => $changedFields],
-                    'new_values' => ['status_id' => $fresh->status_id, 'termination_type' => $fresh->termination_type, 'termination_date' => optional($fresh->termination_date)->toDateString(), 'changes' => $changedFields],
+                    'new_values' => ['status_id' => $fresh->status_id, 'termination_type' => $fresh->termination_type, 'termination_date' => optional($fresh->termination_date)->toDateString(), 'reactivated' => $isReactivation, 'changes' => $changedFields],
                     'created_by' => auth()->id(),
                 ]);
             }

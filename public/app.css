@@ -5196,6 +5196,28 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   align-items: center;
   gap: 7px;
 }
+.employee-movements-table thead th.movement-sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.employee-movements-table thead th.movement-sortable:hover,
+.employee-movements-table thead th.movement-sortable:focus-visible {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  outline: none;
+}
+.employee-movements-table thead th.movement-sortable.is-sorted {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.movement-sort-icon {
+  display: inline-block;
+  margin-inline-start: 5px;
+  font-size: 10px;
+  color: var(--color-primary);
+  vertical-align: middle;
+}
 @media (max-width: 700px) {
   .employee-termination-heading { align-items: flex-start; flex-direction: column; gap: 3px; }
   .employee-termination-fields { grid-template-columns: 1fr; }

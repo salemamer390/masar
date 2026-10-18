@@ -478,19 +478,24 @@
     <div class="panel profile-panel">
         <div class="panel-head"><h3>الحركات الوظيفية</h3></div>
         <div class="table-responsive">
-            <table class="table align-middle">
+            <table class="table align-middle employee-movements-table">
                 <thead><tr><th>التاريخ</th><th>الحركة</th><th>التفاصيل</th><th>القسم السابق</th><th>القسم الجديد</th><th>الوظيفة السابقة</th><th>الوظيفة الجديدة</th><th>الراتب الجديد</th></tr></thead>
                 <tbody>
-                @forelse($employee->movements as $m)
-                    <tr>
-                        <td>{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td>
-                        <td>{{ match($m->movementType?->name) { 'Status Change' => 'تغيير الحالة', 'Profile Update' => 'تحديث بيانات وظيفية', default => $m->movementType?->name ?? '—' } }}</td>
-                        <td>{{ $m->reason ?? $m->notes ?? '—' }}</td>
-                        <td>{{ $m->oldDepartment?->name ?? '—' }}</td>
-                        <td>{{ $m->newDepartment?->name ?? '—' }}</td>
-                        <td>{{ $m->oldJob?->title ?? '—' }}</td>
-                        <td>{{ $m->newJob?->title ?? '—' }}</td>
-                        <td>{{ format_money($m->new_salary ?? 0) }}</td>
+                @forelse($employee->movements->sortByDesc(function ($movement) {
+                    return sprintf('%s %s',
+                        $movement->movement_date?->format('Y-m-d') ?? '0000-00-00',
+                        $movement->created_at?->format('Y-m-d H:i:s') ?? '0000-00-00 00:00:00'
+                    );
+                }) as $m)
+                    <tr data-movement-row>
+                        <td data-sort-value="{{ $m->movement_date?->format('Y-m-d') ?? '' }}">{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->movementType?->name ?? '' }}">{{ match($m->movementType?->name) { 'Status Change' => 'تغيير الحالة', 'Profile Update' => 'تحديث بيانات وظيفية', default => $m->movementType?->name ?? '—' } }}</td>
+                        <td data-sort-value="{{ data_get($m->new_values, 'reactivated') ? 'عودة إلى العمل' : ($m->reason ?? $m->notes ?? '') }}">{{ data_get($m->new_values, 'reactivated') ? 'عودة إلى العمل' : ($m->reason ?? $m->notes ?? '—') }}</td>
+                        <td data-sort-value="{{ $m->oldDepartment?->name ?? '' }}">{{ $m->oldDepartment?->name ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->newDepartment?->name ?? '' }}">{{ $m->newDepartment?->name ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->oldJob?->title ?? '' }}">{{ $m->oldJob?->title ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->newJob?->title ?? '' }}">{{ $m->newJob?->title ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->new_salary ?? 0 }}">{{ format_money($m->new_salary ?? 0) }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="8" class="text-center py-5">لا توجد حركات.</td></tr>
@@ -771,6 +776,65 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!annual || document.querySelector('[name="leave_entitlement_category"]')) return;
   annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', '<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option></select></div>');
   const category = document.querySelector('[name="leave_entitlement_category"]'); if (category) category.value = @json(old('leave_entitlement_category', $employee->leave_entitlement_category ?? 'normal'));
+});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const table = document.querySelector('.employee-movements-table');
+    if (!table) return;
+    const headers = [...table.querySelectorAll('thead th')];
+    const body = table.querySelector('tbody');
+    if (!body || !headers.length) return;
+    const rows = () => [...body.querySelectorAll('tr[data-movement-row]')];
+    const normalize = value => (value || '').trim().toLocaleLowerCase('ar');
+    const valueFor = (row, index) => {
+        const value = normalize(row.cells[index]?.dataset.sortValue || row.cells[index]?.textContent);
+        return /^[-+]?\d+(?:[.,]\d+)?$/.test(value)
+            ? Number(value.replace(',', '.'))
+            : value;
+    };
+    let activeIndex = 0;
+    let direction = 'desc';
+    const renderIcons = () => headers.forEach((header, index) => {
+        header.classList.add('movement-sortable');
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        let icon = header.querySelector('.movement-sort-icon');
+        if (!icon) {
+            icon = document.createElement('i');
+            icon.className = 'bi bi-arrow-down-up movement-sort-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            header.appendChild(icon);
+        }
+        icon.className = 'bi movement-sort-icon ' + (index === activeIndex
+            ? (direction === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down')
+            : 'bi-arrow-down-up');
+        header.classList.toggle('is-sorted', index === activeIndex);
+        header.setAttribute('aria-sort', index === activeIndex
+            ? (direction === 'asc' ? 'ascending' : 'descending')
+            : 'none');
+    });
+    const sortBy = (index, nextDirection) => {
+        activeIndex = index;
+        direction = nextDirection;
+        rows().sort((a, b) => {
+            const left = valueFor(a, index);
+            const right = valueFor(b, index);
+            const comparison = typeof left === 'number' && typeof right === 'number'
+                ? left - right
+                : String(left).localeCompare(String(right), 'ar', { numeric: true, sensitivity: 'base' });
+            return direction === 'asc' ? comparison : -comparison;
+        }).forEach(row => body.appendChild(row));
+        renderIcons();
+    };
+    headers.forEach((header, index) => {
+        const activate = () => sortBy(index, activeIndex === index && direction === 'desc' ? 'asc' : 'desc');
+        header.addEventListener('click', activate);
+        header.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
+        });
+    });
+    sortBy(0, 'desc');
 });
 </script>
 @endpush
