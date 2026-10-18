@@ -21,24 +21,30 @@ class UserController extends Controller
         $roles = $this->rolesForActor()->when(!auth()->user()->isSuperAdmin(), fn ($query) => $query->where('id', '!=', 1))->get();
         $companies = auth()->user()->isSuperAdmin() ? Company::where('status','active')->orderBy('name')->get() : collect([auth()->user()->company])->filter();
         $permissions = Permission::orderBy('module')->orderBy('display_name')->get()->groupBy('module');
+        $moduleLabels = config('authorization.modules', []);
+        $roleLabels = config('authorization.roles', []);
         $permissionGroups = $permissions->map(function ($items, $module) {
             return [
                 'module' => $module,
                 'items' => $items->map(fn (Permission $item) => [
                     'id' => $item->id,
-                    'name' => $item->display_name,
+                    'name' => config('authorization.modules.'.$item->module, $item->module).' - '.config('authorization.actions.'.$item->action, $item->display_name),
                 ])->values()->all(),
             ];
         })->values()->all();
+        $permissionGroups = collect($permissionGroups)->map(function (array $group) use ($moduleLabels) {
+            $group['module'] = $moduleLabels[$group['module']] ?? $group['module'];
+            return $group;
+        })->all();
         $companyOptions = $companies->map(fn (Company $company) => [
             'id' => $company->id,
             'name' => $company->name,
         ])->values()->all();
         $roleOptions = $roles->map(fn (Role $role) => [
             'id' => $role->id,
-            'name' => $role->display_name,
+            'name' => $roleLabels[$role->name] ?? $role->display_name,
         ])->values()->all();
-        return view('users.index', compact('users', 'roles', 'companies', 'permissions', 'permissionGroups', 'companyOptions', 'roleOptions'));
+        return view('users.index', compact('users', 'roles', 'companies', 'permissions', 'permissionGroups', 'companyOptions', 'roleOptions', 'roleLabels'));
     }
 
     public function store(Request $request)

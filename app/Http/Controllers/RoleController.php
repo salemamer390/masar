@@ -17,8 +17,15 @@ class RoleController extends Controller
             ->orderByRaw("CASE WHEN name = 'company_manager' THEN 0 ELSE 1 END")
             ->orderBy('display_name')
             ->get();
-        $permissions = Permission::all()->groupBy('module');
-        return view('roles.index', compact('roles', 'permissions'));
+        $permissions = Permission::orderBy('module')->orderBy('display_name')->get()->groupBy('module');
+
+        return view('roles.index', [
+            'roles' => $roles,
+            'permissions' => $permissions,
+            'roleLabels' => config('authorization.roles', []),
+            'moduleLabels' => config('authorization.modules', []),
+            'actionLabels' => config('authorization.actions', []),
+        ]);
     }
 
     public function store(Request $request)
@@ -29,53 +36,43 @@ class RoleController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
         ]);
         $companyId = auth()->user()->company_id;
-        abort_if(!$companyId, 403, 'لا يمكن إنشاء دور بدون شركة.');
+        abort_if(!$companyId, 403, 'لا يمكن إنشاء دور دون شركة.');
         $name = 'custom_'.str()->slug($data['display_name']).'_'.str()->random(6);
-        $role = Role::create([
+        Role::create([
             'name' => $name,
             'display_name' => $data['display_name'],
             'description' => $data['description'] ?? null,
             'company_id' => $companyId,
         ]);
+
         return redirect()->route('roles.index')->with('toast', 'تم إنشاء الدور بنجاح، ويمكنك تحديد صلاحياته الآن.');
     }
 
     public function update(Request $request, Role $role)
     {
-        if (!auth()->user()->isSuperAdmin() && (int) $role->company_id !== (int) auth()->user()->company_id) {
-            abort(403);
-        }
+        if (!auth()->user()->isSuperAdmin() && (int) $role->company_id !== (int) auth()->user()->company_id) abort(403);
         if ($role->id === 1) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'لا يمكن تعديل صلاحيات المدير العام.'], 422)
-                : back()->with('toast', 'لا يمكن تعديل صلاحيات المدير العام');
+                ? response()->json(['message' => 'لا يمكن تعديل صلاحيات مدير النظام.'], 422)
+                : back()->with('toast', 'لا يمكن تعديل صلاحيات مدير النظام.');
         }
 
         $permissions = $request->input('permissions', []);
-        if ($role->name === 'company_manager') {
-            $permissions = Permission::query()->pluck('id')->all();
-        }
+        if ($role->name === 'company_manager') $permissions = Permission::query()->pluck('id')->all();
         $role->permissions()->sync($permissions);
-
         ActivityLog::record('role_update', "تم تحديث صلاحيات الدور: {$role->display_name}.", $role);
 
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Role permissions updated.', 'role_id' => $role->id])
-            : back()->with('toast', 'تم تحديث صلاحيات الدور بنجاح');
+            ? response()->json(['success' => true, 'message' => 'تم تحديث صلاحيات الدور.', 'role_id' => $role->id])
+            : back()->with('toast', 'تم تحديث صلاحيات الدور بنجاح.');
     }
 
     public function destroy(Role $role)
     {
         $actor = auth()->user();
-        if (!$actor->isSuperAdmin() && (int) $role->company_id !== (int) $actor->company_id) {
-            abort(403);
-        }
-        if ($role->id === 1 || $role->company_id === null) {
-            return back()->with('toast', 'لا يمكن حذف أدوار النظام العامة.');
-        }
-        if ($role->users()->exists()) {
-            return back()->with('toast', 'لا يمكن حذف دور مرتبط بمستخدمين. غيّر أدوارهم أولًا ثم أعد المحاولة.');
-        }
+        if (!$actor->isSuperAdmin() && (int) $role->company_id !== (int) $actor->company_id) abort(403);
+        if ($role->id === 1 || $role->company_id === null) return back()->with('toast', 'لا يمكن حذف أدوار النظام العامة.');
+        if ($role->users()->exists()) return back()->with('toast', 'لا يمكن حذف دور مرتبط بمستخدمين. غيّر أدوارهم أولًا ثم أعد المحاولة.');
 
         $displayName = $role->display_name;
         $role->permissions()->detach();
