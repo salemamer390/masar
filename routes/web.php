@@ -402,6 +402,12 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::put('/{user}', [UserController::class, 'update'])
             ->middleware('permission:users.edit')
             ->name('update');
+        Route::patch('/{user}/status', [UserController::class, 'updateStatus'])
+            ->middleware('permission:users.edit')
+            ->name('status.update');
+        Route::delete('/{user}', [UserController::class, 'destroy'])
+            ->middleware('permission:users.delete')
+            ->name('destroy');
     });
 
     Route::prefix('roles')->name('roles.')->group(function () {

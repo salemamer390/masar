@@ -48,4 +48,20 @@
   bindToggle('togglePlanForm', 'plan-form', 'إضافة باقة');
 })();
 </script>
+<script>
+(() => {
+  const storageKey = 'subscriptions.activeTab';
+  document.querySelectorAll('.subscription-panel form').forEach((form) => {
+    form.addEventListener('submit', () => {
+      const active = document.querySelector('.subscription-tab.active')?.dataset.tab;
+      if (active) sessionStorage.setItem(storageKey, active);
+    });
+  });
+  const storedTab = sessionStorage.getItem(storageKey);
+  if (storedTab && document.querySelector(`.subscription-tab[data-tab="${storedTab}"]`)) {
+    openSubscriptionTab(storedTab);
+    sessionStorage.removeItem(storageKey);
+  }
+})();
+</script>
 @endpush

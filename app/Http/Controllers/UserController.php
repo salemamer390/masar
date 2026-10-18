@@ -123,6 +123,59 @@ class UserController extends Controller
             : back()->with('toast', 'تم تحديث بيانات المستخدم بنجاح');
     }
 
+    public function updateStatus(Request $request, User $user)
+    {
+        $this->ensureUserCanBeManaged($user);
+        $validated = $request->validate(['is_active' => ['required', 'boolean']]);
+
+        $user->update(['is_active' => (bool) $validated['is_active']]);
+        ActivityLog::record(
+            'user_status_update',
+            ($user->is_active ? 'تم تفعيل المستخدم: ' : 'تم إيقاف المستخدم: ') . $user->name . '.',
+            $user
+        );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $user->is_active ? 'تم تفعيل المستخدم.' : 'تم إيقاف المستخدم.',
+                'user' => $user->fresh()->load(['role', 'directPermissions']),
+            ]);
+        }
+
+        return back()->with('toast', $user->is_active ? 'تم تفعيل المستخدم.' : 'تم إيقاف المستخدم.');
+    }
+
+    public function destroy(Request $request, User $user)
+    {
+        $this->ensureUserCanBeManaged($user);
+        $name = $user->name;
+
+        $user->directPermissions()->detach();
+        $user->delete();
+        ActivityLog::record('user_delete', "تم حذف المستخدم: {$name}.");
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'تم حذف المستخدم.', 'user_id' => $user->id]);
+        }
+
+        return back()->with('toast', 'تم حذف المستخدم.');
+    }
+
+    private function ensureUserCanBeManaged(User $user): void
+    {
+        $actor = auth()->user();
+        if (!$actor->isSuperAdmin() && (int) $user->company_id !== (int) $actor->company_id) {
+            abort(403);
+        }
+        if ((int) $user->id === (int) $actor->id) {
+            abort(422, 'لا يمكنك إيقاف أو حذف حسابك الحالي.');
+        }
+        if ($user->isSuperAdmin()) {
+            abort(403, 'لا يمكن تعديل أو حذف حساب مدير المنصة من هنا.');
+        }
+    }
+
     private function ensureHrCapacity(int $companyId): void
     {
         $subscription = CompanySubscription::with('plan')->where('company_id', $companyId)->whereIn('status', ['active', 'trial'])->latest('id')->first();
