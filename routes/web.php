@@ -166,6 +166,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::put('/{attendance}', [AttendanceController::class, 'update'])
             ->middleware('permission:attendance.edit')
             ->name('update');
+        Route::patch('/{attendance}/approve', [AttendanceController::class, 'approve'])
+            ->middleware('permission:attendance.edit')
+            ->name('approve');
         Route::delete('/{attendance}', [AttendanceController::class, 'destroy'])
             ->middleware('permission:attendance.delete')
             ->name('destroy');
