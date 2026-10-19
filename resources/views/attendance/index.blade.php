@@ -119,4 +119,69 @@
   });
 </script>
 @endpush
+@push('scripts')
+<script>
+(() => {
+  const modal = document.getElementById('attendanceModal');
+  if (!modal) return;
+  const form = modal.querySelector('form');
+  const employeeSelect = modal.querySelector('select[name="employee_id"]');
+  const checkIn = modal.querySelector('input[name="check_in"]');
+  const checkOut = modal.querySelector('input[name="check_out"]');
+  const lateMinutes = modal.querySelector('input[name="late_minutes"]');
+  if (employeeSelect) {
+    const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
+    const byId = new Map(employees.map((employee) => [String(employee.id), employee]));
+    [...employeeSelect.options].forEach((option) => {
+      const employee = byId.get(String(option.value));
+      if (employee) option.textContent = `${employee.name} — #${employee.code}`;
+    });
+    employeeSelect.title = 'يمكنك البحث بالاسم أو كود الموظف';
+  }
+  if (lateMinutes) lateMinutes.closest('.col-6')?.remove();
+  const resetDefaults = () => {
+    if (checkIn) checkIn.value = @json($defaultShiftStart);
+    if (checkOut) checkOut.value = @json($defaultShiftEnd);
+  };
+  modal.addEventListener('show.bs.modal', resetDefaults);
+  modal.querySelector('form')?.addEventListener('reset', () => setTimeout(resetDefaults));
+})();
+</script>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const table = document.querySelector('.table-panel table');
+  if (!table) return;
+  const records = @json($attendances->getCollection()->mapWithKeys(fn ($attendance) => [$attendance->id => ['day' => (int) $attendance->day_overtime_minutes, 'night' => (int) $attendance->night_overtime_minutes]]));
+  const rowOrder = @json($attendances->getCollection()->pluck('id')->values());
+  const formatMinutes = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, '0')}:${String(Number(minutes || 0) % 60).padStart(2, '0')}`;
+  const addOvertimeColumns = (row) => {
+    if (!row || row.dataset.overtimeColumns === '1') return;
+    const id = row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1] || rowOrder[[...row.parentElement.children].indexOf(row)];
+    const overtime = records[id] || {day: 0, night: 0};
+    const cells = row.children;
+    if (cells.length < 2) return;
+    const insertBefore = cells[cells.length - 4];
+    const day = document.createElement('td'); day.textContent = formatMinutes(overtime.day);
+    const night = document.createElement('td'); night.textContent = formatMinutes(overtime.night);
+    row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);
+    row.dataset.overtimeColumns = '1';
+  };
+  const head = table.tHead?.rows[0];
+  if (head && !head.dataset.overtimeColumns) {
+    const sourceHead = head.cells[6];
+    if (sourceHead) { const day = document.createElement('th'); day.textContent = 'الإضافي النهاري'; const night = document.createElement('th'); night.textContent = 'الإضافي الليلي'; head.insertBefore(day, sourceHead); head.insertBefore(night, sourceHead); }
+    head.dataset.overtimeColumns = '1';
+  }
+  table.tBodies[0]?.querySelectorAll('tr').forEach(addOvertimeColumns);
+  new MutationObserver(() => table.tBodies[0]?.querySelectorAll('tr').forEach(addOvertimeColumns)).observe(table.tBodies[0], {childList: true});
+  document.addEventListener('masar:success', (event) => {
+    const attendance = event.detail?.attendance;
+    if (!attendance?.id) return;
+    records[attendance.id] = {day: Number(attendance.day_overtime_minutes || 0), night: Number(attendance.night_overtime_minutes || 0)};
+  });
+})();
+</script>
+@endpush
 @endsection

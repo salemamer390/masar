@@ -79,6 +79,85 @@
     @endif
 </div>
 @endif
+
+@push('scripts')
+<script>
+(() => {
+  const form = document.querySelector('#requestCreateModal form');
+  if (!form) return;
+  const type = form.querySelector('[name="request_type_id"]');
+  const modalFooter = form.querySelector('.modal-footer');
+  const oldFields = form.querySelector('.row.g-2.mt-2');
+  oldFields?.remove();
+  const overtimeTypeIds = @json($requestTypes->filter(fn ($item) => $item->source_key === 'overtime')->pluck('id')->values());
+  const fields = document.createElement('div');
+  fields.className = 'row g-2 mt-2';
+  fields.hidden = true;
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control"></div>';
+  modalFooter?.before(fields);
+  const date = fields.querySelector('[name="request_date"]');
+  const period = fields.querySelector('[name="overtime_period"]');
+  const hours = fields.querySelector('[name="duration_hours"]');
+  const sync = () => {
+    const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
+    fields.hidden = !isOvertime;
+    [date, period, hours].forEach((input) => { if (input) input.required = isOvertime; });
+    if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; }
+  };
+  type?.addEventListener('change', sync);
+  sync();
+})();
+</script>
+@endpush
+
+@push('styles')
+<style>
+  #requestCreateModal .request-conditional-card{border:1px solid #dbe7f5;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#fff);padding:16px;margin-top:14px;box-shadow:0 8px 22px rgba(31,73,125,.06)}
+  #requestCreateModal .request-conditional-card .form-label{font-weight:700;color:#16325c;margin-bottom:7px}
+  #requestCreateModal .request-conditional-card .form-control,#requestCreateModal .request-conditional-card .form-select{border-radius:11px;min-height:44px;border-color:#d8e4f2}
+  #requestCreateModal .request-conditional-card[hidden]{display:none!important}
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const form = document.querySelector('#requestCreateModal form');
+  if (!form) return;
+  const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
+  const employeeSelect = form.querySelector('select[name="employee_id"]');
+  if (employeeSelect) {
+    const wrapper = employeeSelect.parentElement;
+    const lookup = document.createElement('input'); lookup.className = 'form-control'; lookup.name = 'employee_lookup'; lookup.setAttribute('list','requestEmployeesList'); lookup.placeholder = 'ابحث باسم الموظف أو كوده'; lookup.required = true;
+    const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'employee_id'; hidden.required = true;
+    const list = document.createElement('datalist'); list.id = 'requestEmployeesList';
+    list.innerHTML = employees.map((employee) => `<option value="${employee.name} — #${employee.code}"></option>`).join('');
+    employeeSelect.removeAttribute('name'); employeeSelect.removeAttribute('required'); employeeSelect.hidden = true;
+    wrapper.append(lookup, hidden, list);
+    const syncEmployee = () => {
+      const query = lookup.value.trim().toLocaleLowerCase();
+      const found = employees.find((employee) => `${employee.name} — #${employee.code}`.toLocaleLowerCase() === query || String(employee.code || '').toLocaleLowerCase() === query || String(employee.name || '').toLocaleLowerCase() === query);
+      hidden.value = found?.id || '';
+    };
+    lookup.addEventListener('input', syncEmployee); lookup.addEventListener('change', syncEmployee);
+  }
+  const type = form.querySelector('[name="request_type_id"]');
+  const title = form.querySelector('[name="title"]');
+  const typeMeta = @json($requestTypes->mapWithKeys(fn ($item) => [$item->id => ['label' => $item->display_name, 'source' => $item->source_key]]));
+  let generatedTitle = '';
+  const syncTitle = () => { const meta = typeMeta[type?.value]; if (!meta) return; if (!title.value.trim() || title.value === generatedTitle) title.value = meta.label; generatedTitle = meta.label; };
+  type?.addEventListener('change', syncTitle); syncTitle();
+  const overtimeCard = form.querySelector('.row.g-2.mt-2');
+  const otherCard = document.createElement('div'); otherCard.className = 'request-conditional-card'; otherCard.hidden = true;
+  otherCard.innerHTML = '<div class="mb-3"><label class="form-label">تاريخ الطلب المؤثر</label><input type="date" name="request_date" class="form-control"></div><div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="affects_payroll" value="1" id="requestAffectsPayroll"><label class="form-check-label" for="requestAffectsPayroll">يؤثر على دورة الرواتب</label></div><div class="row g-2" data-payroll-impact-fields hidden><div class="col-md-6"><label class="form-label">المبلغ</label><input type="number" name="impact_amount" min="0.01" step="0.01" class="form-control"></div><div class="col-md-6"><label class="form-label">نوع التأثير</label><select name="impact_type" class="form-select"><option value="">اختر نوع التأثير</option><option value="earning">مستحق</option><option value="deduction">مستقطع</option></select></div></div>';
+  form.querySelector('.modal-footer')?.before(otherCard);
+  const affects = otherCard.querySelector('[name="affects_payroll"]'); const impactFields = otherCard.querySelector('[data-payroll-impact-fields]'); const impactAmount = otherCard.querySelector('[name="impact_amount"]'); const impactType = otherCard.querySelector('[name="impact_type"]');
+  const syncImpact = () => { const active = affects.checked; impactFields.hidden = !active; impactAmount.required = active; impactType.required = active; if (!active) { impactAmount.value = ''; impactType.value = ''; } };
+  affects.addEventListener('change', syncImpact);
+  const syncOther = () => { const isOther = typeMeta[type?.value]?.source === 'other'; otherCard.hidden = !isOther; if (!isOther) { affects.checked = false; syncImpact(); } };
+  type?.addEventListener('change', syncOther); syncOther(); syncImpact();
+})();
+</script>
+@endpush
 @push('scripts')
 <script>
 const requestCardData=@json($requestCardDetails);const requestKeys=['all','pending','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المعلقة','الطلبات المعتمدة','الطلبات المرفوضة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
@@ -211,3 +290,32 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 <script>document.addEventListener('DOMContentLoaded',function(){const m=document.getElementById('requestCreateModal');if(m){bootstrap.Modal.getOrCreateInstance(m).show();}});</script>
 @endpush
 @endif
+
+@push('scripts')
+<script>
+(() => {
+  const form = document.querySelector('#requestCreateModal form');
+  if (!form) return;
+  const type = form.querySelector('[name="request_type_id"]');
+  const modalFooter = form.querySelector('.modal-footer');
+  form.querySelectorAll('.row.g-2.mt-2').forEach((fields) => fields.remove());
+  const overtimeTypeIds = @json($requestTypes->filter(fn ($item) => $item->source_key === 'overtime')->pluck('id')->values());
+  const fields = document.createElement('div');
+  fields.className = 'row g-2 mt-2';
+  fields.hidden = true;
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control"></div>';
+  modalFooter?.before(fields);
+  const date = fields.querySelector('[name="request_date"]');
+  const period = fields.querySelector('[name="overtime_period"]');
+  const hours = fields.querySelector('[name="duration_hours"]');
+  const sync = () => {
+    const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
+    fields.hidden = !isOvertime;
+    [date, period, hours].forEach((input) => { if (input) input.required = isOvertime; });
+    if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; }
+  };
+  type?.addEventListener('change', sync);
+  sync();
+})();
+</script>
+@endpush

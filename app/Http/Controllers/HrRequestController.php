@@ -89,16 +89,37 @@ class HrRequestController extends Controller
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'duration_days' => ['nullable', 'numeric', 'min:0'],
             'duration_hours' => ['nullable', 'numeric', 'min:0'],
+            'overtime_period' => ['nullable', 'in:day,night'],
+            'affects_payroll' => ['nullable', 'boolean'],
+            'impact_type' => ['nullable', 'in:earning,deduction'],
+            'impact_amount' => ['nullable', 'numeric', 'min:0'],
             'addition_amount' => ['nullable', 'numeric', 'min:0'],
             'deduction_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $type = RequestType::active()->findOrFail($validated['request_type_id']);
+        if ($type->source_key === 'overtime') {
+            $request->validate([
+                'request_date' => ['required', 'date'],
+                'duration_hours' => ['required', 'numeric', 'gt:0'],
+                'overtime_period' => ['required', 'in:day,night'],
+            ]);
+        }
+        if ($type->source_key === 'other' && $request->boolean('affects_payroll')) {
+            $request->validate([
+                'impact_amount' => ['required', 'numeric', 'gt:0'],
+                'impact_type' => ['required', 'in:earning,deduction'],
+            ]);
+        }
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
 
-        $payload = collect([
+        $payload = $type->source_key === 'overtime'
+            ? ['request_date' => $validated['request_date'], 'hours' => $validated['duration_hours'], 'overtime_period' => $validated['overtime_period']]
+            : ($type->source_key === 'other'
+                ? collect(['request_date' => $validated['request_date'] ?? null, 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $validated['impact_type'] ?? null, 'amount' => $validated['impact_amount'] ?? null])->filter(fn ($value) => $value !== null && $value !== '')->all()
+            : collect([
             'request_date' => $validated['request_date'] ?? null,
             'start_date' => $validated['start_date'] ?? null,
             'end_date' => $validated['end_date'] ?? null,
@@ -106,7 +127,7 @@ class HrRequestController extends Controller
             'hours' => $validated['duration_hours'] ?? null,
             'addition_amount' => $validated['addition_amount'] ?? null,
             'deduction_amount' => $validated['deduction_amount'] ?? null,
-        ])->filter(fn ($value) => $value !== null && $value !== '')->all();
+        ])->filter(fn ($value) => $value !== null && $value !== '')->all());
 
         $hrRequest = HrRequest::create([
             'employee_id' => $employee->id,

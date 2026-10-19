@@ -31,6 +31,7 @@ class AttendanceController extends Controller
 
         $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
         $attendances = $query->paginate($perPage)->withQueryString();
+        $attendances->getCollection()->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
         $todaySummary = $this->dashboard->attendance($request->user(), $today);
         $presentToday = $todaySummary['counts']['present'];
         $absentToday = $todaySummary['counts']['absent'];
@@ -42,7 +43,9 @@ class AttendanceController extends Controller
         $employees = Employee::orderBy('full_name')->get();
         $departments = Department::where('is_active', 1)->orderBy('name')->get();
 
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments'));
+        $defaultShiftStart = $this->hrSettings->start();
+        $defaultShiftEnd = $this->hrSettings->end();
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)
@@ -64,9 +67,12 @@ class AttendanceController extends Controller
             ['employee_id' => $validated['employee_id'], 'attendance_date' => $validated['attendance_date']],
             ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null]
         );
+        $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_record', 'Attendance record created or updated.', $attendance, null, $attendance->toArray(), 'attendance');
+        $fresh = $attendance->fresh()->load('employee.department');
+        $this->decorateOvertime($fresh);
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $attendance->fresh()->load('employee.department')])
+            ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $fresh])
             : back()->with('toast', 'تم حفظ سجل الحضور كمسودة.');
     }
 
@@ -114,9 +120,12 @@ class AttendanceController extends Controller
             // أي تعديل يستلزم مراجعة السجل من جديد قبل دخوله في المسير.
             'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
         ]);
+        $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_update', 'Attendance record updated.', $attendance, $old, $attendance->toArray(), 'attendance');
+        $fresh = $attendance->fresh()->load('employee.department');
+        $this->decorateOvertime($fresh);
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Attendance updated.', 'attendance' => $attendance->fresh()->load('employee.department')])
+            ? response()->json(['success' => true, 'message' => 'Attendance updated.', 'attendance' => $fresh])
             : back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
     }
 
@@ -153,5 +162,28 @@ class AttendanceController extends Controller
         $in = Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute;
         $out = Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute;
         return round((($out - $in + 1440) % 1440) / 60, 2);
+    }
+
+    /** Potential overtime shown on attendance; approval is handled separately through HR requests. */
+    private function decorateOvertime(Attendance $attendance): void
+    {
+        $employee = $attendance->employee;
+        $start = $employee?->shift_start ?: $this->hrSettings->start();
+        $end = $employee?->shift_end ?: $this->hrSettings->end();
+        $checkIn = $attendance->check_in;
+        $checkOut = $attendance->check_out;
+        $dayMinutes = 0;
+        $nightMinutes = 0;
+        if ($checkIn && $checkOut) {
+            $in = Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute;
+            $out = Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute;
+            $startMinutes = Carbon::parse($start)->hour * 60 + Carbon::parse($start)->minute;
+            $endMinutes = Carbon::parse($end)->hour * 60 + Carbon::parse($end)->minute;
+            $dayMinutes = max(0, $startMinutes - $in);
+            $nightMinutes = max(0, $out - $endMinutes);
+        }
+        $attendance->setAttribute('day_overtime_minutes', $dayMinutes);
+        $attendance->setAttribute('night_overtime_minutes', $nightMinutes);
+        $attendance->setAttribute('potential_overtime_minutes', $dayMinutes + $nightMinutes);
     }
 }

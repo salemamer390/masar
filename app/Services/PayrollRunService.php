@@ -7,6 +7,7 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\Penalty;
+use App\Models\HrRequest;
 use App\Models\PayrollRecord;
 use App\Models\PayrollRun;
 use App\Models\Salary;
@@ -128,7 +129,18 @@ class PayrollRunService
             ->whereBetween('attendance_date', [$from, $to])
             ->where('approval_status', 'Approved')->get();
         $absenceRecords = $attendance->filter(fn (Attendance $record) => in_array($record->status, ['Absent', 'غياب'], true));
-        $overtimeMinutes = (int) $attendance->sum('overtime_minutes');
+        $overtime = $this->approvedOvertime($employee, $attendance);
+        $otherRequests = HrRequest::with('requestType')->where('employee_id', $employee->id)->where('status', 'Approved')
+            ->where(function ($query) {
+                $query->where('request_type', 'other')
+                    ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'other'));
+            })->get()->filter(function ($request) use ($from, $to) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $date = $payload['request_date'] ?? $payload['start_date'] ?? $request->created_at?->toDateString();
+                return $date && Carbon::parse($date)->betweenIncluded(Carbon::parse($from), Carbon::parse($to));
+            });
+        $otherEarnings = (float) $otherRequests->filter(fn ($request) => ($request->payload['impact_type'] ?? null) === 'earning')->sum(fn ($request) => (float) ($request->payload['amount'] ?? 0));
+        $otherDeductions = (float) $otherRequests->filter(fn ($request) => ($request->payload['impact_type'] ?? null) === 'deduction')->sum(fn ($request) => (float) ($request->payload['amount'] ?? 0));
         $penalties = Penalty::with('penaltyType')->where('employee_id', $employee->id)->whereBetween('penalty_date', [$from, $to])
             ->whereIn('status', ['Approved', 'معتمد'])->get();
         $approvedLeaves = Leave::with('leaveType')->where('employee_id', $employee->id)->where('status', 'Approved')
@@ -139,13 +151,67 @@ class PayrollRunService
         $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
 
         return [
-            'ot_day_hours' => round($overtimeMinutes / 60, 2), 'ot_night_hours' => 0,
+            'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'absence_days' => $absenceRecords->count() + $unpaidLeaveDays, 'penalty_days' => $penaltyDays,
-            'bonus'=>0, 'loans'=>0, 'other_earnings'=>0, 'other_deductions'=>0,
-            'approved_attendance_ids' => $attendance->pluck('id')->all(),
+            'bonus'=>0, 'loans'=>0, 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
+            'approved_attendance_ids' => $attendance->pluck('id')->all(), 'approved_overtime_request_ids' => $overtime['request_ids'], 'approved_other_request_ids' => $otherRequests->pluck('id')->all(),
             'absence_attendance_ids' => $absenceRecords->pluck('id')->all(),
             'approved_leave_ids' => $approvedLeaves->pluck('id')->all(), 'approved_penalty_ids' => $penalties->pluck('id')->all(),
         ];
+    }
+
+    /** Only approved overtime requests can authorize the potential overtime on attendance records. */
+    private function approvedOvertime(Employee $employee, $attendance): array
+    {
+        $requests = HrRequest::with('requestType')
+            ->where('employee_id', $employee->id)
+            ->where('status', 'Approved')
+            ->where(function ($query) {
+                $query->where('request_type', 'overtime')
+                    ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'overtime'));
+            })->get();
+        $dayMinutes = 0;
+        $nightMinutes = 0;
+        $requestIds = [];
+        foreach ($attendance as $record) {
+            [$potentialDay, $potentialNight] = $this->potentialOvertime($employee, $record);
+            $periods = $requests->filter(function ($request) use ($record) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $start = $payload['start_date'] ?? $payload['request_date'] ?? $request->created_at?->toDateString();
+                $end = $payload['end_date'] ?? $start;
+                return $start && $record->attendance_date?->betweenIncluded(Carbon::parse($start), Carbon::parse($end));
+            });
+            $authorizedDay = 0.0;
+            $authorizedNight = 0.0;
+            foreach ($periods as $request) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $start = $payload['start_date'] ?? $payload['request_date'] ?? $request->created_at?->toDateString();
+                $end = $payload['end_date'] ?? $start;
+                if (!$start || !$record->attendance_date?->betweenIncluded(Carbon::parse($start), Carbon::parse($end))) continue;
+                $hours = (float) ($payload['hours'] ?? 0);
+                if ($hours <= 0) continue;
+                $days = max(1, Carbon::parse($start)->diffInDays(Carbon::parse($end)) + 1);
+                $authorizedMinutes = ($hours / $days) * 60;
+                if (($payload['overtime_period'] ?? 'day') === 'night') $authorizedNight += $authorizedMinutes;
+                else $authorizedDay += $authorizedMinutes;
+                $requestIds[] = $request->id;
+            }
+            $dayMinutes += min($potentialDay, $authorizedDay);
+            $nightMinutes += min($potentialNight, $authorizedNight);
+        }
+        return ['day_minutes' => $dayMinutes, 'night_minutes' => $nightMinutes, 'request_ids' => array_values(array_unique($requestIds))];
+    }
+
+    private function potentialOvertime(Employee $employee, Attendance $record): array
+    {
+        if (!$record->check_in || !$record->check_out) return [0, 0];
+        $in = Carbon::parse($record->check_in)->hour * 60 + Carbon::parse($record->check_in)->minute;
+        $out = Carbon::parse($record->check_out)->hour * 60 + Carbon::parse($record->check_out)->minute;
+        $start = Carbon::parse($employee->shift_start ?: $this->hrSettings->start());
+        $end = Carbon::parse($employee->shift_end ?: $this->hrSettings->end());
+        $startMinutes = $start->hour * 60 + $start->minute;
+        $endMinutes = $end->hour * 60 + $end->minute;
+        return [max(0, $startMinutes - $in), max(0, $out - $endMinutes)];
     }
 
     public function approve(PayrollRun $run): PayrollRun
