@@ -35,11 +35,10 @@ class JobDataController extends Controller
             ->when($request->filled('contract_status'), function ($q) use ($request) { return $request->contract_status === 'active' ? $q->where(function ($x) { $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()); }) : $q->whereDate('contract_end_date', '<', today()); })
             ->orderByDesc('id');
 
-        // Render only the first batch; additional batches are fetched on demand.
-        $employees = $employeeQuery->paginate(50)->withQueryString();
-        $nextRowsUrl = $employees->hasMorePages()
-            ? route('jobs.rows', array_merge($request->query(), ['page' => $employees->currentPage() + 1]))
-            : null;
+        $perPage = in_array((int) $request->input('per_page', 50), [25, 50, 100, 200], true)
+            ? (int) $request->input('per_page', 50)
+            : 50;
+        $employees = $employeeQuery->paginate($perPage)->withQueryString();
 
         $monthlyRows = $this->buildMonthlyRows($employees->getCollection(), $month);
         $summaryHistory = MonthlySummarySnapshot::orderByDesc('summary_month')->get();
@@ -57,7 +56,6 @@ class JobDataController extends Controller
 
         return view('jobs.index', compact(
             'employees', 'monthlyRows', 'month', 'summaryHistory',
-            'nextRowsUrl',
             'totalJobs',
             'totalDepartments',
             'totalBranches',
@@ -90,7 +88,11 @@ class JobDataController extends Controller
                     ? $q->where(fn ($x) => $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()))
                     : $q->whereDate('contract_end_date', '<', today());
             })
-            ->orderByDesc('id')->paginate(50)->withQueryString();
+            ->orderByDesc('id')->paginate(
+                in_array((int) $request->input('per_page', 50), [25, 50, 100, 200], true)
+                    ? (int) $request->input('per_page', 50)
+                    : 50
+            )->withQueryString();
 
         return response()->json([
             'html' => view('jobs._rows', ['monthlyRows' => $this->buildMonthlyRows($employees->getCollection(), $month)])->render(),

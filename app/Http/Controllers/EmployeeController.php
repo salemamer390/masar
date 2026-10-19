@@ -57,7 +57,10 @@ class EmployeeController extends Controller
             $query->where('status_id', $request->status_id);
         }
 
-        $employees = $query->paginate(25)->withQueryString();
+        $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true)
+            ? (int) $request->input('per_page', 25)
+            : 25;
+        $employees = $query->paginate($perPage)->withQueryString();
         $departments = Department::where('is_active', 1)->get();
         $statuses = EmployeeStatus::all();
         $totalEmployees = Employee::count();
