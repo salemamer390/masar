@@ -41,8 +41,34 @@ class PayrollController extends Controller
             'net' => $records->sortByDesc('net_salary')->values(),
             'cost' => $records->sortByDesc('employee_cost')->values(),
         ];
+        $payrollDetails = $records->map(fn ($record) => [
+            'id' => $record->id,
+            'name' => $record->employee?->full_name,
+            'code' => $record->employee?->employee_code,
+            'department' => $record->employee?->department?->name,
+            'status' => $record->status,
+            'salary_id' => $record->salary_id,
+            'effective_from' => $record->salary?->effective_from?->format('d/m/Y'),
+            'basic_salary' => (float) $record->basic_salary,
+            'allowances' => (float) $record->allowances,
+            'housing_allowance' => (float) $record->housing_allowance,
+            'transportation_allowance' => (float) $record->transportation_allowance,
+            'meal_allowance' => (float) $record->meal_allowance,
+            'clothing_allowance' => (float) $record->clothing_allowance,
+            'overtime_amount' => (float) $record->overtime_amount,
+            'absence_deduction' => (float) $record->absence_deduction,
+            'penalties' => (float) $record->penalties,
+            'employee_insurance' => (float) $record->employee_insurance,
+            'income_tax' => (float) $record->income_tax,
+            'martyrs_fund' => (float) $record->martyrs_fund,
+            'fixed_deductions' => (float) $record->fixed_deductions,
+            'other_deductions' => (float) $record->other_deductions,
+            'gross_salary' => (float) $record->gross_salary,
+            'net_salary' => (float) $record->net_salary,
+            'employee_cost' => (float) $record->employee_cost,
+        ])->values();
 
-        return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails'));
+        return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails'));
     }
 
     public function generate(Request $request, PayrollRunService $service)

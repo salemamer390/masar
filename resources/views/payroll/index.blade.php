@@ -84,6 +84,49 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
       row.prepend(serialCell);
     });
   }
+  const payrollDetailsData = @json($payrollDetails);
+  const payrollMoney = (value) => Number(value || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
+  const payrollDetailsRows = payrollDetailsTable ? [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]) : [];
+  const detailPanel = document.createElement('div');
+  detailPanel.className = 'offcanvas offcanvas-end payroll-detail-panel';
+  detailPanel.tabIndex = -1;
+  detailPanel.id = 'payrollDetailPanel';
+  detailPanel.innerHTML = '<div class="offcanvas-header"><div><h5 class="offcanvas-title">تفاصيل مسير الموظف</h5><small class="text-muted" data-payroll-detail-subtitle></small></div><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body" data-payroll-detail-body></div>';
+  document.body.append(detailPanel);
+  const detailBody = detailPanel.querySelector('[data-payroll-detail-body]');
+  const payrollUiStyle = document.createElement('style');
+  payrollUiStyle.textContent = '.payroll-clickable-row{cursor:pointer;transition:background .15s ease}.payroll-clickable-row:hover{background:#f1f6ff!important}.payroll-detail-panel{width:min(440px,96vw)}.payroll-detail-section{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;background:#fff}.payroll-detail-section h6{display:flex;gap:7px;align-items:center;margin:0 0 10px;color:#173d72;font-weight:800}.payroll-detail-item{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9}.payroll-detail-item:last-child{border-bottom:0}.payroll-detail-item span{color:#64748b}.payroll-detail-item b{color:#1e293b}.payroll-detail-total{padding:15px;border-radius:12px;background:#eafaf1;display:grid;gap:4px}.payroll-detail-total span{color:#166534}.payroll-detail-total strong{font-size:22px;color:#15803d}.payroll-detail-total small{color:#64748b}.payroll-salary-heading{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:12px;background:#f8fafc;margin-bottom:12px}.payroll-salary-heading span{color:#64748b}.payroll-salary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.payroll-salary-grid .payroll-detail-item{border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid}.payroll-salary-grid .payroll-detail-item b{font-size:15px}@media(max-width:600px){.payroll-salary-grid{grid-template-columns:1fr}.payroll-detail-panel{width:100%}}';
+  document.head.append(payrollUiStyle);
+  const detailValue = (label, value) => `<div class="payroll-detail-item"><span>${label}</span><b>${value}</b></div>`;
+  const openPayrollDetails = (record) => {
+    if (!record || !detailBody) return;
+    detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
+    detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
+    bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
+  };
+  payrollDetailsRows.forEach((row, index) => {
+    const record = payrollDetailsData[index];
+    if (!record) return;
+    row.dataset.payrollRecordIndex = String(index);
+    row.classList.add('payroll-clickable-row');
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('a,button,form,input,select,textarea')) return;
+      openPayrollDetails(record);
+    });
+    row.querySelectorAll('a[href*="/salaries"]').forEach((link) => {
+      link.addEventListener('click', (event) => { event.preventDefault(); openSalaryDetails(record); });
+    });
+  });
+  const salaryModal = document.createElement('div');
+  salaryModal.className = 'modal fade payroll-salary-modal';
+  salaryModal.id = 'payrollSalaryDetails';
+  salaryModal.innerHTML = '<div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">تفاصيل هيكل الراتب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" data-salary-body></div></div></div>';
+  document.body.append(salaryModal);
+  const openSalaryDetails = (record) => {
+    const body = salaryModal.querySelector('[data-salary-body]');
+    body.innerHTML = `<div class="payroll-salary-heading"><strong>${record.name || '—'}</strong><span>هيكل #${record.salary_id || '—'} · ساري من ${record.effective_from || '—'}</span></div><div class="payroll-salary-grid">${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإجمالي المعتمد', payrollMoney(record.gross_salary))}${detailValue('الراتب الصافي', payrollMoney(record.net_salary))}</div>`;
+    bootstrap.Modal.getOrCreateInstance(salaryModal).show();
+  };
   if (payrollDetailsTable) {
     const employeeCodes = @json($records->map(fn ($record) => $record->employee?->employee_code)->values());
     const netSalaries = @json($records->map(fn ($record) => (float) $record->net_salary)->values());
