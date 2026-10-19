@@ -84,6 +84,13 @@ class HrRequestController extends Controller
             ],
             'title' => ['required', 'string', 'max:200'],
             'details' => ['nullable', 'string', 'max:5000'],
+            'request_date' => ['nullable', 'date'],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'duration_days' => ['nullable', 'numeric', 'min:0'],
+            'duration_hours' => ['nullable', 'numeric', 'min:0'],
+            'addition_amount' => ['nullable', 'numeric', 'min:0'],
+            'deduction_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $type = RequestType::active()->findOrFail($validated['request_type_id']);
@@ -91,12 +98,23 @@ class HrRequestController extends Controller
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
 
+        $payload = collect([
+            'request_date' => $validated['request_date'] ?? null,
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'days' => $validated['duration_days'] ?? null,
+            'hours' => $validated['duration_hours'] ?? null,
+            'addition_amount' => $validated['addition_amount'] ?? null,
+            'deduction_amount' => $validated['deduction_amount'] ?? null,
+        ])->filter(fn ($value) => $value !== null && $value !== '')->all();
+
         $hrRequest = HrRequest::create([
             'employee_id' => $employee->id,
             'request_type' => $type->code,
             'request_type_id' => $type->id,
             'title' => $validated['title'],
             'details' => $validated['details'] ?? null,
+            'payload' => $payload ?: null,
             'status' => 'Pending',
             'created_by' => $user->id,
         ]);

@@ -169,6 +169,13 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 @push('scripts')
 <script>
   // Stage 5: creation/deletion use the same guarded AJAX path as review actions.
+  const requestCreateForm = document.querySelector('#requestCreateModal form');
+  if (requestCreateForm && !requestCreateForm.querySelector('[name="duration_days"]')) {
+    const fields = document.createElement('div');
+    fields.className = 'row g-2 mt-2';
+    fields.innerHTML = '<div class="col-md-4"><label class="form-label">تاريخ الطلب</label><input type="date" name="request_date" class="form-control"></div><div class="col-md-4"><label class="form-label">من</label><input type="date" name="start_date" class="form-control"></div><div class="col-md-4"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control"></div><div class="col-md-3"><label class="form-label">الأيام</label><input type="number" step="0.5" min="0" name="duration_days" class="form-control"></div><div class="col-md-3"><label class="form-label">الساعات</label><input type="number" step="0.5" min="0" name="duration_hours" class="form-control"></div><div class="col-md-3"><label class="form-label">إضافة مالية</label><input type="number" step="0.01" min="0" name="addition_amount" class="form-control"></div><div class="col-md-3"><label class="form-label">خصم مالي</label><input type="number" step="0.01" min="0" name="deduction_amount" class="form-control"></div>';
+    requestCreateForm.querySelector('.modal-footer')?.before(fields);
+  }
   const requestBaseUrl = @json(url('/requests'));
   const requestTableBody = document.querySelector('.table-panel table tbody');
   const canDeleteHrRequest = @json(auth()->user()?->hasPermission('requests.delete'));

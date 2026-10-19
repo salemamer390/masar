@@ -45,12 +45,26 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
     const response = await fetch(button.dataset.url, {headers:{Accept:'application/json'}});
     if (!response.ok) return;
     const data = await response.json();
-    const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','penalty_count','penalty_days','annual_balance_remaining'];
+    if (labels.length === 17) labels.push('عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات');
+    const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','penalty_count','penalty_days','approved_request_count','request_days','request_hours','request_additions','request_deductions','request_types','annual_balance_remaining'];
     const labels = ['الكود','الموظف','القسم','الحضور','حضور متأخر','دقائق التأخير','الغياب','سنوية','عارضة','مرضية','بدون أجر','أمومة','أخرى','إجمالي الإجازات','الجزاءات','أيام الخصم','الرصيد المتبقي'];
     document.getElementById('summaryHistoryBody').innerHTML = '<p class="text-muted">رقم الشهر: '+data.month+'</p><div class="table-responsive"><table class="table table-sm monthly-summary-table"><thead><tr>'+labels.map(label => '<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+data.rows.map(row => '<tr>'+keys.map(key => '<td>'+String(row[key] ?? '—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     document.getElementById('summaryHistoryExport').href = data.export_url;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('summaryHistoryModal')).show();
 }));
+// Keep the request columns grouped with the rest of the summary even for
+// cached versions of the Blade header.
+const summaryTable = document.querySelector('.monthly-summary-table');
+if (summaryTable) {
+    const headRows = summaryTable.tHead?.rows;
+    const requestLabels = ['عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات'];
+    if (headRows?.length >= 2 && headRows[1].cells.length < 23) {
+        const balanceCell = headRows[1].lastElementChild;
+        requestLabels.forEach(label => { const cell = document.createElement('th'); cell.textContent = label; headRows[1].insertBefore(cell, balanceCell); });
+        const group = document.createElement('th'); group.colSpan = requestLabels.length; group.textContent = 'الطلبات المعتمدة';
+        headRows[0].insertBefore(group, headRows[0].lastElementChild);
+    }
+}
 const serverSearchForm = document.querySelector('form[data-server-live-search="true"]');
 const serverSearchInput = serverSearchForm?.querySelector('input[name="search"]');
 let serverSearchTimer;

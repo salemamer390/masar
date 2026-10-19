@@ -10,6 +10,7 @@ use App\Models\Job;
 use App\Models\Attendance;
 use App\Models\Leave;
 use App\Models\Penalty;
+use App\Models\HrRequest;
 use App\Models\MonthlySummarySnapshot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -155,14 +156,23 @@ class JobDataController extends Controller
         $employeeIds = $employees->pluck('id');
         $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->where('approval_status', 'Approved')->get()->groupBy('employee_id');
         $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
+        $requests = HrRequest::with('requestType')
+            ->whereIn('employee_id', $employeeIds)
+            ->where('status', 'Approved')
+            ->whereDate('created_at', '<=', $monthEnd)
+            ->get()
+            ->filter(fn (HrRequest $request) => $this->requestBelongsToMonth($request, $month))
+            ->groupBy('employee_id');
         $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->where('status', 'Approved')->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
         $balances = $leaveBalanceService->balancesFor($employees, $month->year);
 
-        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $month, $balances): array {
+        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $balances): array {
             $attendanceRows = $attendance->get($employee->id, collect());
             $employeeLeaves = $leaves->get($employee->id, collect());
             $employeePenalties = $penalties->get($employee->id, collect());
+            $employeeRequests = $requests->get($employee->id, collect());
+            $requestSummary = $this->summarizeRequests($employeeRequests);
             $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinMonth($leave, $month)]);
             $leaveByPolicy = fn (string $policy): float => $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $unpaidLeaveDays = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
@@ -178,6 +188,10 @@ class JobDataController extends Controller
                 'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0), 'unpaid_leave_days' => $unpaidLeaveDays,
                 'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),
                 'penalty_count' => $employeePenalties->count(), 'annual_balance_remaining' => $balance['remaining'],
+                'approved_request_count' => $requestSummary['approved_count'],
+                'request_days' => $requestSummary['days'], 'request_hours' => $requestSummary['hours'],
+                'request_additions' => $requestSummary['additions'], 'request_deductions' => $requestSummary['deductions'],
+                'request_types' => $requestSummary['types'],
             ];
         });
     }
@@ -190,12 +204,47 @@ class JobDataController extends Controller
             'attendance_days' => $row['attendance_days'], 'late_days' => $row['late_days'], 'late_minutes' => $row['late_minutes'], 'absence_days' => $row['absence_days'],
             'annual_leave_days' => $row['annual_leave_days'], 'casual_leave_days' => $row['casual_leave_days'], 'sick_leave_days' => $row['sick_leave_days'], 'unpaid_leave_days' => $row['unpaid_leave_days'], 'maternity_leave_days' => $row['maternity_leave_days'], 'other_leave_days' => $row['other_leave_days'], 'total_leave_days' => $row['total_leave_days'],
             'penalty_count' => $row['penalty_count'], 'penalty_days' => $row['penalty_days'], 'annual_balance_remaining' => $row['annual_balance_remaining'],
+            'approved_request_count' => $row['approved_request_count'], 'request_days' => $row['request_days'], 'request_hours' => $row['request_hours'],
+            'request_additions' => $row['request_additions'], 'request_deductions' => $row['request_deductions'], 'request_types' => $row['request_types'],
         ])->values()->all();
+    }
+
+    private function requestBelongsToMonth(HrRequest $request, Carbon $month): bool
+    {
+        $payload = is_array($request->payload) ? $request->payload : [];
+        $start = $payload['start_date'] ?? $payload['date'] ?? $payload['request_date'] ?? null;
+        $end = $payload['end_date'] ?? $start;
+        if ($start) {
+            try {
+                return Carbon::parse($start)->lte($month->copy()->endOfMonth())
+                    && Carbon::parse($end)->gte($month->copy()->startOfMonth());
+            } catch (\Throwable) {
+                // Invalid optional payload dates fall back to created_at.
+            }
+        }
+        return $request->created_at?->isSameMonth($month) ?? false;
+    }
+
+    private function summarizeRequests($requests): array
+    {
+        $result = ['approved_count' => 0, 'days' => 0.0, 'hours' => 0.0, 'additions' => 0.0, 'deductions' => 0.0, 'types' => []];
+        foreach ($requests as $request) {
+            $payload = is_array($request->payload) ? $request->payload : [];
+            $result['approved_count']++;
+            $result['days'] += (float) ($payload['days'] ?? $payload['duration_days'] ?? 0);
+            $result['hours'] += (float) ($payload['hours'] ?? $payload['duration_hours'] ?? 0);
+            $result['additions'] += (float) ($payload['addition'] ?? $payload['addition_amount'] ?? $payload['amount_added'] ?? 0);
+            $result['deductions'] += (float) ($payload['deduction'] ?? $payload['deduction_amount'] ?? $payload['amount_deducted'] ?? 0);
+            $label = $request->requestType?->display_name ?: $request->title;
+            if ($label && !in_array($label, $result['types'], true)) $result['types'][] = $label;
+        }
+        $result['types'] = implode('، ', $result['types']);
+        return $result;
     }
 
     private function excelResponse(array $rows, Carbon $month)
     {
-        return response()->view('jobs.export', compact('rows', 'month'), 200, [
+        return response()->view('jobs.export_requests', compact('rows', 'month'), 200, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="monthly-summary-'.$month->format('Y-m').'.xls"',
         ]);

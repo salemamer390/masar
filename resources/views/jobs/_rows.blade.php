@@ -18,5 +18,11 @@
         <td>{{ format_number($row['penalty_count']) }}</td>
         <td>{{ format_number($row['penalty_days']) }}</td>
         <td><span class="badge-soft success">{{ format_number($row['annual_balance_remaining']) }} يوم</span></td>
+        <td>{{ format_number($row['approved_request_count']) }}</td>
+        <td>{{ format_number($row['request_days']) }}</td>
+        <td>{{ format_number($row['request_hours']) }}</td>
+        <td>{{ format_number($row['request_additions']) }}</td>
+        <td>{{ format_number($row['request_deductions']) }}</td>
+        <td>{{ $row['request_types'] ?: '—' }}</td>
     </tr>
 @endforeach
