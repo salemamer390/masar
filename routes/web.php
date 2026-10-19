@@ -154,9 +154,15 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::get('/', [AttendanceController::class, 'index'])
             ->middleware('permission:attendance.view')
             ->name('index');
+        Route::get('/export', [AttendanceController::class, 'export'])
+            ->middleware('permission:attendance.view')
+            ->name('export');
         Route::post('/', [AttendanceController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('store');
+        Route::post('/import', [\App\Http\Controllers\AttendanceImportController::class, 'store'])
+            ->middleware('permission:attendance.create')
+            ->name('import');
         Route::put('/{attendance}', [AttendanceController::class, 'update'])
             ->middleware('permission:attendance.edit')
             ->name('update');

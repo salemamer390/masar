@@ -163,8 +163,8 @@
     const cells = row.children;
     if (cells.length < 2) return;
     const insertBefore = cells[cells.length - 4];
-    const day = document.createElement('td'); day.textContent = formatMinutes(overtime.day);
-    const night = document.createElement('td'); night.textContent = formatMinutes(overtime.night);
+    const day = document.createElement('td'); day.textContent = formatMinutes(overtime.day); day.dataset.label = 'الإضافي النهاري';
+    const night = document.createElement('td'); night.textContent = formatMinutes(overtime.night); night.dataset.label = 'الإضافي الليلي';
     row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);
     row.dataset.overtimeColumns = '1';
   };
@@ -180,6 +180,163 @@
     const attendance = event.detail?.attendance;
     if (!attendance?.id) return;
     records[attendance.id] = {day: Number(attendance.day_overtime_minutes || 0), night: Number(attendance.night_overtime_minutes || 0)};
+  });
+})();
+</script>
+@endpush
+@push('styles')
+<style>
+  .attendance-filter-search{min-width:240px;flex:1 1 260px}
+  @media(max-width:600px){.attendance-filter-search{min-width:100%;flex-basis:100%}}
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const filter = document.querySelector('form.filter-bar');
+  if (!filter || filter.querySelector('[name="search"]')) return;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'search-table attendance-filter-search';
+  wrapper.innerHTML = '<i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}">';
+  filter.prepend(wrapper);
+  const exportLink = document.createElement('a');
+  exportLink.className = 'btn btn-outline-success';
+  exportLink.href = '{{ route('attendance.export') }}' + (window.location.search || '');
+  exportLink.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> تصدير CSV';
+  exportLink.title = 'تصدير النتائج الحالية';
+  filter.append(exportLink);
+})();
+</script>
+@endpush
+@push('styles')
+<style>
+</style>
+@endpush
+@push('scripts')
+<script>
+/* quick clock controls removed */
+/*
+  panel.innerHTML = '<select class="form-select" aria-label="اختر الموظف"><option value="">اختر الموظف لتسجيل حركة سريعة</option></select><button type="button" class="btn btn-outline-success" data-clock="in"><i class="bi bi-box-arrow-in-left"></i> تسجيل الحضور الآن</button><button type="button" class="btn btn-outline-primary" data-clock="out"><i class="bi bi-box-arrow-right"></i> تسجيل الانصراف الآن</button>';
+  const select = panel.querySelector('select');
+  employees.forEach((employee) => { const option = document.createElement('option'); option.value = employee.id; option.textContent = `${employee.name} — #${employee.code}`; select.append(option); });
+  filter.before(panel);
+  panel.querySelectorAll('[data-clock]').forEach((button) => button.addEventListener('click', async () => {
+    if (!select.value) { alert('اختر الموظف أولًا.'); return; }
+    button.disabled = true;
+    try {
+      const response = await fetch('/attendance/clock-disabled', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'تعذر تسجيل الحركة.');
+      window.location.reload();
+    } catch (error) { alert(error.message); } finally { button.disabled = false; }
+  }));
+*/
+</script>
+@endpush
+@if(auth()->user()?->hasPermission('attendance.create'))
+@push('styles')
+<style>
+  .attendance-import-trigger{margin-inline-start:auto;white-space:nowrap}
+  .attendance-import-modal .modal-content{border:0;border-radius:18px;overflow:hidden}
+  .attendance-import-modal .modal-header{background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:#fff}
+  .attendance-import-modal .modal-header .btn-close{filter:brightness(0) invert(1)}
+  .attendance-import-modal .import-help{background:#f5f8fc;border:1px solid #e1eaf5;border-radius:12px;padding:12px;line-height:1.8}
+  @media(max-width:600px){.attendance-import-trigger{width:100%;margin-top:8px}}
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const head = document.querySelector('.page-head');
+  if (!head || document.getElementById('attendanceImportModal')) return;
+  const actions = head.querySelector('.page-head-actions') || head.querySelector('.actions') || head;
+  const button = document.createElement('button');
+  button.type = 'button'; button.className = 'btn btn-outline-primary attendance-import-trigger';
+  button.setAttribute('data-bs-toggle', 'modal'); button.setAttribute('data-bs-target', '#attendanceImportModal');
+  button.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> استيراد سجلات';
+  actions.append(button);
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="modal fade attendance-import-modal" id="attendanceImportModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet me-2"></i>استيراد سجلات الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
+        <form method="POST" action="{{ route('attendance.import') }}" enctype="multipart/form-data">
+          @csrf
+          <div class="modal-body">
+            <div class="import-help mb-3">يجب أن يحتوي الملف على عمود <strong>التاريخ</strong> وعمود <strong>كود الموظف</strong> أو <strong>اسم الموظف</strong>. الأعمدة الاختيارية: الحضور، الانصراف، الحالة. يتم تحديث سجل الموظف داخل شركتك فقط.</div>
+            <label class="form-label" for="attendanceImportFile">ملف السجلات</label>
+            <input class="form-control" id="attendanceImportFile" type="file" name="file" accept=".xlsx,.csv,.txt" required>
+            <div class="form-text">الحد الأقصى 20MB. السجلات المكررة لنفس الموظف والتاريخ يتم تحديثها.</div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" type="submit"><i class="bi bi-upload"></i> بدء الاستيراد</button></div>
+        </form>
+      </div></div>
+    </div>`);
+})();
+</script>
+@endpush
+@endif
+@push('styles')
+<style>
+  .attendance-details-trigger{cursor:pointer;transition:background-color .18s ease,transform .18s ease}
+  .attendance-details-trigger:hover{background:#f1f6ff;transform:translateY(-1px)}
+  .attendance-details-trigger td:last-child{cursor:default}
+  .attendance-detail-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .attendance-detail-item{padding:10px 12px;border:1px solid #e4ebf5;border-radius:12px;background:#f8fafd}
+  .attendance-detail-item small{display:block;color:#71809a;margin-bottom:3px}
+  .attendance-detail-item strong{display:block;color:#15294d}
+  @media(max-width:576px){.attendance-detail-list{grid-template-columns:1fr}}
+  @media(max-width:700px){
+    .table-panel .table thead{display:none}
+    .table-panel .table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;border:1px solid #e3eaf4;border-radius:14px;margin-bottom:10px;background:#fff}
+    .table-panel .table tbody td{display:flex;flex-direction:column;gap:2px;border:0;padding:6px 8px;min-width:0}
+    .table-panel .table tbody td::before{font-size:11px;color:#74839c;font-weight:600}
+    .table-panel .table tbody td:nth-child(1)::before{content:'التاريخ'} .table-panel .table tbody td:nth-child(2)::before{content:'الموظف'} .table-panel .table tbody td:nth-child(3)::before{content:'القسم'} .table-panel .table tbody td:nth-child(4)::before{content:'الحضور'} .table-panel .table tbody td:nth-child(5)::before{content:'الانصراف'} .table-panel .table tbody td:nth-child(6)::before{content:'التأخير'} .table-panel .table tbody td:nth-child(7)::before{content:'الإضافي النهاري'} .table-panel .table tbody td:nth-child(8)::before{content:'الإضافي الليلي'} .table-panel .table tbody td:nth-child(9)::before{content:'المصدر'} .table-panel .table tbody td:nth-child(10)::before{content:'الحالة'} .table-panel .table tbody td:nth-child(11)::before{content:'الاعتماد'} .table-panel .table tbody td:nth-child(12)::before{content:'الإجراءات'}
+    .table-panel .table tbody td:nth-child(2),.table-panel .table tbody td:nth-child(11),.table-panel .table tbody td:nth-child(12){grid-column:1/-1}
+    .table-panel .table tbody td[colspan]{display:block;grid-column:1/-1}
+    .table-panel .table .btn{width:auto;display:inline-flex}
+  }
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  const table = document.querySelector('.table-panel table');
+  if (!table) return;
+  @php
+    $attendanceDetails = $attendances->getCollection()->mapWithKeys(function ($attendance) {
+      return [$attendance->id => [
+      'employee' => $attendance->employee?->full_name,
+      'code' => $attendance->employee?->employee_code,
+      'department' => $attendance->employee?->department?->name,
+      'date' => $attendance->attendance_date?->format('d/m/Y'),
+      'check_in' => $attendance->check_in,
+      'check_out' => $attendance->check_out,
+      'late' => $attendance->formatted_late,
+      'early' => sprintf('%02d:%02d', intdiv((int) ($attendance->early_leave_minutes ?? 0), 60), ((int) ($attendance->early_leave_minutes ?? 0)) % 60),
+      'worked' => $attendance->worked_hours,
+      'day_overtime' => sprintf('%02d:%02d', intdiv((int) ($attendance->day_overtime_minutes ?? 0), 60), ((int) ($attendance->day_overtime_minutes ?? 0)) % 60),
+      'night_overtime' => sprintf('%02d:%02d', intdiv((int) ($attendance->night_overtime_minutes ?? 0), 60), ((int) ($attendance->night_overtime_minutes ?? 0)) % 60),
+      'status' => arabic_label($attendance->status),
+      'approval' => $attendance->approval_status === 'Approved' ? 'معتمد' : 'مسودة',
+      'source' => arabic_label($attendance->source ?? 'manual'),
+      ]];
+    })->all();
+  @endphp
+  const details = @json($attendanceDetails);
+  const labels = {employee:'الموظف', code:'كود الموظف', department:'القسم', date:'التاريخ', check_in:'الحضور', check_out:'الانصراف', late:'التأخير', early:'الانصراف المبكر', worked:'ساعات العمل', day_overtime:'الإضافي النهاري', night_overtime:'الإضافي الليلي', status:'الحالة', approval:'الاعتماد', source:'المصدر'};
+  const esc = (value) => String(value ?? '—').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  document.body.insertAdjacentHTML('beforeend', `<div class="offcanvas offcanvas-end" tabindex="-1" id="attendanceDetailsPanel" aria-labelledby="attendanceDetailsTitle"><div class="offcanvas-header"><h5 id="attendanceDetailsTitle">تفاصيل سجل الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body"><div class="attendance-detail-list" id="attendanceDetailList"></div></div></div>`);
+  const panel = document.getElementById('attendanceDetailsPanel');
+  const list = document.getElementById('attendanceDetailList');
+  table.querySelectorAll('tbody tr[data-attendance-id], tbody tr').forEach((row) => {
+    const id = row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1];
+    if (!id || !details[id]) return;
+    row.dataset.attendanceId = id; row.classList.add('attendance-details-trigger');
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('a,button,form,input,select,textarea')) return;
+      list.innerHTML = Object.entries(details[id]).map(([key, value]) => `<div class="attendance-detail-item"><small>${labels[key] || key}</small><strong>${esc(value)}</strong></div>`).join('');
+      bootstrap.Offcanvas.getOrCreateInstance(panel).show();
+    });
   });
 })();
 </script>

@@ -32,8 +32,9 @@
 
     <section class="content">
       @php
-        $persistentAlertMessage = $errors->any() ? $errors->first() : (session('error') ?? session('warning') ?? session('toast'));
-        $persistentAlertType = $errors->any() || session('error') ? 'danger' : (session('warning') ? 'warning' : 'success');
+        $viewErrors = $errors ?? new \Illuminate\Support\MessageBag();
+        $persistentAlertMessage = $viewErrors->any() ? $viewErrors->first() : (session('error') ?? session('warning') ?? session('toast'));
+        $persistentAlertType = $viewErrors->any() || session('error') ? 'danger' : (session('warning') ? 'warning' : 'success');
       @endphp
       @if($persistentAlertMessage && !session('toast'))
         <div class="global-alert global-alert-{{ $persistentAlertType }}" role="alert">
@@ -472,9 +473,9 @@
     });
   @endif
 
-  @if($errors->any())
+  @if(($errors ?? new \Illuminate\Support\MessageBag())->any())
     document.addEventListener('DOMContentLoaded', function() {
-      showToast(@json($errors->first()));
+      showToast(@json(($errors ?? new \Illuminate\Support\MessageBag())->first()));
     });
   @endif
 

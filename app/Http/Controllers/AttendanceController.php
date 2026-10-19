@@ -28,6 +28,12 @@ class AttendanceController extends Controller
         if ($request->filled('to_date')) { $query->whereDate('attendance_date', '<=', $request->to_date); }
         if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
         if ($request->filled('department_id')) { $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id)); }
+        if ($request->filled('search')) {
+            $search = trim($request->string('search')->toString());
+            $query->whereHas('employee', fn ($employee) => $employee
+                ->where('full_name', 'like', "%{$search}%")
+                ->orWhere('employee_code', 'like', "%{$search}%"));
+        }
 
         $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
         $attendances = $query->paginate($perPage)->withQueryString();
@@ -46,6 +52,41 @@ class AttendanceController extends Controller
         $defaultShiftStart = $this->hrSettings->start();
         $defaultShiftEnd = $this->hrSettings->end();
         return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd'));
+    }
+
+    public function export(Request $request)
+    {
+        $query = Attendance::with(['employee.department'])
+            ->orderByDesc('attendance_date')->orderByDesc('id');
+        if ($request->filled('from_date')) $query->whereDate('attendance_date', '>=', $request->date('from_date'));
+        if ($request->filled('to_date')) $query->whereDate('attendance_date', '<=', $request->date('to_date'));
+        if ($request->filled('employee_id')) $query->where('employee_id', $request->integer('employee_id'));
+        if ($request->filled('department_id')) $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->integer('department_id')));
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->whereHas('employee', fn ($q) => $q->where('full_name', 'like', "%{$search}%")->orWhere('employee_code', 'like', "%{$search}%"));
+        }
+        $records = $query->get();
+        $this->decorateOvertimeCollection($records);
+        $filename = 'attendance-' . now()->format('Y-m-d-His') . '.csv';
+
+        return response()->streamDownload(function () use ($records) {
+            $out = fopen('php://output', 'wb');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة', 'الاعتماد'], ',');
+            foreach ($records as $attendance) {
+                fputcsv($out, [
+                    $attendance->attendance_date?->format('d/m/Y'), $attendance->employee?->employee_code,
+                    $attendance->employee?->full_name, $attendance->employee?->department?->name,
+                    $attendance->check_in, $attendance->check_out, $attendance->formatted_late,
+                    sprintf('%02d:%02d', intdiv((int) ($attendance->early_leave_minutes ?? 0), 60), ((int) ($attendance->early_leave_minutes ?? 0)) % 60),
+                    sprintf('%02d:%02d', intdiv((int) ($attendance->day_overtime_minutes ?? 0), 60), ((int) ($attendance->day_overtime_minutes ?? 0)) % 60),
+                    sprintf('%02d:%02d', intdiv((int) ($attendance->night_overtime_minutes ?? 0), 60), ((int) ($attendance->night_overtime_minutes ?? 0)) % 60),
+                    arabic_label($attendance->status), $attendance->approval_status === 'Approved' ? 'معتمد' : 'مسودة',
+                ], ',');
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard)
@@ -74,6 +115,53 @@ class AttendanceController extends Controller
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $fresh])
             : back()->with('toast', 'تم حفظ سجل الحضور كمسودة.');
+    }
+
+    public function clockIn(Request $request, PayrollPeriodGuard $periodGuard)
+    {
+        return $this->clock($request, $periodGuard, 'in');
+    }
+
+    public function clockOut(Request $request, PayrollPeriodGuard $periodGuard)
+    {
+        return $this->clock($request, $periodGuard, 'out');
+    }
+
+    private function clock(Request $request, PayrollPeriodGuard $periodGuard, string $direction)
+    {
+        $validated = $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'attendance_date' => ['nullable', 'date'],
+        ]);
+        $date = $validated['attendance_date'] ?? today()->toDateString();
+        $periodGuard->ensureOpen($date);
+        $employee = Employee::findOrFail($validated['employee_id']);
+        $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'attendance_date' => $date]);
+        if ($direction === 'in' && $attendance->check_in) {
+            abort(422, 'تم تسجيل حضور هذا الموظف بالفعل لهذا اليوم.');
+        }
+        if ($direction === 'out' && !$attendance->check_in) {
+            abort(422, 'يجب تسجيل الحضور أولًا قبل تسجيل الانصراف.');
+        }
+        if ($direction === 'out' && $attendance->check_out) {
+            abort(422, 'تم تسجيل انصراف هذا الموظف بالفعل لهذا اليوم.');
+        }
+        $now = now()->format('H:i');
+        $checkIn = $direction === 'in' ? $now : $attendance->check_in;
+        $checkOut = $direction === 'out' ? $now : $attendance->check_out;
+        $lateMinutes = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->hrSettings->start());
+        $attendance->fill([
+            'check_in' => $checkIn, 'check_out' => $checkOut,
+            'status' => $lateMinutes > 0 ? 'Late' : 'Present',
+            'late_minutes' => $lateMinutes,
+            'early_leave_minutes' => $this->earlyLeaveMinutes($checkOut, $employee->shift_end ?: $this->hrSettings->end()),
+            'worked_hours' => $this->workedHours($checkIn, $checkOut),
+            'source' => 'manual', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
+        ])->save();
+        ActivityLog::record('attendance_clock_'.$direction, 'Attendance clock event recorded.', $attendance, null, $attendance->toArray(), 'attendance');
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => $direction === 'in' ? 'تم تسجيل الحضور.' : 'تم تسجيل الانصراف.', 'attendance' => $attendance->fresh()->load('employee.department')])
+            : back()->with('toast', $direction === 'in' ? 'تم تسجيل الحضور بنجاح.' : 'تم تسجيل الانصراف بنجاح.');
     }
 
     public function approve(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard)
@@ -185,5 +273,10 @@ class AttendanceController extends Controller
         $attendance->setAttribute('day_overtime_minutes', $dayMinutes);
         $attendance->setAttribute('night_overtime_minutes', $nightMinutes);
         $attendance->setAttribute('potential_overtime_minutes', $dayMinutes + $nightMinutes);
+    }
+
+    private function decorateOvertimeCollection($attendances): void
+    {
+        $attendances->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
     }
 }
