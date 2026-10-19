@@ -200,7 +200,7 @@
   wrapper.innerHTML = '<i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}">';
   filter.prepend(wrapper);
   const exportLink = document.createElement('a');
-  exportLink.className = 'btn btn-outline-success';
+  exportLink.className = 'btn btn-outline-success attendance-export-trigger';
   exportLink.href = '{{ route('attendance.export') }}' + (window.location.search || '');
   exportLink.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> تصدير CSV';
   exportLink.title = 'تصدير النتائج الحالية';
@@ -231,6 +231,31 @@
     } catch (error) { alert(error.message); } finally { button.disabled = false; }
   }));
 */
+</script>
+@endpush
+@push('styles')
+<style>
+  .attendance-page-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-inline-start:auto}
+  .attendance-page-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:10px;white-space:nowrap;font-size:13px}
+  @media(max-width:700px){.attendance-page-actions{width:100%;margin-top:10px;justify-content:flex-start;overflow-x:auto}.attendance-page-actions .btn{min-height:36px;padding:7px 10px;font-size:12px;flex:0 0 auto}.page-head{flex-wrap:wrap}}
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  setTimeout(() => {
+    const head = document.querySelector('.page-head');
+    if (!head || head.querySelector('.attendance-page-actions')) return;
+    const actions = document.createElement('div');
+    actions.className = 'attendance-page-actions';
+    const title = head.firstElementChild;
+    const existing = [...head.children].filter((child) => child !== title);
+    existing.forEach((child) => actions.append(child));
+    const exportLink = document.querySelector('.attendance-export-trigger');
+    if (exportLink) actions.prepend(exportLink);
+    if (actions.children.length) head.append(actions);
+  }, 0);
+})();
 </script>
 @endpush
 @if(auth()->user()?->hasPermission('attendance.create'))
