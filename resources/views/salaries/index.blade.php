@@ -64,8 +64,8 @@
     </div>
 
     <div class="salary-main-number">
-      {{ format_money($s->salary_input) }} <small>ج.م</small>
-      <span>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</span>
+      {{ format_money($s->net_salary) }} <small>ج.م</small>
+      <span>الراتب الصافي</span>
     </div>
 
     <div class="salary-compact-grid salary-card-key-metrics">
@@ -104,7 +104,7 @@
     </div>
     <div class="modal-body">
       <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-cash-stack"></i><span>الراتب والبدلات</span></div><div class="salary-detail-grid">
-        <div><span>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</span><strong>{{ format_money($s->salary_input) }} ج.م</strong></div>
+        <div><span>الراتب الصافي</span><strong>{{ format_money($s->net_salary) }} ج.م</strong></div>
         <div><span>الراتب الإجمالي</span><strong>{{ format_money($s->gross_salary) }} ج.م</strong></div>
         <div><span>الأجر الأساسي</span><strong>{{ format_money($s->basic_salary) }} ج.م</strong></div>
         <div><span>إجمالي البدلات ({{ format_number($s->allowance_limit_pct) }}%)</span><strong>{{ format_money($s->allowance_limit) }} ج.م</strong></div>

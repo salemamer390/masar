@@ -323,6 +323,11 @@ class EmployeeController extends Controller
         $hadTerminationDetails = filled($employee->termination_type) || filled($employee->termination_date);
         $this->ensureOwnedEmployeeReferences($validated, $employee);
         $validated = $this->applyTerminationDetails($request, $validated, $employee);
+        $oldStatusName = EmployeeStatus::find($employee->status_id)?->name;
+        $newStatusName = EmployeeStatus::find($validated['status_id'] ?? $employee->status_id)?->name;
+        if ($this->isTerminalEmployeeStatus($oldStatusName) && ! $this->isInactiveEmployeeStatus($newStatusName)) {
+            $this->ensureReactivationCapacity($employee);
+        }
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
         if ($salaryChanged) {
             $validated = $this->applyNationalIdData($validated);
@@ -435,6 +440,42 @@ class EmployeeController extends Controller
         if (!$subscription || !$subscription->plan) return;
         $count = Employee::where('company_id', $companyId)->whereHas('status', fn ($query) => $query->whereNotIn('name', ['منتهي الخدمة','موقوف','قيد التعيين','Terminated','Suspended','Pending']))->count();
         if ($count >= $subscription->plan->employee_limit) abort(422, "لا يمكن إضافة موظف جديد: باقتك تسمح حتى {$subscription->plan->employee_limit} موظفًا، والمستخدمون حاليًا {$count}.");
+    }
+
+    private function ensureReactivationCapacity(Employee $employee): void
+    {
+        $subscription = CompanySubscription::with('plan')
+            ->where('company_id', $employee->company_id)
+            ->whereIn('status', ['active', 'trial'])
+            ->latest('id')
+            ->first();
+
+        if (! $subscription?->plan) return;
+
+        $count = Employee::where('company_id', $employee->company_id)
+            ->whereHas('status', fn ($query) => $query->whereNotIn('name', $this->inactiveEmployeeStatuses()))
+            ->count();
+
+        if ($count >= (int) $subscription->plan->employee_limit) {
+            throw ValidationException::withMessages([
+                'status_id' => "لا يمكن إعادة تنشيط الموظف: باقة الشركة ممتلئة ({$count} من {$subscription->plan->employee_limit} موظف). يرجى ترقية الباقة أو إنهاء موظف آخر أولًا.",
+            ]);
+        }
+    }
+
+    private function inactiveEmployeeStatuses(): array
+    {
+        return ['منتهي الخدمة', 'منتهى الخدمة', 'موقوف', 'قيد التعيين', 'Terminated', 'Suspended', 'Pending'];
+    }
+
+    private function isInactiveEmployeeStatus(?string $statusName): bool
+    {
+        return $statusName !== null && in_array($statusName, $this->inactiveEmployeeStatuses(), true);
+    }
+
+    private function isTerminalEmployeeStatus(?string $statusName): bool
+    {
+        return $statusName !== null && in_array($statusName, ['منتهي الخدمة', 'منتهى الخدمة', 'Terminated', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true);
     }
 
     /**

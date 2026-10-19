@@ -51,7 +51,16 @@ class EmployeeImportService
         'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code']],
         'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name']],
         'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'national id', 'national_id', 'nid']],
-        'insurance_number' => ['الرقم التأميني', ['رقم التأمين', 'الرقم التامينى', 'رقم التأمين الاجتماعي', 'insurance number', 'insurance_number']],
+        'insurance_number' => ['الرقم التأميني', [
+            // Arabic variants used by personnel/insurance spreadsheets.
+            'رقم التأمين', 'الرقم التامينى', 'رقم التأمين الاجتماعي', 'رقم التأمينات',
+            'الرقم التأميني الاجتماعي', 'رقم التأمينات الاجتماعية', 'الرقم التأميني للتأمينات',
+            // English variants (including the labels produced by common HR exports).
+            'insurance number', 'insurance_number', 'insurance no', 'insurance no.',
+            'insurance id', 'social insurance number', 'social insurance id',
+            'social security number', 'social security id', 'insurance registration number',
+            'ins no', 'ins number', 'ins id',
+        ]],
         'phone' => ['رقم الهاتف', ['الهاتف', 'الموبايل', 'رقم الموبايل', 'التليفون', 'رقم التليفون', 'phone', 'mobile']],
         'email' => ['البريد الإلكتروني', ['البريد', 'الايميل', 'الإيميل', 'email', 'e-mail']],
         'birth_date' => ['تاريخ الميلاد', ['الميلاد', 'birth date', 'birth_date', 'date of birth', 'dob']],

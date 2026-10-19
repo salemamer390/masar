@@ -85,6 +85,19 @@ class EmployeeImportMappingTest extends TestCase
         $this->assertSame([], $this->invoke('sanitizeMappings', 'garbage'));
     }
 
+    public function test_common_insurance_number_headers_are_mapped_automatically(): void
+    {
+        $aliases = $this->invoke('aliasMap');
+        [$headerRow, $map] = $this->invoke('detectHeader', [
+            1 => [0 => 'Full Name', 1 => 'Social Insurance Number'],
+            2 => [0 => 'Ahmed Ali', 1 => '123456789'],
+        ], $aliases, []);
+
+        $this->assertSame(1, $headerRow);
+        $this->assertSame('full_name', $map[0]);
+        $this->assertSame('insurance_number', $map[1]);
+    }
+
     public function test_template_headers_are_all_recognised(): void
     {
         $aliases = $this->invoke('aliasMap');
