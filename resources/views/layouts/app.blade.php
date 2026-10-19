@@ -483,6 +483,43 @@
   })();
       /* Company-isolation diagnostic removed.
   })(); */
+
+  // Unified live search for list screens. The server-side filter remains the
+  // source of truth; this only narrows the already-rendered, company-scoped
+  // rows/cards while the user types, matching the subscriptions screen UX.
+  (() => {
+    const containers = '.table-panel, .salary-layout, .documents-card-grid';
+    const rowsFor = (container) => [...container.querySelectorAll('tbody tr, .salary-card, .doc-card')]
+      .filter((item) => !item.querySelector('[colspan]'));
+    const after = (form, element) => Boolean(form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    document.querySelectorAll('form.filter-bar input[name="search"], form.salary-filter-bar input[name="search"]').forEach((input) => {
+      const form = input.form;
+      const allContainers = [...document.querySelectorAll(containers)];
+      const container = allContainers.find((candidate) => after(form, candidate))
+        || allContainers.find((candidate) => after(candidate, form));
+      if (!form || !container) return;
+      const rows = rowsFor(container);
+      if (!rows.length) return;
+      const empty = document.createElement('div');
+      empty.className = 'live-filter-empty text-muted text-center py-4';
+      empty.textContent = 'لا توجد نتائج مطابقة.';
+      empty.hidden = true;
+      container.appendChild(empty);
+      const apply = () => {
+        const query = input.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        rows.forEach((row) => {
+          const match = !query || row.textContent.toLocaleLowerCase().includes(query);
+          row.hidden = !match;
+          if (match) visible++;
+        });
+        empty.hidden = visible !== 0;
+      };
+      input.addEventListener('input', apply);
+      apply();
+    });
+  })();
 </script>
 
 @stack('scripts')

@@ -5250,3 +5250,53 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
 /* MASAR HR brand assets */
 .app-shell .brand-logo{background:#fff;padding:4px;overflow:hidden}
 .app-shell .brand-logo img{display:block;width:100%;height:100%;object-fit:contain}
+
+/* Payroll detail cards: used on phones while the full table remains available on desktop. */
+.payroll-mobile-cards{display:none}
+.payroll-mobile-card{width:100%;border:1px solid var(--border,#dfe8f3);border-radius:14px;background:#fff;color:var(--ink,#152238);padding:14px;text-align:right;box-shadow:0 4px 14px rgba(24,54,94,.05);cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.payroll-mobile-card:hover,.payroll-mobile-card:focus-visible{border-color:#9ec5f8;box-shadow:0 8px 20px rgba(24,105,224,.1);transform:translateY(-1px);outline:none}
+.payroll-mobile-card-head,.payroll-mobile-card-values,.payroll-mobile-card-footer{display:flex;align-items:center}
+.payroll-mobile-card-head{justify-content:space-between;gap:10px;padding-bottom:11px;border-bottom:1px solid #eef3f8}
+.payroll-mobile-card-head>span:first-child{min-width:0}.payroll-mobile-card-head strong,.payroll-mobile-card-head small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.payroll-mobile-card-head strong{font-size:14px}.payroll-mobile-card-head small{color:#71819a;font-size:11px;margin-top:3px}
+.payroll-mobile-card-values{gap:8px;padding:13px 0}.payroll-mobile-card-values>span{flex:1;min-width:0;padding:8px;border-radius:9px;background:#f7faff}.payroll-mobile-card-values small,.payroll-mobile-card-values b{display:block}.payroll-mobile-card-values small{color:#71819a;font-size:10px}.payroll-mobile-card-values b{font-size:12px;margin-top:3px;white-space:nowrap}
+.payroll-mobile-card-footer{justify-content:space-between;color:#6c7d96;font-size:10px}.payroll-mobile-card-footer i{color:#1769e0;font-size:14px}
+.payroll-record-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin-bottom:16px;border-radius:11px;background:#eff8f2;color:#176b45}.payroll-record-summary span{font-size:12px}.payroll-record-summary strong{font-size:20px}
+.payroll-record-details-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.payroll-record-details-grid>div{padding:11px;border:1px solid #edf1f6;border-radius:10px}.payroll-record-details-grid span,.payroll-record-details-grid b{display:block}.payroll-record-details-grid span{font-size:10px;color:#74839a}.payroll-record-details-grid b{font-size:12px;margin-top:4px}
+@media(max-width:767px){
+  body:has(.payroll-mobile-cards) .panel.table-panel .table-responsive{display:none}
+  .payroll-mobile-cards{display:grid;gap:10px}
+  .payroll-record-details-grid{grid-template-columns:1fr}
+}
+
+/* Keep mobile actions compact: controls size to their label instead of stretching across the page. */
+@media(max-width:767px){
+  .page-head>div:last-child,
+  .page-head>.d-flex{width:auto;max-width:100%;}
+  .page-head .btn,
+  .page-head>div:last-child .btn,
+  .page-head>.d-flex .btn,
+  .panel-head .btn,
+  .panel-head a.btn,
+  .panel-head>form,
+  .filter-bar>.btn,
+  .filter-bar>a.btn,
+  .documents-toolbar>.btn,
+  .documents-toolbar>a.btn,
+  .modal-footer .btn,
+  .doc-card-actions .btn,
+  .btn-group .btn,
+  .btn.w-100{
+    width:auto!important;
+    max-width:100%;
+    flex:0 0 auto!important;
+  }
+  .page-head .btn,
+  .panel-head .btn,
+  .filter-bar>.btn,
+  .documents-toolbar>.btn,
+  .modal-footer .btn{
+    min-height:34px;
+    padding:7px 11px;
+    font-size:11px;
+  }
+}

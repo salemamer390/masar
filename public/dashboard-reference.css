@@ -73,15 +73,15 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 
 @media(max-width:520px){
   .dashboard-command-bar--reference{
-    grid-template-columns:repeat(3,max-content)!important;
-    justify-content:start!important;
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    justify-content:stretch!important;
     align-items:start!important;
   }
   .reference-kpi-grid--six{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
   .dashboard-command-bar--reference>*{
-    width:max-content!important;
-    min-width:72px!important;
-    max-width:92px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:none!important;
     min-height:62px!important;
     padding:7px 4px!important;
     flex-direction:column!important;
