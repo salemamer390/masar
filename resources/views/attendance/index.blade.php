@@ -13,6 +13,7 @@
 @push('scripts')
 <script>
   const attendanceBaseUrl = @json(url('/attendance'));
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const attendanceTableBody = document.querySelector('.table-panel table tbody');
   const escapeAttendanceHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const attendanceStatus = (status) => ({
@@ -132,9 +133,46 @@
   if (employeeSelect) {
     const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
     const byId = new Map(employees.map((employee) => [String(employee.id), employee]));
+    const employeeSearch = document.createElement('input');
+    employeeSearch.type = 'search'; employeeSearch.className = 'attendance-employee-search';
+    employeeSearch.placeholder = 'ابحث باسم الموظف أو الكود';
+    employeeSearch.setAttribute('aria-label', 'البحث عن الموظف بالاسم أو الكود');
+    const employeeSearchBox = document.createElement('div');
+    employeeSearchBox.className = 'search-table attendance-employee-search-box mb-2';
+    employeeSearchBox.innerHTML = '<i class="bi bi-search"></i>';
+    employeeSearchBox.append(employeeSearch);
+    employeeSelect.parentElement?.insertBefore(employeeSearchBox, employeeSelect);
+    employeeSelect.classList.remove('form-select');
+    employeeSelect.hidden = true;
+    employeeSelect.removeAttribute('required');
+    const suggestions = document.createElement('div');
+    suggestions.className = 'attendance-employee-suggestions';
+    employeeSearchBox.after(suggestions);
     [...employeeSelect.options].forEach((option) => {
       const employee = byId.get(String(option.value));
       if (employee) option.textContent = `${employee.name} — #${employee.code}`;
+    });
+    const renderSuggestions = () => {
+      const query = employeeSearch.value.trim().toLocaleLowerCase();
+      const matches = employees.filter((employee) => !query || `${employee.name} ${employee.code}`.toLocaleLowerCase().includes(query)).slice(0, 8);
+      suggestions.innerHTML = matches.map((employee) => `<button type="button" class="attendance-employee-suggestion" data-employee-id="${employee.id}"><span>${employee.name}</span><small>#${employee.code}</small></button>`).join('');
+      suggestions.hidden = matches.length === 0;
+      suggestions.querySelectorAll('[data-employee-id]').forEach((option) => option.addEventListener('click', () => {
+        const employee = byId.get(String(option.dataset.employeeId));
+        if (!employee) return;
+        employeeSelect.value = employee.id;
+        employeeSearch.value = `${employee.name} — #${employee.code}`;
+        suggestions.hidden = true;
+      }));
+    };
+    employeeSearch.addEventListener('input', renderSuggestions);
+    employeeSearch.addEventListener('focus', renderSuggestions);
+    employeeSelect.addEventListener('change', () => {
+      const employee = byId.get(String(employeeSelect.value));
+      if (employee) employeeSearch.value = `${employee.name} — #${employee.code}`;
+    });
+    document.addEventListener('click', (event) => {
+      if (!employeeSearchBox.contains(event.target) && !suggestions.contains(event.target)) suggestions.hidden = true;
     });
     employeeSelect.title = 'يمكنك البحث بالاسم أو كود الموظف';
   }
@@ -405,5 +443,15 @@
   });
 })();
 </script>
+@endpush
+@push('styles')
+<style>
+  .attendance-employee-search-box{width:100%;margin-bottom:8px}
+  .attendance-employee-search-box input{width:100%;border:0;outline:0;background:transparent}
+  .attendance-employee-suggestions{position:relative;z-index:1060;display:flex;flex-direction:column;max-height:220px;overflow-y:auto;margin-top:-6px;margin-bottom:8px;border:1px solid #dbe5f2;border-radius:10px;background:#fff;box-shadow:0 8px 22px rgba(20,45,80,.12)}
+  .attendance-employee-suggestions[hidden]{display:none}
+  .attendance-employee-suggestion{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;border:0;border-bottom:1px solid #edf1f6;background:#fff;text-align:start;color:#18345d}
+  .attendance-employee-suggestion:last-child{border-bottom:0}.attendance-employee-suggestion:hover{background:#eef5ff}.attendance-employee-suggestion small{color:#6b82a3}
+</style>
 @endpush
 @endsection
