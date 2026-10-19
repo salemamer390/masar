@@ -71,6 +71,82 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 
 @push('scripts')
 <script>
+  const payrollDetailsTable = document.querySelectorAll('.panel.table-panel')[1]?.querySelector('table');
+  if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-serial-column]')) {
+    const serialHeader = document.createElement('th');
+    serialHeader.dataset.serialColumn = 'true';
+    serialHeader.textContent = 'م';
+    payrollDetailsTable.tHead?.rows[0]?.prepend(serialHeader);
+    [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
+      const serialCell = document.createElement('td');
+      serialCell.textContent = String(index + 1);
+      serialCell.className = 'text-muted fw-semibold';
+      row.prepend(serialCell);
+    });
+  }
+  if (payrollDetailsTable) {
+    const employeeCodes = @json($records->map(fn ($record) => $record->employee?->employee_code)->values());
+    const netSalaries = @json($records->map(fn ($record) => (float) $record->net_salary)->values());
+    [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
+      const employeeCell = row.cells[1];
+      if (employeeCell && employeeCodes[index] && !employeeCell.querySelector('[data-employee-code]')) {
+        const code = document.createElement('small');
+        code.dataset.employeeCode = 'true';
+        code.className = 'd-block text-muted';
+        code.textContent = `كود الموظف: ${employeeCodes[index]}`;
+        employeeCell.append(code);
+      }
+      const salaryCell = row.cells[2];
+      const netCell = row.cells[9];
+      if (salaryCell && netCell) {
+        const net = salaryCell.querySelector('[data-net-salary]') || document.createElement('small');
+        net.dataset.netSalary = 'true';
+        net.className = 'd-block text-muted';
+        net.textContent = `الراتب الصافي: ${netCell.textContent.trim()}`;
+        const oldAgreed = [...salaryCell.querySelectorAll('small')].find((item) => item.textContent.includes('المتفق عليه'));
+        if (oldAgreed) oldAgreed.replaceWith(net); else if (!salaryCell.querySelector('[data-net-salary]')) salaryCell.append(net);
+      }
+    });
+    document.querySelectorAll('.payroll-mobile-card').forEach((card, index) => {
+      const title = card.querySelector('strong');
+      if (title && employeeCodes[index] && !card.querySelector('[data-employee-code]')) {
+        const code = document.createElement('small');
+        code.dataset.employeeCode = 'true';
+        code.textContent = `كود الموظف: ${employeeCodes[index]}`;
+        title.parentElement.append(code);
+      }
+    });
+  }
+  const payrollDetailsWrap = payrollDetailsTable?.closest('.table-responsive');
+  if (payrollDetailsTable && payrollDetailsWrap && !payrollDetailsWrap.querySelector('.payroll-record-filter')) {
+    const filter = document.createElement('div');
+    filter.className = 'payroll-record-filter d-flex align-items-center gap-2 mb-3';
+    filter.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;';
+    filter.innerHTML = '<label class="form-label mb-0" for="payrollRecordSearch"><i class="bi bi-search"></i> بحث في الموظفين</label><input id="payrollRecordSearch" type="search" class="form-control" placeholder="اكتب اسم الموظف أو الكود أو القسم أو الحالة" autocomplete="off"><span class="text-muted small" data-payroll-filter-count></span>';
+    payrollDetailsWrap.prepend(filter);
+    const input = filter.querySelector('input');
+    input.style.cssText = 'max-width:360px;min-width:220px;border-radius:10px;border:1px solid #cbd5e1;padding:.55rem .75rem;';
+    const count = filter.querySelector('[data-payroll-filter-count]');
+    const rows = [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]);
+    const empty = document.createElement('div');
+    empty.className = 'text-center text-muted py-4 payroll-filter-empty';
+    empty.textContent = 'لا توجد نتائج مطابقة.';
+    empty.hidden = true;
+    payrollDetailsWrap.append(empty);
+    const applyPayrollFilter = () => {
+      const query = input.value.trim().toLocaleLowerCase('ar-EG');
+      let visible = 0;
+      rows.forEach((row) => {
+        const match = !query || row.textContent.toLocaleLowerCase('ar-EG').includes(query);
+        row.hidden = !match;
+        if (match) visible++;
+      });
+      count.textContent = query ? `${visible} من ${rows.length}` : `${rows.length} موظف`;
+      empty.hidden = visible !== 0 || rows.length === 0;
+    };
+    input.addEventListener('input', applyPayrollFilter);
+    applyPayrollFilter();
+  }
   // Payroll inputs are the only payroll action moved in this stage. Generate,
   // approve, lock, and pay remain full server transitions by design.
   const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
