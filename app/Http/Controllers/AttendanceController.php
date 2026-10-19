@@ -29,7 +29,8 @@ class AttendanceController extends Controller
         if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
         if ($request->filled('department_id')) { $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id)); }
 
-        $attendances = $query->paginate(25)->withQueryString();
+        $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
+        $attendances = $query->paginate($perPage)->withQueryString();
         $todaySummary = $this->dashboard->attendance($request->user(), $today);
         $presentToday = $todaySummary['counts']['present'];
         $absentToday = $todaySummary['counts']['absent'];

@@ -19,7 +19,7 @@ class MovementController extends Controller
             ->when($request->filled('movement_type_id'), fn ($q) => $q->where('movement_type_id', $request->movement_type_id))
             ->when($request->filled('from_date'), fn ($q) => $q->whereDate('movement_date', '>=', $request->from_date))
             ->when($request->filled('to_date'), fn ($q) => $q->whereDate('movement_date', '<=', $request->to_date))
-            ->orderByDesc('movement_date')->paginate(25)->withQueryString();
+            ->orderByDesc('movement_date')->paginate(in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25)->withQueryString();
         $employees = Employee::orderBy('full_name')->get();
         $movementTypes = MovementType::all();
         $departments = Department::where('is_active', 1)->get();

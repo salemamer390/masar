@@ -43,7 +43,8 @@ class HrRequestController extends Controller
             });
         }
 
-        $requests = $query->paginate(20)->withQueryString();
+        $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
+        $requests = $query->paginate($perPage)->withQueryString();
         $selectedRequest = null;
         if ($request->filled('request')) {
             $selectedRequest = HrRequest::query()

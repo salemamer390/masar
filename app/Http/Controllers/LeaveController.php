@@ -33,7 +33,8 @@ class LeaveController extends Controller
         if ($request->filled('leave_type_id')) $query->where('leave_type_id', $request->leave_type_id);
         if ($request->filled('from_date')) $query->whereDate('end_date', '>=', $request->from_date);
         if ($request->filled('to_date')) $query->whereDate('start_date', '<=', $request->to_date);
-        $leaves = $query->paginate(20)->withQueryString();
+        $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
+        $leaves = $query->paginate($perPage)->withQueryString();
         $pendingLeaves = Leave::whereIn('status', ['Pending', 'Manager Approved'])->count();
         $approvedThisMonth = Leave::where('status', 'Approved')->whereMonth('start_date', now()->month)->whereYear('start_date', now()->year)->count();
         $totalDays = Leave::where('status', 'Approved')->sum('days');

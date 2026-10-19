@@ -20,7 +20,7 @@ class PenaltyController extends Controller
             ->when($request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $request->from_date))
             ->when($request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $request->to_date))
             ->orderByDesc('penalty_date')->orderByDesc('id')
-            ->paginate(25)->withQueryString();
+            ->paginate(in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25)->withQueryString();
 
         $employees = Employee::orderBy('full_name')->get();
         $penaltyTypes = PenaltyType::where('is_active', 1)->get();

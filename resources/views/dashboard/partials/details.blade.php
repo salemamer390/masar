@@ -8,4 +8,4 @@
 @elseif($type === 'requests')<tr><td>{{ $item['title'] }}</td><td>{{ $item['type_label'] }}</td><td><span class="badge-soft {{ $item['status_class'] }}">{{ $item['status_label'] }}</span></td></tr>
 @else<tr><td>{{ $item->employee?->full_name }}</td><td>{{ $item->leaveType?->name }}</td><td>{{ $item->status === 'Manager Approved' ? 'بانتظار HR' : 'بانتظار المدير' }}</td></tr>@endif
 @empty<tr><td colspan="3" class="text-center text-muted py-4">لا توجد بيانات.</td></tr>@endforelse</tbody></table></div>
-@if($items instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator)<div class="mt-3">{{ $items->links() }}</div>@endif
+@if($items instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator)<x-pagination-controls :paginator="$items" :default="15" />@endif

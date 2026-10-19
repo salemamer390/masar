@@ -120,7 +120,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         </table>
     </div>
 </div>
-@if($requests->hasPages())<div class="d-flex justify-content-center mt-3">{{ $requests->links() }}</div>@endif
+<x-pagination-controls :paginator="$requests" />
 
 @if(auth()->user()?->hasPermission('requests.create'))
 <div class="modal fade" id="requestCreateModal" tabindex="-1" aria-labelledby="requestCreateTitle" aria-hidden="true">

@@ -28,7 +28,8 @@ class DocumentController extends Controller
             $query->where('status', $request->status);
         }
 
-        $documents = $query->paginate(20)->withQueryString();
+        $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
+        $documents = $query->paginate($perPage)->withQueryString();
         return view('documents.index', compact('documents'));
     }
 
