@@ -3311,6 +3311,68 @@ button,
 }
 .pagination {
   gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.pagination nav {
+  max-width: 100%;
+}
+.pagination svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  display: block;
+}
+/* Laravel's default paginator uses Tailwind utility classes, while this
+   project uses Bootstrap-style CSS. Normalize its navigation so the mobile
+   and desktop blocks do not render together and SVG arrows stay compact. */
+nav[role="navigation"] > div:first-child {
+  display: none !important;
+}
+nav[role="navigation"] > div:last-child {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+}
+nav[role="navigation"] svg {
+  width: 16px !important;
+  height: 16px !important;
+  max-width: 16px !important;
+  display: block;
+}
+nav[role="navigation"] a,
+nav[role="navigation"] span[aria-current="page"] > span,
+nav[role="navigation"] span[aria-disabled="true"] > span {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 7px 10px !important;
+  line-height: 1;
+  font-size: 11px;
+  border: 1px solid var(--border, #dfe7f1);
+  border-radius: 8px;
+  background: #fff;
+  color: #1769e0;
+  text-decoration: none;
+}
+nav[role="navigation"] span[aria-current="page"] > span {
+  background: #eaf2ff;
+  font-weight: 700;
+}
+.pagination a,
+.pagination span > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 34px;
+  line-height: 1;
 }
 .page-link {
   border-radius: 8px !important;
