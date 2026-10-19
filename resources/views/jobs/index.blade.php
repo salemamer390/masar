@@ -28,11 +28,10 @@
 .monthly-summary-table { --summary-blue:#eaf3ff; --summary-orange:#fff4df; --summary-green:#eafaf1; --summary-red:#fff0f1; --summary-purple:#f3edff; --summary-cyan:#e8f7ff; }
 .monthly-summary-table thead tr:first-child th { font-weight:800; border-bottom:0; }
 .monthly-summary-table thead tr:first-child th:nth-child(1), .monthly-summary-table thead tr:nth-child(2) th:nth-child(-n+3), .monthly-summary-table tbody td:nth-child(-n+3) { background:var(--summary-blue); }
-.monthly-summary-table thead tr:first-child th:nth-child(2), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+4):nth-child(-n+7), .monthly-summary-table tbody td:nth-child(n+4):nth-child(-n+7) { background:var(--summary-orange); }
-.monthly-summary-table thead tr:first-child th:nth-child(3), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+8):nth-child(-n+14), .monthly-summary-table tbody td:nth-child(n+8):nth-child(-n+14) { background:var(--summary-green); }
-.monthly-summary-table thead tr:first-child th:nth-child(4), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+15):nth-child(-n+16), .monthly-summary-table tbody td:nth-child(n+15):nth-child(-n+16) { background:var(--summary-red); }
-.monthly-summary-table thead tr:first-child th:nth-child(5), .monthly-summary-table thead tr:nth-child(2) th:nth-child(17), .monthly-summary-table tbody td:nth-child(17) { background:var(--summary-purple); }
-.monthly-summary-table thead tr:first-child th:nth-child(6), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+18):nth-child(-n+23), .monthly-summary-table tbody td:nth-child(n+18):nth-child(-n+23) { background:var(--summary-cyan); }
+.monthly-summary-table thead tr:first-child th:nth-child(2), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+4):nth-child(-n+10), .monthly-summary-table tbody td:nth-child(n+4):nth-child(-n+10) { background:var(--summary-orange); }
+.monthly-summary-table thead tr:first-child th:nth-child(3), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+11):nth-child(-n+18), .monthly-summary-table tbody td:nth-child(n+11):nth-child(-n+18) { background:var(--summary-green); }
+.monthly-summary-table thead tr:first-child th:nth-child(4), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+19):nth-child(-n+20), .monthly-summary-table tbody td:nth-child(n+19):nth-child(-n+20) { background:var(--summary-red); }
+.monthly-summary-table thead tr:first-child th:nth-child(5), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+21):nth-child(-n+23), .monthly-summary-table tbody td:nth-child(n+21):nth-child(-n+23) { background:var(--summary-cyan); }
 .monthly-summary-table tbody td { border-color:rgba(30,50,80,.08); }
 .monthly-summary-table thead th, .monthly-summary-table tbody td { text-align:center; vertical-align:middle; white-space:nowrap; }
 .monthly-summary-table { min-width:1900px; }
@@ -49,7 +48,7 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
     if (!response.ok) return;
     const data = await response.json();
     if (labels.length === 17) labels.push('عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات');
-    const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','penalty_count','penalty_days','approved_request_count','request_days','request_hours','request_additions','request_deductions','request_types','annual_balance_remaining'];
+    const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','early_leave_minutes','day_overtime_minutes','night_overtime_minutes','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','annual_balance_remaining','penalty_count','penalty_days','advance_request_count','permission_request_count','mission_request_count'];
     const labels = ['الكود','الموظف','القسم','الحضور','حضور متأخر','دقائق التأخير','الغياب','سنوية','عارضة','مرضية','بدون أجر','أمومة','أخرى','إجمالي الإجازات','الجزاءات','أيام الخصم','الرصيد المتبقي'];
     document.getElementById('summaryHistoryBody').innerHTML = '<p class="text-muted">رقم الشهر: '+data.month+'</p><div class="table-responsive"><table class="table table-sm monthly-summary-table"><thead><tr>'+labels.map(label => '<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+data.rows.map(row => '<tr>'+keys.map(key => '<td>'+String(row[key] ?? '—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     document.getElementById('summaryHistoryExport').href = data.export_url;
@@ -60,6 +59,22 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
 const summaryTable = document.querySelector('.monthly-summary-table');
 if (summaryTable) {
     const headRows = summaryTable.tHead?.rows;
+    const summaryData = @json($summaryRowData);
+    if (headRows?.length >= 2) {
+        headRows[0].innerHTML = '<th colspan="3">الموظف</th><th colspan="7">الحضور والغياب</th><th colspan="8">الإجازات المعتمدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th colspan="3">الطلبات المعتمدة</th>';
+        headRows[1].innerHTML = ['الكود','اسم الموظف','القسم','أيام الحضور','منها حضور متأخر','دقائق التأخير','أيام الغياب','دقائق الانصراف المبكر','إضافي نهاري','إضافي ليلي','سنوية','عارضة','مرضية','بدون أجر','أمومة','أنواع أخرى','إجمالي الإجازات','رصيد الإجازة السنوية المتبقي','عدد الجزاءات','أيام خصم الجزاءات','سلفة','إذن','مأمورية'].map(label => `<th>${label}</th>`).join('');
+        summaryTable.tBodies?.[0]?.querySelectorAll('tr').forEach(row => {
+            if (row.cells.length < 23) return;
+            const data = summaryData[row.cells[0]?.textContent?.trim()] || {};
+            const cells = Array.from(row.cells);
+            const replacement = [...cells.slice(0, 7), ...[
+                data.early_leave_minutes ?? 0, data.day_overtime_minutes ?? 0, data.night_overtime_minutes ?? 0
+            ].map(value => { const cell = document.createElement('td'); cell.textContent = value; return cell; }), ...cells.slice(7, 14), cells[16], cells[14], cells[15], ...[
+                data.advance_request_count ?? 0, data.permission_request_count ?? 0, data.mission_request_count ?? 0
+            ].map(value => { const cell = document.createElement('td'); cell.textContent = value; return cell; })];
+            row.replaceChildren(...replacement);
+        });
+    }
     // The leave section contains seven detail columns; keep its group header aligned.
     if (headRows?.length >= 1 && headRows[0].cells.length >= 3) headRows[0].cells[2].colSpan = 7;
     const requestLabels = ['عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات'];

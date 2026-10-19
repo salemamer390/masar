@@ -28,7 +28,7 @@ class JobDataController extends Controller
 
         $employeeQuery = Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
-                'branch_id', 'employment_type_id', 'hire_date', 'birth_date',
+                'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
                 'leave_entitlement_category', 'manual_annual_balance',
             ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
             ->when($request->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
@@ -42,6 +42,15 @@ class JobDataController extends Controller
         $employees = $employeeQuery->paginate($perPage)->withQueryString();
 
         $monthlyRows = $this->buildMonthlyRows($employees->getCollection(), $month);
+        $summaryRowData = $monthlyRows->mapWithKeys(fn (array $row) => [$row['employee']->employee_code => [
+            'early_leave_minutes' => $row['early_leave_minutes'],
+            'day_overtime_minutes' => $row['day_overtime_minutes'],
+            'night_overtime_minutes' => $row['night_overtime_minutes'],
+            'annual_balance_remaining' => $row['annual_balance_remaining'],
+            'advance_request_count' => $row['advance_request_count'],
+            'permission_request_count' => $row['permission_request_count'],
+            'mission_request_count' => $row['mission_request_count'],
+        ]])->all();
         $summaryHistory = MonthlySummarySnapshot::orderByDesc('summary_month')->get();
 
         $totalJobs = Job::where('is_active', 1)->count();
@@ -56,7 +65,7 @@ class JobDataController extends Controller
         $employmentTypes = EmploymentType::all();
 
         return view('jobs.index', compact(
-            'employees', 'monthlyRows', 'month', 'summaryHistory',
+            'employees', 'monthlyRows', 'summaryRowData', 'month', 'summaryHistory',
             'totalJobs',
             'totalDepartments',
             'totalBranches',
@@ -77,7 +86,7 @@ class JobDataController extends Controller
             : now()->startOfMonth();
         $employees = Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
-                'branch_id', 'employment_type_id', 'hire_date', 'birth_date',
+                'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
                 'leave_entitlement_category', 'manual_annual_balance',
             ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
             ->when($request->filled('search'), fn ($q) => $q->where(fn ($x) => $x
@@ -96,7 +105,7 @@ class JobDataController extends Controller
             )->withQueryString();
 
         return response()->json([
-            'html' => view('jobs._rows', ['monthlyRows' => $this->buildMonthlyRows($employees->getCollection(), $month)])->render(),
+            'html' => view('jobs._summary_rows', ['monthlyRows' => $this->buildMonthlyRows($employees->getCollection(), $month)])->render(),
             'next_url' => $employees->hasMorePages()
                 ? route('jobs.rows', array_merge($request->query(), ['page' => $employees->currentPage() + 1]))
                 : null,
@@ -107,7 +116,7 @@ class JobDataController extends Controller
     public function captureSnapshot(Carbon $month, ?int $createdBy = null): MonthlySummarySnapshot
     {
         $month = $month->copy()->startOfMonth();
-        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
+        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end', 'leave_entitlement_category', 'manual_annual_balance'])
             ->with(['department:id,name', 'job:id,title', 'currentSalary'])->orderBy('id')->get();
         $rows = $this->snapshotRows($this->buildMonthlyRows($employees, $month));
 
@@ -186,8 +195,15 @@ class JobDataController extends Controller
                 'annual_leave_days' => $leaveByPolicy('annual'), 'casual_leave_days' => $leaveByPolicy('casual'), 'sick_leave_days' => $leaveByPolicy('sick'), 'maternity_leave_days' => $leaveByPolicy('maternity'),
                 'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity')),
                 'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0), 'unpaid_leave_days' => $unpaidLeaveDays,
+                'early_leave_minutes' => (int) $attendanceRows->sum('early_leave_minutes'),
+                'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->overtimeMinutes($item, $employee, 'day')),
+                'night_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->overtimeMinutes($item, $employee, 'night')),
                 'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),
                 'penalty_count' => $employeePenalties->count(), 'annual_balance_remaining' => $balance['remaining'],
+                'advance_request_count' => $this->requestTypeCount($employeeRequests, 'advance'),
+                'permission_request_count' => $this->requestTypeCount($employeeRequests, 'permission'),
+                'mission_request_count' => $this->requestTypeCount($employeeRequests, 'mission'),
+                // Legacy keys remain available for cached row templates during rollout.
                 'approved_request_count' => $requestSummary['approved_count'],
                 'request_days' => $requestSummary['days'], 'request_hours' => $requestSummary['hours'],
                 'request_additions' => $requestSummary['additions'], 'request_deductions' => $requestSummary['deductions'],
@@ -201,11 +217,11 @@ class JobDataController extends Controller
         return $monthlyRows->map(fn (array $row) => [
             'employee_code' => $row['employee']->employee_code, 'employee_name' => $row['employee']->full_name,
             'department' => $row['employee']->department?->name ?? '—',
-            'attendance_days' => $row['attendance_days'], 'late_days' => $row['late_days'], 'late_minutes' => $row['late_minutes'], 'absence_days' => $row['absence_days'],
-            'annual_leave_days' => $row['annual_leave_days'], 'casual_leave_days' => $row['casual_leave_days'], 'sick_leave_days' => $row['sick_leave_days'], 'unpaid_leave_days' => $row['unpaid_leave_days'], 'maternity_leave_days' => $row['maternity_leave_days'], 'other_leave_days' => $row['other_leave_days'], 'total_leave_days' => $row['total_leave_days'],
-            'penalty_count' => $row['penalty_count'], 'penalty_days' => $row['penalty_days'], 'annual_balance_remaining' => $row['annual_balance_remaining'],
-            'approved_request_count' => $row['approved_request_count'], 'request_days' => $row['request_days'], 'request_hours' => $row['request_hours'],
-            'request_additions' => $row['request_additions'], 'request_deductions' => $row['request_deductions'], 'request_types' => $row['request_types'],
+            'attendance_days' => $row['attendance_days'], 'late_days' => $row['late_days'], 'late_minutes' => $row['late_minutes'], 'absence_days' => $row['absence_days'], 'early_leave_minutes' => $row['early_leave_minutes'], 'day_overtime_minutes' => $row['day_overtime_minutes'], 'night_overtime_minutes' => $row['night_overtime_minutes'],
+            'annual_leave_days' => $row['annual_leave_days'], 'casual_leave_days' => $row['casual_leave_days'], 'sick_leave_days' => $row['sick_leave_days'], 'unpaid_leave_days' => $row['unpaid_leave_days'], 'maternity_leave_days' => $row['maternity_leave_days'], 'other_leave_days' => $row['other_leave_days'], 'total_leave_days' => $row['total_leave_days'], 'annual_balance_remaining' => $row['annual_balance_remaining'],
+            'penalty_count' => $row['penalty_count'], 'penalty_days' => $row['penalty_days'],
+            'advance_request_count' => $row['advance_request_count'], 'permission_request_count' => $row['permission_request_count'], 'mission_request_count' => $row['mission_request_count'],
+            'approved_request_count' => $row['approved_request_count'], 'request_days' => $row['request_days'], 'request_hours' => $row['request_hours'], 'request_additions' => $row['request_additions'], 'request_deductions' => $row['request_deductions'], 'request_types' => $row['request_types'],
         ])->values()->all();
     }
 
@@ -244,12 +260,32 @@ class JobDataController extends Controller
 
     private function excelResponse(array $rows, Carbon $month)
     {
-        return response()->view('jobs.export_requests', compact('rows', 'month'), 200, [
+        return response()->view('jobs.export_monthly_summary', compact('rows', 'month'), 200, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="monthly-summary-'.$month->format('Y-m').'.xls"',
         ]);
     }
 
+
+    private function requestTypeCount($requests, string $source): int
+    {
+        return $requests->filter(fn (HrRequest $request) => ($request->requestType?->source_key ?: $request->request_type) === $source)->count();
+    }
+
+    private function overtimeMinutes(Attendance $attendance, Employee $employee, string $period): int
+    {
+        if (!$attendance->check_in || !$attendance->check_out) return 0;
+        $settings = app(\App\Services\HrOperationalSettingsService::class);
+        $start = Carbon::parse($employee->shift_start ?: $settings->start());
+        $end = Carbon::parse($employee->shift_end ?: $settings->end());
+        $checkIn = Carbon::parse($attendance->check_in);
+        $checkOut = Carbon::parse($attendance->check_out);
+        $startMinutes = $start->hour * 60 + $start->minute;
+        $endMinutes = $end->hour * 60 + $end->minute;
+        $inMinutes = $checkIn->hour * 60 + $checkIn->minute;
+        $outMinutes = $checkOut->hour * 60 + $checkOut->minute;
+        return $period === 'day' ? max(0, $startMinutes - $inMinutes) : max(0, $outMinutes - $endMinutes);
+    }
 
     private function daysWithinMonth(Leave $leave, Carbon $month): int
     {
