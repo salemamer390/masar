@@ -169,9 +169,6 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::delete('/{attendance}', [AttendanceController::class, 'destroy'])
             ->middleware('permission:attendance.delete')
             ->name('destroy');
-        Route::patch('/{attendance}/approve', [AttendanceController::class, 'approve'])
-            ->middleware('permission:attendance.edit')
-            ->name('approve');
     });
 
     // Leaves

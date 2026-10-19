@@ -258,6 +258,31 @@
 })();
 </script>
 @endpush
+@push('styles')
+<style>
+  .attendance-approval-hidden{display:none!important}
+</style>
+@endpush
+@push('scripts')
+<script>
+(() => {
+  document.querySelector('#attendanceModal button.btn-primary')?.replaceChildren(document.createTextNode('حفظ السجل'));
+  const hideApprovalColumn = () => {
+    const table = document.querySelector('.table-panel table');
+    if (!table) return;
+    const headers = [...(table.tHead?.rows[0]?.cells || [])];
+    if (headers.length < 9) return;
+    const approvalIndex = headers.length - 2;
+    headers[approvalIndex]?.classList.add('attendance-approval-hidden');
+    table.tBodies?.[0]?.querySelectorAll('tr').forEach((row) => row.cells[approvalIndex]?.classList.add('attendance-approval-hidden'));
+  };
+  hideApprovalColumn();
+  const table = document.querySelector('.table-panel table');
+  if (table?.tHead) new MutationObserver(hideApprovalColumn).observe(table.tHead, {childList:true,subtree:true});
+  if (table?.tBodies?.[0]) new MutationObserver(hideApprovalColumn).observe(table.tBodies[0], {childList:true,subtree:true});
+})();
+</script>
+@endpush
 @if(auth()->user()?->hasPermission('attendance.create'))
 @push('styles')
 <style>
@@ -305,11 +330,21 @@
   .attendance-details-trigger{cursor:pointer;transition:background-color .18s ease,transform .18s ease}
   .attendance-details-trigger:hover{background:#f1f6ff;transform:translateY(-1px)}
   .attendance-details-trigger td:last-child{cursor:default}
-  .attendance-detail-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .attendance-detail-item{padding:10px 12px;border:1px solid #e4ebf5;border-radius:12px;background:#f8fafd}
-  .attendance-detail-item small{display:block;color:#71809a;margin-bottom:3px}
-  .attendance-detail-item strong{display:block;color:#15294d}
-  @media(max-width:576px){.attendance-detail-list{grid-template-columns:1fr}}
+  .attendance-detail-list{display:flex;flex-direction:column;gap:8px}
+  .attendance-detail-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 13px;border:1px solid #e4ebf5;border-radius:10px;background:#f8fafd}
+  .attendance-detail-item small{color:#71809a;font-size:12px}
+  .attendance-detail-item strong{color:#15294d;font-size:14px;text-align:end}
+  .attendance-detail-item--check_out{background:#eef5ff;border-color:#9ec5fe}.attendance-detail-item--check_out strong{color:#1d4ed8}
+  .attendance-detail-item--worked{background:#ecfdf5;border-color:#86efac}.attendance-detail-item--worked strong{color:#047857}
+  .attendance-detail-item--late{background:#fff8e6;border-color:#f8c76a}.attendance-detail-item--late strong{color:#b45309}
+  .attendance-detail-item--early{background:#fff1f2;border-color:#fda4af}.attendance-detail-item--early strong{color:#be123c}
+  .attendance-detail-group{margin-bottom:18px}
+  .attendance-detail-group-title{display:flex;align-items:center;gap:8px;margin:0 0 9px;padding-bottom:7px;border-bottom:1px solid #e4ebf5;color:#173866;font-size:14px;font-weight:700}
+  .attendance-detail-group-title i{color:#2674e8}
+  .attendance-detail-group--late .attendance-detail-item strong{color:#b45309}
+  .attendance-detail-group--overtime .attendance-detail-item strong{color:#087f5b}
+  .attendance-detail-item.is-zero strong{color:#8290a6!important;font-weight:500}
+  @media(max-width:576px){.attendance-detail-item{align-items:flex-start;flex-direction:column;gap:3px}.attendance-detail-item strong{text-align:start}}
   @media(max-width:700px){
     .table-panel .table thead{display:none}
     .table-panel .table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px;border:1px solid #e3eaf4;border-radius:14px;margin-bottom:10px;background:#fff}
@@ -359,7 +394,12 @@
     row.dataset.attendanceId = id; row.classList.add('attendance-details-trigger');
     row.addEventListener('click', (event) => {
       if (event.target.closest('a,button,form,input,select,textarea')) return;
-      list.innerHTML = Object.entries(details[id]).map(([key, value]) => `<div class="attendance-detail-item"><small>${labels[key] || key}</small><strong>${esc(value)}</strong></div>`).join('');
+      const groups = [
+        {title:'أوقات الدوام', icon:'bi-clock', keys:['date','check_in','check_out','worked']},
+        {title:'التأخير والانصراف المبكر', icon:'bi-exclamation-triangle', className:'attendance-detail-group--late', keys:['late','early']},
+        {title:'الساعات الإضافية', icon:'bi-plus-circle', className:'attendance-detail-group--overtime', keys:['day_overtime','night_overtime']},
+      ];
+      list.innerHTML = groups.map((group) => `<section class="attendance-detail-group ${group.className || ''}"><h6 class="attendance-detail-group-title"><i class="bi ${group.icon}"></i>${group.title}</h6><div class="attendance-detail-list">${group.keys.filter((key) => Object.prototype.hasOwnProperty.call(details[id], key)).map((key) => { const value = details[id][key]; const zero = ['00:00','0','0.00',0,null,'—'].includes(value); return `<div class="attendance-detail-item attendance-detail-item--${key} ${zero ? 'is-zero' : ''}"><small>${labels[key] || key}</small><strong>${esc(value)}</strong></div>`; }).join('')}</div></section>`).join('');
       bootstrap.Offcanvas.getOrCreateInstance(panel).show();
     });
   });

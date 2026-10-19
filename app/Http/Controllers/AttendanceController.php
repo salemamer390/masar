@@ -106,7 +106,7 @@ class AttendanceController extends Controller
         $status = ($checkIn || $checkOut) ? ($lateMinutes > 0 ? 'Late' : 'Present') : $validated['status'];
         $attendance = Attendance::updateOrCreate(
             ['employee_id' => $validated['employee_id'], 'attendance_date' => $validated['attendance_date']],
-            ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null]
+            ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
         );
         $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_record', 'Attendance record created or updated.', $attendance, null, $attendance->toArray(), 'attendance');
@@ -156,7 +156,7 @@ class AttendanceController extends Controller
             'late_minutes' => $lateMinutes,
             'early_leave_minutes' => $this->earlyLeaveMinutes($checkOut, $employee->shift_end ?: $this->hrSettings->end()),
             'worked_hours' => $this->workedHours($checkIn, $checkOut),
-            'source' => 'manual', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
+            'source' => 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
         ])->save();
         ActivityLog::record('attendance_clock_'.$direction, 'Attendance clock event recorded.', $attendance, null, $attendance->toArray(), 'attendance');
         return $request->wantsJson()
@@ -206,7 +206,7 @@ class AttendanceController extends Controller
             'worked_hours' => $this->workedHours($validated['check_in'], $validated['check_out']),
             'source' => $validated['source'] ?? 'manual',
             // أي تعديل يستلزم مراجعة السجل من جديد قبل دخوله في المسير.
-            'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null,
+            'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
         ]);
         $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_update', 'Attendance record updated.', $attendance, $old, $attendance->toArray(), 'attendance');

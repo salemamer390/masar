@@ -49,7 +49,7 @@ class AttendanceImportController extends Controller
                 $late = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->settings->start());
                 $attendance = Attendance::updateOrCreate(
                     ['employee_id' => $employee->id, 'attendance_date' => $date],
-                    ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $late > 0 ? 'Late' : $status, 'late_minutes' => $late, 'early_leave_minutes' => $this->earlyLeave($checkOut, $employee->shift_end ?: $this->settings->end()), 'worked_hours' => $this->workedHours($checkIn, $checkOut), 'source' => 'import', 'approval_status' => 'Draft', 'approved_by' => null, 'approved_at' => null]
+                    ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $late > 0 ? 'Late' : $status, 'late_minutes' => $late, 'early_leave_minutes' => $this->earlyLeave($checkOut, $employee->shift_end ?: $this->settings->end()), 'worked_hours' => $this->workedHours($checkIn, $checkOut), 'source' => 'import', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
                 );
                 $imported++;
             } catch (\Throwable $exception) {
