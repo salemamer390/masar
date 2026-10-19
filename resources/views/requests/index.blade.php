@@ -102,6 +102,7 @@
     const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
     fields.hidden = !isOvertime;
     [date, period, hours].forEach((input) => { if (input) input.required = isOvertime; });
+    if (isOvertime && !date.value) date.value = @json(today()->toDateString());
     if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; }
   };
   type?.addEventListener('change', sync);
@@ -112,7 +113,7 @@
 
 @push('styles')
 <style>
-  #requestCreateModal .request-conditional-card{border:1px solid #dbe7f5;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#fff);padding:16px;margin-top:14px;box-shadow:0 8px 22px rgba(31,73,125,.06)}
+  #requestCreateModal .request-conditional-card{width:min(100%,520px);margin:14px auto 0;border:1px solid #dbe7f5;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#fff);padding:16px;box-shadow:0 8px 22px rgba(31,73,125,.06)}
   #requestCreateModal .request-conditional-card .form-label{font-weight:700;color:#16325c;margin-bottom:7px}
   #requestCreateModal .request-conditional-card .form-control,#requestCreateModal .request-conditional-card .form-select{border-radius:11px;min-height:44px;border-color:#d8e4f2}
   #requestCreateModal .request-conditional-card[hidden]{display:none!important}
@@ -301,9 +302,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
   form.querySelectorAll('.row.g-2.mt-2').forEach((fields) => fields.remove());
   const overtimeTypeIds = @json($requestTypes->filter(fn ($item) => $item->source_key === 'overtime')->pluck('id')->values());
   const fields = document.createElement('div');
-  fields.className = 'row g-2 mt-2';
+  fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control"></div>';
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control" required></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select" required><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control" required></div>';
   modalFooter?.before(fields);
   const date = fields.querySelector('[name="request_date"]');
   const period = fields.querySelector('[name="overtime_period"]');
@@ -312,6 +313,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
     fields.hidden = !isOvertime;
     [date, period, hours].forEach((input) => { if (input) input.required = isOvertime; });
+    if (isOvertime && !date.value) date.value = @json(today()->toDateString());
     if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; }
   };
   type?.addEventListener('change', sync);
