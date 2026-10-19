@@ -105,7 +105,9 @@ class EmployeeImportMappingTest extends TestCase
         [$headerRow, $map, $entries] = $this->invoke('detectHeader', $rows, $aliases, []);
 
         $this->assertSame(1, $headerRow);
-        $this->assertCount(count(EmployeeImportService::COLUMNS), $map);
+        // The template intentionally omits optional fields such as manager name
+        // and manual annual balance; every header that is present must map.
+        $this->assertCount(count($rows[1]), $map);
         $this->assertSame([], $entries);
     }
 }
