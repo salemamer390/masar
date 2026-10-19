@@ -25,14 +25,23 @@ class JobDataController extends Controller
         $monthStart = $month->copy()->startOfMonth()->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
 
-        $employees = Employee::with(['department', 'job', 'branch', 'employmentType', 'currentSalary'])
+        $employeeQuery = Employee::select([
+                'id', 'employee_code', 'full_name', 'department_id', 'job_id',
+                'branch_id', 'employment_type_id', 'hire_date', 'birth_date',
+                'leave_entitlement_category', 'manual_annual_balance',
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
             ->when($request->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
             ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
             ->when($request->filled('contract_status'), function ($q) use ($request) { return $request->contract_status === 'active' ? $q->where(function ($x) { $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()); }) : $q->whereDate('contract_end_date', '<', today()); })
-            ->orderByDesc('id')
-            ->get();
+            ->orderByDesc('id');
 
-        $monthlyRows = $this->buildMonthlyRows($employees, $month);
+        // Render only the first batch; additional batches are fetched on demand.
+        $employees = $employeeQuery->paginate(50)->withQueryString();
+        $nextRowsUrl = $employees->hasMorePages()
+            ? route('jobs.rows', array_merge($request->query(), ['page' => $employees->currentPage() + 1]))
+            : null;
+
+        $monthlyRows = $this->buildMonthlyRows($employees->getCollection(), $month);
         $summaryHistory = MonthlySummarySnapshot::orderByDesc('summary_month')->get();
 
         $totalJobs = Job::where('is_active', 1)->count();
@@ -48,6 +57,7 @@ class JobDataController extends Controller
 
         return view('jobs.index', compact(
             'employees', 'monthlyRows', 'month', 'summaryHistory',
+            'nextRowsUrl',
             'totalJobs',
             'totalDepartments',
             'totalBranches',
@@ -60,11 +70,42 @@ class JobDataController extends Controller
         ));
     }
 
+    /** Return the next employee batch for the progressive monthly-summary table. */
+    public function rows(Request $request)
+    {
+        $month = $request->filled('month')
+            ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth()
+            : now()->startOfMonth();
+        $employees = Employee::select([
+                'id', 'employee_code', 'full_name', 'department_id', 'job_id',
+                'branch_id', 'employment_type_id', 'hire_date', 'birth_date',
+                'leave_entitlement_category', 'manual_annual_balance',
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
+            ->when($request->filled('search'), fn ($q) => $q->where(fn ($x) => $x
+                ->where('full_name', 'like', '%'.$request->input('search').'%')
+                ->orWhere('employee_code', 'like', '%'.$request->input('search').'%')))
+            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->input('department_id')))
+            ->when($request->filled('contract_status'), function ($q) use ($request) {
+                return $request->input('contract_status') === 'active'
+                    ? $q->where(fn ($x) => $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()))
+                    : $q->whereDate('contract_end_date', '<', today());
+            })
+            ->orderByDesc('id')->paginate(50)->withQueryString();
+
+        return response()->json([
+            'html' => view('jobs._rows', ['monthlyRows' => $this->buildMonthlyRows($employees->getCollection(), $month)])->render(),
+            'next_url' => $employees->hasMorePages()
+                ? route('jobs.rows', array_merge($request->query(), ['page' => $employees->currentPage() + 1]))
+                : null,
+        ]);
+    }
+
 
     public function captureSnapshot(Carbon $month, ?int $createdBy = null): MonthlySummarySnapshot
     {
         $month = $month->copy()->startOfMonth();
-        $employees = Employee::with(['department', 'job', 'currentSalary'])->orderBy('id')->get();
+        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
+            ->with(['department:id,name', 'job:id,title', 'currentSalary'])->orderBy('id')->get();
         $rows = $this->snapshotRows($this->buildMonthlyRows($employees, $month));
 
         return MonthlySummarySnapshot::updateOrCreate(
@@ -86,7 +127,8 @@ class JobDataController extends Controller
     public function export(Request $request)
     {
         $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
-        $employees = Employee::with(['department', 'job', 'currentSalary'])->orderBy('id')->get();
+        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
+            ->with(['department:id,name', 'job:id,title', 'currentSalary'])->orderBy('id')->get();
         return $this->excelResponse($this->snapshotRows($this->buildMonthlyRows($employees, $month)), $month);
     }
 
@@ -113,15 +155,16 @@ class JobDataController extends Controller
         $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
         $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->where('status', 'Approved')->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
+        $balances = $leaveBalanceService->balancesFor($employees, $month->year);
 
-        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $month, $leaveBalanceService): array {
+        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $month, $balances): array {
             $attendanceRows = $attendance->get($employee->id, collect());
             $employeeLeaves = $leaves->get($employee->id, collect());
             $employeePenalties = $penalties->get($employee->id, collect());
             $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinMonth($leave, $month)]);
             $leaveByPolicy = fn (string $policy): float => $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $unpaidLeaveDays = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
-            $balance = $leaveBalanceService->balance($employee, $month->year);
+            $balance = $balances->get($employee->id, ['remaining' => 0]);
             return [
                 'employee' => $employee, 'salary' => $employee->currentSalary,
                 'attendance_days' => $attendanceRows->whereNotIn('status', ['Absent', 'غائب'])->count(),

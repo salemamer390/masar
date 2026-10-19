@@ -8,14 +8,69 @@ use App\Models\LeaveType;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Collection;
 
 class LeaveBalanceService
 {
+    /** Policies are identical for all employees in one request. */
+    private array $policyCache = [];
+
     public function policy(string $key, string $default = ''): string
     {
+        if (array_key_exists($key, $this->policyCache)) return $this->policyCache[$key];
         $query = DB::table('leave_policy_settings')->where('setting_key', $key);
         if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
-        return (string) ($query->value('setting_value') ?? $default);
+        return $this->policyCache[$key] = (string) ($query->value('setting_value') ?? $default);
+    }
+
+    /**
+     * Calculate balances for a batch of employees with one leave query and one
+     * balance upsert, instead of running balance() (and its queries) per row.
+     */
+    public function balancesFor(Collection $employees, int $year): Collection
+    {
+        if ($employees->isEmpty()) return collect();
+
+        $ids = $employees->pluck('id')->values();
+        $leaves = Leave::with('leaveType')
+            ->whereIn('employee_id', $ids)
+            ->where('status', 'Approved')
+            ->whereYear('start_date', $year)
+            ->get()
+            ->groupBy('employee_id');
+        $rows = [];
+        $now = now();
+        foreach ($employees as $employee) {
+            $annual = $employee->manual_annual_balance !== null
+                ? (float) $employee->manual_annual_balance
+                : $this->entitlement($employee, $year);
+            $employeeLeaves = $leaves->get($employee->id, collect());
+            $used = (float) $employeeLeaves
+                ->filter(fn (Leave $leave) => $leave->leaveType && (bool) $leave->leaveType->deducts_annual_balance)
+                ->sum('days');
+            $casual = (float) $employeeLeaves
+                ->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === 'casual')
+                ->sum('days');
+            $advance = max(0, $used - $annual);
+            $rows[] = [
+                'employee_id' => $employee->id,
+                'leave_year' => $year,
+                'annual_entitlement' => $annual,
+                'annual_used' => $used,
+                'casual_used' => $casual,
+                'advance_used' => $advance,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        DB::table('leave_balances')->upsert($rows, ['employee_id', 'leave_year'], ['annual_entitlement', 'annual_used', 'casual_used', 'advance_used', 'updated_at']);
+        return collect($rows)->keyBy('employee_id')->map(fn (array $row) => [
+            'annual_entitlement' => (float) $row['annual_entitlement'],
+            'annual_used' => (float) $row['annual_used'],
+            'casual_used' => (float) $row['casual_used'],
+            'advance_used' => (float) $row['advance_used'],
+            'remaining' => max(0, (float) $row['annual_entitlement'] - (float) $row['annual_used']),
+        ]);
     }
 
     public function entitlement(Employee $employee, int $year): float

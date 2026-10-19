@@ -493,7 +493,7 @@
       .filter((item) => !item.querySelector('[colspan]'));
     const after = (form, element) => Boolean(form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-    document.querySelectorAll('form.filter-bar input[name="search"], form.salary-filter-bar input[name="search"]').forEach((input) => {
+    document.querySelectorAll('form.filter-bar:not([data-server-live-search="true"]) input[name="search"], form.salary-filter-bar:not([data-server-live-search="true"]) input[name="search"]').forEach((input) => {
       const form = input.form;
       const allContainers = [...document.querySelectorAll(containers)];
       const container = allContainers.find((candidate) => after(form, candidate))

@@ -2,11 +2,14 @@
 @section('title', 'ملخص الشهر')
 @section('content')
 <div class="page-head"><div><h1>ملخص الشهر</h1><p>كشف الحضور والإجازات والجزاءات والأرصدة خلال الفترة المحددة.</p></div><span class="badge-soft info px-3 py-2"><i class="bi bi-calendar3"></i> {{ $month->format('m/Y') }}</span></div>
-<form class="filter-bar d-flex flex-wrap gap-2 mb-3" method="GET"><input type="month" name="month" class="form-control" value="{{ $month->format('Y-m') }}"><div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو الكود"></div><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select><button class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button><a class="btn btn-light" href="{{ route('jobs.index') }}">مسح</a></form>
+<form class="filter-bar d-flex flex-wrap gap-2 mb-3" method="GET" data-server-live-search="true"><input type="month" name="month" class="form-control" value="{{ $month->format('Y-m') }}"><div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو الكود"></div><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select><button class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button><a class="btn btn-light" href="{{ route('jobs.index') }}">مسح</a></form>
 <div class="d-flex gap-2 flex-wrap mb-3"><button class="btn btn-primary" type="button" data-summary-tab="current"><i class="bi bi-table"></i> ملخص الشهر الحالي</button><button class="btn btn-light" type="button" data-summary-tab="history"><i class="bi bi-clock-history"></i> سجل الملخص</button><a class="btn btn-outline-success" href="{{ route('jobs.export', ['month' => $month->format('Y-m')]) }}"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a><form method="POST" action="{{ route('jobs.summary-history.store') }}" class="d-inline">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}"><button class="btn btn-outline-primary"><i class="bi bi-save"></i> حفظ في السجل</button></form></div>
 <div id="summaryCurrent"><div class="panel table-panel"><div class="panel-head"><div><h3>ملخص حركة الموظفين</h3><span>السجلات المعتمدة داخل الفترة المحددة.</span></div></div><div class="table-responsive"><table class="table align-middle monthly-summary-table"><thead><tr><th colspan="3">الموظف</th><th colspan="4">الحضور والغياب</th><th colspan="6">الإجازات المعتمدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th>الرصيد</th></tr><tr><th>الكود</th><th>اسم الموظف</th><th>القسم</th><th>أيام الحضور</th><th>منها حضور متأخر</th><th>دقائق التأخير</th><th>أيام الغياب</th><th>سنوية</th><th>عارضة</th><th>مرضية</th><th>بدون أجر</th><th>أمومة</th><th>أنواع أخرى</th><th>إجمالي الإجازات</th><th>عدد الجزاءات</th><th>أيام خصم الجزاءات</th><th>رصيد الإجازة السنوية المتبقي</th></tr></thead><tbody>
 @forelse($monthlyRows as $row) @php($employee=$row['employee'])<tr><td>{{ $employee->employee_code }}</td><td><a class="employee-link fw-bold" href="{{ route('employees.show',$employee) }}">{{ $employee->full_name }}</a></td><td>{{ $employee->department?->name ?? '—' }}</td><td>{{ format_number($row['attendance_days']) }}</td><td>{{ format_number($row['late_days']) }}</td><td>{{ format_number($row['late_minutes']) }}</td><td>{{ format_number($row['absence_days']) }}</td><td>{{ format_number($row['annual_leave_days']) }}</td><td>{{ format_number($row['casual_leave_days']) }}</td><td>{{ format_number($row['sick_leave_days']) }}</td><td>{{ format_number($row['unpaid_leave_days']) }}</td><td>{{ format_number($row['maternity_leave_days']) }}</td><td>{{ format_number($row['other_leave_days']) }}</td><td>{{ format_number($row['total_leave_days']) }}</td><td>{{ format_number($row['penalty_count']) }}</td><td>{{ format_number($row['penalty_days']) }}</td><td><span class="badge-soft success">{{ format_number($row['annual_balance_remaining']) }} يوم</span></td></tr>@empty<tr><td colspan="17" class="text-center py-5">لا توجد بيانات مطابقة للفترة أو الفلاتر الحالية.</td></tr>@endforelse
 </tbody></table></div></div></div>
+@if($employees->hasMorePages())
+<div class="text-center mt-3" id="monthlySummaryLoadMoreWrap"><button type="button" class="btn btn-outline-primary" id="monthlySummaryLoadMore" data-next-url="{{ $nextRowsUrl }}"><i class="bi bi-arrow-down-circle"></i> تحميل المزيد</button></div>
+@endif
 <div id="summaryHistory" hidden><div class="panel table-panel"><div class="panel-head"><div><h3>سجل الملخصات المحفوظة</h3><span>كل سجل لقطة ثابتة للبيانات وقت الحفظ.</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>رقم الشهر</th><th>عدد الموظفين</th><th>تاريخ الحفظ</th><th>الإجراء</th></tr></thead><tbody>@forelse($summaryHistory as $snapshot)<tr><td>{{ $snapshot->summary_month->format('m/Y') }}</td><td>{{ $snapshot->employee_count }}</td><td>{{ $snapshot->created_at->format('d/m/Y H:i') }}</td><td><button type="button" class="btn btn-sm btn-outline-primary summary-history-open" data-url="{{ route('jobs.summary-history.show',$snapshot) }}"><i class="bi bi-eye"></i> فتح</button> <a class="btn btn-sm btn-outline-success" href="{{ route('jobs.summary-history.export',$snapshot) }}"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a></td></tr>@empty<tr><td colspan="4" class="text-center py-4">لا توجد سجلات محفوظة بعد.</td></tr>@endforelse</tbody></table></div></div></div>
 <div class="modal fade" id="summaryHistoryModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">سجل ملخص الشهر</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="summaryHistoryBody"></div><div class="modal-footer"><a id="summaryHistoryExport" class="btn btn-success" href="#"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a><button type="button" class="btn btn-light" data-bs-dismiss="modal">إغلاق</button></div></div></div></div>
 <style>
@@ -37,6 +40,51 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
     document.getElementById('summaryHistoryExport').href = data.export_url;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('summaryHistoryModal')).show();
 }));
+const loadMoreButton = document.getElementById('monthlySummaryLoadMore');
+loadMoreButton?.addEventListener('click', async () => {
+    const original = loadMoreButton.innerHTML;
+    loadMoreButton.disabled = true;
+    loadMoreButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> جاري التحميل...';
+    try {
+        const response = await fetch(loadMoreButton.dataset.nextUrl, {headers: {Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest'}});
+        if (!response.ok) throw new Error('load failed');
+        const data = await response.json();
+        document.querySelector('.monthly-summary-table tbody')?.insertAdjacentHTML('beforeend', data.html);
+        if (data.next_url) {
+            loadMoreButton.dataset.nextUrl = data.next_url;
+            loadMoreButton.disabled = false;
+            loadMoreButton.innerHTML = original;
+        } else {
+            document.getElementById('monthlySummaryLoadMoreWrap')?.remove();
+        }
+    } catch (error) {
+        loadMoreButton.disabled = false;
+        loadMoreButton.innerHTML = original;
+        window.dispatchEvent(new CustomEvent('toast', {detail: {type: 'error', message: 'تعذر تحميل باقي الموظفين.'}}));
+    }
+});
+const serverSearchForm = document.querySelector('form[data-server-live-search="true"]');
+const serverSearchInput = serverSearchForm?.querySelector('input[name="search"]');
+let serverSearchTimer;
+serverSearchInput?.addEventListener('input', () => {
+    clearTimeout(serverSearchTimer);
+    serverSearchTimer = setTimeout(async () => {
+        const params = new URLSearchParams(new FormData(serverSearchForm));
+        params.delete('page');
+        const response = await fetch('{{ route('jobs.rows') }}?' + params.toString(), {headers: {Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest'}});
+        if (!response.ok) return;
+        const data = await response.json();
+        const tbody = document.querySelector('.monthly-summary-table tbody');
+        if (tbody) tbody.innerHTML = data.html || '<tr><td colspan="17" class="text-center py-5">لا توجد بيانات مطابقة.</td></tr>';
+        const wrap = document.getElementById('monthlySummaryLoadMoreWrap');
+        if (data.next_url) {
+            if (!wrap) return;
+            loadMoreButton.dataset.nextUrl = data.next_url;
+            loadMoreButton.disabled = false;
+            wrap.hidden = false;
+        } else if (wrap) wrap.hidden = true;
+    }, 250);
+});
 </script>
 @endsection
 

@@ -132,6 +132,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/jobs', [JobDataController::class, 'index'])
         ->middleware('permission:employees.view')
         ->name('jobs.index');
+    Route::get('/jobs/rows', [JobDataController::class, 'rows'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.rows');
     Route::get('/jobs/export', [JobDataController::class, 'export'])
         ->middleware('permission:employees.view')
         ->name('jobs.export');
