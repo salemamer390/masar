@@ -83,7 +83,7 @@ class HrRequestController extends Controller
                 Rule::exists('request_types', 'id')->where(fn ($query) => $query->where('is_active', true)),
             ],
             'title' => ['required', 'string', 'max:200'],
-            'details' => ['nullable', 'string', 'max:5000'],
+            'details' => ['required', 'string', 'max:5000'],
             'request_date' => ['nullable', 'date'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
@@ -107,9 +107,13 @@ class HrRequestController extends Controller
         }
         if ($type->source_key === 'other' && $request->boolean('affects_payroll')) {
             $request->validate([
+                'request_date' => ['required', 'date'],
                 'impact_amount' => ['required', 'numeric', 'gt:0'],
                 'impact_type' => ['required', 'in:earning,deduction'],
             ]);
+        }
+        if ($type->source_key === 'other' && !$request->boolean('affects_payroll')) {
+            $request->validate(['request_date' => ['required', 'date']]);
         }
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);

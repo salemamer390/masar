@@ -85,6 +85,7 @@
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
+  form.querySelector('[name="details"]')?.setAttribute('required', 'required');
   const type = form.querySelector('[name="request_type_id"]');
   const modalFooter = form.querySelector('.modal-footer');
   const oldFields = form.querySelector('.row.g-2.mt-2');
@@ -151,10 +152,10 @@
   const otherCard = document.createElement('div'); otherCard.className = 'request-conditional-card'; otherCard.hidden = true;
   otherCard.innerHTML = '<div class="mb-3"><label class="form-label">تاريخ الطلب المؤثر</label><input type="date" name="request_date" class="form-control"></div><div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="affects_payroll" value="1" id="requestAffectsPayroll"><label class="form-check-label" for="requestAffectsPayroll">يؤثر على دورة الرواتب</label></div><div class="row g-2" data-payroll-impact-fields hidden><div class="col-md-6"><label class="form-label">المبلغ</label><input type="number" name="impact_amount" min="0.01" step="0.01" class="form-control"></div><div class="col-md-6"><label class="form-label">نوع التأثير</label><select name="impact_type" class="form-select"><option value="">اختر نوع التأثير</option><option value="earning">مستحق</option><option value="deduction">مستقطع</option></select></div></div>';
   form.querySelector('.modal-footer')?.before(otherCard);
-  const affects = otherCard.querySelector('[name="affects_payroll"]'); const impactFields = otherCard.querySelector('[data-payroll-impact-fields]'); const impactAmount = otherCard.querySelector('[name="impact_amount"]'); const impactType = otherCard.querySelector('[name="impact_type"]');
+  const otherDate = otherCard.querySelector('[name="request_date"]'); const affects = otherCard.querySelector('[name="affects_payroll"]'); const impactFields = otherCard.querySelector('[data-payroll-impact-fields]'); const impactAmount = otherCard.querySelector('[name="impact_amount"]'); const impactType = otherCard.querySelector('[name="impact_type"]');
   const syncImpact = () => { const active = affects.checked; impactFields.hidden = !active; impactAmount.required = active; impactType.required = active; if (!active) { impactAmount.value = ''; impactType.value = ''; } };
   affects.addEventListener('change', syncImpact);
-  const syncOther = () => { const isOther = typeMeta[type?.value]?.source === 'other'; otherCard.hidden = !isOther; if (!isOther) { affects.checked = false; syncImpact(); } };
+  const syncOther = () => { const isOther = typeMeta[type?.value]?.source === 'other'; otherCard.hidden = !isOther; otherDate.required = isOther; if (isOther && !otherDate.value) otherDate.value = @json(today()->toDateString()); if (!isOther) { otherDate.value = ''; affects.checked = false; syncImpact(); } };
   type?.addEventListener('change', syncOther); syncOther(); syncImpact();
 })();
 </script>
