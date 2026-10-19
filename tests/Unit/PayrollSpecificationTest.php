@@ -4,13 +4,24 @@ namespace Tests\Unit;
 
 use App\Services\Payroll\GrossUpEngine;
 use App\Services\Payroll\OvertimeEngine;
+use App\Services\PayrollSettingsService;
 use PHPUnit\Framework\TestCase;
 
 class PayrollSpecificationTest extends TestCase
 {
     public function test_overtime_uses_gross(): void
     {
-        $engine = new OvertimeEngine();
+        // Keep this a real unit test: the expected calculation uses the
+        // documented defaults and must not require a database connection.
+        $settings = new class extends PayrollSettingsService {
+            public function hoursDivisor(): float { return 240; }
+            public function daysDivisor(): float { return 30; }
+            public function dayOvertimeMultiplier(): float { return 1.35; }
+            public function nightOvertimeMultiplier(): float { return 1.70; }
+            public function officialHolidayMultiplier(): float { return 2; }
+            public function weeklyRestMultiplier(): float { return 1; }
+        };
+        $engine = new OvertimeEngine($settings);
         $r = $engine->calculate(24000, 10, 5, 2, 1);
         $this->assertEquals(1350.00, $r['day_overtime']);
         $this->assertEquals(850.00, $r['night_overtime']);

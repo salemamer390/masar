@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
+use Carbon\Carbon;
 
 /**
  * Bulk employee import (Excel / CSV).
@@ -944,9 +945,14 @@ class EmployeeImportService
         if ($isNew) {
             $hire ??= date('Y-m-d');
             $contractStart ??= $hire;
-            $contractEnd ??= date('Y-m-d', strtotime($contractStart . ' +1 year'));
+            $contractEnd ??= $this->renewedContractEnd($contractStart);
         } elseif ($hire !== null && $contractStart === null) {
             $contractStart = $hire;
+        }
+        // A missing end date means an annually renewing contract, not a
+        // contract that expires one year after the original hire date.
+        if ($contractEnd === null && $contractStart !== null && $get('termination_date') === '') {
+            $contractEnd = $this->renewedContractEnd($contractStart);
         }
         if ($hire !== null) {
             $data['hire_date'] = $hire;
@@ -1040,6 +1046,17 @@ class EmployeeImportService
             'errors' => $errors,
             'warnings' => $warnings,
         ];
+    }
+
+    private function renewedContractEnd(string $start): string
+    {
+        $startDate = Carbon::parse($start)->startOfDay();
+        $end = $startDate->copy()->addYear()->subDay();
+        $today = Carbon::today();
+        while ($end->lt($today)) {
+            $end->addYear();
+        }
+        return $end->toDateString();
     }
 
     /**

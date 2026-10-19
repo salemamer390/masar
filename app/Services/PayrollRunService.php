@@ -48,6 +48,11 @@ class PayrollRunService
                 })
                 ->orderBy('id')->cursor();
 
+            // Keep track of the employees that are valid for this run. A draft
+            // can be regenerated after employee/status/contract changes, so
+            // records that no longer qualify must be removed from the draft.
+            $eligibleEmployeeIds = [];
+
             foreach ($employees as $employee) {
                 $serviceWindow = $this->serviceWindow($employee, $month);
                 if ($serviceWindow === null) continue;
@@ -56,6 +61,7 @@ class PayrollRunService
                     ->where('effective_from', '<=', $month->copy()->endOfMonth()->toDateString())
                     ->latest('effective_from')->latest('id')->first();
                 if (!$salary) continue;
+                $eligibleEmployeeIds[] = $employee->id;
                 $structure = $this->calculator->structureForSalary($salary);
                 $inputs = $this->approvedInputs($employee, $month, $structure);
                 $insuranceDue = $this->insuranceIsDueForMonth($employee, $month);
@@ -96,6 +102,17 @@ class PayrollRunService
                     ]),
                 ];
                 PayrollRecord::updateOrCreate(['employee_id' => $employee->id, 'payroll_month' => $month->toDateString()], $payload);
+            }
+
+            // Reconciliation is deliberately limited to the current draft
+            // run. Approved and locked runs are rejected above and remain
+            // immutable historical snapshots.
+            if ($eligibleEmployeeIds) {
+                $run->records()
+                    ->whereNotIn('employee_id', $eligibleEmployeeIds)
+                    ->delete();
+            } else {
+                $run->records()->delete();
             }
             ActivityLog::record('payroll_generate', 'Payroll run generated.', $run, null, $run->toArray(), 'payroll');
             return $run->fresh();
@@ -225,14 +242,31 @@ class PayrollRunService
             // do not accidentally include the employee in every future run.
             if (!$terminationDate || !$terminationDate->isSameMonth($month)) return null;
         }
-        $contractEnd = $terminationDate
-            ?? ($employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy());
+        $contractEnd = $terminationDate;
+        if (!$contractEnd && $employee->contract_start_date) {
+            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->contract_start_date), $monthEnd);
+        }
+        if (!$contractEnd && $employee->hire_date) {
+            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->hire_date), $monthEnd);
+        }
+        $contractEnd ??= ($employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy());
         $start = $hireDate->greaterThan($monthStart) ? $hireDate : $monthStart;
         $end = $contractEnd->lessThan($monthEnd) ? $contractEnd : $monthEnd;
         if ($start->greaterThan($end)) return null;
 
         $days = $start->diffInDays($end) + 1;
         return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => min(1, $days / 30)];
+    }
+
+    /** Return the end of the current annual renewal cycle. */
+    private function renewedContractEnd(Carbon $start, ?Carbon $reference = null): Carbon
+    {
+        $end = $start->copy()->addYear()->subDay();
+        $reference ??= Carbon::today();
+        while ($end->lt($reference)) {
+            $end->addYear();
+        }
+        return $end;
     }
 
     private function insuranceIsDueForMonth(Employee $employee, Carbon $month): bool
