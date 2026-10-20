@@ -540,7 +540,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 <div class="panel table-panel">
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>الطلب</th><th>الموظف</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>الإجراء</th></tr></thead>
+            <thead><tr><th>الطلب</th><th>الموظف</th><th>النوع</th><th>التاريخ</th><th>الإجراء</th></tr></thead>
             <tbody>
             @forelse($requests as $hrRequest)
                 <tr data-request-id="{{ $hrRequest->id }}" data-employee-id="{{ $hrRequest->employee_id }}">
@@ -551,7 +551,6 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
                     <td><a href="{{ $hrRequest->employee ? route('employees.show', $hrRequest->employee) : '#' }}">{{ $hrRequest->employee?->full_name ?? '—' }}</a></td>
                     <td><span class="badge-soft info">{{ $hrRequest->requestType?->display_name ?? $hrRequest->request_type }}</span></td>
                     <td>{{ $hrRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
-                    <td><span class="badge-soft {{ $hrRequest->status_badge_class }}">{{ $hrRequest->status_label }}</span></td>
                     <td>
                         <div class="d-flex gap-1 align-items-center">
                             <a class="btn btn-sm btn-light" href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" title="التفاصيل"><i class="bi bi-eye"></i></a>
@@ -609,11 +608,12 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     const row = form.closest('tr');
     if (!row) return;
     const status = event.detail?.request?.status || (form.action.endsWith('/reject') ? 'Rejected' : 'Approved');
-    const statusCell = row.children[4];
+    const statusCell = row.querySelector('[data-request-status-cell]');
+    if (!statusCell) return;
     statusCell.innerHTML = status === 'Rejected'
       ? '<span class="badge-soft danger">مرفوض</span>'
       : '<span class="badge-soft success">معتمد</span>';
-    row.children[5].querySelectorAll('form[action$="/approve"], form[action$="/reject"]').forEach((actionForm) => actionForm.remove());
+    row.lastElementChild?.querySelectorAll('form[action$="/approve"], form[action$="/reject"]').forEach((actionForm) => actionForm.remove());
   });
 </script>
 @endpush
@@ -668,20 +668,22 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
           if (valueCell && editedValue !== undefined) valueCell.textContent = editedValue || '—';
           if (row.children[3] && editedValue !== undefined) row.children[3].textContent = editedValue || '—';
           if (row.children[3] && item?.value !== undefined) row.children[3].textContent = item.value || '—';
-          if (row.children[5]) row.children[5].innerHTML = '<span class="badge-soft success">معتمد</span>';
         }
       } else if (item && requestTableBody) {
         requestTableBody.querySelector('td[colspan]')?.closest('tr')?.remove();
         requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));
         const addedRow = requestTableBody.querySelector(`tr[data-request-id="${Number(item.id)}"]`);
         if (addedRow) {
+          // Remove a legacy status cell if an old client-side row template
+          // was still used by the browser.
+          const legacyStatusCell = addedRow.children[4];
+          if (legacyStatusCell?.querySelector('.badge-soft') && !legacyStatusCell.querySelector('form, a, button')) legacyStatusCell.remove();
           const actions = addedRow.lastElementChild;
           if (actions) {
             const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="تعديل"><i class="bi bi-pencil"></i></a>` : '';
             const remove = @json(auth()->user()?->hasPermission('requests.delete')) ? `<form method="POST" action="${requestBaseUrl}/${Number(item.id)}"><input type="hidden" name="_token" value="${escapeRequestHtml(document.querySelector('meta[name=\"csrf-token\"]')?.content || '')}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
             actions.innerHTML = `<div class="d-flex gap-1 align-items-center">${edit}${remove}</div>`;
           }
-          if (addedRow.children[4]) addedRow.children[4].innerHTML = '<span class="badge-soft success">معتمد</span>';
         }
         wireHrRequestAjaxForms(requestTableBody);
       }
