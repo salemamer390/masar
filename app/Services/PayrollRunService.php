@@ -154,7 +154,7 @@ class PayrollRunService
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'absence_days' => $absenceRecords->count() + $unpaidLeaveDays, 'penalty_days' => $penaltyDays,
-            'bonus'=>0, 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
+            'bonus'=>0, 'advance_earnings'=>$advancePlan['grant_amount'], 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
             'approved_attendance_ids' => $attendance->pluck('id')->all(), 'approved_overtime_request_ids' => $overtime['request_ids'], 'approved_other_request_ids' => $otherRequests->pluck('id')->all(),
             'absence_attendance_ids' => $absenceRecords->pluck('id')->all(),
             'approved_leave_ids' => $approvedLeaves->pluck('id')->all(), 'approved_penalty_ids' => $penalties->pluck('id')->all(),
@@ -177,6 +177,7 @@ class PayrollRunService
         $monthlyCap = round(max(0, $gross) * 0.10, 2);
         $remainingCapacity = $monthlyCap;
         $total = 0.0;
+        $grantAmount = 0.0;
         $details = [];
         foreach ($requests as $request) {
             $payload = is_array($request->payload) ? $request->payload : [];
@@ -184,6 +185,10 @@ class PayrollRunService
             $requestDate = $payload['request_date'] ?? $request->created_at?->toDateString();
             if ($amount <= 0 || !$requestDate) continue;
             $startMonth = Carbon::parse($requestDate)->startOfMonth()->addMonth();
+            if ($month->copy()->startOfMonth()->equalTo(Carbon::parse($requestDate)->startOfMonth())) {
+                $grantAmount += $amount;
+                continue;
+            }
             if ($month->copy()->startOfMonth()->lt($startMonth)) continue;
             $paid = 0.0;
             foreach ($priorRecords as $record) {
@@ -205,7 +210,7 @@ class PayrollRunService
                 'start_month' => $startMonth->toDateString(),
             ];
         }
-        return ['amount' => round($total, 2), 'details' => $details];
+        return ['amount' => round($total, 2), 'grant_amount' => round($grantAmount, 2), 'details' => $details];
     }
 
     /** Only approved overtime requests can authorize the potential overtime on attendance records. */

@@ -204,6 +204,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::post('/', [HrRequestController::class, 'store'])
             ->middleware('permission:requests.create')
             ->name('store');
+        Route::put('/{hrRequest}', [HrRequestController::class, 'update'])
+            ->middleware('permission:requests.create')
+            ->name('update');
         Route::patch('/{hrRequest}/approve', [HrRequestController::class, 'approve'])
             ->middleware('permission:requests.approve')
             ->name('approve');

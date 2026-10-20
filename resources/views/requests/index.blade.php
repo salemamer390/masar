@@ -8,7 +8,7 @@
         <p>طلبات السلف والأذونات والمأموريات وطلبات المستندات والطلبات الأخرى، مرتبطة مباشرة بقاعدة البيانات.</p>
     </div>
     @if(auth()->user()?->hasPermission('requests.create'))
-        <a href="#requestCreateModal" class="btn btn-primary" data-bs-toggle="modal"><i class="bi bi-plus-lg"></i> طلب جديد</a>
+        <a href="{{ route('requests.index', ['create' => 1]) }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> طلب جديد</a>
     @endif
 </div>
 
@@ -82,6 +82,42 @@
 
 @push('scripts')
 <script>
+// Normalize dynamically rendered delete forms so they always use the current
+// application's base URL and the CSRF token emitted by Laravel.
+document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+  const form = methodInput.form;
+  if (!form) return;
+  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = `${new URL('/requests/' + id, window.location.origin).pathname}`;
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  const tokenInput = form.querySelector('input[name="_token"]');
+  if (token && tokenInput) tokenInput.value = token;
+});
+</script>
+@endpush
+
+@push('scripts')
+<script>
+// Re-apply CSRF and URL normalization after the table script has replaced
+// action cells with edit/delete controls.
+document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+  const form = methodInput.form;
+  if (!form) return;
+  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  const tokenInput = form.querySelector('input[name="_token"]');
+  if (token && tokenInput) tokenInput.value = token;
+  form.dataset.ajax = 'true';
+  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
+  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
+  form.removeAttribute('onsubmit');
+});
+</script>
+@endpush
+
+@push('scripts')
+<script>
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
@@ -110,6 +146,42 @@
   type?.addEventListener('change', sync);
   sync();
 })();
+</script>
+@endpush
+
+@push('scripts')
+<script>
+document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+  const form = methodInput.form;
+  if (!form) return;
+  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  const tokenInput = form.querySelector('input[name="_token"]');
+  if (token && tokenInput) tokenInput.value = token;
+  form.dataset.ajax = 'true';
+  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
+  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
+  form.removeAttribute('onsubmit');
+});
+</script>
+@endpush
+
+@push('scripts')
+<script>
+document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+  const form = methodInput.form;
+  if (!form) return;
+  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  const tokenInput = form.querySelector('input[name="_token"]');
+  if (token && tokenInput) tokenInput.value = token;
+  form.dataset.ajax = 'true';
+  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
+  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
+  form.removeAttribute('onsubmit');
+});
 </script>
 @endpush
 
@@ -147,6 +219,8 @@ window.addEventListener('load', () => {
   #requestCreateModal .advance-field-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 190px;gap:12px;align-items:end}
   #requestCreateModal .advance-limit-box{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid #f1aeb5;border-radius:11px;background:#fff5f5;color:#842029;min-height:76px}
   #requestCreateModal .advance-limit-box strong{font-size:16px}.advance-limit-box small{font-size:11px}.advance-warning{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3cd;color:#856404;font-size:13px}.advance-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
+  #requestCreateModal .advance-existing-notice{margin-top:12px;padding:10px 12px;border:1px solid #b6d4fe;border-radius:10px;background:#eef6ff;color:#084298;font-size:13px;line-height:1.7}
+  #requestCreateModal .advance-existing-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
   @media(max-width:576px){#requestCreateModal .advance-field-grid{grid-template-columns:1fr}}
 </style>
 @endpush
@@ -155,8 +229,11 @@ window.addEventListener('load', () => {
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
+  const isEditingRequest = form.dataset.editing === '1';
   const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
   const employeeGrossSalaries = @json($employeeGrossSalaries);
+  const employeeRequestMonths = @json($employeeRequestMonths);
+  const employeeAdvanceWarnings = @json($employeeAdvanceWarnings);
   const employeeSelect = form.querySelector('select[name="employee_id"]');
   if (employeeSelect) {
     const wrapper = employeeSelect.parentElement;
@@ -202,6 +279,23 @@ window.addEventListener('load', () => {
   const advanceWarning = advanceCard.querySelector('[data-advance-warning]');
   const advanceConfirm = advanceCard.querySelector('[name="advance_over_limit_confirm"]');
   const employeeIdInput = form.querySelector('input[name="employee_id"]');
+  const existingAdvanceNotice = document.createElement('div');
+  existingAdvanceNotice.className = 'advance-existing-notice';
+  existingAdvanceNotice.hidden = true;
+  advanceCard.append(existingAdvanceNotice);
+  const existingAdvanceConfirm = document.createElement('input');
+  existingAdvanceConfirm.type = 'checkbox';
+  existingAdvanceConfirm.name = 'advance_existing_confirm';
+  existingAdvanceConfirm.value = '1';
+  existingAdvanceConfirm.required = false;
+  const existingAdvanceConfirmLabel = document.createElement('label');
+  existingAdvanceConfirmLabel.className = 'form-check-label';
+  existingAdvanceConfirmLabel.textContent = 'أؤكد أنني أريد إنشاء سلفة جديدة رغم وجود رصيد سابق غير مسدد.';
+  const existingAdvanceConfirmWrap = document.createElement('div');
+  existingAdvanceConfirmWrap.className = 'form-check advance-existing-confirm';
+  existingAdvanceConfirmWrap.hidden = true;
+  existingAdvanceConfirmWrap.append(existingAdvanceConfirm, existingAdvanceConfirmLabel);
+  advanceCard.append(existingAdvanceConfirmWrap);
   const formatMoney = (value) => `${Number(value || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ج.م`;
   const syncAdvance = () => {
     const active = advanceTypeIds.includes(String(type?.value || ''));
@@ -218,6 +312,25 @@ window.addEventListener('load', () => {
     advanceConfirm.closest('.advance-confirm').hidden = !overLimit;
     advanceConfirm.required = overLimit;
     if (!overLimit) advanceConfirm.checked = false;
+    const monthKey = advanceDate.value ? advanceDate.value.slice(0, 7) : '';
+    const duplicate = (employeeRequestMonths[employeeIdInput?.value] || []).includes(monthKey);
+    const previous = employeeAdvanceWarnings[employeeIdInput?.value];
+    if (isEditingRequest) {
+      existingAdvanceNotice.hidden = true;
+      existingAdvanceConfirmWrap.hidden = true;
+      existingAdvanceConfirm.required = false;
+      existingAdvanceConfirm.checked = false;
+      return;
+    }
+    existingAdvanceNotice.hidden = !previous && !duplicate;
+    existingAdvanceNotice.innerHTML = duplicate
+      ? '<i class="bi bi-exclamation-triangle"></i> يوجد طلب قائم لهذا الموظف داخل نفس الشهر، وسيتم رفض الطلب المكرر.'
+      : previous
+        ? `<i class="bi bi-info-circle"></i> سبق للموظف الحصول على سلفة بقيمة ${formatMoney(previous.original_amount)} بتاريخ ${previous.date || '—'}، والمتبقي منها ${formatMoney(previous.amount)}.`
+        : '';
+    existingAdvanceConfirmWrap.hidden = !previous;
+    existingAdvanceConfirm.required = !!previous;
+    if (!previous) existingAdvanceConfirm.checked = false;
   };
   advanceAmount.addEventListener('input', syncAdvance);
   employeeIdInput?.addEventListener('change', syncAdvance);
@@ -247,6 +360,78 @@ window.addEventListener('load', () => {
 @push('scripts')
 <script>
 const requestCardData=@json($requestCardDetails);const requestKeys=['all','pending','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المعلقة','الطلبات المعتمدة','الطلبات المرفوضة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
+</script>
+@endpush
+
+@push('scripts')
+<script>
+(() => {
+  const requestValueData = @json($requestValueData);
+  const editingRequest = @json($editingRequestData);
+  if (editingRequest) {
+    const editForm = document.querySelector('#requestCreateModal form');
+    if (editForm) {
+      editForm.dataset.editingId = String(editingRequest.id || '');
+      const title = editForm.querySelector('[name="title"]');
+      const details = editForm.querySelector('[name="details"]');
+      const employee = editForm.querySelector('[name="employee_id"]');
+      const type = editForm.querySelector('[name="request_type_id"]');
+      if (title) title.value = editingRequest.title || '';
+      if (details) { details.value = editingRequest.details || ''; details.required = false; }
+      if (employee) { employee.value = editingRequest.employee_id || ''; employee.disabled = true; employee.required = false; }
+      if (type) { type.value = editingRequest.request_type_id || ''; type.disabled = true; type.required = false; }
+      const heading = document.getElementById('requestCreateTitle');
+      if (heading) heading.textContent = '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0637\u0644\u0628';
+      const submit = editForm.querySelector('button[type="submit"]');
+      if (submit) submit.textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644';
+      const applyEditingFields = () => {
+        const payload = editingRequest.payload || {};
+        [employee, type].forEach((field) => field?.closest('.mb-3') && (field.closest('.mb-3').hidden = true));
+        const note = document.createElement('div');
+        note.className = 'alert alert-info py-2 mb-3';
+        note.textContent = '\u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0646\u0648\u0639 \u0627\u0644\u0637\u0644\u0628 \u062b\u0627\u0628\u062a\u0627\u0646 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062a\u0639\u062f\u064a\u0644.';
+        editForm.querySelector('.modal-body')?.prepend(note);
+        const lookup = editForm.querySelector('[name="employee_lookup"]');
+        const hiddenEmployee = editForm.querySelector('input[name="employee_id"]');
+        if (lookup) lookup.value = editingRequest.employee_name || '';
+        if (hiddenEmployee) hiddenEmployee.value = editingRequest.employee_id || '';
+        const set = (name, value) => { const field = editForm.querySelector(`[name="${name}"]`); if (field && value !== undefined && value !== null) field.value = value; };
+        set('advance_request_date', payload.request_date); set('advance_amount', payload.amount);
+        set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
+        set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
+        set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
+        const affects = editForm.querySelector('[name="affects_payroll"]'); if (affects) affects.checked = !!payload.affects_payroll;
+        set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
+        editForm.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      applyEditingFields();
+    }
+  }
+  const table = document.querySelector('.panel.table-panel table');
+  const header = table?.tHead?.rows[0];
+  if (!table || !header) return;
+  const valueHeader = document.createElement('th');
+  valueHeader.dataset.requestValue = 'true';
+  valueHeader.textContent = '\u0627\u0644\u0642\u064a\u0645\u0629';
+  header.cells[3]?.before(valueHeader);
+  [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row) => {
+    row.dataset.requestId ||= row.querySelector('a[href*="request="]')?.href.match(/request=(\d+)/)?.[1] || '';
+    const valueCell = document.createElement('td');
+    valueCell.textContent = requestValueData[row.dataset.requestId] || '—';
+    row.cells[3]?.before(valueCell);
+  });
+  const canEdit = @json(auth()->user()?->hasPermission('requests.create'));
+  const canDelete = @json(auth()->user()?->hasPermission('requests.delete'));
+  [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row) => {
+    const id = row.dataset.requestId || row.querySelector('a[href*="request="]')?.href.match(/request=(\d+)/)?.[1];
+    const actions = row.lastElementChild;
+    if (!id || !actions) return;
+    const buttons = [];
+    if (canEdit) buttons.push(`<a class="btn btn-sm btn-outline-primary" href="?edit=${id}" title="تعديل"><i class="bi bi-pencil"></i></a>`);
+    if (canDelete) buttons.push(`<form method="POST" action="/requests/${id}"><input type="hidden" name="_token" value="${typeof csrfToken !== 'undefined' ? csrfToken : ''}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>`);
+    if (buttons.length) actions.innerHTML = `<div class="d-flex gap-1 align-items-center">${buttons.join('')}</div>`;
+  });
+})();
 </script>
 @endpush
 
@@ -291,8 +476,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 <div class="modal fade" id="requestCreateModal" tabindex="-1" aria-labelledby="requestCreateTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <form method="POST" action="{{ route('requests.store') }}">
-                @csrf
+            <form method="POST" data-editing="{{ $editingRequest ? '1' : '0' }}" action="{{ $editingRequest ? route('requests.update', $editingRequest) : route('requests.store') }}">
+                @csrf @if($editingRequest) @method('PUT') @endif
                 <div class="modal-header"><h5 class="modal-title" id="requestCreateTitle">طلب HR جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
                     <div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required><option value="">اختر الموظف</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected(old('employee_id') == $employee->id)>{{ $employee->full_name }} @if($employee->employee_code) · {{ $employee->employee_code }} @endif</option>@endforeach</select></div>
@@ -363,15 +548,40 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     if (!(form instanceof HTMLFormElement)) return;
     if (form.closest('#requestCreateModal')) {
       const item = event.detail?.request;
-      if (item && requestTableBody) { requestTableBody.querySelector('td[colspan]')?.closest('tr')?.remove(); requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item)); wireHrRequestAjaxForms(requestTableBody); }
-      bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide(); form.reset();
+      if (item && requestTableBody && form.dataset.editingId) {
+        const row = requestTableBody.querySelector(`tr[data-request-id="${form.dataset.editingId}"]`);
+        if (row) {
+          const titleCell = row.children[0];
+          const titleLink = titleCell?.querySelector('a');
+          if (titleLink) titleLink.textContent = item.title || '';
+          const details = titleCell?.querySelector('.text-muted');
+          if (item.details && details) details.textContent = item.details;
+          if (row.children[3] && item.value !== undefined) row.children[3].textContent = item.value || '—';
+          if (row.children[5]) row.children[5].innerHTML = '<span class="badge-soft success">معتمد</span>';
+        }
+      } else if (item && requestTableBody) {
+        requestTableBody.querySelector('td[colspan]')?.closest('tr')?.remove();
+        requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));
+        const addedRow = requestTableBody.querySelector(`tr[data-request-id="${Number(item.id)}"]`);
+        if (addedRow) {
+          const actions = addedRow.lastElementChild;
+          if (actions) {
+            const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="تعديل"><i class="bi bi-pencil"></i></a>` : '';
+            const remove = @json(auth()->user()?->hasPermission('requests.delete')) ? `<form method="POST" action="${requestBaseUrl}/${Number(item.id)}"><input type="hidden" name="_token" value="${escapeRequestHtml(document.querySelector('meta[name=\"csrf-token\"]')?.content || '')}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
+            actions.innerHTML = `<div class="d-flex gap-1 align-items-center">${edit}${remove}</div>`;
+          }
+          if (addedRow.children[4]) addedRow.children[4].innerHTML = '<span class="badge-soft success">معتمد</span>';
+        }
+        wireHrRequestAjaxForms(requestTableBody);
+      }
+      bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide(); form.reset(); delete form.dataset.editingId;
     }
     if (form.querySelector('input[name="_method"][value="DELETE"]') && form.action.includes('/requests/')) form.closest('tr')?.remove();
   });
 </script>
 @endpush
 
-@if(request()->boolean('create') || $errors->hasAny(['employee_id', 'request_type_id', 'title', 'details']))
+@if(request()->boolean('create') || request()->filled('edit') || $errors->hasAny(['employee_id', 'request_type_id', 'title', 'details']))
 @push('scripts')
 <script>document.addEventListener('DOMContentLoaded',function(){const m=document.getElementById('requestCreateModal');if(m){bootstrap.Modal.getOrCreateInstance(m).show();}});</script>
 @endpush
@@ -404,5 +614,23 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
   type?.addEventListener('change', sync);
   sync();
 })();
+</script>
+@endpush
+
+@push('scripts')
+<script>
+document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
+  const form = methodInput.form;
+  if (!form) return;
+  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+  const tokenInput = form.querySelector('input[name="_token"]');
+  if (token && tokenInput) tokenInput.value = token;
+  form.dataset.ajax = 'true';
+  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
+  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
+  form.removeAttribute('onsubmit');
+});
 </script>
 @endpush

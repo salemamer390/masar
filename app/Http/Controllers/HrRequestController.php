@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\HrRequest;
+use App\Models\PayrollRecord;
 use App\Models\RequestType;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class HrRequestController extends Controller
 {
@@ -56,6 +59,28 @@ class HrRequestController extends Controller
             ->filter(fn (RequestType $type) => $type->source_key !== 'leave');
         $employees = $this->targetEmployees($user);
         $employeeGrossSalaries = $employees->mapWithKeys(fn (Employee $employee) => [$employee->id => (float) ($employee->gross_salary ?? 0)]);
+        $visibleRequestRows = HrRequest::visibleTo($user)->get(['employee_id', 'payload', 'status', 'created_at']);
+        $employeeRequestMonths = $visibleRequestRows->filter(fn (HrRequest $row) => $row->status !== 'Rejected')
+            ->groupBy('employee_id')
+            ->map(fn ($rows) => $rows->map(function (HrRequest $row) {
+                $date = data_get($row->payload, 'request_date') ?: $row->created_at?->toDateString();
+                return $date ? Carbon::parse($date)->format('Y-m') : null;
+            })->filter()->unique()->values()->all());
+        $employeeAdvanceWarnings = [];
+        $outstandingAdvances = $this->outstandingAdvancesFor($employees->pluck('id')->all());
+        $outstandingAdvanceRequests = HrRequest::whereIn('id', collect($outstandingAdvances)->pluck('request_id')->filter()->all())->get()->keyBy('id');
+        foreach ($employees as $employee) {
+            $warning = $outstandingAdvances[$employee->id] ?? ['amount' => 0.0, 'request_id' => null];
+            if ($warning['amount'] > 0) {
+                $advance = $outstandingAdvanceRequests->get($warning['request_id']);
+                $employeeAdvanceWarnings[$employee->id] = [
+                    'amount' => $warning['amount'],
+                    'request_id' => $warning['request_id'],
+                    'date' => data_get($advance?->payload, 'request_date') ?: $advance?->created_at?->toDateString(),
+                    'original_amount' => (float) data_get($advance?->payload, 'amount', 0),
+                ];
+            }
+        }
 
         $statsQuery = HrRequest::visibleTo($user);
         $stats = [
@@ -70,8 +95,24 @@ class HrRequestController extends Controller
             'approved' => (clone $statsQuery)->with('employee')->where('status', 'Approved')->latest('id')->get(),
             'rejected' => (clone $statsQuery)->with('employee')->where('status', 'Rejected')->latest('id')->get(),
         ];
+        $editingRequest = null;
+        if ($request->filled('edit')) {
+            $editingRequest = HrRequest::query()->with(['employee', 'requestType'])->visibleTo($user)->find($request->integer('edit'));
+        }
+        $editingRequestData = $editingRequest ? [
+            'id' => $editingRequest->id,
+            'title' => $editingRequest->title,
+            'details' => $editingRequest->details,
+            'employee_id' => $editingRequest->employee_id,
+            'employee_name' => $editingRequest->employee?->full_name,
+            'request_type_id' => $editingRequest->request_type_id,
+            'payload' => $editingRequest->payload,
+        ] : null;
+        $requestValueData = $requests->getCollection()->mapWithKeys(function (HrRequest $hrRequest) {
+            return [$hrRequest->id => $hrRequest->display_value];
+        });
 
-        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'employeeGrossSalaries', 'stats', 'selectedRequest', 'requestCardDetails'));
+        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'employeeGrossSalaries', 'employeeRequestMonths', 'employeeAdvanceWarnings', 'stats', 'selectedRequest', 'editingRequest', 'editingRequestData', 'requestValueData', 'requestCardDetails'));
     }
 
     public function store(Request $request)
@@ -103,6 +144,7 @@ class HrRequestController extends Controller
             'deduction_amount' => ['nullable', 'numeric', 'min:0'],
             'advance_amount' => ['nullable', 'numeric', 'gt:0'],
             'advance_over_limit_confirm' => ['nullable', 'boolean'],
+            'advance_existing_confirm' => ['nullable', 'accepted'],
         ]);
 
         $type = RequestType::active()->findOrFail($validated['request_type_id']);
@@ -129,6 +171,25 @@ class HrRequestController extends Controller
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
+        $requestDate = match ($type->source_key) {
+            'advance' => $validated['advance_request_date'] ?? null,
+            'overtime' => $validated['overtime_request_date'] ?? null,
+            'other' => $validated['other_request_date'] ?? null,
+            default => $validated['request_date'] ?? null,
+        };
+        if ($requestDate) {
+            $requestMonth = Carbon::parse($requestDate)->startOfMonth();
+            $duplicate = HrRequest::where('employee_id', $employee->id)
+                ->where('status', '!=', 'Rejected')
+                ->get(['payload', 'created_at'])
+                ->contains(function (HrRequest $existing) use ($requestMonth): bool {
+                    $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
+                    return $existingDate && Carbon::parse($existingDate)->isSameMonth($requestMonth);
+                });
+            if ($duplicate) {
+                throw ValidationException::withMessages(['request_date' => 'يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن إنشاء طلب آخر قبل معالجة الطلب الحالي.']);
+            }
+        }
         if ($type->source_key === 'advance') {
             $advanceValidated = $request->validate([
                 'advance_request_date' => ['required', 'date'],
@@ -138,6 +199,10 @@ class HrRequestController extends Controller
             $limit = (float) ($employee->gross_salary ?? 0) * 0.10;
             if ((float) $validated['advance_amount'] > $limit) {
                 $request->validate(['advance_over_limit_confirm' => ['accepted']]);
+            }
+            $outstandingAdvance = $this->outstandingAdvanceFor($employee->id);
+            if ($outstandingAdvance['amount'] > 0) {
+                $request->validate(['advance_existing_confirm' => ['accepted']]);
             }
         }
 
@@ -149,6 +214,9 @@ class HrRequestController extends Controller
                 'limit_amount' => $limit,
                 'exceeds_limit' => (float) $validated['advance_amount'] > $limit,
                 'over_limit_confirmed' => $request->boolean('advance_over_limit_confirm'),
+                'previous_outstanding_amount' => $outstandingAdvance['amount'],
+                'previous_outstanding_request_id' => $outstandingAdvance['request_id'],
+                'previous_outstanding_confirmed' => $request->boolean('advance_existing_confirm'),
             ]
             : ($type->source_key === 'overtime'
             ? ['request_date' => $validated['overtime_request_date'], 'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'], 'overtime_period' => $validated['overtime_period']]
@@ -171,8 +239,10 @@ class HrRequestController extends Controller
             'title' => $validated['title'],
             'details' => $validated['details'] ?? null,
             'payload' => $payload ?: null,
-            'status' => 'Pending',
+            'status' => 'Approved',
             'created_by' => $user->id,
+            'reviewed_by' => $user->id,
+            'reviewed_at' => now(),
         ]);
 
         ActivityLog::record('request_create', "تم إنشاء طلب HR: {$hrRequest->title} للموظف {$employee->full_name}.", $hrRequest, null, $hrRequest->toArray(), 'requests');
@@ -189,6 +259,7 @@ class HrRequestController extends Controller
                     'status' => $hrRequest->status,
                     'created_at' => $hrRequest->created_at?->toIso8601String(),
                     'request_type_label' => $hrRequest->requestType?->display_name ?? $hrRequest->request_type,
+                    'value' => $hrRequest->display_value,
                     'employee' => [
                         'id' => $hrRequest->employee?->id,
                         'full_name' => $hrRequest->employee?->full_name,
@@ -198,6 +269,81 @@ class HrRequestController extends Controller
         }
 
         return back()->with('toast', 'تم إنشاء الطلب وإرساله للمراجعة.');
+    }
+
+    public function update(Request $request, HrRequest $hrRequest)
+    {
+        $user = $request->user();
+        $this->authorizeVisible($hrRequest, $user);
+        abort_unless($user->hasPermission('requests.create'), 403, 'لا توجد صلاحية لتعديل الطلبات.');
+        $hrRequest->loadMissing(['requestType', 'employee']);
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:200'],
+            'details' => ['nullable', 'string', 'max:5000'],
+        ]);
+        $source = $hrRequest->requestType?->source_key ?: $hrRequest->request_type;
+        $payload = (array) ($hrRequest->payload ?? []);
+        if ($source === 'advance') {
+            $data = $request->validate(['advance_request_date' => ['required', 'date'], 'advance_amount' => ['required', 'numeric', 'gt:0']]);
+            $gross = (float) ($hrRequest->employee?->gross_salary ?? data_get($payload, 'gross_salary', 0));
+            $payload = array_merge($payload, ['request_date' => $data['advance_request_date'], 'amount' => (float) $data['advance_amount'], 'gross_salary' => $gross, 'limit_amount' => $gross * 0.10, 'exceeds_limit' => (float) $data['advance_amount'] > ($gross * 0.10)]);
+        } elseif ($source === 'overtime') {
+            $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0']]);
+            $hours = $data['overtime_period'] === 'day' ? $data['day_overtime_hours'] : $data['night_overtime_hours'];
+            $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => (float) $hours, 'overtime_period' => $data['overtime_period']]);
+        } elseif ($source === 'other') {
+            $data = $request->validate(['other_request_date' => ['required', 'date'], 'affects_payroll' => ['nullable', 'boolean'], 'impact_type' => ['required_if:affects_payroll,1', 'nullable', 'in:earning,deduction'], 'impact_amount' => ['required_if:affects_payroll,1', 'nullable', 'numeric', 'gt:0']]);
+            $payload = array_merge($payload, ['request_date' => $data['other_request_date'], 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $data['impact_type'] ?? null, 'amount' => $data['impact_amount'] ?? null]);
+        } else {
+            $data = $request->validate(['request_date' => ['nullable', 'date'], 'start_date' => ['nullable', 'date'], 'end_date' => ['nullable', 'date', 'after_or_equal:start_date'], 'duration_days' => ['nullable', 'numeric', 'min:0'], 'duration_hours' => ['nullable', 'numeric', 'min:0'], 'addition_amount' => ['nullable', 'numeric', 'min:0'], 'deduction_amount' => ['nullable', 'numeric', 'min:0']]);
+            $payload = collect(array_merge($payload, ['request_date' => $data['request_date'] ?? null, 'start_date' => $data['start_date'] ?? null, 'end_date' => $data['end_date'] ?? null, 'days' => $data['duration_days'] ?? null, 'hours' => $data['duration_hours'] ?? null, 'addition_amount' => $data['addition_amount'] ?? null, 'deduction_amount' => $data['deduction_amount'] ?? null]))->filter(fn ($value) => $value !== null && $value !== '')->all();
+        }
+        $old = $hrRequest->only(['title', 'details', 'payload', 'status']);
+        $hrRequest->update(array_merge($validated, ['payload' => $payload ?: null,
+            'status' => 'Approved',
+            'reviewed_by' => $user->id,
+            'reviewed_at' => now(),
+            'rejection_reason' => null,
+        ]));
+        ActivityLog::record('request_update', "تم تعديل طلب HR: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->fresh()->only(['title', 'details', 'status']), 'requests');
+        $updated = $hrRequest->fresh(['employee', 'requestType']);
+        $updated->setAttribute('value', $updated->display_value);
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => 'تم تعديل الطلب.', 'request' => $hrRequest->fresh(['employee', 'requestType'])])
+            : redirect()->route('requests.index')->with('toast', 'تم تعديل الطلب بنجاح.');
+    }
+
+    private function outstandingAdvanceFor(int $employeeId): array
+    {
+        return $this->outstandingAdvancesFor([$employeeId])[$employeeId] ?? ['amount' => 0.0, 'request_id' => null];
+    }
+
+    private function outstandingAdvancesFor(array $employeeIds): array
+    {
+        $advances = HrRequest::with('requestType')
+            ->whereIn('employee_id', $employeeIds)
+            ->where('status', 'Approved')
+            ->where(function ($query) {
+                $query->where('request_type', 'advance')
+                    ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
+            })->orderBy('id')->get();
+        $paidByRequest = [];
+        PayrollRecord::whereIn('employee_id', $employeeIds)
+            ->get(['calculation_snapshot'])
+            ->each(function (PayrollRecord $record) use (&$paidByRequest): void {
+                foreach ((array) data_get($record->calculation_snapshot, 'advance_details', []) as $detail) {
+                    $id = (int) ($detail['request_id'] ?? 0);
+                    if ($id > 0) $paidByRequest[$id] = ($paidByRequest[$id] ?? 0) + (float) ($detail['installment'] ?? 0);
+                }
+            });
+        $result = [];
+        foreach ($advances as $advance) {
+            if (isset($result[$advance->employee_id]) && $result[$advance->employee_id]['amount'] > 0) continue;
+            $amount = (float) data_get($advance->payload, 'amount', 0);
+            $remaining = round(max(0, $amount - (float) ($paidByRequest[$advance->id] ?? 0)), 2);
+            if ($remaining > 0) $result[$advance->employee_id] = ['amount' => $remaining, 'request_id' => $advance->id];
+        }
+        return $result;
     }
 
     public function approve(HrRequest $hrRequest, Request $request)
@@ -250,8 +396,6 @@ class HrRequestController extends Controller
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
         abort_unless($user->hasPermission('requests.delete'), 403);
-        abort_if($hrRequest->status !== 'Pending', 422, 'لا يمكن حذف طلب تمت مراجعته.');
-
         $snapshot = $hrRequest->toArray();
         $hrRequest->delete();
         ActivityLog::record('request_delete', "تم حذف الطلب: {$snapshot['title']}.", null, $snapshot, null, 'requests');

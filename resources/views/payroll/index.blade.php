@@ -108,9 +108,10 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   const payrollDetailsData = @json($payrollDetails);
   if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
     const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
-    const index = header ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(header) : -1;
+    const targetHeader = header || payrollDetailsTable.tHead.rows[0].cells[4];
+    const index = targetHeader ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(targetHeader) : -1;
     if (index >= 0) {
-      const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; header.after(advanceHeader);
+      const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; targetHeader.after(advanceHeader);
       [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2}) : '0.00'; row.cells[index]?.after(cell); });
     }
   }
@@ -131,6 +132,8 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     if (!record || !detailBody) return;
     detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
     detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
+    const earningsSection = detailBody.querySelectorAll('.payroll-detail-section')[1];
+    if (earningsSection && Number(record.advance_earnings || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('السلفة المصروفة', payrollMoney(record.advance_earnings)));
     bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
   };
   payrollDetailsRows.forEach((row, index) => {

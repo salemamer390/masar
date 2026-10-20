@@ -56,6 +56,7 @@ class PayrollController extends Controller
             'meal_allowance' => (float) $record->meal_allowance,
             'clothing_allowance' => (float) $record->clothing_allowance,
             'overtime_amount' => (float) $record->overtime_amount,
+            'advance_earnings' => (float) data_get($record->calculation_snapshot, 'inputs.advance_earnings', data_get($record->calculation_snapshot, 'advance_earnings', 0)),
             'absence_deduction' => (float) $record->absence_deduction,
             'penalties' => (float) $record->penalties,
             'loans' => (float) $record->loans,
@@ -155,6 +156,7 @@ class PayrollController extends Controller
         $data['loans'] = $advanceAmount;
         $inputs = array_merge($data, [
             'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
+            'advance_earnings'=>(float) data_get($snapshot, 'inputs.advance_earnings', 0),
         ]);
         $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance || !$insuranceDue);
         $result = $service->applyStructureStatutoryValues($result, $salary, $insuranceDue);
@@ -167,7 +169,7 @@ class PayrollController extends Controller
             'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
             'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],
-            'calculation_snapshot'=>array_merge($snapshot, ['insurance_due'=>$insuranceDue, 'advance_details'=>$updatedAdvanceDetails, 'advance_override_rate'=>$advanceRate, 'advance_override_amount'=>$advanceRate !== null ? $advanceAmount : null]),
+            'calculation_snapshot'=>array_merge($snapshot, ['insurance_due'=>$insuranceDue, 'advance_earnings'=>$inputs['advance_earnings'], 'advance_details'=>$updatedAdvanceDetails, 'advance_override_rate'=>$advanceRate, 'advance_override_amount'=>$advanceRate !== null ? $advanceAmount : null]),
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
         return $request->wantsJson()

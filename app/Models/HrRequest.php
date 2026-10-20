@@ -64,6 +64,17 @@ class HrRequest extends Model
         return $this->isAdvance() ? (float) data_get($this->payload, 'limit_amount', 0) : 0.0;
     }
 
+    public function getDisplayValueAttribute(): string
+    {
+        $source = $this->requestType?->source_key ?: $this->request_type;
+        if ($source === 'advance') return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
+        if ($source === 'overtime') return number_format((float) data_get($this->payload, 'hours', 0) * 60, 0).' دقيقة';
+        if ($source === 'other' && data_get($this->payload, 'amount') !== null) return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
+        if (data_get($this->payload, 'days') !== null) return number_format((float) data_get($this->payload, 'days', 0), 2).' يوم';
+        if (data_get($this->payload, 'hours') !== null) return number_format((float) data_get($this->payload, 'hours', 0), 2).' ساعة';
+        return '—';
+    }
+
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
         if ($user->isSuperAdmin()) {
