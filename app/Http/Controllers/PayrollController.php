@@ -58,6 +58,7 @@ class PayrollController extends Controller
             'overtime_amount' => (float) $record->overtime_amount,
             'absence_deduction' => (float) $record->absence_deduction,
             'penalties' => (float) $record->penalties,
+            'loans' => (float) $record->loans,
             'employee_insurance' => (float) $record->employee_insurance,
             'income_tax' => (float) $record->income_tax,
             'martyrs_fund' => (float) $record->martyrs_fund,
@@ -122,6 +123,7 @@ class PayrollController extends Controller
         $data = $request->validate([
             'ot_day_hours'=>['nullable','numeric','min:0'], 'ot_night_hours'=>['nullable','numeric','min:0'],
             'bonus'=>['nullable','numeric','min:0'], 'loans'=>['nullable','numeric','min:0'],
+            'advance_rate'=>['nullable','numeric','min:0','max:100'],
             'other_earnings'=>['nullable','numeric','min:0'], 'other_deductions'=>['nullable','numeric','min:0'],
         ]);
         $salary = $payrollRecord->salary ?? Salary::find($payrollRecord->salary_id);
@@ -130,6 +132,27 @@ class PayrollController extends Controller
         $insuranceDue = $insuranceDueSnapshot === null
             ? $this->insuranceDueForExistingRecord($payrollRecord)
             : (bool) $insuranceDueSnapshot;
+        $snapshot = $payrollRecord->calculation_snapshot ?? [];
+        $advanceDetails = (array) ($snapshot['advance_details'] ?? []);
+        $advanceAvailable = round(collect($advanceDetails)->sum(fn ($detail) => (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0)), 2);
+        $advanceRate = $request->filled('advance_rate') ? (float) $data['advance_rate'] : null;
+        $advanceAmount = $advanceRate !== null ? round((float) $payrollRecord->gross_salary * $advanceRate / 100, 2) : (float) ($data['loans'] ?? 0);
+        if ($advanceDetails && $advanceAmount > $advanceAvailable) {
+            return back()->withErrors(['advance_rate' => 'قيمة خصم السلفة تتجاوز الرصيد المتبقي منها.']);
+        }
+        if (!$advanceDetails && $advanceRate !== null && $advanceAmount > 0) {
+            return back()->withErrors(['advance_rate' => 'لا توجد سلفة مجدولة لهذا الموظف في هذا المسير.']);
+        }
+        $remainingToAllocate = $advanceAmount;
+        $updatedAdvanceDetails = array_map(function (array $detail) use (&$remainingToAllocate): array {
+            $available = round((float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0), 2);
+            $installment = round(min($available, $remainingToAllocate), 2);
+            $remainingToAllocate = round($remainingToAllocate - $installment, 2);
+            $detail['installment'] = $installment;
+            $detail['remaining_after'] = round($available - $installment, 2);
+            return $detail;
+        }, $advanceDetails);
+        $data['loans'] = $advanceAmount;
         $inputs = array_merge($data, [
             'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
         ]);
@@ -144,7 +167,7 @@ class PayrollController extends Controller
             'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
             'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],
-            'calculation_snapshot'=>array_merge($payrollRecord->calculation_snapshot ?? [], ['insurance_due'=>$insuranceDue]),
+            'calculation_snapshot'=>array_merge($snapshot, ['insurance_due'=>$insuranceDue, 'advance_details'=>$updatedAdvanceDetails, 'advance_override_rate'=>$advanceRate, 'advance_override_amount'=>$advanceRate !== null ? $advanceAmount : null]),
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
         return $request->wantsJson()

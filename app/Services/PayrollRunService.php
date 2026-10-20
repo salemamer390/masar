@@ -94,7 +94,7 @@ class PayrollRunService
                     'penalty_deduction' => $calculation['penalty_deduction'], 'net_salary' => $calculation['net_monthly'],
                     'status' => 'Draft', 'is_locked' => false,
                     'calculation_snapshot' => array_merge($structure, $calculation, [
-                        'inputs' => $inputs, 'settings' => $run->settings_snapshot,
+                        'inputs' => $inputs, 'advance_details' => $inputs['advance_details'] ?? [], 'settings' => $run->settings_snapshot,
                         'insurance_due' => $insuranceDue,
                         'service_start' => $serviceWindow['start']->toDateString(),
                         'service_end' => $serviceWindow['end']->toDateString(),
@@ -149,15 +149,63 @@ class PayrollRunService
             ->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)
             ->sum(fn (Leave $leave) => $this->leaveDaysWithinMonth($leave, $month));
         $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
+        $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross']);
 
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'absence_days' => $absenceRecords->count() + $unpaidLeaveDays, 'penalty_days' => $penaltyDays,
-            'bonus'=>0, 'loans'=>0, 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
+            'bonus'=>0, 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
             'approved_attendance_ids' => $attendance->pluck('id')->all(), 'approved_overtime_request_ids' => $overtime['request_ids'], 'approved_other_request_ids' => $otherRequests->pluck('id')->all(),
             'absence_attendance_ids' => $absenceRecords->pluck('id')->all(),
             'approved_leave_ids' => $approvedLeaves->pluck('id')->all(), 'approved_penalty_ids' => $penalties->pluck('id')->all(),
         ];
+    }
+
+    /** Approved advances start in the month after the request date and are capped at 10% of gross monthly salary. */
+    private function advanceDeduction(Employee $employee, Carbon $month, float $gross): array
+    {
+        $requests = HrRequest::with('requestType')
+            ->where('employee_id', $employee->id)
+            ->where('status', 'Approved')
+            ->where(function ($query) {
+                $query->where('request_type', 'advance')
+                    ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
+            })->get();
+        $priorRecords = PayrollRecord::where('employee_id', $employee->id)
+            ->where('payroll_month', '<', $month->toDateString())
+            ->get(['payroll_month', 'calculation_snapshot']);
+        $monthlyCap = round(max(0, $gross) * 0.10, 2);
+        $remainingCapacity = $monthlyCap;
+        $total = 0.0;
+        $details = [];
+        foreach ($requests as $request) {
+            $payload = is_array($request->payload) ? $request->payload : [];
+            $amount = (float) ($payload['amount'] ?? 0);
+            $requestDate = $payload['request_date'] ?? $request->created_at?->toDateString();
+            if ($amount <= 0 || !$requestDate) continue;
+            $startMonth = Carbon::parse($requestDate)->startOfMonth()->addMonth();
+            if ($month->copy()->startOfMonth()->lt($startMonth)) continue;
+            $paid = 0.0;
+            foreach ($priorRecords as $record) {
+                foreach ((array) data_get($record->calculation_snapshot, 'advance_details', []) as $detail) {
+                    if ((int) ($detail['request_id'] ?? 0) === (int) $request->id) $paid += (float) ($detail['installment'] ?? 0);
+                }
+            }
+            $remaining = round(max(0, $amount - $paid), 2);
+            if ($remaining <= 0 || $remainingCapacity <= 0) continue;
+            $installment = round(min($remaining, $remainingCapacity), 2);
+            $total += $installment;
+            $remainingCapacity = round($remainingCapacity - $installment, 2);
+            $details[] = [
+                'request_id' => $request->id,
+                'amount' => $amount,
+                'paid_before' => round($paid, 2),
+                'installment' => $installment,
+                'remaining_after' => round($remaining - $installment, 2),
+                'start_month' => $startMonth->toDateString(),
+            ];
+        }
+        return ['amount' => round($total, 2), 'details' => $details];
     }
 
     /** Only approved overtime requests can authorize the potential overtime on attendance records. */

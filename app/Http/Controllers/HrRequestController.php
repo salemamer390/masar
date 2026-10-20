@@ -55,6 +55,7 @@ class HrRequestController extends Controller
         $requestTypes = RequestType::active()->orderBy('sort_order')->orderBy('id')->get()
             ->filter(fn (RequestType $type) => $type->source_key !== 'leave');
         $employees = $this->targetEmployees($user);
+        $employeeGrossSalaries = $employees->mapWithKeys(fn (Employee $employee) => [$employee->id => (float) ($employee->gross_salary ?? 0)]);
 
         $statsQuery = HrRequest::visibleTo($user);
         $stats = [
@@ -70,7 +71,7 @@ class HrRequestController extends Controller
             'rejected' => (clone $statsQuery)->with('employee')->where('status', 'Rejected')->latest('id')->get(),
         ];
 
-        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'stats', 'selectedRequest', 'requestCardDetails'));
+        return view('requests.index', compact('requests', 'requestTypes', 'employees', 'employeeGrossSalaries', 'stats', 'selectedRequest', 'requestCardDetails'));
     }
 
     public function store(Request $request)
@@ -85,44 +86,74 @@ class HrRequestController extends Controller
             'title' => ['required', 'string', 'max:200'],
             'details' => ['required', 'string', 'max:5000'],
             'request_date' => ['nullable', 'date'],
+            'advance_request_date' => ['nullable', 'date'],
+            'overtime_request_date' => ['nullable', 'date'],
+            'other_request_date' => ['nullable', 'date'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'duration_days' => ['nullable', 'numeric', 'min:0'],
             'duration_hours' => ['nullable', 'numeric', 'min:0'],
+            'day_overtime_hours' => ['nullable', 'numeric', 'min:0'],
+            'night_overtime_hours' => ['nullable', 'numeric', 'min:0'],
             'overtime_period' => ['nullable', 'in:day,night'],
             'affects_payroll' => ['nullable', 'boolean'],
             'impact_type' => ['nullable', 'in:earning,deduction'],
             'impact_amount' => ['nullable', 'numeric', 'min:0'],
             'addition_amount' => ['nullable', 'numeric', 'min:0'],
             'deduction_amount' => ['nullable', 'numeric', 'min:0'],
+            'advance_amount' => ['nullable', 'numeric', 'gt:0'],
+            'advance_over_limit_confirm' => ['nullable', 'boolean'],
         ]);
 
         $type = RequestType::active()->findOrFail($validated['request_type_id']);
         if ($type->source_key === 'overtime') {
-            $request->validate([
-                'request_date' => ['required', 'date'],
-                'duration_hours' => ['required', 'numeric', 'gt:0'],
+            $overtimeValidated = $request->validate([
+                'overtime_request_date' => ['required', 'date'],
                 'overtime_period' => ['required', 'in:day,night'],
+                'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'],
+                'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'],
             ]);
+            $validated = array_merge($validated, $overtimeValidated);
         }
         if ($type->source_key === 'other' && $request->boolean('affects_payroll')) {
-            $request->validate([
-                'request_date' => ['required', 'date'],
+            $otherValidated = $request->validate([
+                'other_request_date' => ['required', 'date'],
                 'impact_amount' => ['required', 'numeric', 'gt:0'],
                 'impact_type' => ['required', 'in:earning,deduction'],
             ]);
+            $validated = array_merge($validated, $otherValidated);
         }
         if ($type->source_key === 'other' && !$request->boolean('affects_payroll')) {
-            $request->validate(['request_date' => ['required', 'date']]);
+            $validated = array_merge($validated, $request->validate(['other_request_date' => ['required', 'date']]));
         }
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
+        if ($type->source_key === 'advance') {
+            $advanceValidated = $request->validate([
+                'advance_request_date' => ['required', 'date'],
+                'advance_amount' => ['required', 'numeric', 'gt:0'],
+            ]);
+            $validated = array_merge($validated, $advanceValidated);
+            $limit = (float) ($employee->gross_salary ?? 0) * 0.10;
+            if ((float) $validated['advance_amount'] > $limit) {
+                $request->validate(['advance_over_limit_confirm' => ['accepted']]);
+            }
+        }
 
-        $payload = $type->source_key === 'overtime'
-            ? ['request_date' => $validated['request_date'], 'hours' => $validated['duration_hours'], 'overtime_period' => $validated['overtime_period']]
+        $payload = $type->source_key === 'advance'
+            ? [
+                'request_date' => $validated['advance_request_date'],
+                'amount' => (float) $validated['advance_amount'],
+                'gross_salary' => (float) ($employee->gross_salary ?? 0),
+                'limit_amount' => $limit,
+                'exceeds_limit' => (float) $validated['advance_amount'] > $limit,
+                'over_limit_confirmed' => $request->boolean('advance_over_limit_confirm'),
+            ]
+            : ($type->source_key === 'overtime'
+            ? ['request_date' => $validated['overtime_request_date'], 'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'], 'overtime_period' => $validated['overtime_period']]
             : ($type->source_key === 'other'
-                ? collect(['request_date' => $validated['request_date'] ?? null, 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $validated['impact_type'] ?? null, 'amount' => $validated['impact_amount'] ?? null])->filter(fn ($value) => $value !== null && $value !== '')->all()
+                ? collect(['request_date' => $validated['other_request_date'] ?? null, 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $validated['impact_type'] ?? null, 'amount' => $validated['impact_amount'] ?? null])->filter(fn ($value) => $value !== null && $value !== '')->all()
             : collect([
             'request_date' => $validated['request_date'] ?? null,
             'start_date' => $validated['start_date'] ?? null,
@@ -131,7 +162,7 @@ class HrRequestController extends Controller
             'hours' => $validated['duration_hours'] ?? null,
             'addition_amount' => $validated['addition_amount'] ?? null,
             'deduction_amount' => $validated['deduction_amount'] ?? null,
-        ])->filter(fn ($value) => $value !== null && $value !== '')->all());
+        ])->filter(fn ($value) => $value !== null && $value !== '')->all()));
 
         $hrRequest = HrRequest::create([
             'employee_id' => $employee->id,

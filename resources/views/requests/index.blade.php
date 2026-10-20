@@ -96,9 +96,10 @@
   fields.hidden = true;
   fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control"></div>';
   modalFooter?.before(fields);
-  const date = fields.querySelector('[name="request_date"]');
+  const date = fields.querySelector('input[type="date"]');
   const period = fields.querySelector('[name="overtime_period"]');
-  const hours = fields.querySelector('[name="duration_hours"]');
+  const hours = fields.querySelector('input[type="number"]');
+  period?.addEventListener('change', () => { hours.name = period.value === 'night' ? 'night_overtime_hours' : 'day_overtime_hours'; });
   const sync = () => {
     const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
     fields.hidden = !isOvertime;
@@ -112,12 +113,41 @@
 </script>
 @endpush
 
+@push('scripts')
+<script>
+window.addEventListener('load', () => {
+  const form = document.querySelector('#requestCreateModal form');
+  if (!form) return;
+  const overtime = form.querySelector('.overtime-request-fields');
+  const advance = form.querySelector('.advance-request-fields');
+  const other = [...form.querySelectorAll('.request-conditional-card')].find((card) => card !== overtime && card !== advance);
+  const overtimeDate = overtime?.querySelector('input[type="date"]');
+  const overtimePeriod = overtime?.querySelector('[name="overtime_period"]');
+  const overtimeHours = overtime?.querySelector('input[type="number"]');
+  if (overtimeDate) overtimeDate.name = 'overtime_request_date';
+  if (overtimeHours) {
+    const syncOvertimeHoursName = () => { overtimeHours.name = overtimePeriod?.value === 'night' ? 'night_overtime_hours' : 'day_overtime_hours'; };
+    overtimePeriod?.addEventListener('change', syncOvertimeHoursName);
+    syncOvertimeHoursName();
+  }
+  const advanceDate = advance?.querySelector('input[type="date"]');
+  if (advanceDate) advanceDate.name = 'advance_request_date';
+  const otherDate = other?.querySelector('input[type="date"]');
+  if (otherDate) otherDate.name = 'other_request_date';
+});
+</script>
+@endpush
+
 @push('styles')
 <style>
   #requestCreateModal .request-conditional-card{width:min(100%,520px);margin:14px auto 0;border:1px solid #dbe7f5;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#fff);padding:16px;box-shadow:0 8px 22px rgba(31,73,125,.06)}
   #requestCreateModal .request-conditional-card .form-label{font-weight:700;color:#16325c;margin-bottom:7px}
   #requestCreateModal .request-conditional-card .form-control,#requestCreateModal .request-conditional-card .form-select{border-radius:11px;min-height:44px;border-color:#d8e4f2}
   #requestCreateModal .request-conditional-card[hidden]{display:none!important}
+  #requestCreateModal .advance-field-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 190px;gap:12px;align-items:end}
+  #requestCreateModal .advance-limit-box{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid #f1aeb5;border-radius:11px;background:#fff5f5;color:#842029;min-height:76px}
+  #requestCreateModal .advance-limit-box strong{font-size:16px}.advance-limit-box small{font-size:11px}.advance-warning{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3cd;color:#856404;font-size:13px}.advance-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
+  @media(max-width:576px){#requestCreateModal .advance-field-grid{grid-template-columns:1fr}}
 </style>
 @endpush
 @push('scripts')
@@ -126,6 +156,7 @@
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
   const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
+  const employeeGrossSalaries = @json($employeeGrossSalaries);
   const employeeSelect = form.querySelector('select[name="employee_id"]');
   if (employeeSelect) {
     const wrapper = employeeSelect.parentElement;
@@ -139,6 +170,7 @@
       const query = lookup.value.trim().toLocaleLowerCase();
       const found = employees.find((employee) => `${employee.name} — #${employee.code}`.toLocaleLowerCase() === query || String(employee.code || '').toLocaleLowerCase() === query || String(employee.name || '').toLocaleLowerCase() === query);
       hidden.value = found?.id || '';
+      hidden.dispatchEvent(new Event('change'));
     };
     lookup.addEventListener('input', syncEmployee); lookup.addEventListener('change', syncEmployee);
   }
@@ -157,6 +189,58 @@
   affects.addEventListener('change', syncImpact);
   const syncOther = () => { const isOther = typeMeta[type?.value]?.source === 'other'; otherCard.hidden = !isOther; otherDate.required = isOther; if (isOther && !otherDate.value) otherDate.value = @json(today()->toDateString()); if (!isOther) { otherDate.value = ''; affects.checked = false; syncImpact(); } };
   type?.addEventListener('change', syncOther); syncOther(); syncImpact();
+
+  const advanceTypeIds = Object.entries(typeMeta).filter(([, meta]) => meta.source === 'advance').map(([id]) => String(id));
+  const advanceCard = document.createElement('div');
+  advanceCard.className = 'request-conditional-card advance-request-fields';
+  advanceCard.hidden = true;
+  advanceCard.innerHTML = '<div class="advance-field-grid"><div><label class="form-label">تاريخ طلب السلفة</label><input type="date" name="request_date" class="form-control" required></div><div><label class="form-label">مبلغ السلفة (جنيه)</label><input type="number" name="advance_amount" class="form-control" min="0.01" step="0.01"></div><div class="advance-limit-box"><span>الحد الافتراضي للسلفة</span><strong data-advance-limit>—</strong><small>10% من الراتب الإجمالي</small></div></div><div class="advance-warning" data-advance-warning hidden><i class="bi bi-exclamation-triangle"></i><span>المبلغ يتجاوز 10% من الراتب الإجمالي. يلزم تأكيد المتابعة.</span></div><div class="form-check advance-confirm" data-advance-confirm hidden><input class="form-check-input" type="checkbox" name="advance_over_limit_confirm" value="1" id="advanceOverLimitConfirm"><label class="form-check-label" for="advanceOverLimitConfirm">أؤكد أن مبلغ السلفة يتجاوز الحد الافتراضي وأرغب في المتابعة.</label></div>';
+  form.querySelector('.modal-footer')?.before(advanceCard);
+  const advanceAmount = advanceCard.querySelector('[name="advance_amount"]');
+  const advanceDate = advanceCard.querySelector('[name="request_date"]');
+  const advanceLimit = advanceCard.querySelector('[data-advance-limit]');
+  const advanceWarning = advanceCard.querySelector('[data-advance-warning]');
+  const advanceConfirm = advanceCard.querySelector('[name="advance_over_limit_confirm"]');
+  const employeeIdInput = form.querySelector('input[name="employee_id"]');
+  const formatMoney = (value) => `${Number(value || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ج.م`;
+  const syncAdvance = () => {
+    const active = advanceTypeIds.includes(String(type?.value || ''));
+    advanceCard.hidden = !active;
+    if (!active) { advanceDate.value = ''; advanceDate.required = false; advanceAmount.value = ''; advanceAmount.required = false; advanceWarning.hidden = true; advanceConfirm.checked = false; advanceConfirm.required = false; return; }
+    advanceDate.required = true;
+    if (!advanceDate.value) advanceDate.value = @json(today()->toDateString());
+    advanceAmount.required = true;
+    const gross = Number(employeeGrossSalaries[employeeIdInput?.value] || 0);
+    const limit = gross * 0.10;
+    advanceLimit.textContent = gross > 0 ? formatMoney(limit) : 'اختر الموظف أولًا';
+    const overLimit = Number(advanceAmount.value || 0) > limit;
+    advanceWarning.hidden = !overLimit;
+    advanceConfirm.closest('.advance-confirm').hidden = !overLimit;
+    advanceConfirm.required = overLimit;
+    if (!overLimit) advanceConfirm.checked = false;
+  };
+  advanceAmount.addEventListener('input', syncAdvance);
+  employeeIdInput?.addEventListener('change', syncAdvance);
+  type?.addEventListener('change', syncAdvance);
+  syncAdvance();
+
+  // Multiple conditional sections use request_date. Submit only the date
+  // belonging to the selected request type so hidden sections cannot
+  // overwrite the active value with an empty one.
+  form.addEventListener('submit', () => {
+    const source = typeMeta[type?.value]?.source;
+    const activeDate = source === 'advance'
+      ? advanceDate
+      : source === 'overtime'
+        ? overtimeCard?.querySelector('[name="request_date"]')
+        : source === 'other'
+          ? otherDate
+          : null;
+    form.querySelectorAll('[name="request_date"]').forEach((input) => {
+      input.disabled = input !== activeDate;
+    });
+    if (activeDate) activeDate.disabled = false;
+  });
 })();
 </script>
 @endpush

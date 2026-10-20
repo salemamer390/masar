@@ -67,6 +67,27 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 @endif
 </script>
 @endpush
+
+@push('scripts')
+<script>
+(() => {
+  const advanceRates = @json($records->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_override_rate')]));
+  const advanceSchedules = @json($records->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_details', [])]));
+  document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => {
+    if (form.querySelector('[name="advance_rate"]')) return;
+    const loans = form.querySelector('[name="loans"]');
+    if (!loans) return;
+    const recordId = form.action.match(/\/payroll\/(\d+)\/?$/)?.[1];
+    if ((advanceSchedules[recordId] || []).length) { loans.readOnly = true; loans.title = 'يتم تحديد السلفة من نسبة الخصم اليدوية أو الحساب التلقائي'; }
+    const wrapper = document.createElement('div');
+    wrapper.className = 'col-6';
+    wrapper.innerHTML = '<label class="form-label">نسبة خصم السلفة (%)</label><input type="number" name="advance_rate" min="0" max="100" step="0.01" class="form-control" placeholder="تلقائي حسب 10%"><small class="text-muted">يُحسب المبلغ من الراتب الإجمالي ولا يتجاوز الرصيد.</small>';
+    wrapper.querySelector('input').value = advanceRates[recordId] ?? '';
+    loans.closest('.col-6')?.after(wrapper);
+  });
+})();
+</script>
+@endpush
 @endsection
 
 @push('scripts')
@@ -85,6 +106,14 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     });
   }
   const payrollDetailsData = @json($payrollDetails);
+  if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
+    const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
+    const index = header ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(header) : -1;
+    if (index >= 0) {
+      const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; header.after(advanceHeader);
+      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2}) : '0.00'; row.cells[index]?.after(cell); });
+    }
+  }
   const payrollMoney = (value) => Number(value || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
   const payrollDetailsRows = payrollDetailsTable ? [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]) : [];
   const detailPanel = document.createElement('div');
@@ -101,7 +130,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   const openPayrollDetails = (record) => {
     if (!record || !detailBody) return;
     detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
-    detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
+    detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
     bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
   };
   payrollDetailsRows.forEach((row, index) => {
