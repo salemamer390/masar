@@ -416,11 +416,27 @@ class HrRequestController extends Controller
         $this->authorizeVisible($hrRequest, $user);
         abort_unless($user->hasPermission('requests.delete'), 403);
         $snapshot = $hrRequest->toArray();
+        $deletedEmployeeId = (int) $hrRequest->employee_id;
+        $deletedRequestDate = data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toDateString();
         $hrRequest->delete();
         ActivityLog::record('request_delete', "تم حذف الطلب: {$snapshot['title']}.", null, $snapshot, null, 'requests');
 
+        $remainingAdvance = $this->outstandingAdvanceFor($deletedEmployeeId);
+        if (($remainingAdvance['amount'] ?? 0) > 0 && !empty($remainingAdvance['request_id'])) {
+            $remainingRequest = HrRequest::find($remainingAdvance['request_id']);
+            $remainingAdvance['date'] = data_get($remainingRequest?->payload, 'request_date') ?: $remainingRequest?->created_at?->toDateString();
+            $remainingAdvance['original_amount'] = (float) data_get($remainingRequest?->payload, 'amount', $remainingAdvance['amount']);
+        }
+
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'HR request deleted.', 'request_id' => $snapshot['id']])
+            ? response()->json([
+                'success' => true,
+                'message' => 'تم حذف الطلب بنجاح.',
+                'request_id' => $snapshot['id'],
+                'employee_id' => $deletedEmployeeId,
+                'request_date' => $deletedRequestDate,
+                'remaining_advance' => $remainingAdvance,
+            ])
             : back()->with('toast', 'تم حذف الطلب.');
     }
 

@@ -75,11 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.confirm('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061f')) return;
     form.dataset.busy = '1';
     const row = form.closest('tr');
+    const employeeId = row?.dataset.employeeId || row?.querySelector('td:nth-child(2) a[href*="/employees/"]')?.href.match(/\/employees\/(\d+)/)?.[1] || '';
     row?.classList.add('request-row-removing');
     try {
       const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' } });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
+      document.dispatchEvent(new CustomEvent('masar:request-deleted', { detail: { ...payload, employee_id: payload.employee_id || employeeId } }));
       setTimeout(() => row?.remove(), 260);
       window.showToast?.(payload.message || '\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628 \u0628\u0646\u062c\u0627\u062d.');
     } catch (error) {
@@ -173,6 +175,15 @@ document.addEventListener('DOMContentLoaded', () => {
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
+  // Status is controlled by the request workflow and must never be an edit
+  // field. Remove any stale field left by an older cached template/script.
+  const removeWorkflowStatusField = () => {
+    form.querySelectorAll('[name="status"], [name="request_status"], [data-request-status-field]').forEach((field) => {
+      const group = field.closest('.mb-3, .form-group, .row, .request-status-field');
+      if (group && group !== form) group.remove(); else field.remove();
+    });
+  };
+  removeWorkflowStatusField();
   form.querySelector('[name="details"]')?.setAttribute('required', 'required');
   const type = form.querySelector('[name="request_type_id"]');
   const modalFooter = form.querySelector('.modal-footer');
@@ -250,6 +261,20 @@ window.addEventListener('load', () => {
   const employeeGrossSalaries = @json($employeeGrossSalaries);
   const employeeRequestMonths = @json($employeeRequestMonths);
   const employeeAdvanceWarnings = @json($employeeAdvanceWarnings);
+  // Keep the client-side warnings synchronized after an AJAX deletion. The
+  // page must not continue showing a warning for a request that was removed.
+  document.addEventListener('masar:request-deleted', (event) => {
+    const detail = event.detail || {};
+    const employeeId = String(detail.employee_id || '');
+    if (!employeeId) return;
+    const remaining = detail.remaining_advance || {};
+    if (Number(remaining.amount || 0) > 0) employeeAdvanceWarnings[employeeId] = remaining;
+    else delete employeeAdvanceWarnings[employeeId];
+    const month = detail.request_date ? String(detail.request_date).slice(0, 7) : '';
+    if (month && Array.isArray(employeeRequestMonths[employeeId])) {
+      employeeRequestMonths[employeeId] = employeeRequestMonths[employeeId].filter((value) => value !== month);
+    }
+  });
   const employeeSelect = form.querySelector('select[name="employee_id"]');
   if (employeeSelect) {
     const wrapper = employeeSelect.parentElement;
@@ -435,6 +460,10 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
       const details = editForm.querySelector('[name="details"]');
       const employee = editForm.querySelector('[name="employee_id"]');
       const type = editForm.querySelector('[name="request_type_id"]');
+      editForm.querySelectorAll('[name="status"], [name="request_status"], [data-request-status-field]').forEach((field) => {
+        const group = field.closest('.mb-3, .form-group, .row, .request-status-field');
+        if (group && group !== editForm) group.remove(); else field.remove();
+      });
       if (title) title.value = editingRequest.title || '';
       if (details) { details.value = editingRequest.details || ''; details.required = false; }
       if (employee) { employee.value = editingRequest.employee_id || ''; employee.disabled = true; employee.required = false; }
@@ -514,7 +543,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
             <thead><tr><th>الطلب</th><th>الموظف</th><th>النوع</th><th>التاريخ</th><th>الحالة</th><th>الإجراء</th></tr></thead>
             <tbody>
             @forelse($requests as $hrRequest)
-                <tr>
+                <tr data-request-id="{{ $hrRequest->id }}" data-employee-id="{{ $hrRequest->employee_id }}">
                     <td>
                         <a href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" class="fw-bold">{{ $hrRequest->title }}</a>
                         @if($hrRequest->details)<div class="text-muted small mt-1">{{ mb_strimwidth($hrRequest->details, 0, 70, '…') }}</div>@endif
