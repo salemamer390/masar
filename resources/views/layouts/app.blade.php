@@ -405,7 +405,7 @@
   // controller has confirmed a successful, authorized server-side change.
   document.addEventListener('submit', async (event) => {
     const form = event.target;
-    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true') return;
+    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true' || form.classList.contains('request-delete-form')) return;
 
     if (form.dataset.ajaxConfirm && !window.confirm(form.dataset.ajaxConfirm)) {
       event.preventDefault();

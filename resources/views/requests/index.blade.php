@@ -2,6 +2,84 @@
 @section('title', 'الطلبات')
 
 @section('content')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const button = document.querySelector('a[href*="create=1"]');
+  if (!button) return;
+  button.id = 'newRequestButton';
+  button.href = '#requestCreateModal';
+  button.dataset.storeUrl = @json(route('requests.store'));
+  button.dataset.bsToggle = 'modal';
+  button.addEventListener('click', () => {
+    const form = document.querySelector('#requestCreateModal form');
+    if (!form) return;
+    form.action = button.dataset.storeUrl;
+    form.dataset.editing = '0';
+    delete form.dataset.editingId;
+    form.querySelector('input[name="_method"]')?.remove();
+    form.reset();
+    form.querySelectorAll('[name="employee_id"], [name="request_type_id"]').forEach((field) => {
+      field.disabled = false; field.required = true; field.closest('.mb-3')?.removeAttribute('hidden');
+    });
+    const lookup = form.querySelector('[name="employee_lookup"]');
+    if (lookup) { lookup.value = ''; lookup.required = true; }
+    form.querySelector('input[name="employee_id"]')?.removeAttribute('disabled');
+    form.querySelectorAll('.modal-body .alert-info').forEach((note) => note.remove());
+    form.querySelector('[name="request_type_id"]')?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+});
+</script>
+<style>
+  .request-row-adding{animation:requestRowIn .35s ease both}
+  .request-row-removing{animation:requestRowOut .28s ease forwards;pointer-events:none}
+  @keyframes requestRowIn{from{opacity:0;transform:translateY(-10px);background:#eaf4ff}to{opacity:1;transform:none;background:transparent}}
+  @keyframes requestRowOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(28px);height:0}}
+</style>
+@push('scripts')
+<script>
+(() => {
+  const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const requestRoot = @json(url('/requests'));
+  const prepareDeleteForms = (root = document) => root.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((input) => {
+    const form = input.form;
+    if (!form) return;
+    form.classList.add('request-delete-form');
+    // The global AJAX handler must not claim this form; the request-specific
+    // handler below removes the row only after the server confirms deletion.
+    form.dataset.ajax = 'native';
+    const id = form.action.match(/\/requests\/(\d+)/)?.[1];
+  if (id) form.action = @json(url('/requests')) + '/' + id;
+    const token = form.querySelector('input[name="_token"]');
+    if (token) token.value = csrf();
+  });
+  prepareDeleteForms();
+  const table = document.querySelector('.table-panel');
+  if (table) new MutationObserver(() => prepareDeleteForms(table)).observe(table, { childList: true, subtree: true });
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.classList.contains('request-delete-form')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (form.dataset.busy === '1') return;
+    if (!window.confirm('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061f')) return;
+    form.dataset.busy = '1';
+    const row = form.closest('tr');
+    row?.classList.add('request-row-removing');
+    try {
+      const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' } });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
+      setTimeout(() => row?.remove(), 260);
+      window.showToast?.(payload.message || '\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628 \u0628\u0646\u062c\u0627\u062d.');
+    } catch (error) {
+      row?.classList.remove('request-row-removing');
+      form.dataset.busy = '0';
+      window.showToast?.(error.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
+    }
+  }, true);
+})();
+</script>
+@endpush
 <div class="page-head">
     <div>
         <h1>طلبات الموارد البشرية</h1>
@@ -88,7 +166,7 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const form = methodInput.form;
   if (!form) return;
   const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = `${new URL('/requests/' + id, window.location.origin).pathname}`;
+    if (id) form.action = `${requestRoot}/${id}`;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
@@ -104,11 +182,12 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const form = methodInput.form;
   if (!form) return;
   const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  if (id) form.action = @json(url('/requests')) + '/' + id;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
-  form.dataset.ajax = 'true';
+  form.classList.add('request-delete-form');
+  form.dataset.ajax = 'native';
   form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
   form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
   form.removeAttribute('onsubmit');
@@ -155,11 +234,12 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const form = methodInput.form;
   if (!form) return;
   const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  if (id) form.action = @json(url('/requests')) + '/' + id;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
-  form.dataset.ajax = 'true';
+  form.classList.add('request-delete-form');
+  form.dataset.ajax = 'native';
   form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
   form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
   form.removeAttribute('onsubmit');
@@ -173,7 +253,7 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const form = methodInput.form;
   if (!form) return;
   const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  if (id) form.action = @json(url('/requests')) + '/' + id;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
@@ -369,6 +449,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
   const requestValueData = @json($requestValueData);
   const editingRequest = @json($editingRequestData);
   if (editingRequest) {
+    const cleanEditUrl = new URL(window.location.href);
+    cleanEditUrl.searchParams.delete('edit');
+    window.history.replaceState({}, document.title, cleanEditUrl.pathname + (cleanEditUrl.search ? `?${cleanEditUrl.searchParams.toString()}` : '') + cleanEditUrl.hash);
     const editForm = document.querySelector('#requestCreateModal form');
     if (editForm) {
       editForm.dataset.editingId = String(editingRequest.id || '');
@@ -564,6 +647,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));
         const addedRow = requestTableBody.querySelector(`tr[data-request-id="${Number(item.id)}"]`);
         if (addedRow) {
+          addedRow.classList.add('request-row-adding');
           const actions = addedRow.lastElementChild;
           if (actions) {
             const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="تعديل"><i class="bi bi-pencil"></i></a>` : '';
@@ -574,7 +658,13 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         }
         wireHrRequestAjaxForms(requestTableBody);
       }
-      bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide(); form.reset(); delete form.dataset.editingId;
+      bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide();
+      form.reset();
+      delete form.dataset.editingId;
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('create');
+      cleanUrl.searchParams.delete('edit');
+      window.history.replaceState({}, document.title, cleanUrl.pathname + (cleanUrl.search ? `?${cleanUrl.searchParams.toString()}` : '') + cleanUrl.hash);
     }
     if (form.querySelector('input[name="_method"][value="DELETE"]') && form.action.includes('/requests/')) form.closest('tr')?.remove();
   });
@@ -623,7 +713,7 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const form = methodInput.form;
   if (!form) return;
   const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = new URL('/requests/' + id, window.location.origin).pathname;
+  if (id) form.action = @json(url('/requests')) + '/' + id;
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
