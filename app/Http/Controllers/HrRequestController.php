@@ -106,6 +106,7 @@ class HrRequestController extends Controller
             'employee_id' => $editingRequest->employee_id,
             'employee_name' => $editingRequest->employee?->full_name,
             'request_type_id' => $editingRequest->request_type_id,
+            'request_type_source' => $editingRequest->requestType?->source_key ?: $editingRequest->request_type,
             'payload' => $editingRequest->payload,
         ] : null;
         $requestValueData = $requests->getCollection()->mapWithKeys(function (HrRequest $hrRequest) {
@@ -308,6 +309,21 @@ class HrRequestController extends Controller
         ActivityLog::record('request_update', "تم تعديل طلب HR: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->fresh()->only(['title', 'details', 'status']), 'requests');
         $updated = $hrRequest->fresh(['employee', 'requestType']);
         $updated->setAttribute('value', $updated->display_value);
+        $updated->append('display_value');
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تعديل الطلب.',
+                'request' => [
+                    'id' => $updated->id,
+                    'title' => $updated->title,
+                    'details' => $updated->details,
+                    'status' => $updated->status,
+                    'value' => $updated->display_value,
+                    'display_value' => $updated->display_value,
+                ],
+            ]);
+        }
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'تم تعديل الطلب.', 'request' => $hrRequest->fresh(['employee', 'requestType'])])
             : redirect()->route('requests.index')->with('toast', 'تم تعديل الطلب بنجاح.');

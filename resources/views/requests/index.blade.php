@@ -72,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => row?.remove(), 260);
       window.showToast?.(payload.message || '\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628 \u0628\u0646\u062c\u0627\u062d.');
     } catch (error) {
-      row?.classList.remove('request-row-removing');
       form.dataset.busy = '0';
       window.showToast?.(error.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
     }
@@ -469,6 +468,12 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
       if (submit) submit.textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644';
       const applyEditingFields = () => {
         const payload = editingRequest.payload || {};
+        const advanceCard = editForm.querySelector('.advance-request-fields');
+        if (advanceCard && editingRequest.request_type_source === 'advance') {
+          advanceCard.hidden = false;
+          advanceCard.querySelector('[name="advance_amount"]')?.setAttribute('required', 'required');
+          advanceCard.querySelector('[name="advance_request_date"]')?.setAttribute('required', 'required');
+        }
         [employee, type].forEach((field) => field?.closest('.mb-3') && (field.closest('.mb-3').hidden = true));
         const note = document.createElement('div');
         note.className = 'alert alert-info py-2 mb-3';
@@ -480,6 +485,13 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         if (hiddenEmployee) hiddenEmployee.value = editingRequest.employee_id || '';
         const set = (name, value) => { const field = editForm.querySelector(`[name="${name}"]`); if (field && value !== undefined && value !== null) field.value = value; };
         set('advance_request_date', payload.request_date); set('advance_amount', payload.amount);
+        if (advanceCard) {
+          const advanceDateField = advanceCard.querySelector('input[type="date"]');
+          const advanceAmountField = advanceCard.querySelector('[name="advance_amount"]');
+          if (advanceDateField) advanceDateField.value = payload.request_date || '';
+          if (advanceAmountField) advanceAmountField.value = payload.amount ?? '';
+          advanceAmountField?.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
         set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
         set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
@@ -500,6 +512,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
   [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row) => {
     row.dataset.requestId ||= row.querySelector('a[href*="request="]')?.href.match(/request=(\d+)/)?.[1] || '';
     const valueCell = document.createElement('td');
+    valueCell.dataset.requestValueCell = 'true';
     valueCell.textContent = requestValueData[row.dataset.requestId] || '—';
     row.cells[3]?.before(valueCell);
   });
@@ -559,7 +572,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 <div class="modal fade" id="requestCreateModal" tabindex="-1" aria-labelledby="requestCreateTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <form method="POST" data-editing="{{ $editingRequest ? '1' : '0' }}" action="{{ $editingRequest ? route('requests.update', $editingRequest) : route('requests.store') }}">
+            <form method="POST" data-editing="{{ $editingRequest ? '1' : '0' }}" data-editing-id="{{ $editingRequest?->id ?? '' }}" action="{{ $editingRequest ? route('requests.update', $editingRequest) : route('requests.store') }}">
                 @csrf @if($editingRequest) @method('PUT') @endif
                 <div class="modal-header"><h5 class="modal-title" id="requestCreateTitle">طلب HR جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body">
@@ -630,16 +643,22 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
     if (form.closest('#requestCreateModal')) {
-      const item = event.detail?.request;
-      if (item && requestTableBody && form.dataset.editingId) {
+      const item = event.detail?.request || {};
+      if (form.dataset.editingId && requestTableBody) {
         const row = requestTableBody.querySelector(`tr[data-request-id="${form.dataset.editingId}"]`);
         if (row) {
           const titleCell = row.children[0];
           const titleLink = titleCell?.querySelector('a');
-          if (titleLink) titleLink.textContent = item.title || '';
+          const titleValue = form.querySelector('[name="title"]')?.value || item?.title || '';
+          const detailsValue = form.querySelector('[name="details"]')?.value || item?.details || '';
+          if (titleLink) titleLink.textContent = titleValue;
           const details = titleCell?.querySelector('.text-muted');
-          if (item.details && details) details.textContent = item.details;
-          if (row.children[3] && item.value !== undefined) row.children[3].textContent = item.value || '—';
+          if (detailsValue && details) details.textContent = detailsValue;
+          const editedValue = item?.value || item?.display_value || form.querySelector('[name="advance_amount"], [name="impact_amount"], [name="addition_amount"], [name="deduction_amount"]')?.value;
+          const valueCell = row.querySelector('[data-request-value-cell]') || row.children[3];
+          if (valueCell && editedValue !== undefined) valueCell.textContent = editedValue || '—';
+          if (row.children[3] && editedValue !== undefined) row.children[3].textContent = editedValue || '—';
+          if (row.children[3] && item?.value !== undefined) row.children[3].textContent = item.value || '—';
           if (row.children[5]) row.children[5].innerHTML = '<span class="badge-soft success">معتمد</span>';
         }
       } else if (item && requestTableBody) {
@@ -647,7 +666,6 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));
         const addedRow = requestTableBody.querySelector(`tr[data-request-id="${Number(item.id)}"]`);
         if (addedRow) {
-          addedRow.classList.add('request-row-adding');
           const actions = addedRow.lastElementChild;
           if (actions) {
             const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="تعديل"><i class="bi bi-pencil"></i></a>` : '';
