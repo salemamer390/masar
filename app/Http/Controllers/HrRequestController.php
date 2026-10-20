@@ -145,7 +145,6 @@ class HrRequestController extends Controller
             'deduction_amount' => ['nullable', 'numeric', 'min:0'],
             'advance_amount' => ['nullable', 'numeric', 'gt:0'],
             'advance_over_limit_confirm' => ['nullable', 'boolean'],
-            'advance_existing_confirm' => ['nullable', 'accepted'],
         ]);
 
         $type = RequestType::active()->findOrFail($validated['request_type_id']);
@@ -203,7 +202,11 @@ class HrRequestController extends Controller
             }
             $outstandingAdvance = $this->outstandingAdvanceFor($employee->id);
             if ($outstandingAdvance['amount'] > 0) {
-                $request->validate(['advance_existing_confirm' => ['accepted']]);
+                if (!$request->boolean('advance_existing_confirm')) {
+                    throw ValidationException::withMessages([
+                        'advance_existing_confirm' => 'لدى الموظف سلفة سابقة غير مسددة. فعّل مربع التأكيد للمتابعة أو عدّل السلفة السابقة أولاً.',
+                    ]);
+                }
             }
         }
 

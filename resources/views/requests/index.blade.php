@@ -6,6 +6,15 @@
 document.addEventListener('DOMContentLoaded', () => {
   const button = document.querySelector('a[href*="create=1"]');
   if (!button) return;
+  const clearRequestToast = () => {
+    const toast = document.getElementById('liveToast');
+    bootstrap.Toast.getInstance(toast)?.hide();
+    const text = document.getElementById('toastText');
+    if (text) text.textContent = '';
+  };
+  document.getElementById('requestCreateModal')?.addEventListener('show.bs.modal', clearRequestToast);
+  document.getElementById('requestCreateModal')?.addEventListener('input', clearRequestToast);
+  document.getElementById('requestCreateModal')?.addEventListener('change', clearRequestToast);
   button.id = 'newRequestButton';
   button.href = '#requestCreateModal';
   button.dataset.storeUrl = @json(route('requests.store'));
@@ -13,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
   button.addEventListener('click', () => {
     const form = document.querySelector('#requestCreateModal form');
     if (!form) return;
+    // Do not carry a validation toast from a previous request into a new one.
+    clearRequestToast();
     form.action = button.dataset.storeUrl;
     form.dataset.editing = '0';
     delete form.dataset.editingId;
@@ -159,43 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 @push('scripts')
 <script>
-// Normalize dynamically rendered delete forms so they always use the current
-// application's base URL and the CSRF token emitted by Laravel.
-document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
-  const form = methodInput.form;
-  if (!form) return;
-  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-    if (id) form.action = `${requestRoot}/${id}`;
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  const tokenInput = form.querySelector('input[name="_token"]');
-  if (token && tokenInput) tokenInput.value = token;
-});
-</script>
-@endpush
-
-@push('scripts')
-<script>
-// Re-apply CSRF and URL normalization after the table script has replaced
-// action cells with edit/delete controls.
-document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
-  const form = methodInput.form;
-  if (!form) return;
-  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = @json(url('/requests')) + '/' + id;
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  const tokenInput = form.querySelector('input[name="_token"]');
-  if (token && tokenInput) tokenInput.value = token;
-  form.classList.add('request-delete-form');
-  form.dataset.ajax = 'native';
-  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
-  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
-  form.removeAttribute('onsubmit');
-});
-</script>
-@endpush
-
-@push('scripts')
-<script>
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
@@ -224,43 +198,6 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   type?.addEventListener('change', sync);
   sync();
 })();
-</script>
-@endpush
-
-@push('scripts')
-<script>
-document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
-  const form = methodInput.form;
-  if (!form) return;
-  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = @json(url('/requests')) + '/' + id;
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  const tokenInput = form.querySelector('input[name="_token"]');
-  if (token && tokenInput) tokenInput.value = token;
-  form.classList.add('request-delete-form');
-  form.dataset.ajax = 'native';
-  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
-  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
-  form.removeAttribute('onsubmit');
-});
-</script>
-@endpush
-
-@push('scripts')
-<script>
-document.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
-  const form = methodInput.form;
-  if (!form) return;
-  const id = form.action.match(/\/requests\/(\d+)/)?.[1];
-  if (id) form.action = @json(url('/requests')) + '/' + id;
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-  const tokenInput = form.querySelector('input[name="_token"]');
-  if (token && tokenInput) tokenInput.value = token;
-  form.dataset.ajax = 'true';
-  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
-  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
-  form.removeAttribute('onsubmit');
-});
 </script>
 @endpush
 
@@ -375,6 +312,13 @@ window.addEventListener('load', () => {
   existingAdvanceConfirmWrap.hidden = true;
   existingAdvanceConfirmWrap.append(existingAdvanceConfirm, existingAdvanceConfirmLabel);
   advanceCard.append(existingAdvanceConfirmWrap);
+  // Laravel's `accepted` rule accepts "yes" consistently across versions;
+  // keep the submitted value explicit instead of relying on browser defaults.
+  existingAdvanceConfirm.value = 'yes';
+  const previousAdvanceForEmployee = () => {
+    const employeeId = String(employeeIdInput?.value || '');
+    return employeeAdvanceWarnings[employeeId] || employeeAdvanceWarnings[Number(employeeId)] || null;
+  };
   const formatMoney = (value) => `${Number(value || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ج.م`;
   const syncAdvance = () => {
     const active = advanceTypeIds.includes(String(type?.value || ''));
@@ -393,7 +337,7 @@ window.addEventListener('load', () => {
     if (!overLimit) advanceConfirm.checked = false;
     const monthKey = advanceDate.value ? advanceDate.value.slice(0, 7) : '';
     const duplicate = (employeeRequestMonths[employeeIdInput?.value] || []).includes(monthKey);
-    const previous = employeeAdvanceWarnings[employeeIdInput?.value];
+    const previous = previousAdvanceForEmployee();
     if (isEditingRequest) {
       existingAdvanceNotice.hidden = true;
       existingAdvanceConfirmWrap.hidden = true;
@@ -408,13 +352,46 @@ window.addEventListener('load', () => {
         ? `<i class="bi bi-info-circle"></i> سبق للموظف الحصول على سلفة بقيمة ${formatMoney(previous.original_amount)} بتاريخ ${previous.date || '—'}، والمتبقي منها ${formatMoney(previous.amount)}.`
         : '';
     existingAdvanceConfirmWrap.hidden = !previous;
-    existingAdvanceConfirm.required = !!previous;
+    // Keep the confirmation in sync with visibility.  A hidden required
+    // checkbox causes the browser/AJAX request to fail with the generic
+    // "field must be accepted" message before the user can act on it.
+    // The form is submitted through the global AJAX handler, so a dynamic
+    // required checkbox can make reportValidity() silently stop the submit.
+    // We validate it in the cancellable before-submit hook below instead.
+    existingAdvanceConfirm.required = false;
     if (!previous) existingAdvanceConfirm.checked = false;
   };
   advanceAmount.addEventListener('input', syncAdvance);
   employeeIdInput?.addEventListener('change', syncAdvance);
   type?.addEventListener('change', syncAdvance);
   syncAdvance();
+
+  // Give the user a clear, local explanation instead of submitting a request
+  // that the server must reject when an earlier advance is still outstanding.
+  form.addEventListener('submit', (event) => {
+    const active = advanceTypeIds.includes(String(type?.value || ''));
+    const previous = previousAdvanceForEmployee();
+    if (!isEditingRequest && active && previous && !existingAdvanceConfirm.checked) {
+      event.preventDefault();
+      existingAdvanceConfirmWrap.hidden = false;
+      existingAdvanceConfirm.required = false;
+      existingAdvanceNotice.hidden = false;
+      existingAdvanceConfirm.focus();
+      window.showToast?.('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة أو اختر موظفًا آخر.');
+    }
+  }, true);
+
+  form.addEventListener('masar:before-submit', (event) => {
+    const active = advanceTypeIds.includes(String(type?.value || ''));
+    const previous = previousAdvanceForEmployee();
+    if (isEditingRequest || !active || !previous || existingAdvanceConfirm.checked) return;
+    event.preventDefault();
+    existingAdvanceConfirmWrap.hidden = false;
+    existingAdvanceConfirm.required = false;
+    existingAdvanceNotice.hidden = false;
+    existingAdvanceConfirm.focus();
+    window.showToast?.('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة.');
+  });
 
   // Multiple conditional sections use request_date. Submit only the date
   // belonging to the selected request type so hidden sections cannot
@@ -616,7 +593,10 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 <script>
   // Stage 5: creation/deletion use the same guarded AJAX path as review actions.
   const requestCreateForm = document.querySelector('#requestCreateModal form');
-  if (requestCreateForm && !requestCreateForm.querySelector('[name="duration_days"]')) {
+  // The conditional fields are created by the unified request form script.
+  // Keep this legacy hook disabled so a second, conflicting field set cannot
+  // be injected into the modal.
+  if (false && requestCreateForm && !requestCreateForm.querySelector('[name="duration_days"]')) {
     const fields = document.createElement('div');
     fields.className = 'row g-2 mt-2';
     fields.innerHTML = '<div class="col-md-4"><label class="form-label">تاريخ الطلب</label><input type="date" name="request_date" class="form-control"></div><div class="col-md-4"><label class="form-label">من</label><input type="date" name="start_date" class="form-control"></div><div class="col-md-4"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control"></div><div class="col-md-3"><label class="form-label">الأيام</label><input type="number" step="0.5" min="0" name="duration_days" class="form-control"></div><div class="col-md-3"><label class="form-label">الساعات</label><input type="number" step="0.5" min="0" name="duration_hours" class="form-control"></div><div class="col-md-3"><label class="form-label">إضافة مالية</label><input type="number" step="0.01" min="0" name="addition_amount" class="form-control"></div><div class="col-md-3"><label class="form-label">خصم مالي</label><input type="number" step="0.01" min="0" name="deduction_amount" class="form-control"></div>';
@@ -700,6 +680,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
+  // The unified conditional-fields script above owns overtime rendering.
+  // This older duplicate used to replace its fields after initialization.
+  return;
   const type = form.querySelector('[name="request_type_id"]');
   const modalFooter = form.querySelector('.modal-footer');
   form.querySelectorAll('.row.g-2.mt-2').forEach((fields) => fields.remove());
