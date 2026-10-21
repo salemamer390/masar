@@ -191,9 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
   oldFields?.remove();
   const overtimeTypeIds = @json($requestTypes->filter(fn ($item) => $item->source_key === 'overtime')->pluck('id')->values());
   const fields = document.createElement('div');
-  fields.className = 'row g-2 mt-2';
+  fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control"></div>';
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="day_overtime_hours" class="form-control"></div>';
   modalFooter?.before(fields);
   const date = fields.querySelector('input[type="date"]');
   const period = fields.querySelector('[name="overtime_period"]');
@@ -247,6 +247,8 @@ window.addEventListener('load', () => {
   #requestCreateModal .advance-limit-box{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid #f1aeb5;border-radius:11px;background:#fff5f5;color:#842029;min-height:76px}
   #requestCreateModal .advance-limit-box strong{font-size:16px}.advance-limit-box small{font-size:11px}.advance-warning{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3cd;color:#856404;font-size:13px}.advance-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
   #requestCreateModal .advance-existing-notice{margin-top:12px;padding:10px 12px;border:1px solid #b6d4fe;border-radius:10px;background:#eef6ff;color:#084298;font-size:13px;line-height:1.7}
+  #requestCreateModal .overtime-existing-notice{margin-top:12px;padding:10px 12px;border:1px solid #b6d4fe;border-radius:10px;background:#eef6ff;color:#084298;font-size:13px;line-height:1.7}
+  #requestCreateModal .overtime-existing-notice.is-danger{border-color:#f1aeb5;background:#fff5f5;color:#842029}
   #requestCreateModal .advance-existing-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
   @media(max-width:576px){#requestCreateModal .advance-field-grid{grid-template-columns:1fr}}
 </style>
@@ -260,6 +262,7 @@ window.addEventListener('load', () => {
   const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
   const employeeGrossSalaries = @json($employeeGrossSalaries);
   const employeeRequestMonths = @json($employeeRequestMonths);
+  const employeeOvertimeDays = @json($employeeOvertimeDays);
   const employeeAdvanceWarnings = @json($employeeAdvanceWarnings);
   // Keep the client-side warnings synchronized after an AJAX deletion. The
   // page must not continue showing a warning for a request that was removed.
@@ -298,7 +301,28 @@ window.addEventListener('load', () => {
   let generatedTitle = '';
   const syncTitle = () => { const meta = typeMeta[type?.value]; if (!meta) return; if (!title.value.trim() || title.value === generatedTitle) title.value = meta.label; generatedTitle = meta.label; };
   type?.addEventListener('change', syncTitle); syncTitle();
-  const overtimeCard = form.querySelector('.row.g-2.mt-2');
+  const overtimeCard = form.querySelector('.overtime-request-fields');
+  const overtimeWarning = document.createElement('div');
+  overtimeWarning.className = 'overtime-existing-notice';
+  overtimeWarning.hidden = true;
+  overtimeCard?.append(overtimeWarning);
+  const syncOvertimeWarning = () => {
+    const employeeId = String(employeeIdInput?.value || form.querySelector('input[name="employee_id"]')?.value || '');
+    const date = overtimeCard?.querySelector('[name="overtime_request_date"]')?.value || '';
+    const period = overtimeCard?.querySelector('[name="overtime_period"]')?.value || '';
+    const existing = employeeOvertimeDays[employeeId]?.[date] || [];
+    const labels = { day: 'إضافي نهاري', night: 'إضافي ليلي' };
+    if (!employeeId || !date || !period || form.dataset.editingId) { overtimeWarning.hidden = true; return; }
+    const hasSame = existing.includes(period);
+    const hasOther = existing.filter((value) => value !== period).map((value) => labels[value] || value);
+    overtimeWarning.hidden = !hasSame && !hasOther.length;
+    overtimeWarning.className = `overtime-existing-notice ${hasSame ? 'is-danger' : 'is-info'}`;
+    overtimeWarning.innerHTML = hasSame
+      ? `<i class="bi bi-exclamation-triangle"></i> يوجد ${labels[period] || 'إضافي'} لهذا الموظف في نفس اليوم، ولا يمكن تكراره.`
+      : `<i class="bi bi-info-circle"></i> يوجد ${hasOther.join(' و ')} في هذا اليوم. يمكنك إضافة ${labels[period] || 'النوع الآخر'} أيضًا.`;
+  };
+  overtimeCard?.querySelector('[name="overtime_request_date"]')?.addEventListener('change', syncOvertimeWarning);
+  overtimeCard?.querySelector('[name="overtime_period"]')?.addEventListener('change', syncOvertimeWarning);
   const otherCard = document.createElement('div'); otherCard.className = 'request-conditional-card'; otherCard.hidden = true;
   otherCard.innerHTML = '<div class="mb-3"><label class="form-label">تاريخ الطلب المؤثر</label><input type="date" name="request_date" class="form-control"></div><div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="affects_payroll" value="1" id="requestAffectsPayroll"><label class="form-check-label" for="requestAffectsPayroll">يؤثر على دورة الرواتب</label></div><div class="row g-2" data-payroll-impact-fields hidden><div class="col-md-6"><label class="form-label">المبلغ</label><input type="number" name="impact_amount" min="0.01" step="0.01" class="form-control"></div><div class="col-md-6"><label class="form-label">نوع التأثير</label><select name="impact_type" class="form-select"><option value="">اختر نوع التأثير</option><option value="earning">مستحق</option><option value="deduction">مستقطع</option></select></div></div>';
   form.querySelector('.modal-footer')?.before(otherCard);
@@ -320,6 +344,8 @@ window.addEventListener('load', () => {
   const advanceWarning = advanceCard.querySelector('[data-advance-warning]');
   const advanceConfirm = advanceCard.querySelector('[name="advance_over_limit_confirm"]');
   const employeeIdInput = form.querySelector('input[name="employee_id"]');
+  employeeIdInput?.addEventListener('change', syncOvertimeWarning);
+  type?.addEventListener('change', syncOvertimeWarning);
   const existingAdvanceNotice = document.createElement('div');
   existingAdvanceNotice.className = 'advance-existing-notice';
   existingAdvanceNotice.hidden = true;
@@ -360,8 +386,6 @@ window.addEventListener('load', () => {
     advanceConfirm.closest('.advance-confirm').hidden = !overLimit;
     advanceConfirm.required = overLimit;
     if (!overLimit) advanceConfirm.checked = false;
-    const monthKey = advanceDate.value ? advanceDate.value.slice(0, 7) : '';
-    const duplicate = (employeeRequestMonths[employeeIdInput?.value] || []).includes(monthKey);
     const previous = previousAdvanceForEmployee();
     if (isEditingRequest) {
       existingAdvanceNotice.hidden = true;
@@ -370,10 +394,8 @@ window.addEventListener('load', () => {
       existingAdvanceConfirm.checked = false;
       return;
     }
-    existingAdvanceNotice.hidden = !previous && !duplicate;
-    existingAdvanceNotice.innerHTML = duplicate
-      ? '<i class="bi bi-exclamation-triangle"></i> يوجد طلب قائم لهذا الموظف داخل نفس الشهر، وسيتم رفض الطلب المكرر.'
-      : previous
+    existingAdvanceNotice.hidden = !previous;
+    existingAdvanceNotice.innerHTML = previous
         ? `<i class="bi bi-info-circle"></i> سبق للموظف الحصول على سلفة بقيمة ${formatMoney(previous.original_amount)} بتاريخ ${previous.date || '—'}، والمتبقي منها ${formatMoney(previous.amount)}.`
         : '';
     existingAdvanceConfirmWrap.hidden = !previous;
@@ -390,6 +412,16 @@ window.addEventListener('load', () => {
   employeeIdInput?.addEventListener('change', syncAdvance);
   type?.addEventListener('change', syncAdvance);
   syncAdvance();
+  syncOvertimeWarning();
+
+  // Prevent accidental value changes when the pointer wheel is over a
+  // numeric field; values remain editable by keyboard or direct input.
+  form.querySelectorAll('input[type="number"]').forEach((input) => {
+    input.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      input.blur();
+    }, { passive: false });
+  });
 
   // Give the user a clear, local explanation instead of submitting a request
   // that the server must reject when an earlier advance is still outstanding.
@@ -426,7 +458,7 @@ window.addEventListener('load', () => {
     const activeDate = source === 'advance'
       ? advanceDate
       : source === 'overtime'
-        ? overtimeCard?.querySelector('[name="request_date"]')
+        ? overtimeCard?.querySelector('[name="overtime_request_date"], [name="request_date"]')
         : source === 'other'
           ? otherDate
           : null;
@@ -500,6 +532,19 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         }
         set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
         set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
+        const overtimeEditCard = editForm.querySelector('.overtime-request-fields');
+        if (overtimeEditCard && editingRequest.request_type_source === 'overtime') {
+          overtimeEditCard.hidden = false;
+          const overtimeEditDate = overtimeEditCard.querySelector('[name="overtime_request_date"]');
+          const overtimeEditPeriod = overtimeEditCard.querySelector('[name="overtime_period"]');
+          const overtimeEditHours = overtimeEditCard.querySelector('input[type="number"]');
+          if (overtimeEditDate) overtimeEditDate.value = payload.request_date || '';
+          if (overtimeEditPeriod) {
+            overtimeEditPeriod.value = payload.overtime_period || '';
+            overtimeEditPeriod.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (overtimeEditHours) overtimeEditHours.value = payload.hours ?? '';
+        }
         set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
         const affects = editForm.querySelector('[name="affects_payroll"]'); if (affects) affects.checked = !!payload.affects_payroll;
         set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
