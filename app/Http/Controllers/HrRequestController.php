@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\HrRequest;
 use App\Models\PayrollRecord;
 use App\Models\RequestType;
+use App\Services\PayrollRunService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -116,7 +117,7 @@ class HrRequestController extends Controller
         return view('requests.index', compact('requests', 'requestTypes', 'employees', 'employeeGrossSalaries', 'employeeRequestMonths', 'employeeAdvanceWarnings', 'stats', 'selectedRequest', 'editingRequest', 'editingRequestData', 'requestValueData', 'requestCardDetails'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, PayrollRunService $payrollRuns)
     {
         $user = $request->user();
         $validated = $request->validate([
@@ -249,6 +250,10 @@ class HrRequestController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        // Requests are effective immediately; refresh only this employee in
+        // open payroll drafts instead of rebuilding the whole company run.
+        $payrollRuns->refreshEmployeeInOpenDrafts($employee->id);
+
         ActivityLog::record('request_create', "تم إنشاء طلب HR: {$hrRequest->title} للموظف {$employee->full_name}.", $hrRequest, null, $hrRequest->toArray(), 'requests');
 
         if ($request->wantsJson()) {
@@ -275,7 +280,7 @@ class HrRequestController extends Controller
         return back()->with('toast', 'تم إنشاء الطلب وإرساله للمراجعة.');
     }
 
-    public function update(Request $request, HrRequest $hrRequest)
+    public function update(Request $request, HrRequest $hrRequest, PayrollRunService $payrollRuns)
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
@@ -309,6 +314,7 @@ class HrRequestController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => null,
         ]));
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $hrRequest->employee_id);
         ActivityLog::record('request_update', "تم تعديل طلب HR: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->fresh()->only(['title', 'details', 'status']), 'requests');
         $updated = $hrRequest->fresh(['employee', 'requestType']);
         $updated->setAttribute('value', $updated->display_value);
@@ -410,7 +416,7 @@ class HrRequestController extends Controller
             : back()->with('toast', 'تم رفض الطلب.');
     }
 
-    public function destroy(HrRequest $hrRequest, Request $request)
+    public function destroy(HrRequest $hrRequest, Request $request, PayrollRunService $payrollRuns)
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
@@ -419,6 +425,7 @@ class HrRequestController extends Controller
         $deletedEmployeeId = (int) $hrRequest->employee_id;
         $deletedRequestDate = data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toDateString();
         $hrRequest->delete();
+        $payrollRuns->refreshEmployeeInOpenDrafts($deletedEmployeeId);
         ActivityLog::record('request_delete', "تم حذف الطلب: {$snapshot['title']}.", null, $snapshot, null, 'requests');
 
         $remainingAdvance = $this->outstandingAdvanceFor($deletedEmployeeId);

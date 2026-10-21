@@ -26,9 +26,14 @@ class PayrollRunService
     {
     }
 
-    public function generate(Carbon $month): PayrollRun
+    /**
+     * Generate a whole draft run, or refresh only selected employees when
+     * $employeeIds is supplied. Partial generation deliberately skips draft
+     * reconciliation so unrelated employee records are never removed.
+     */
+    public function generate(Carbon $month, ?array $employeeIds = null): PayrollRun
     {
-        return DB::transaction(function () use ($month) {
+        return DB::transaction(function () use ($month, $employeeIds) {
             $companyId = auth()->user()?->company_id;
             $run = PayrollRun::lockForUpdate()->firstOrCreate(
                 ['company_id' => $companyId, 'payroll_month' => $month->toDateString()],
@@ -40,6 +45,7 @@ class PayrollRunService
             $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
             $employees = Employee::query()
                 ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+                ->when($employeeIds !== null, fn ($query) => $query->whereIn('id', $employeeIds))
                 ->where(function ($query) use ($excludedStatuses, $month) {
                     $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', $excludedStatuses))
                         ->orWhere(function ($terminated) use ($month) {
@@ -108,16 +114,34 @@ class PayrollRunService
             // Reconciliation is deliberately limited to the current draft
             // run. Approved and locked runs are rejected above and remain
             // immutable historical snapshots.
-            if ($eligibleEmployeeIds) {
-                $run->records()
-                    ->whereNotIn('employee_id', $eligibleEmployeeIds)
-                    ->delete();
-            } else {
-                $run->records()->delete();
+            if ($employeeIds === null) {
+                if ($eligibleEmployeeIds) {
+                    $run->records()
+                        ->whereNotIn('employee_id', $eligibleEmployeeIds)
+                        ->delete();
+                } else {
+                    $run->records()->delete();
+                }
             }
             ActivityLog::record('payroll_generate', 'Payroll run generated.', $run, null, $run->toArray(), 'payroll');
             return $run->fresh();
         });
+    }
+
+    /** Refresh the affected employee in every open draft run for this company. */
+    public function refreshEmployeeInOpenDrafts(int $employeeId, ?Carbon $from = null, ?Carbon $to = null): void
+    {
+        $companyId = auth()->user()?->company_id;
+        $runs = PayrollRun::query()
+            ->where('status', 'Draft')
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->when($from, fn ($query) => $query->whereDate('payroll_month', '>=', $from->copy()->startOfMonth()))
+            ->when($to, fn ($query) => $query->whereDate('payroll_month', '<=', $to->copy()->startOfMonth()))
+            ->get();
+
+        foreach ($runs as $run) {
+            $this->generate($run->payroll_month->copy(), [$employeeId]);
+        }
     }
 
     /** Build payroll inputs exclusively from finalized records within the payroll month. */
@@ -125,12 +149,12 @@ class PayrollRunService
     {
         $from = $month->copy()->startOfMonth()->toDateString();
         $to = $month->copy()->endOfMonth()->toDateString();
+        // Attendance records are effective immediately; no separate approval is required.
         $attendance = Attendance::where('employee_id', $employee->id)
-            ->whereBetween('attendance_date', [$from, $to])
-            ->where('approval_status', 'Approved')->get();
+            ->whereBetween('attendance_date', [$from, $to])->get();
         $absenceRecords = $attendance->filter(fn (Attendance $record) => in_array($record->status, ['Absent', 'غياب'], true));
         $overtime = $this->approvedOvertime($employee, $attendance);
-        $otherRequests = HrRequest::with('requestType')->where('employee_id', $employee->id)->where('status', 'Approved')
+        $otherRequests = HrRequest::with('requestType')->where('employee_id', $employee->id)->whereNotIn('status', ['Rejected', 'مرفوض'])
             ->where(function ($query) {
                 $query->where('request_type', 'other')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'other'));
@@ -166,7 +190,7 @@ class PayrollRunService
     {
         $requests = HrRequest::with('requestType')
             ->where('employee_id', $employee->id)
-            ->where('status', 'Approved')
+            ->whereNotIn('status', ['Rejected', 'مرفوض'])
             ->where(function ($query) {
                 $query->where('request_type', 'advance')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
@@ -213,12 +237,12 @@ class PayrollRunService
         return ['amount' => round($total, 2), 'grant_amount' => round($grantAmount, 2), 'details' => $details];
     }
 
-    /** Only approved overtime requests can authorize the potential overtime on attendance records. */
+    /** Non-rejected overtime requests authorize potential overtime immediately. */
     private function approvedOvertime(Employee $employee, $attendance): array
     {
         $requests = HrRequest::with('requestType')
             ->where('employee_id', $employee->id)
-            ->where('status', 'Approved')
+            ->whereNotIn('status', ['Rejected', 'مرفوض'])
             ->where(function ($query) {
                 $query->where('request_type', 'overtime')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'overtime'));

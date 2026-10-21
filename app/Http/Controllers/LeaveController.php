@@ -11,6 +11,7 @@ use App\Services\HrOperationalSettingsService;
 use App\Services\EmployeeLeaveStatusService;
 use App\Services\PayrollPeriodGuard;
 use App\Services\LeaveBalanceService;
+use App\Services\PayrollRunService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -47,7 +48,7 @@ class LeaveController extends Controller
         return view('leaves.index', compact('leaves', 'pendingLeaves', 'approvedThisMonth', 'totalDays', 'onLeaveToday', 'rejectedThisMonth', 'leaveTypes', 'employees', 'departments'));
     }
 
-    public function update(Request $request, Leave $leave, PayrollPeriodGuard $periodGuard)
+    public function update(Request $request, Leave $leave, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $data = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
@@ -101,13 +102,14 @@ class LeaveController extends Controller
             'early_grant_approved_at' => ($data['status'] === 'Approved' && !empty($data['is_early_grant'])) ? now() : null,
         ]);
         $this->leaveStatus->sync();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
         ActivityLog::record('leave_update', 'Leave request updated.', $leave, $oldValues, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request updated.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
             : back()->with('toast', 'تم تحديث طلب الإجازة بنجاح.');
     }
 
-    public function store(Request $request, PayrollPeriodGuard $periodGuard)
+    public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $data = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
@@ -146,12 +148,13 @@ class LeaveController extends Controller
             throw $exception;
         }
         ActivityLog::record('leave_create', 'Leave request created.', $leave, null, $leave->toArray(), 'leaves');
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request created.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
             : back()->with('toast', 'تم إنشاء طلب الإجازة بنجاح.');
     }
 
-    public function approve(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
+    public function approve(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $oldValues = $leave->only(['status', 'manager_approved_by', 'manager_approved_at', 'approved_by', 'approved_at']);
@@ -170,29 +173,32 @@ class LeaveController extends Controller
         $this->leaveBalances->validateForApproval($leave);
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now(), 'early_grant_approved_by' => $leave->is_early_grant ? auth()->id() : null, 'early_grant_approved_at' => $leave->is_early_grant ? now() : null]);
         $this->leaveStatus->sync();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request approved.', 'leave' => $leave->fresh()])
             : back()->with('toast', 'تم اعتماد طلب الإجازة بنجاح.');
     }
 
-    public function reject(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
+    public function reject(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $data = $request->validate(['rejection_reason' => ['nullable', 'string', 'max:500']]);
         $oldValues = $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']);
         $leave->update(['status' => 'Rejected', 'approved_by' => auth()->id(), 'approved_at' => now(), 'rejection_reason' => $data['rejection_reason'] ?? null]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
         ActivityLog::record('leave_reject', 'Leave request rejected.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request rejected.', 'leave' => $leave->fresh()])
             : back()->with('toast', 'تم رفض طلب الإجازة.');
     }
 
-    public function destroy(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard)
+    public function destroy(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $snapshot = $leave->toArray();
         $leave->delete();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $snapshot['employee_id']);
         $this->leaveStatus->sync();
         ActivityLog::record('leave_delete', 'Leave request deleted.', null, $snapshot, null, 'leaves');
         return $request->wantsJson()

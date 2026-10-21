@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Services\PayrollPeriodGuard;
 use App\Services\HrOperationalSettingsService;
 use App\Services\DashboardDataService;
+use App\Services\PayrollRunService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -89,7 +90,7 @@ class AttendanceController extends Controller
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    public function store(Request $request, PayrollPeriodGuard $periodGuard)
+    public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
@@ -108,6 +109,7 @@ class AttendanceController extends Controller
             ['employee_id' => $validated['employee_id'], 'attendance_date' => $validated['attendance_date']],
             ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
         );
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $attendance->employee_id);
         $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_record', 'Attendance record created or updated.', $attendance, null, $attendance->toArray(), 'attendance');
         $fresh = $attendance->fresh()->load('employee.department');
@@ -175,7 +177,7 @@ class AttendanceController extends Controller
             : back()->with('toast', 'تم اعتماد سجل الحضور.');
     }
 
-    public function update(Request $request, Attendance $attendance, PayrollPeriodGuard $periodGuard)
+    public function update(Request $request, Attendance $attendance, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
@@ -208,6 +210,7 @@ class AttendanceController extends Controller
             // أي تعديل يستلزم مراجعة السجل من جديد قبل دخوله في المسير.
             'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
         ]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $attendance->employee_id);
         $this->decorateOvertime($attendance->load('employee.department'));
         ActivityLog::record('attendance_update', 'Attendance record updated.', $attendance, $old, $attendance->toArray(), 'attendance');
         $fresh = $attendance->fresh()->load('employee.department');
@@ -217,11 +220,12 @@ class AttendanceController extends Controller
             : back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
     }
 
-    public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard)
+    public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($attendance->attendance_date);
         $snapshot = $attendance->toArray();
         $attendance->delete();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $snapshot['employee_id']);
         ActivityLog::record('attendance_delete', 'Attendance record deleted.', null, $snapshot, null, 'attendance');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance deleted.', 'attendance_id' => $snapshot['id']])

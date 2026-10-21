@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Penalty;
 use App\Models\PenaltyType;
 use App\Services\PayrollPeriodGuard;
+use App\Services\PayrollRunService;
 use Illuminate\Http\Request;
 
 class PenaltyController extends Controller
@@ -29,7 +30,7 @@ class PenaltyController extends Controller
         return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments'));
     }
 
-    public function store(Request $request, PayrollPeriodGuard $periodGuard)
+    public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
@@ -66,9 +67,12 @@ class PenaltyController extends Controller
             'action' => $validated['details'] ?? $validated['reason'],
             'amount' => $validated['amount'] ?? 0,
             'deduction_days' => array_key_exists('deduction_days', $validated) ? $validated['deduction_days'] : $typeObj?->default_deduction_days,
-            'status' => 'Pending',
+            // Penalties affect payroll immediately; there is no separate
+            // approval step in the HR request workflow.
+            'status' => 'Approved',
             'issued_by' => auth()->id(),
         ]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $penalty->employee_id);
 
         $emp = $employee;
         ActivityLog::record('penalty_create', "تم تسجيل إجراء تأديبي ({$title}) بحق الموظف ({$emp?->full_name}).", $penalty);
@@ -84,13 +88,14 @@ class PenaltyController extends Controller
         return back()->with('toast', 'تم تسجيل الإجراء التأديبي');
     }
 
-    public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request)
+    public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
         $penalty->update([
             'status' => 'Approved',
             'closed_at' => now(),
         ]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $penalty->employee_id);
 
         ActivityLog::record('penalty_close', "تم إغلاق الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty);
 
@@ -99,7 +104,7 @@ class PenaltyController extends Controller
             : back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
     }
 
-    public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard)
+    public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
@@ -126,19 +131,21 @@ class PenaltyController extends Controller
             'amount' => $validated['amount'] ?? 0,
             'deduction_days' => array_key_exists('deduction_days', $validated) ? $validated['deduction_days'] : $type->default_deduction_days,
             // التعديل يعيد الإجراء للمراجعة حتى لا يعتمد أثر مالي قديم على بيانات جديدة.
-            'status' => 'Pending', 'closed_at' => null,
+            'status' => 'Approved', 'closed_at' => now(),
         ]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $penalty->employee_id);
         ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty updated.', 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType'])])
             : back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
     }
 
-    public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard)
+    public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
         $snapshot = $penalty->toArray();
         $penalty->delete();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $snapshot['employee_id']);
         ActivityLog::record('penalty_delete', 'تم حذف إجراء تأديبي.', null, $snapshot, null, 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty deleted.', 'penalty_id' => $snapshot['id']])

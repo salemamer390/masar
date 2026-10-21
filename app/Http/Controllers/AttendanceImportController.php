@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Services\HrOperationalSettingsService;
 use App\Services\Imports\SpreadsheetReader;
 use App\Services\PayrollPeriodGuard;
+use App\Services\PayrollRunService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,7 @@ class AttendanceImportController extends Controller
         private readonly HrOperationalSettingsService $settings,
     ) {}
 
-    public function store(Request $request, PayrollPeriodGuard $periodGuard)
+    public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $request->validate(['file' => ['required', 'file', 'max:20480', 'mimes:xlsx,csv,txt']]);
         $file = $request->file('file');
@@ -35,7 +36,7 @@ class AttendanceImportController extends Controller
         if (!isset($map['date']) || (!isset($map['employee_code']) && !isset($map['employee_name']))) {
             return back()->withErrors(['file' => 'يجب أن يحتوي الملف على كود الموظف أو اسمه، بالإضافة إلى تاريخ الحضور.']);
         }
-        $imported = 0; $skipped = 0; $errors = [];
+        $imported = 0; $skipped = 0; $errors = []; $affectedEmployeeIds = [];
         foreach ($data as $rowNumber => $row) {
             try {
                 $employee = $this->resolveEmployee($row[$map['employee_code'] ?? -1] ?? null, $row[$map['employee_name'] ?? -1] ?? null);
@@ -51,11 +52,15 @@ class AttendanceImportController extends Controller
                     ['employee_id' => $employee->id, 'attendance_date' => $date],
                     ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $late > 0 ? 'Late' : $status, 'late_minutes' => $late, 'early_leave_minutes' => $this->earlyLeave($checkOut, $employee->shift_end ?: $this->settings->end()), 'worked_hours' => $this->workedHours($checkIn, $checkOut), 'source' => 'import', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
                 );
+                $affectedEmployeeIds[] = (int) $employee->id;
                 $imported++;
             } catch (\Throwable $exception) {
                 $skipped++;
                 if (count($errors) < 25) $errors[] = "الصف {$rowNumber}: {$exception->getMessage()}";
             }
+        }
+        foreach (array_unique($affectedEmployeeIds) as $employeeId) {
+            $payrollRuns->refreshEmployeeInOpenDrafts($employeeId);
         }
         ActivityLog::record('attendance_import', 'Attendance records imported.', null, null, ['imported' => $imported, 'skipped' => $skipped, 'errors' => $errors], 'attendance');
         $message = "تم استيراد {$imported} سجل حضور" . ($skipped ? " وتخطي {$skipped} سجل." : '.');

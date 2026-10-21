@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Salary;
 use App\Services\PayrollCalculator;
 use App\Services\PayrollSettingsService;
+use App\Services\PayrollRunService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -69,7 +70,7 @@ class SalaryController extends Controller
         return view('salaries.index', compact('salaries', 'employees', 'departments', 'paymentMethods', 'allowanceRate', 'payrollSettings', 'allowanceDistribution', 'selectedEmployee'));
     }
 
-    public function store(Request $request, PayrollCalculator $calculator)
+    public function store(Request $request, PayrollCalculator $calculator, PayrollRunService $payrollRuns)
     {
         $validated = $this->validateSalary($request);
         $employee = Employee::findOrFail((int) $validated['employee_id']);
@@ -92,6 +93,7 @@ class SalaryController extends Controller
             array_merge($data, $calculator->persistFields($structure), ['status' => 'Active'])
         );
         Salary::syncInsuredSalary((int)$salary->employee_id);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $salary->employee_id);
 
         $emp = Employee::find($data['employee_id']);
         ActivityLog::record(
@@ -111,7 +113,7 @@ class SalaryController extends Controller
         return back()->with('toast', 'تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.');
     }
 
-    public function update(Request $request, Salary $salary, PayrollCalculator $calculator)
+    public function update(Request $request, Salary $salary, PayrollCalculator $calculator, PayrollRunService $payrollRuns)
     {
         $validated = $this->validateSalary($request);
         $employee = $salary->employee;
@@ -127,6 +129,7 @@ class SalaryController extends Controller
         $structure = $calculator->structure($this->structureInput($data));
         $salary->update(array_merge($data, $calculator->persistFields($structure)));
         Salary::syncInsuredSalary((int)$salary->employee_id);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $salary->employee_id);
 
         ActivityLog::record('salary_update', "تم تعديل هيكل راتب الموظف ({$salary->employee?->full_name}).", $salary);
         if ($request->wantsJson()) {
@@ -140,11 +143,12 @@ class SalaryController extends Controller
         return back()->with('toast', 'تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.');
     }
 
-    public function destroy(Salary $salary, Request $request)
+    public function destroy(Salary $salary, Request $request, PayrollRunService $payrollRuns)
     {
         $employee = $salary->employee;
         $salary->update(['status' => 'Inactive']);
         Salary::syncInsuredSalary((int)$salary->employee_id);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $salary->employee_id);
         ActivityLog::record('salary_delete', "تم إيقاف هيكل راتب الموظف ({$employee?->full_name}).", $salary);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'تم إيقاف هيكل الراتب.', 'salary_id' => $salary->id])
