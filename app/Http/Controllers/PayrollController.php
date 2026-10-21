@@ -57,6 +57,11 @@ class PayrollController extends Controller
             'clothing_allowance' => (float) $record->clothing_allowance,
             'overtime_amount' => (float) $record->overtime_amount,
             'advance_earnings' => (float) data_get($record->calculation_snapshot, 'inputs.advance_earnings', data_get($record->calculation_snapshot, 'advance_earnings', 0)),
+            'bonus' => (float) $record->bonus,
+            'incentives' => (float) $record->incentives,
+            'commission' => (float) $record->commission,
+            'profit_share' => (float) $record->profit_share,
+            'other_earnings' => (float) $record->other_earnings,
             'absence_deduction' => (float) $record->absence_deduction,
             'penalties' => (float) $record->penalties,
             'loans' => (float) $record->loans,
@@ -68,6 +73,10 @@ class PayrollController extends Controller
             'gross_salary' => (float) $record->gross_salary,
             'net_salary' => (float) $record->net_salary,
             'employee_cost' => (float) $record->employee_cost,
+            'additional_amount' => (float) $record->overtime_amount
+                + (float) data_get($record->calculation_snapshot, 'inputs.advance_earnings', data_get($record->calculation_snapshot, 'advance_earnings', 0))
+                + (float) $record->bonus + (float) $record->incentives + (float) $record->commission
+                + (float) $record->profit_share + (float) $record->other_earnings,
         ])->values();
 
         return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails'));
@@ -172,9 +181,16 @@ class PayrollController extends Controller
             'calculation_snapshot'=>array_merge($snapshot, ['insurance_due'=>$insuranceDue, 'advance_earnings'=>$inputs['advance_earnings'], 'advance_details'=>$updatedAdvanceDetails, 'advance_override_rate'=>$advanceRate, 'advance_override_amount'=>$advanceRate !== null ? $advanceAmount : null]),
         ]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
-        return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Payroll inputs recalculated.', 'record' => $payrollRecord->fresh()->load('employee')])
-            : back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
+        if ($request->wantsJson()) {
+            $updatedRecord = $payrollRecord->fresh()->load('employee');
+            $updatedRecord->setAttribute('advance_earnings', (float) data_get($updatedRecord->calculation_snapshot, 'advance_earnings', 0));
+            $updatedRecord->setAttribute('additional_amount', (float) $updatedRecord->overtime_amount
+                + (float) $updatedRecord->advance_earnings + (float) $updatedRecord->bonus
+                + (float) $updatedRecord->incentives + (float) $updatedRecord->commission
+                + (float) $updatedRecord->profit_share + (float) $updatedRecord->other_earnings);
+            return response()->json(['success' => true, 'message' => 'Payroll inputs recalculated.', 'record' => $updatedRecord]);
+        }
+        return back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
     }
 
     private function insuranceDueForExistingRecord(PayrollRecord $record): bool

@@ -88,6 +88,26 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 })();
 </script>
 @endpush
+
+@push('scripts')
+<script>
+(() => {
+  const advanceByRecord = @json($records->mapWithKeys(fn ($record) => [$record->id => (float) data_get($record->calculation_snapshot, 'advance_earnings', 0)]));
+  document.querySelectorAll('.payroll-record-details-modal').forEach((modal) => {
+    modal.addEventListener('show.bs.modal', () => {
+      const id = modal.id.replace('payrollRecordDetails', '');
+      const amount = Number(advanceByRecord[id] || 0);
+      const grid = modal.querySelector('.payroll-record-details-grid');
+      if (!grid || amount <= 0 || grid.querySelector('[data-advance-earned]')) return;
+      const item = document.createElement('div');
+      item.dataset.advanceEarned = 'true';
+      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ج.م</b>`;
+      grid.insertBefore(item, grid.children[4] || null);
+    });
+  });
+})();
+</script>
+@endpush
 @endsection
 
 @push('scripts')
@@ -106,7 +126,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     });
   }
   const payrollDetailsData = @json($payrollDetails);
-  if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
+  if (false && payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
     const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
     const targetHeader = header || payrollDetailsTable.tHead.rows[0].cells[4];
     const index = targetHeader ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(targetHeader) : -1;
@@ -133,12 +153,24 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
     detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
     const earningsSection = detailBody.querySelectorAll('.payroll-detail-section')[1];
+    if (earningsSection) {
+      if (Number(record.bonus || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('المكافأة', payrollMoney(record.bonus)));
+      if (Number(record.incentives || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الحوافز', payrollMoney(record.incentives)));
+      if (Number(record.commission || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('العمولة', payrollMoney(record.commission)));
+      if (Number(record.profit_share || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('نصيب الأرباح', payrollMoney(record.profit_share)));
+      if (Number(record.other_earnings || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('استحقاقات أخرى', payrollMoney(record.other_earnings)));
+    }
     if (earningsSection && Number(record.advance_earnings || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('السلفة المصروفة', payrollMoney(record.advance_earnings)));
     bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
   };
   payrollDetailsRows.forEach((row, index) => {
     const record = payrollDetailsData[index];
     if (!record) return;
+    const overtimeCell = row.cells[4];
+    if (overtimeCell) {
+      const additional = Number(record.additional_amount || 0);
+      overtimeCell.textContent = additional.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
     row.dataset.payrollRecordIndex = String(index);
     row.classList.add('payroll-clickable-row');
     row.addEventListener('click', (event) => {
@@ -237,13 +269,14 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     const record = event.detail?.record;
     const row = form.closest('.modal')?.previousElementSibling?.closest('tr') || document.querySelector(`tr[data-payroll-record-id="${record?.id}"]`);
     if (row && record) {
-      row.children[3].textContent = money(record.overtime_amount);
-      row.children[4].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
-      row.children[5].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
-      row.children[6].textContent = money(record.employee_insurance);
-      row.children[7].textContent = money(record.income_tax);
-      row.children[8].textContent = money(record.net_salary);
-      row.children[9].textContent = money(record.employee_cost);
+      const additional = Number(record.additional_amount ?? (Number(record.overtime_amount || 0) + Number(record.advance_earnings || 0) + Number(record.bonus || 0) + Number(record.other_earnings || 0)));
+      row.children[4].textContent = additional.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      row.children[5].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
+      row.children[6].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
+      row.children[7].textContent = money(record.employee_insurance);
+      row.children[8].textContent = money(record.income_tax);
+      row.children[9].textContent = money(record.net_salary);
+      row.children[10].textContent = money(record.employee_cost);
     }
     bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
   });

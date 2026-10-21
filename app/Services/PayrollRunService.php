@@ -320,7 +320,7 @@ class PayrollRunService
         ]);
     }
 
-    /** Salary earnings are prorated by 30 days; statutory amounts stay full-month. */
+    /** Prorate fixed salary by 30 days; variable earnings (overtime, advances, bonuses) stay whole. */
     public function applyProration(array $calculation, float $factor): array
     {
         $factor = min(1, max(0, $factor));
@@ -331,10 +331,16 @@ class PayrollRunService
             ];
         }
 
-        $entitlements = round((float) $calculation['entitlements'] * $factor, 2);
+        $fixedEntitlements = (float) $calculation['basic_salary'] + (float) $calculation['allowances'];
+        $variableEntitlements = (float) $calculation['entitlements'] - $fixedEntitlements;
+        $nonProratedDeductions = (float) ($calculation['loans'] ?? 0) + (float) ($calculation['other_deductions'] ?? 0);
+        $proratedDeductions = max(0, (float) $calculation['monthly_deductions'] - $nonProratedDeductions);
+        $entitlements = round(($fixedEntitlements * $factor) + $variableEntitlements, 2);
+        $deductions = round(($proratedDeductions * $factor) + $nonProratedDeductions, 2);
         return array_merge($calculation, [
             'entitlements' => $entitlements,
-            'net_monthly' => round($entitlements - (float) $calculation['monthly_deductions'], 2),
+            'monthly_deductions' => $deductions,
+            'net_monthly' => round((($fixedEntitlements - $proratedDeductions) * $factor) + $variableEntitlements - $nonProratedDeductions, 2),
             'employee_cost' => round($entitlements + (float) $calculation['employer_insurance'], 2),
             'proration_factor' => $factor,
         ]);
@@ -343,7 +349,10 @@ class PayrollRunService
     private function serviceWindow(Employee $employee, Carbon $month): ?array
     {
         $monthStart = $month->copy()->startOfMonth();
-        $monthEnd = $month->copy()->endOfMonth();
+        $calendarMonthEnd = $month->copy()->endOfMonth();
+        $monthEnd = $month->isSameMonth(Carbon::today())
+            ? Carbon::today()->startOfDay()
+            : $calendarMonthEnd;
         $status = strtolower(trim((string) $employee->status?->name));
         $terminal = in_array($status, ['terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true);
         $eligibleWhileActive = in_array($status, ['', 'active', 'leave', 'إجازة'], true);
@@ -363,10 +372,10 @@ class PayrollRunService
         }
         $contractEnd = $terminationDate;
         if (!$contractEnd && $employee->contract_start_date) {
-            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->contract_start_date), $monthEnd);
+            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->contract_start_date), $calendarMonthEnd);
         }
         if (!$contractEnd && $employee->hire_date) {
-            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->hire_date), $monthEnd);
+            $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->hire_date), $calendarMonthEnd);
         }
         $contractEnd ??= ($employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy());
         $start = $hireDate->greaterThan($monthStart) ? $hireDate : $monthStart;
