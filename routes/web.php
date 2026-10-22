@@ -261,9 +261,6 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::get('/', [PayrollController::class, 'index'])
             ->middleware('permission:payroll.view')
             ->name('index');
-        Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
-            ->middleware('permission:payroll.view')
-            ->name('employee-salaries');
         Route::get('/settings', [PayrollSettingsController::class, 'index'])
             ->middleware('permission:payroll.settings')
             ->name('settings.index');
@@ -314,6 +311,11 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:payroll.export')
             ->name('export');
     });
+
+    // Employee salaries (separate from the monthly payroll route)
+    Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
+        ->middleware('permission:payroll.view')
+        ->name('payroll.employee-salaries');
 
     // Insurance
     Route::get('/employees/{employee}/forms/s1-editable', [EditableS1Controller::class, 'show'])

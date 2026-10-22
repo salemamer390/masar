@@ -11,6 +11,7 @@
   <div class="side-section">الرواتب والتأمينات</div>
   @if(auth()->user()?->hasPermission('salary.view'))<a href="{{ route('salaries.index') }}" class="nav-item {{ request()->routeIs('salaries.*') ? 'active' : '' }}"><i class="bi bi-cash-stack"></i><span>هياكل الرواتب</span></a>@endif
   @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.index') }}" class="nav-item {{ request()->routeIs('payroll.index') ? 'active' : '' }}"><i class="bi bi-calendar3"></i><span>دورة الرواتب</span></a>@endif
+  @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.employee-salaries') }}" class="nav-item {{ request()->routeIs('payroll.employee-salaries') ? 'active' : '' }}"><i class="bi bi-person-vcard"></i><span>رواتب الموظفين</span></a>@endif
   @if(auth()->user()?->hasPermission('insurance.view'))<a href="{{ route('insurance.index') }}" class="nav-item {{ request()->routeIs('insurance.*') ? 'active' : '' }}"><i class="bi bi-shield-check"></i><span>التأمينات</span></a>@endif
   <div class="side-section">الإدارة والتقارير</div>
   @if(auth()->user()?->hasPermission('movements.view'))<a href="{{ route('movements.index') }}" class="nav-item {{ request()->routeIs('movements.*') ? 'active' : '' }}"><i class="bi bi-arrow-left-right"></i><span>الحركات الوظيفية</span></a>@endif
@@ -22,6 +23,5 @@
   @if(auth()->user()?->isSuperAdmin())<a href="{{ route('subscriptions.index') }}" class="nav-item {{ request()->routeIs('subscriptions.*') ? 'active' : '' }}"><i class="bi bi-boxes"></i><span>الباقات والشركات</span></a>@endif
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'active' : '' }}"><i class="bi bi-person-gear"></i><span>حسابات HR والموظفين</span></a>@endif
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('company.account') }}" class="nav-item {{ request()->routeIs('company.account') ? 'active' : '' }}"><i class="bi bi-building"></i><span>حساب الشركة</span></a>@endif
-  @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.employee-salaries') }}" class="nav-item {{ request()->routeIs('payroll.employee-salaries') ? 'active' : '' }}"><i class="bi bi-person-vcard"></i><span>رواتب الموظفين</span></a>@endif
 </aside>
 <div class="sidebar-overlay" data-sidebar-overlay aria-hidden="true"></div>
