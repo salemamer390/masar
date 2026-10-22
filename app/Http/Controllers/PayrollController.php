@@ -92,6 +92,7 @@ class PayrollController extends Controller
             'fixed_deductions' => (float) $record->fixed_deductions,
             'other_deductions' => (float) $record->other_deductions,
             'gross_salary' => (float) $record->gross_salary,
+            'monthly_total' => (float) $record->monthly_total,
             'net_salary' => (float) $record->net_salary,
             'employee_cost' => (float) $record->employee_cost,
             'additional_amount' => (float) $record->overtime_amount
@@ -337,6 +338,7 @@ class PayrollController extends Controller
             'ot_day_hours'=>$result['ot_day_hours'], 'ot_night_hours'=>$result['ot_night_hours'], 'ot_day_amount'=>$result['ot_day_amount'], 'ot_night_amount'=>$result['ot_night_amount'],
             'day_overtime_hours'=>$result['ot_day_hours'], 'night_overtime_hours'=>$result['ot_night_hours'], 'day_overtime_amount'=>$result['ot_day_amount'], 'night_overtime_amount'=>$result['ot_night_amount'],
             'overtime_amount'=>$result['overtime_amount'], 'total_overtime'=>$result['overtime_amount'], 'bonus'=>$result['bonus'], 'incentives'=>$result['incentives'], 'commission'=>$result['commission'], 'profit_share'=>$result['profit_share'], 'loans'=>$result['loans'],
+            'monthly_total'=>$result['monthly_total'],
             'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
             'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],

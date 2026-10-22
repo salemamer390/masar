@@ -167,7 +167,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       if (!grid || amount <= 0 || grid.querySelector('[data-advance-earned]')) return;
       const item = document.createElement('div');
       item.dataset.advanceEarned = 'true';
-      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ج.م</b>`;
+      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('en-US', {maximumFractionDigits: 0})} ج.م</b>`;
       grid.insertBefore(item, grid.children[4] || null);
     });
   });
@@ -243,16 +243,31 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   }
   window.payrollDetailsData = @json($payrollDetails);
   const payrollDetailsData = window.payrollDetailsData;
+  if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-monthly-total-column]')) {
+    const headers = [...payrollDetailsTable.tHead.rows[0].cells];
+    const grossIndex = headers.findIndex((cell) => cell.textContent.trim() === 'الراتب الإجمالي');
+    if (grossIndex >= 0) {
+      const monthlyHeader = document.createElement('th');
+      monthlyHeader.dataset.monthlyTotalColumn = 'true';
+      monthlyHeader.textContent = 'الإجمالي الشهري';
+      headers[grossIndex].after(monthlyHeader);
+      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => {
+        const cell = document.createElement('td');
+        cell.textContent = Number(payrollDetailsData[rowIndex]?.monthly_total || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+        row.cells[grossIndex]?.after(cell);
+      });
+    }
+  }
   if (false && payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
     const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
     const targetHeader = header || payrollDetailsTable.tHead.rows[0].cells[4];
     const index = targetHeader ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(targetHeader) : -1;
     if (index >= 0) {
       const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; targetHeader.after(advanceHeader);
-      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('en-US', {minimumFractionDigits: 2}) : '0.00'; row.cells[index]?.after(cell); });
+      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('en-US', {maximumFractionDigits: 0}) : '0'; row.cells[index]?.after(cell); });
     }
   }
-  const payrollMoney = (value) => Number(value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
+  const payrollMoney = (value) => Number(value || 0).toLocaleString('en-US', {maximumFractionDigits: 0}) + ' ج.م';
   const payrollDetailsRows = payrollDetailsTable ? [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]) : [];
   const detailPanel = document.createElement('div');
   detailPanel.className = 'offcanvas offcanvas-end payroll-detail-panel';
@@ -263,6 +278,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const detailBody = detailPanel.querySelector('[data-payroll-detail-body]');
   const payrollUiStyle = document.createElement('style');
   payrollUiStyle.textContent = '.payroll-clickable-row{cursor:pointer;transition:background .15s ease}.payroll-clickable-row:hover{background:#f1f6ff!important}.payroll-detail-panel{width:min(440px,96vw)}.payroll-detail-section{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;background:#fff}.payroll-detail-section h6{display:flex;gap:7px;align-items:center;margin:0 0 10px;color:#173d72;font-weight:800}.payroll-detail-item{display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9}.payroll-detail-item:last-child{border-bottom:0}.payroll-detail-item span{color:#64748b}.payroll-detail-item b{color:#1e293b}.payroll-detail-total{padding:15px;border-radius:12px;background:#eafaf1;display:grid;gap:4px}.payroll-detail-total span{color:#166534}.payroll-detail-total strong{font-size:22px;color:#15803d}.payroll-detail-total small{color:#64748b}.payroll-salary-heading{display:flex;justify-content:space-between;gap:10px;padding:12px;border-radius:12px;background:#f8fafc;margin-bottom:12px}.payroll-salary-heading span{color:#64748b}.payroll-salary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.payroll-salary-grid .payroll-detail-item{border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid}.payroll-salary-grid .payroll-detail-item b{font-size:15px}@media(max-width:600px){.payroll-salary-grid{grid-template-columns:1fr}.payroll-detail-panel{width:100%}}';
+  payrollUiStyle.textContent += '.payroll-collapse-toggle{cursor:pointer;user-select:none;background:#f8fafc;padding-inline:8px;border-radius:8px}.payroll-collapse-toggle::after{content:"⌃";color:#1769e0;font-weight:800;margin-inline-start:auto}.payroll-collapse-toggle[aria-expanded="false"]::after{content:"⌄"}';
   document.head.append(payrollUiStyle);
   const detailValue = (label, value) => `<div class="payroll-detail-item"><span>${label}</span><b>${value}</b></div>`;
   const openPayrollDetails = (record) => {
@@ -270,7 +286,28 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
     detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
     const earningsSection = detailBody.querySelectorAll('.payroll-detail-section')[1];
+    const grossTotalItem = earningsSection ? [...earningsSection.querySelectorAll('.payroll-detail-item')].reverse().find((item) => item.querySelector('b')?.textContent?.trim() === payrollMoney(record.gross_salary)) : null;
+    grossTotalItem?.remove();
+    let additionalItems = [];
     if (earningsSection) {
+      const allowanceItems = [...earningsSection.querySelectorAll('.payroll-detail-item')].slice(2, 6);
+      const allowanceTotal = earningsSection.querySelectorAll('.payroll-detail-item')[1];
+      if (allowanceTotal && allowanceItems.length) {
+        allowanceTotal.classList.add('payroll-collapse-toggle');
+        allowanceTotal.setAttribute('role', 'button');
+        allowanceTotal.setAttribute('tabindex', '0');
+        allowanceTotal.setAttribute('aria-expanded', 'false');
+        allowanceItems.forEach((item) => { item.hidden = true; });
+        const toggleAllowances = () => {
+          const expanded = allowanceTotal.getAttribute('aria-expanded') === 'true';
+          allowanceTotal.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+          allowanceItems.forEach((item) => { item.hidden = expanded; });
+        };
+        allowanceTotal.addEventListener('click', toggleAllowances);
+        allowanceTotal.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAllowances(); }
+        });
+      }
       earningsSection.querySelectorAll('.payroll-detail-item').forEach((item) => {
         if (item.querySelector('span')?.textContent?.includes('الإضافي')) item.remove();
         const amount = item.querySelector('b')?.textContent?.trim() || '';
@@ -288,22 +325,44 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         const amount = item.querySelector('b')?.textContent?.trim() || '';
         if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
       });
-      if (Number(record.bonus || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('المكافأة', payrollMoney(record.bonus)));
-      if (Number(record.incentives || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الحوافز', payrollMoney(record.incentives)));
-      if (Number(record.commission || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('العمولة', payrollMoney(record.commission)));
-      if (Number(record.profit_share || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('نصيب الأرباح', payrollMoney(record.profit_share)));
-      if (Number(record.other_earnings || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('استحقاقات أخرى', payrollMoney(record.other_earnings)));
+      const addAdditional = (label, value) => { if (Number(value || 0) > 0) additionalItems.push([label, Number(value)]); };
+      addAdditional('المكافأة', record.bonus);
+      addAdditional('الحوافز', record.incentives);
+      addAdditional('العمولة', record.commission);
+      addAdditional('نصيب الأرباح', record.profit_share);
+      addAdditional('استحقاقات أخرى', record.other_earnings);
     }
-    if (earningsSection && Number(record.advance_earnings || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('السلفة المصروفة', payrollMoney(record.advance_earnings)));
+    if (earningsSection) {
+      if (Number(record.advance_earnings || 0) > 0) additionalItems.push(['السلفة المصروفة', Number(record.advance_earnings)]);
+      if (additionalItems.length) {
+        const additionalTotal = additionalItems.reduce((sum, [, value]) => sum + value, 0);
+        const additionalGroup = document.createElement('div');
+        additionalGroup.className = 'payroll-additional-group';
+        additionalGroup.innerHTML = `${detailValue('إضافي', payrollMoney(additionalTotal))}<div class="payroll-additional-items" hidden>${additionalItems.map(([label, value]) => detailValue(label, payrollMoney(value))).join('')}</div>`;
+        const toggle = additionalGroup.querySelector('.payroll-detail-item');
+        const items = additionalGroup.querySelector('.payroll-additional-items');
+        toggle.classList.add('payroll-collapse-toggle');
+        toggle.setAttribute('role', 'button');
+        toggle.setAttribute('tabindex', '0');
+        toggle.setAttribute('aria-expanded', 'false');
+        const toggleAdditional = () => { const expanded = toggle.getAttribute('aria-expanded') === 'true'; toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true'); items.hidden = expanded; };
+        toggle.addEventListener('click', toggleAdditional);
+        toggle.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleAdditional(); } });
+        earningsSection.append(additionalGroup);
+      }
+    }
+    if (earningsSection) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإجمالي الشهري', payrollMoney(record.monthly_total ?? record.gross_salary)));
     bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
   };
   payrollDetailsRows.forEach((row, index) => {
     const record = payrollDetailsData[index];
     if (!record) return;
-    const overtimeCell = row.cells[3];
+    const overtimeIndex = [...(payrollDetailsTable?.tHead?.rows[0]?.cells || [])]
+      .findIndex((cell) => cell.textContent.trim() === 'إضافي');
+    const overtimeCell = overtimeIndex >= 0 ? row.cells[overtimeIndex] : null;
     if (overtimeCell) {
       const additional = Number(record.additional_amount || 0);
-      overtimeCell.textContent = additional.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      overtimeCell.textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
     }
     row.dataset.payrollRecordIndex = String(index);
     row.classList.add('payroll-clickable-row');
@@ -403,7 +462,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   }
   // Payroll inputs are the only payroll action moved in this stage. Generate,
   // approve, lock, and pay remain full server transitions by design.
-  const money = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  const money = (value) => Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' ج.م';
   document.querySelectorAll('[id^="inputs"]').forEach((modal) => {
     const trigger = document.querySelector(`[data-bs-target="#${modal.id}"]`);
     const match = modal.id.match(/^inputs(\d+)$/);
@@ -430,13 +489,22 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const row = form.closest('.modal')?.previousElementSibling?.closest('tr') || document.querySelector(`tr[data-payroll-record-id="${record?.id}"]`);
     if (row && record) {
       const additional = Number(record.additional_amount ?? (Number(record.overtime_amount || 0) + Number(record.advance_earnings || 0) + Number(record.bonus || 0) + Number(record.other_earnings || 0)));
-      row.children[4].textContent = additional.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+      row.children[4].textContent = Number(record.monthly_total || 0).toLocaleString('en-US', {maximumFractionDigits: 0});
+      row.children[5].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
       row.children[5].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
       row.children[6].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
       row.children[7].textContent = money(record.employee_insurance);
       row.children[8].textContent = money(record.income_tax);
       row.children[9].textContent = money(record.net_salary);
       row.children[10].textContent = money(record.employee_cost);
+      // Column order includes the new monthly total after gross salary.
+      row.children[5].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
+      row.children[6].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
+      row.children[7].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
+      row.children[8].textContent = money(record.employee_insurance);
+      row.children[9].textContent = money(record.income_tax);
+      row.children[10].textContent = money(record.net_salary);
+      row.children[11].textContent = money(record.employee_cost);
     }
     bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
   });

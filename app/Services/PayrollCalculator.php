@@ -104,6 +104,7 @@ class PayrollCalculator
         $absenceDeduction = $absenceDays * $gross / max(1, $this->settings->absenceDailyDivisor());
         $penaltyDeduction = $penaltyDays * $structure['basic_salary'] / max(1, $this->settings->penaltyDailyDivisor());
         $entitlements = $structure['basic_salary'] + $structure['allowances'] + $otDay + $otNight + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $monthlyTotal = $structure['gross'] + $otDay + $otNight + $bonus + $incentives + $commission + $profitShare + $advanceEarnings;
         $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
@@ -111,7 +112,7 @@ class PayrollCalculator
             'overtime_amount'=>$otDay + $otNight, 'bonus'=>$bonus, 'incentives'=>$incentives, 'commission'=>$commission, 'profit_share'=>$profitShare, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'income_tax'=>$tax, 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
-            'entitlements'=>$entitlements, 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
+            'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
     }
 

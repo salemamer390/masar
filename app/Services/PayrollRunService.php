@@ -91,7 +91,7 @@ class PayrollRunService
                     'night_overtime_hours' => $calculation['ot_night_hours'], 'night_overtime_amount' => $calculation['ot_night_amount'],
                     'ot_day_hours'=>$calculation['ot_day_hours'], 'ot_night_hours'=>$calculation['ot_night_hours'], 'ot_day_amount'=>$calculation['ot_day_amount'], 'ot_night_amount'=>$calculation['ot_night_amount'],
                     'absence_days'=>$calculation['absence_days'], 'penalty_days'=>$calculation['penalty_days'], 'bonus'=>$calculation['bonus'], 'incentives'=>$calculation['incentives'], 'commission'=>$calculation['commission'], 'profit_share'=>$calculation['profit_share'], 'loans'=>$calculation['loans'], 'other_earnings'=>$calculation['other_earnings'], 'other_deductions'=>$calculation['other_deductions'],
-                    'deductions' => $calculation['monthly_deductions'], 'gross_salary' => $calculation['gross'],
+                    'deductions' => $calculation['monthly_deductions'], 'gross_salary' => $calculation['gross'], 'monthly_total' => $calculation['monthly_total'],
                     'insurance_wage' => $calculation['insurance_wage'], 'employee_insurance' => $calculation['employee_insurance'],
                     'income_tax' => $calculation['income_tax'], 'martyrs_fund' => $calculation['martyrs_fund'],
                     'employer_insurance' => $calculation['employer_insurance'], 'employee_cost' => $calculation['employee_cost'],
@@ -375,6 +375,7 @@ class PayrollRunService
         if ($factor >= 1) {
             return $calculation + [
                 'proration_factor' => 1.0,
+                'monthly_total' => round((float) ($calculation['monthly_total'] ?? $calculation['gross']), 2),
                 'employee_cost' => round((float) $calculation['entitlements'] + (float) $calculation['employer_insurance'], 2),
             ];
         }
@@ -384,9 +385,17 @@ class PayrollRunService
         $nonProratedDeductions = (float) ($calculation['loans'] ?? 0) + (float) ($calculation['other_deductions'] ?? 0);
         $proratedDeductions = max(0, (float) $calculation['monthly_deductions'] - $nonProratedDeductions);
         $entitlements = round(($fixedEntitlements * $factor) + $variableEntitlements, 2);
+        $monthlyTotal = round(($fixedEntitlements * $factor)
+            + (float) ($calculation['overtime_amount'] ?? 0)
+            + (float) ($calculation['bonus'] ?? 0)
+            + (float) ($calculation['incentives'] ?? 0)
+            + (float) ($calculation['commission'] ?? 0)
+            + (float) ($calculation['profit_share'] ?? 0)
+            + (float) ($calculation['advance_earnings'] ?? 0), 2);
         $deductions = round(($proratedDeductions * $factor) + $nonProratedDeductions, 2);
         return array_merge($calculation, [
             'entitlements' => $entitlements,
+            'monthly_total' => $monthlyTotal,
             'monthly_deductions' => $deductions,
             'net_monthly' => round((($fixedEntitlements - $proratedDeductions) * $factor) + $variableEntitlements - $nonProratedDeductions, 2),
             'employee_cost' => round($entitlements + (float) $calculation['employer_insurance'], 2),
