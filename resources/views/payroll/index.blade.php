@@ -124,10 +124,29 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   });
 })();
 </script>
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+<div class="payroll-pagination-bar mt-3">
   <div class="text-muted small">عرض {{ $records->firstItem() ?? 0 }} إلى {{ $records->lastItem() ?? 0 }} من {{ $records->total() }} موظف</div>
-  <div>{{ $records->onEachSide(1)->links() }}</div>
+  <form method="GET" class="payroll-page-size d-flex align-items-center gap-2">
+    @foreach(request()->except(['page', 'per_page']) as $key => $value)
+      @if(is_scalar($value))
+        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+      @endif
+    @endforeach
+    <label for="payrollPerPage" class="small mb-0">&#1593;&#1583;&#1583; &#1575;&#1604;&#1589;&#1601;&#1608;&#1601;</label>
+    <select id="payrollPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
+      @foreach([10, 25, 50, 100] as $size)
+        <option value="{{ $size }}" @selected((int) $records->perPage() === $size)>{{ $size }}</option>
+      @endforeach
+    </select>
+  </form>
+  <div class="d-flex justify-content-center">{{ $records->onEachSide(1)->links() }}</div>
 </div>
+<style>
+  .payroll-pagination-bar { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+  .payroll-pagination-bar nav { display: flex; justify-content: center; }
+  .payroll-pagination-bar .pagination { margin-bottom: 0; }
+  .payroll-page-size .form-select { width: auto; min-width: 4.5rem; }
+</style>
 @endsection
 
 @push('scripts')
