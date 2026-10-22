@@ -286,6 +286,12 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::post('/runs/generate', [PayrollController::class, 'generateRun'])
             ->middleware('permission:payroll.create')
             ->name('runs.generate');
+        Route::post('/runs/generate/start', [PayrollController::class, 'startGeneration'])
+            ->middleware('permission:payroll.create')
+            ->name('runs.generate.start');
+        Route::post('/runs/generate/batch', [PayrollController::class, 'generateBatch'])
+            ->middleware('permission:payroll.create')
+            ->name('runs.generate.batch');
         Route::post('/runs/{payrollRun}/approve', [PayrollController::class, 'approveRun'])
             ->middleware('permission:payroll.approve')
             ->name('runs.approve');

@@ -77,6 +77,66 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
 @push('scripts')
 <script>
 (() => {
+  const form = document.querySelector('form[action$="/payroll/runs/generate"]');
+  const modalElement = document.getElementById('payrollGenerationModal');
+  if (!form || !modalElement || typeof bootstrap === 'undefined') return;
+  const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || form.querySelector('[name="_token"]')?.value;
+  const percent = document.getElementById('payrollGenerationPercent');
+  const progress = document.getElementById('payrollGenerationProgress');
+  const message = document.getElementById('payrollGenerationMessage');
+  const icon = document.getElementById('payrollGenerationIcon');
+  const setProgress = (value, text) => {
+    const safe = Math.max(0, Math.min(100, Number(value) || 0));
+    percent.textContent = `${safe}%`;
+    progress.style.width = `${safe}%`;
+    if (text) message.textContent = text;
+  };
+  const requestJson = async (url, body) => {
+    const response = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify(body) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'تعذر إنشاء المسير.');
+    return data;
+  };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    modalElement.querySelector('.modal-content').classList.remove('border-danger');
+    icon.className = 'bi bi-arrow-repeat fs-1 text-primary';
+    setProgress(0, 'جاري تجهيز قائمة الموظفين...');
+    modal.show();
+    try {
+      const month = form.querySelector('[name="month"]')?.value;
+      const started = await requestJson('{{ route('payroll.runs.generate.start') }}', { month });
+      const total = Number(started.total || 0);
+      let offset = 0;
+      if (!total) {
+        setProgress(100, 'لا توجد سجلات موظفين لإنشائها.');
+      }
+      while (offset < total || total === 0) {
+        const result = await requestJson('{{ route('payroll.runs.generate.batch') }}', { month: started.month, offset, batch_size: started.batch_size || 25 });
+        offset = Number(result.processed || total);
+        setProgress(result.percent, `تمت معالجة ${offset} من ${total} موظف`);
+        if (result.complete || total === 0) break;
+      }
+      setProgress(100, 'اكتمل إنشاء مسودة المسير بنجاح.');
+      icon.className = 'bi bi-check-circle-fill fs-1 text-success';
+      setTimeout(() => window.location.reload(), 700);
+    } catch (error) {
+      icon.className = 'bi bi-exclamation-triangle-fill fs-1 text-danger';
+      modalElement.querySelector('.modal-content').classList.add('border-danger');
+      message.textContent = error.message;
+      if (button) button.disabled = false;
+    }
+  });
+})();
+</script>
+@endpush
+
+@push('scripts')
+<script>
+(() => {
   const advanceRates = @json($records->getCollection()->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_override_rate')]));
   const advanceSchedules = @json($records->getCollection()->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_details', [])]));
   document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => {
@@ -153,6 +213,17 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   .payroll-pagination-bar .pagination { margin-bottom: 0; }
   .payroll-page-size .form-select { width: auto; min-width: 4.5rem; }
 </style>
+<div class="modal fade" id="payrollGenerationModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content text-center p-4">
+      <div class="mb-3"><i class="bi bi-arrow-repeat fs-1 text-primary" id="payrollGenerationIcon"></i></div>
+      <h5 class="mb-2">جاري تحميل المسير</h5>
+      <p class="text-muted small mb-3" id="payrollGenerationMessage">جاري تجهيز بيانات الموظفين...</p>
+      <div class="d-flex justify-content-between small mb-1"><span>التقدم</span><strong id="payrollGenerationPercent">0%</strong></div>
+      <div class="progress" style="height:10px"><div id="payrollGenerationProgress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
 @endsection
 
 @push('scripts')

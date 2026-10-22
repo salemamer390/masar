@@ -11,6 +11,7 @@ use App\Services\PayrollRunService;
 use App\Models\PayrollRun;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PayrollController extends Controller
 {
@@ -208,6 +209,62 @@ class PayrollController extends Controller
         }
         $service->generate($month);
         return back()->with('toast', 'تم إنشاء مسير الرواتب كمسودة.');
+    }
+
+    public function startGeneration(Request $request)
+    {
+        $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
+        $companyId = auth()->user()?->company_id;
+        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->whereDate('payroll_month', $month->toDateString())->first();
+        if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
+            return response()->json(['message' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.'], 422);
+        }
+
+        $run = DB::transaction(function () use ($month, $existing) {
+            $run = $existing
+                ? PayrollRun::whereKey($existing->id)->lockForUpdate()->firstOrFail()
+                : PayrollRun::create(['payroll_month' => $month->toDateString(), 'status' => 'Generating', 'created_by' => auth()->id()]);
+            $run->update(['status' => 'Generating', 'created_by' => $run->created_by ?: auth()->id()]);
+            return $run;
+        });
+
+        $total = $this->eligiblePayrollEmployeeIds($month, $companyId)->count();
+        return response()->json(['success' => true, 'run_id' => $run->id, 'month' => $month->toDateString(), 'total' => $total, 'processed' => 0, 'batch_size' => 25]);
+    }
+
+    public function generateBatch(Request $request, PayrollRunService $service)
+    {
+        $data = $request->validate(['month' => ['required', 'date'], 'offset' => ['required', 'integer', 'min:0'], 'batch_size' => ['nullable', 'integer', 'min:10', 'max:50']]);
+        $month = Carbon::parse($data['month'])->startOfMonth();
+        $companyId = auth()->user()?->company_id;
+        $allIds = $this->eligiblePayrollEmployeeIds($month, $companyId)->values();
+        $offset = (int) $data['offset'];
+        $batchSize = (int) ($data['batch_size'] ?? 25);
+        $ids = $allIds->slice($offset, $batchSize)->values()->all();
+        $run = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $month->toDateString())->firstOrFail();
+        abort_unless($run->status === 'Generating', 422, 'لا توجد عملية إنشاء نشطة لهذا الشهر.');
+        if ($ids) $service->generate($month, $ids);
+        $processed = min($offset + count($ids), $allIds->count());
+        $complete = $processed >= $allIds->count();
+        if ($complete) {
+            $run->records()->when($allIds->isNotEmpty(), fn ($query) => $query->whereNotIn('employee_id', $allIds->all()))->delete();
+            $run->update(['status' => 'Draft']);
+        }
+        return response()->json(['success' => true, 'processed' => $processed, 'total' => $allIds->count(), 'percent' => $allIds->count() ? (int) round(($processed / $allIds->count()) * 100) : 100, 'complete' => $complete]);
+    }
+
+    private function eligiblePayrollEmployeeIds(Carbon $month, ?int $companyId)
+    {
+        $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
+        return Employee::query()->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->where(function ($query) use ($excludedStatuses, $month) {
+                $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', $excludedStatuses))
+                    ->orWhere(function ($terminated) use ($month) {
+                        $terminated->whereHas('status', fn ($status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة']))
+                            ->whereBetween('termination_date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()]);
+                    });
+            })->orderBy('id')->pluck('id');
     }
 
     public function approveRun(PayrollRun $payrollRun, PayrollRunService $service)

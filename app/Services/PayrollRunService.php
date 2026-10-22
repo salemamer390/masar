@@ -108,7 +108,7 @@ class PayrollRunService
                         'proration_factor' => $serviceWindow['factor'],
                     ]),
                 ];
-                PayrollRecord::updateOrCreate(['employee_id' => $employee->id, 'payroll_month' => $month->toDateString()], $payload);
+                PayrollRecord::withoutGlobalScopes()->updateOrCreate(['employee_id' => $employee->id, 'payroll_month' => $month->toDateString()], $payload);
             }
 
             // Reconciliation is deliberately limited to the current draft
