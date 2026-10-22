@@ -419,6 +419,8 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     if (record?.id && Array.isArray(window.payrollDetailsData)) {
       const detail = window.payrollDetailsData.find((item) => String(item.id) === String(record.id));
       if (detail) Object.assign(detail, record, {
+        day_overtime_amount: Math.max(Number(record.day_overtime_amount || 0), Number(record.ot_day_amount || 0)),
+        night_overtime_amount: Math.max(Number(record.night_overtime_amount || 0), Number(record.ot_night_amount || 0)),
         bonus: Number(record.bonus || 0),
         loans: Number(record.loans || 0),
         other_earnings: Number(record.other_earnings || 0),
