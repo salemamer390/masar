@@ -326,6 +326,7 @@ class PayrollController extends Controller
         $data['loans'] = $advanceAmount;
         $inputs = array_merge($data, [
             'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
+            'incentives'=>(float) $payrollRecord->incentives, 'commission'=>(float) $payrollRecord->commission, 'profit_share'=>(float) $payrollRecord->profit_share,
             'advance_earnings'=>(float) data_get($snapshot, 'inputs.advance_earnings', 0),
         ]);
         $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance || !$insuranceDue);
@@ -335,7 +336,7 @@ class PayrollController extends Controller
         $payrollRecord->update([
             'ot_day_hours'=>$result['ot_day_hours'], 'ot_night_hours'=>$result['ot_night_hours'], 'ot_day_amount'=>$result['ot_day_amount'], 'ot_night_amount'=>$result['ot_night_amount'],
             'day_overtime_hours'=>$result['ot_day_hours'], 'night_overtime_hours'=>$result['ot_night_hours'], 'day_overtime_amount'=>$result['ot_day_amount'], 'night_overtime_amount'=>$result['ot_night_amount'],
-            'overtime_amount'=>$result['overtime_amount'], 'total_overtime'=>$result['overtime_amount'], 'bonus'=>$result['bonus'], 'loans'=>$result['loans'],
+            'overtime_amount'=>$result['overtime_amount'], 'total_overtime'=>$result['overtime_amount'], 'bonus'=>$result['bonus'], 'incentives'=>$result['incentives'], 'commission'=>$result['commission'], 'profit_share'=>$result['profit_share'], 'loans'=>$result['loans'],
             'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
             'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
             'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],

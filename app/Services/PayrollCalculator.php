@@ -89,6 +89,9 @@ class PayrollCalculator
         $otNight = $nightHours * $hourly * $this->settings->nightOvertimeMultiplier();
         $overtime = $otDay + $otNight;
         $bonus = max(0, (float)($monthly['bonus'] ?? 0));
+        $incentives = max(0, (float)($monthly['incentives'] ?? 0));
+        $commission = max(0, (float)($monthly['commission'] ?? 0));
+        $profitShare = max(0, (float)($monthly['profit_share'] ?? 0));
         $advanceEarnings = max(0, (float)($monthly['advance_earnings'] ?? 0));
         $otherEarnings = max(0, (float)($monthly['other_earnings'] ?? 0));
         $absenceDays = max(0, (float)($monthly['absence_days'] ?? 0));
@@ -100,12 +103,12 @@ class PayrollCalculator
         );
         $absenceDeduction = $absenceDays * $gross / max(1, $this->settings->absenceDailyDivisor());
         $penaltyDeduction = $penaltyDays * $structure['basic_salary'] / max(1, $this->settings->penaltyDailyDivisor());
-        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $otDay + $otNight + $bonus + $otherEarnings + $advanceEarnings;
+        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $otDay + $otNight + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
         $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
             'hourly_rate'=>$hourly, 'ot_day_hours'=>$dayHours, 'ot_night_hours'=>$nightHours, 'ot_day_amount'=>$otDay, 'ot_night_amount'=>$otNight,
-            'overtime_amount'=>$otDay + $otNight, 'bonus'=>$bonus, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
+            'overtime_amount'=>$otDay + $otNight, 'bonus'=>$bonus, 'incentives'=>$incentives, 'commission'=>$commission, 'profit_share'=>$profitShare, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'income_tax'=>$tax, 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),

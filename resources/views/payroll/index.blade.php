@@ -9,7 +9,7 @@
 
 <div class="modal fade" id="payrollCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="payrollCardTitle">تفاصيل البطاقة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="payrollCardBody" class="details-grid"></div></div></div></div></div>
 <script>
-document.querySelectorAll('.stat-grid .stat-card').forEach((card,index)=>{card.classList.add('clickable-card');card.setAttribute('role','button');card.addEventListener('click',()=>{const data=@json($cardDetails);const keys=['employees','reviewed','drafts','net','cost'];const labels=['الموظفون','السجلات المعتمدة أو المصروفة','المسودات','تفاصيل صافي المسير','تفاصيل إجمالي التكلفة'];const list=data[keys[index]]||[];document.getElementById('payrollCardTitle').textContent=labels[index]||'تفاصيل البطاقة';document.getElementById('payrollCardBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.employee?.full_name||'—';const value=item.net_salary!==undefined?Number(item.net_salary).toLocaleString('ar-EG')+' ج.م':(item.employee_cost!==undefined?Number(item.employee_cost).toLocaleString('ar-EG')+' ج.م':(item.status||item.employee_code||''));return '<div><label>'+name+'</label><b>'+value+'</b></div>'}).join(''):'<div class="text-muted">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('payrollCardDetails')).show()})});
+document.querySelectorAll('.stat-grid .stat-card').forEach((card,index)=>{card.classList.add('clickable-card');card.setAttribute('role','button');card.addEventListener('click',()=>{const data=@json($cardDetails);const keys=['employees','reviewed','drafts','net','cost'];const labels=['الموظفون','السجلات المعتمدة أو المصروفة','المسودات','تفاصيل صافي المسير','تفاصيل إجمالي التكلفة'];const list=data[keys[index]]||[];document.getElementById('payrollCardTitle').textContent=labels[index]||'تفاصيل البطاقة';document.getElementById('payrollCardBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.employee?.full_name||'—';const value=item.net_salary!==undefined?Number(item.net_salary).toLocaleString('en-US')+' ج.م':(item.employee_cost!==undefined?Number(item.employee_cost).toLocaleString('en-US')+' ج.م':(item.status||item.employee_code||''));return '<div><label>'+name+'</label><b>'+value+'</b></div>'}).join(''):'<div class="text-muted">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('payrollCardDetails')).show()})});
 </script>
 <script>
 document.querySelectorAll('.stat-grid .stat-card').forEach(card=>card.classList.add('payroll-kpi-card'));
@@ -167,7 +167,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       if (!grid || amount <= 0 || grid.querySelector('[data-advance-earned]')) return;
       const item = document.createElement('div');
       item.dataset.advanceEarned = 'true';
-      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ج.م</b>`;
+      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ج.م</b>`;
       grid.insertBefore(item, grid.children[4] || null);
     });
   });
@@ -241,17 +241,18 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       row.prepend(serialCell);
     });
   }
-  const payrollDetailsData = @json($payrollDetails);
+  window.payrollDetailsData = @json($payrollDetails);
+  const payrollDetailsData = window.payrollDetailsData;
   if (false && payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
     const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
     const targetHeader = header || payrollDetailsTable.tHead.rows[0].cells[4];
     const index = targetHeader ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(targetHeader) : -1;
     if (index >= 0) {
       const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; targetHeader.after(advanceHeader);
-      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2}) : '0.00'; row.cells[index]?.after(cell); });
+      [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('en-US', {minimumFractionDigits: 2}) : '0.00'; row.cells[index]?.after(cell); });
     }
   }
-  const payrollMoney = (value) => Number(value || 0).toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
+  const payrollMoney = (value) => Number(value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
   const payrollDetailsRows = payrollDetailsTable ? [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]) : [];
   const detailPanel = document.createElement('div');
   detailPanel.className = 'offcanvas offcanvas-end payroll-detail-panel';
@@ -277,6 +278,12 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       });
       if (Number(record.day_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي النهاري', payrollMoney(record.day_overtime_amount)));
       if (Number(record.night_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي الليلي', payrollMoney(record.night_overtime_amount)));
+      const dayOvertime = Number(record.day_overtime_amount || 0);
+      const nightOvertime = Number(record.night_overtime_amount || 0);
+      const totalOvertime = Number(record.overtime_amount || 0);
+      if (dayOvertime <= 0 && nightOvertime <= 0 && totalOvertime > 0) {
+        earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي', payrollMoney(totalOvertime)));
+      }
       detailBody.querySelectorAll('.payroll-detail-section:nth-of-type(3) .payroll-detail-item').forEach((item) => {
         const amount = item.querySelector('b')?.textContent?.trim() || '';
         if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
@@ -396,7 +403,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   }
   // Payroll inputs are the only payroll action moved in this stage. Generate,
   // approve, lock, and pay remain full server transitions by design.
-  const money = (value) => Number(value || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
+  const money = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ج.م';
   document.querySelectorAll('[id^="inputs"]').forEach((modal) => {
     const trigger = document.querySelector(`[data-bs-target="#${modal.id}"]`);
     const match = modal.id.match(/^inputs(\d+)$/);
@@ -407,6 +414,17 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.action.endsWith('/inputs')) return;
     const record = event.detail?.record;
+    // Keep the already-rendered Payslip drawer in sync with the AJAX update.
+    // The table row is updated below, but its drawer reads payrollDetailsData.
+    if (record?.id && Array.isArray(window.payrollDetailsData)) {
+      const detail = window.payrollDetailsData.find((item) => String(item.id) === String(record.id));
+      if (detail) Object.assign(detail, record, {
+        bonus: Number(record.bonus || 0),
+        loans: Number(record.loans || 0),
+        other_earnings: Number(record.other_earnings || 0),
+        advance_earnings: Number(record.advance_earnings || 0),
+      });
+    }
     const row = form.closest('.modal')?.previousElementSibling?.closest('tr') || document.querySelector(`tr[data-payroll-record-id="${record?.id}"]`);
     if (row && record) {
       const additional = Number(record.additional_amount ?? (Number(record.overtime_amount || 0) + Number(record.advance_earnings || 0) + Number(record.bonus || 0) + Number(record.other_earnings || 0)));

@@ -16,6 +16,7 @@ class Salary extends Model
         'deductions','fixed_deductions','net_salary','gross_salary','insurance_wage','applied_insurance_wage',
         'employee_insurance','income_tax','taxable_annual','martyrs_fund','total_deductions',
         'employer_insurance','employee_cost','no_insurance','excluded_allowance_pct',
+        'incentives','commission','profit_share','profit_share_tax_exempt','other_earnings',
         'personal_exemption','tax_treatment','status','payment_method_id','notes',
     ];
 
@@ -28,6 +29,7 @@ class Salary extends Model
         'insurance_wage' => 'decimal:2','applied_insurance_wage' => 'decimal:2','employee_insurance' => 'decimal:2','income_tax' => 'decimal:2','taxable_annual' => 'decimal:2',
         'martyrs_fund' => 'decimal:2','total_deductions' => 'decimal:2','employer_insurance' => 'decimal:2','employee_cost' => 'decimal:2',
         'no_insurance' => 'boolean','excluded_allowance_pct' => 'decimal:2','personal_exemption' => 'decimal:2',
+        'incentives' => 'decimal:2','commission' => 'decimal:2','profit_share' => 'decimal:2','profit_share_tax_exempt' => 'boolean','other_earnings' => 'decimal:2',
     ];
 
     public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }

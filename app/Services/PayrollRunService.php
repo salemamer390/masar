@@ -70,7 +70,7 @@ class PayrollRunService
                 if (!$salary) continue;
                 $eligibleEmployeeIds[] = $employee->id;
                 $structure = $this->calculator->structureForSalary($salary);
-                $inputs = $this->approvedInputs($employee, $month, $structure);
+                $inputs = $this->approvedInputs($employee, $month, $structure, $salary);
                 $insuranceDue = $this->insuranceIsDueForMonth($employee, $month);
                 $calculation = $this->calculator->monthly(
                     (float) $structure['gross'],
@@ -90,7 +90,7 @@ class PayrollRunService
                     'day_overtime_hours' => $calculation['ot_day_hours'], 'day_overtime_amount' => $calculation['ot_day_amount'],
                     'night_overtime_hours' => $calculation['ot_night_hours'], 'night_overtime_amount' => $calculation['ot_night_amount'],
                     'ot_day_hours'=>$calculation['ot_day_hours'], 'ot_night_hours'=>$calculation['ot_night_hours'], 'ot_day_amount'=>$calculation['ot_day_amount'], 'ot_night_amount'=>$calculation['ot_night_amount'],
-                    'absence_days'=>$calculation['absence_days'], 'penalty_days'=>$calculation['penalty_days'], 'bonus'=>$calculation['bonus'], 'loans'=>$calculation['loans'], 'other_earnings'=>$calculation['other_earnings'], 'other_deductions'=>$calculation['other_deductions'],
+                    'absence_days'=>$calculation['absence_days'], 'penalty_days'=>$calculation['penalty_days'], 'bonus'=>$calculation['bonus'], 'incentives'=>$calculation['incentives'], 'commission'=>$calculation['commission'], 'profit_share'=>$calculation['profit_share'], 'loans'=>$calculation['loans'], 'other_earnings'=>$calculation['other_earnings'], 'other_deductions'=>$calculation['other_deductions'],
                     'deductions' => $calculation['monthly_deductions'], 'gross_salary' => $calculation['gross'],
                     'insurance_wage' => $calculation['insurance_wage'], 'employee_insurance' => $calculation['employee_insurance'],
                     'income_tax' => $calculation['income_tax'], 'martyrs_fund' => $calculation['martyrs_fund'],
@@ -145,7 +145,7 @@ class PayrollRunService
     }
 
     /** Build payroll inputs exclusively from finalized records within the payroll month. */
-    private function approvedInputs(Employee $employee, Carbon $month, array $structure): array
+    private function approvedInputs(Employee $employee, Carbon $month, array $structure, ?Salary $salary = null): array
     {
         $from = $month->copy()->startOfMonth()->toDateString();
         $to = $month->copy()->endOfMonth()->toDateString();
@@ -178,7 +178,7 @@ class PayrollRunService
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'absence_days' => $absenceRecords->count() + $unpaidLeaveDays, 'penalty_days' => $penaltyDays,
-            'bonus'=>0, 'advance_earnings'=>$advancePlan['grant_amount'], 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
+            'bonus'=>0, 'incentives'=>(float) ($salary?->incentives ?? 0), 'commission'=>(float) ($salary?->commission ?? 0), 'profit_share'=>(float) ($salary?->profit_share ?? 0), 'advance_earnings'=>$advancePlan['grant_amount'], 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings + (float) ($salary?->other_earnings ?? 0), 'other_deductions'=>$otherDeductions,
             'approved_attendance_ids' => $attendance->pluck('id')->all(), 'approved_overtime_request_ids' => $overtime['request_ids'], 'approved_other_request_ids' => $otherRequests->pluck('id')->all(),
             'absence_attendance_ids' => $absenceRecords->pluck('id')->all(),
             'approved_leave_ids' => $approvedLeaves->pluck('id')->all(), 'approved_penalty_ids' => $penalties->pluck('id')->all(),
