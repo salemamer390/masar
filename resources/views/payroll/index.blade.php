@@ -142,7 +142,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   <div class="d-flex justify-content-center">{{ $records->onEachSide(1)->links() }}</div>
 </div>
 <style>
-  .payroll-pagination-bar { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+  .payroll-pagination-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .75rem 1.25rem; }
   .payroll-pagination-bar nav { display: flex; justify-content: center; }
   .payroll-pagination-bar .pagination { margin-bottom: 0; }
   .payroll-page-size .form-select { width: auto; min-width: 4.5rem; }
@@ -282,6 +282,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     filter.innerHTML = '<label class="form-label mb-0" for="payrollRecordSearch"><i class="bi bi-search"></i> بحث في الموظفين</label><input id="payrollRecordSearch" type="search" class="form-control" placeholder="اكتب اسم الموظف أو الكود أو القسم أو الحالة" autocomplete="off"><span class="text-muted small" data-payroll-filter-count></span>';
     payrollDetailsWrap.prepend(filter);
     const input = filter.querySelector('input');
+    input.value = @json(request('search', ''));
     input.style.cssText = 'max-width:360px;min-width:220px;border-radius:10px;border:1px solid #cbd5e1;padding:.55rem .75rem;';
     const count = filter.querySelector('[data-payroll-filter-count]');
     const rows = [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]);
@@ -301,7 +302,19 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
       count.textContent = query ? `${visible} من ${rows.length}` : `${rows.length} موظف`;
       empty.hidden = visible !== 0 || rows.length === 0;
     };
-    input.addEventListener('input', applyPayrollFilter);
+    let searchTimer;
+    input.addEventListener('input', () => {
+      applyPayrollFilter();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        const url = new URL(window.location.href);
+        const value = input.value.trim();
+        if (value) url.searchParams.set('search', value);
+        else url.searchParams.delete('search');
+        url.searchParams.delete('page');
+        window.location.assign(url.toString());
+      }, 350);
+    });
     applyPayrollFilter();
   }
   // Payroll inputs are the only payroll action moved in this stage. Generate,

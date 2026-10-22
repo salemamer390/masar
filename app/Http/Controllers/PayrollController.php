@@ -25,9 +25,16 @@ class PayrollController extends Controller
     {
         $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
+        $search = trim((string) $request->input('search', ''));
         $records = PayrollRecord::with(['employee.department', 'employee.job'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())
+            ->when($search !== '', function ($query) use ($search) {
+                $query->whereHas('employee', function ($employeeQuery) use ($search) {
+                    $employeeQuery->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('employee_code', 'like', "%{$search}%");
+                });
+            })
             ->orderByDesc('id')
             ->paginate(min(max((int) $request->input('per_page', 25), 10), 100))
             ->withQueryString();
