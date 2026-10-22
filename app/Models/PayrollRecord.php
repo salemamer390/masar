@@ -13,7 +13,7 @@ class PayrollRecord extends Model
         'payroll_run_id','employee_id','salary_id','payroll_month','basic_salary','allowances','housing_allowance','transportation_allowance','meal_allowance','clothing_allowance','overtime_amount','deductions','absence_deduction',
         'gross_salary','monthly_total','insurance_wage','employee_insurance','income_tax','martyrs_fund','employer_insurance',
         'employee_cost','fixed_deductions','attendance_deduction','penalties','penalty_deduction','day_overtime_hours','night_overtime_hours','day_overtime_amount','night_overtime_amount','total_overtime','net_salary','status','paid_at','notes','calculation_snapshot','approved_at','approved_by','is_locked',
-        'absence_days','penalty_days','ot_day_hours','ot_night_hours','ot_day_amount','ot_night_amount','bonus','incentives','commission','profit_share','other_earnings','other_deductions',
+        'absence_days','penalty_days','ot_day_hours','ot_night_hours','ot_day_amount','ot_night_amount','bonus','incentives','commission','profit_share','loans','other_earnings','other_deductions',
     ];
 
     protected $casts = [

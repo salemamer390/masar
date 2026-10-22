@@ -131,7 +131,7 @@
   const previousDrawer = drawer;
   const item = (pair) => { const node = document.createElement('div'); node.className = 'item'; node.innerHTML = `<span>${pair[0]}</span><b>${money(pair[1])}</b>`; return node; };
   const arabic = (codes) => String.fromCharCode(...codes.split(',').map(Number));
-  const collapseStyle = document.createElement('style'); collapseStyle.textContent = '#payrollPrototype .payslip-collapse-toggle{display:flex;align-items:center;gap:10px}#payrollPrototype .payslip-collapse-toggle small{margin-inline-start:auto;color:var(--muted);font-weight:700}#payrollPrototype .payslip-collapse-toggle .payslip-collapse-arrow{font-size:18px;color:var(--blue);line-height:1}#payrollPrototype .payslip-collapse-toggle::after{content:none!important}'; document.head.append(collapseStyle);
+  const collapseStyle = document.createElement('style'); collapseStyle.textContent = '#payrollPrototype .payslip-collapse-toggle{display:flex;align-items:center;gap:10px}#payrollPrototype .payslip-collapse-toggle small{margin-inline-start:auto;color:var(--muted);font-weight:700}#payrollPrototype .payslip-collapse-toggle .payslip-collapse-arrow{font-size:18px;color:var(--blue);line-height:1}#payrollPrototype .payslip-collapse-toggle::after{content:none!important}#payrollPrototype .whatsapp-payslip-btn{background:#25D366!important;border-color:#25D366!important;color:#fff!important;display:inline-flex;align-items:center;justify-content:center;gap:6px}#payrollPrototype .whatsapp-payslip-btn:hover{background:#1ebe5d!important;border-color:#1ebe5d!important}#payrollPrototype .whatsapp-payslip-btn i{font-size:16px}#payrollPrototype .drawer .profile{position:relative}#payrollPrototype .drawer .profile>.close{position:absolute;top:10px;left:10px;z-index:2}'; document.head.append(collapseStyle);
   const group = (title, entries) => {
     if (!entries?.length) return null;
     const wrapper = document.createElement('div'); wrapper.className = 'payslip-collapse-group';
@@ -145,6 +145,38 @@
     const selectedPerson = typeof selected !== 'undefined' ? selected : null;
     const container = document.querySelector('#payrollPrototype #earnItems');
     if (!selectedPerson || !container) return;
+    const drawerElement = document.querySelector('#payrollPrototype #drawer');
+    const profile = drawerElement?.querySelector('.profile');
+    const header = drawerElement?.querySelector('.panelhead');
+    drawerElement?.querySelector('.docicon')?.remove();
+    const closeButton = drawerElement?.querySelector('.close');
+    if (profile && closeButton && closeButton.parentElement !== profile) profile.prepend(closeButton);
+    if (header) header.remove();
+    document.querySelector('#payrollPrototype #drawer .panelhead h2')?.remove();
+    document.querySelector('#payrollPrototype #drawer .panelhead p')?.remove();
+    document.querySelector('#payrollPrototype #drawer .metas .pill')?.remove();
+    const codeNode = document.querySelector('#payrollPrototype #pId');
+    if (codeNode) codeNode.textContent = `الكود الوظيفي: ${selectedPerson.code || selectedPerson.id || ''}`;
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+    const payslipHtml = () => {
+      const allowanceItems = selectedPerson.allowanceItems || [];
+      const additionalItems = selectedPerson.additionalItems || [];
+      const deductions = selectedPerson.deductions || [];
+      const earnings = [...(selectedPerson.items?.[0] ? [selectedPerson.items[0]] : []), ...allowanceItems, ...additionalItems];
+      const rows = (items) => items.map(([label, amount]) => `<tr><td>${escapeHtml(label)}</td><td>${money(amount)} ج.م</td></tr>`).join('');
+      return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسيمة راتب ${escapeHtml(selectedPerson.name)}</title><style>body{font-family:Arial,sans-serif;background:#f4f7fc;color:#203252;padding:24px}.sheet{max-width:760px;margin:auto;background:#fff;padding:24px;border-radius:14px}h1{margin:0 0 8px;color:#142b55}h2{font-size:16px;margin-top:22px;border-bottom:1px solid #e3eaf4;padding-bottom:8px}table{width:100%;border-collapse:collapse}td{padding:9px;border-bottom:1px solid #edf1f7}td:last-child{font-weight:700;text-align:left}.net{margin-top:20px;padding:14px;background:#eaf3ff;border-radius:10px;font-size:22px;font-weight:800;color:#0969e8}@media print{body{background:#fff;padding:0}.sheet{box-shadow:none}}</style></head><body><main class="sheet"><h1>قسيمة راتب</h1><div>${escapeHtml(selectedPerson.name)} — الكود الوظيفي: ${escapeHtml(selectedPerson.code || selectedPerson.id)}</div><h2>الاستحقاقات</h2><table>${rows(earnings)}</table><h2>الاستقطاعات</h2><table>${rows(deductions)}</table><div class="net">صافي الراتب: ${money(selectedPerson.net || 0)} ج.م</div></main></body></html>`;
+    };
+    const openPayslip = (printAfter = false) => { const popup = window.open('', '_blank', 'noopener,noreferrer'); if (!popup) return; popup.document.write(payslipHtml()); popup.document.close(); if (printAfter) popup.addEventListener('load', () => popup.print(), {once:true}); };
+    const actions = document.querySelector('#payrollPrototype #drawer .actions');
+    if (actions) {
+      const whatsapp = actions.querySelector('[data-whatsapp-payslip]') || document.createElement('button');
+      whatsapp.type = 'button'; whatsapp.dataset.whatsappPayslip = 'true'; whatsapp.className = 'btn whatsapp-payslip-btn'; whatsapp.innerHTML = '<i class="bi bi-whatsapp"></i> واتساب';
+      if (!whatsapp.parentElement) actions.append(whatsapp);
+      whatsapp.onclick = async () => { const html = payslipHtml(); const file = new File([html], `payslip-${selectedPerson.code || selectedPerson.id}.html`, {type:'text/html'}); if (navigator.canShare?.({files:[file]})) { try { await navigator.share({files:[file], title:'قسيمة الراتب'}); return; } catch (error) { if (error?.name === 'AbortError') return; } } const phone = String(selectedPerson.phone || '').replace(/[^0-9]/g, ''); const message = encodeURIComponent(`قسيمة راتب ${selectedPerson.name} — الكود الوظيفي: ${selectedPerson.code || selectedPerson.id}`); window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener'); };
+    }
+    document.querySelector('#payrollPrototype #view')?.addEventListener('click', () => openPayslip(false), {once:true});
+    document.querySelector('#payrollPrototype #pdf')?.addEventListener('click', () => openPayslip(true), {once:true});
+    document.querySelector('#payrollPrototype #print')?.addEventListener('click', () => openPayslip(true), {once:true});
     container.innerHTML = '';
     if (selectedPerson.items?.[0]) container.append(item(selectedPerson.items[0]));
     const allowances = group(arabic('1575,1604,1576,1583,1604,1575,1578'), selectedPerson.allowanceItems || []);

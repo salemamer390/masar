@@ -162,13 +162,14 @@ class PayrollController extends Controller
             }
             $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
             if ($advance > 0) $items[] = ['السلفة المصروفة', $advance];
+            $advanceInstallment = (float) data_get($inputs, 'loans', data_get($snapshot, 'loans', $record->loans ?? 0));
             $deductions = [
                 ['تأمين الموظف', (float) $record->employee_insurance],
                 ['الضريبة', (float) $record->income_tax],
                 ['صندوق الشهداء', (float) $record->martyrs_fund],
                 ['خصم الغياب', (float) $record->absence_deduction],
                 ['خصم الجزاءات', (float) $record->penalty_deduction],
-                ['أقساط السلف', (float) $record->loans],
+                ['قسط السلفة', $advanceInstallment],
                 ['خصومات أخرى', (float) $record->other_deductions],
             ];
             $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
@@ -176,6 +177,7 @@ class PayrollController extends Controller
             return [
                 'id' => (int) $employee?->id,
                 'code' => (string) ($employee?->employee_code ?? ''),
+                'phone' => (string) ($employee?->phone ?? ''),
                 'name' => $employee?->full_name ?? '—',
                 'role' => $employee?->job?->title ?? '—',
                 'dept' => $employee?->department?->name ?? '—',

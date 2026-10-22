@@ -213,12 +213,64 @@ class PayrollRunService
             })->get();
         $priorRecords = PayrollRecord::where('employee_id', $employee->id)
             ->where('payroll_month', '<', $month->toDateString())
-            ->get(['payroll_month', 'calculation_snapshot']);
+            ->get(['payroll_month', 'loans', 'calculation_snapshot']);
         $monthlyCap = round(max(0, $gross) * 0.10, 2);
         $remainingCapacity = $monthlyCap;
         $total = 0.0;
         $grantAmount = 0.0;
         $details = [];
+        $paidByRequest = [];
+        $legacyRecords = [];
+
+        // Newer records retain the exact request allocation. Older records may
+        // only have the aggregate loan value, so collect both formats first.
+        foreach ($priorRecords as $record) {
+            $recordDetails = (array) data_get($record->calculation_snapshot, 'advance_details', []);
+            if ($recordDetails) {
+                foreach ($recordDetails as $detail) {
+                    $requestId = (int) ($detail['request_id'] ?? 0);
+                    if ($requestId > 0) {
+                        $paidByRequest[$requestId] = round(
+                            ($paidByRequest[$requestId] ?? 0) + (float) ($detail['installment'] ?? 0),
+                            2
+                        );
+                    }
+                }
+            } else {
+                $legacyRecords[] = [
+                    'month' => Carbon::parse($record->payroll_month)->startOfMonth(),
+                    'amount' => (float) ($record->loans ?? data_get($record->calculation_snapshot, 'inputs.loans', 0)),
+                ];
+            }
+        }
+
+        // Backfill payment history for records created before advance_details
+        // was stored. Allocate each legacy aggregate to the oldest outstanding
+        // advance first, matching the normal repayment order.
+        $orderedRequests = $requests->sortBy(function ($request) {
+            return [
+                (string) data_get($request->payload, 'request_date', $request->created_at?->toDateString()),
+                (int) $request->id,
+            ];
+        });
+        foreach ($legacyRecords as $legacy) {
+            $remainingLegacy = round(max(0, $legacy['amount']), 2);
+            if ($remainingLegacy <= 0) continue;
+            foreach ($orderedRequests as $request) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $amount = (float) ($payload['amount'] ?? 0);
+                $requestDate = $payload['request_date'] ?? $request->created_at?->toDateString();
+                if ($amount <= 0 || !$requestDate) continue;
+                if (Carbon::parse($requestDate)->startOfMonth()->gte($legacy['month'])) continue;
+                $outstanding = round(max(0, $amount - ($paidByRequest[$request->id] ?? 0)), 2);
+                $allocated = round(min($outstanding, $remainingLegacy), 2);
+                if ($allocated <= 0) continue;
+                $paidByRequest[$request->id] = round(($paidByRequest[$request->id] ?? 0) + $allocated, 2);
+                $remainingLegacy = round($remainingLegacy - $allocated, 2);
+                if ($remainingLegacy <= 0) break;
+            }
+        }
+
         foreach ($requests as $request) {
             $payload = is_array($request->payload) ? $request->payload : [];
             $amount = (float) ($payload['amount'] ?? 0);
@@ -230,12 +282,7 @@ class PayrollRunService
                 continue;
             }
             if ($month->copy()->startOfMonth()->lt($startMonth)) continue;
-            $paid = 0.0;
-            foreach ($priorRecords as $record) {
-                foreach ((array) data_get($record->calculation_snapshot, 'advance_details', []) as $detail) {
-                    if ((int) ($detail['request_id'] ?? 0) === (int) $request->id) $paid += (float) ($detail['installment'] ?? 0);
-                }
-            }
+            $paid = (float) ($paidByRequest[$request->id] ?? 0);
             $remaining = round(max(0, $amount - $paid), 2);
             if ($remaining <= 0 || $remainingCapacity <= 0) continue;
             $installment = round(min($remaining, $remainingCapacity), 2);
