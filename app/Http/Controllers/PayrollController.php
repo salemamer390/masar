@@ -29,26 +29,30 @@ class PayrollController extends Controller
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())
             ->orderByDesc('id')
-            ->get();
+            ->paginate(min(max((int) $request->input('per_page', 25), 10), 100))
+            ->withQueryString();
+        $recordCollection = $records->getCollection();
+        $summaryQuery = PayrollRecord::when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->whereDate('payroll_month', $month->toDateString());
 
         $totalEmployees = Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->count();
-        $reviewedCount = $records->whereIn('status', ['معتمدة', 'تم الصرف', 'Approved', 'Paid'])->count();
-        $pendingReview = $records->whereIn('status', ['قيد الإعداد', 'Draft'])->count();
-        $totalNet = $records->sum('net_salary');
-        $totalCost = $records->sum('employee_cost');
-        $totalEmployeeInsurance = $records->sum('employee_insurance');
-        $totalTax = $records->sum('income_tax');
-        $totalEmployerInsurance = $records->sum('employer_insurance');
-        $totalMartyrs = $records->sum('martyrs_fund');
+        $reviewedCount = (clone $summaryQuery)->whereIn('status', ['معتمدة', 'تم الصرف', 'Approved', 'Paid'])->count();
+        $pendingReview = (clone $summaryQuery)->whereIn('status', ['قيد الإعداد', 'Draft'])->count();
+        $totalNet = (clone $summaryQuery)->sum('net_salary');
+        $totalCost = (clone $summaryQuery)->sum('employee_cost');
+        $totalEmployeeInsurance = (clone $summaryQuery)->sum('employee_insurance');
+        $totalTax = (clone $summaryQuery)->sum('income_tax');
+        $totalEmployerInsurance = (clone $summaryQuery)->sum('employer_insurance');
+        $totalMartyrs = (clone $summaryQuery)->sum('martyrs_fund');
         $runs = PayrollRun::withCount('records')->when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderByDesc('payroll_month')->limit(12)->get();
         $cardDetails = [
             'employees' => Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderBy('full_name')->get(['id','full_name','employee_code']),
-            'reviewed' => $records->whereIn('status', ['Ù…Ø¹ØªÙ…Ø¯Ø©', 'ØªÙ… Ø§Ù„ØµØ±Ù', 'Approved', 'Paid'])->values(),
-            'drafts' => $records->whereIn('status', ['Ù‚ÙŠØ¯ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'Draft'])->values(),
-            'net' => $records->sortByDesc('net_salary')->values(),
-            'cost' => $records->sortByDesc('employee_cost')->values(),
+            'reviewed' => $recordCollection->whereIn('status', ['Ù…Ø¹ØªÙ…Ø¯Ø©', 'ØªÙ… Ø§Ù„ØµØ±Ù', 'Approved', 'Paid'])->values(),
+            'drafts' => $recordCollection->whereIn('status', ['Ù‚ÙŠØ¯ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'Draft'])->values(),
+            'net' => $recordCollection->sortByDesc('net_salary')->values(),
+            'cost' => $recordCollection->sortByDesc('employee_cost')->values(),
         ];
-        $payrollDetails = $records->map(fn ($record) => [
+        $payrollDetails = $recordCollection->map(fn ($record) => [
             'id' => $record->id,
             'name' => $record->employee?->full_name,
             'code' => $record->employee?->employee_code,
@@ -63,6 +67,8 @@ class PayrollController extends Controller
             'meal_allowance' => (float) $record->meal_allowance,
             'clothing_allowance' => (float) $record->clothing_allowance,
             'overtime_amount' => (float) $record->overtime_amount,
+            'day_overtime_amount' => (float) ($record->day_overtime_amount ?? $record->ot_day_amount ?? 0),
+            'night_overtime_amount' => (float) ($record->night_overtime_amount ?? $record->ot_night_amount ?? 0),
             'advance_earnings' => (float) data_get($record->calculation_snapshot, 'inputs.advance_earnings', data_get($record->calculation_snapshot, 'advance_earnings', 0)),
             'bonus' => (float) $record->bonus,
             'incentives' => (float) $record->incentives,
@@ -89,7 +95,7 @@ class PayrollController extends Controller
         // Data shape consumed by the approved payroll drawer prototype.
         // Keeping this adapter here lets us preserve the prototype UI while
         // replacing its sample JavaScript data with the real payroll records.
-        $prototypePeople = $records->values()->map(function ($record) {
+        $prototypePeople = $recordCollection->values()->map(function ($record) {
             $snapshot = (array) ($record->calculation_snapshot ?? []);
             $inputs = (array) ($snapshot['inputs'] ?? []);
             $employee = $record->employee;
@@ -165,8 +171,8 @@ class PayrollController extends Controller
         $prototypeStats = [
             'cost' => (float) $totalCost,
             'net' => (float) $totalNet,
-            'deductions' => (float) $records->sum('deductions'),
-            'employees' => $records->count(),
+            'deductions' => (float) $recordCollection->sum('deductions'),
+            'employees' => $recordCollection->count(),
         ];
 
         $view = $request->attributes->get('payroll_view', 'payroll.index');

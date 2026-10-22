@@ -71,8 +71,8 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 @push('scripts')
 <script>
 (() => {
-  const advanceRates = @json($records->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_override_rate')]));
-  const advanceSchedules = @json($records->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_details', [])]));
+  const advanceRates = @json($records->getCollection()->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_override_rate')]));
+  const advanceSchedules = @json($records->getCollection()->mapWithKeys(fn ($record) => [$record->id => data_get($record->calculation_snapshot, 'advance_details', [])]));
   document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => {
     if (form.querySelector('[name="advance_rate"]')) return;
     const loans = form.querySelector('[name="loans"]');
@@ -92,7 +92,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 @push('scripts')
 <script>
 (() => {
-  const advanceByRecord = @json($records->mapWithKeys(fn ($record) => [$record->id => (float) data_get($record->calculation_snapshot, 'advance_earnings', 0)]));
+  const advanceByRecord = @json($records->getCollection()->mapWithKeys(fn ($record) => [$record->id => (float) data_get($record->calculation_snapshot, 'advance_earnings', 0)]));
   document.querySelectorAll('.payroll-record-details-modal').forEach((modal) => {
     modal.addEventListener('show.bs.modal', () => {
       const id = modal.id.replace('payrollRecordDetails', '');
@@ -108,6 +108,26 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
 })();
 </script>
 @endpush
+<script>
+(() => {
+  const hideZeroItems = (root) => {
+    root.querySelectorAll('.payroll-record-details-grid > div, .payroll-detail-section .payroll-detail-item').forEach((item) => {
+      const value = item.querySelector('b')?.textContent || item.textContent || '';
+      const match = value.match(/-?\d[\d,]*(?:\.\d+)?/);
+      const number = match ? Number(match[0].replace(/,/g, '')) : NaN;
+      if (Number.isFinite(number) && number === 0) item.remove();
+    });
+  };
+  document.querySelectorAll('.payroll-record-details-modal').forEach((modal) => {
+    hideZeroItems(modal);
+    modal.addEventListener('show.bs.modal', () => hideZeroItems(modal));
+  });
+})();
+</script>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+  <div class="text-muted small">عرض {{ $records->firstItem() ?? 0 }} إلى {{ $records->lastItem() ?? 0 }} من {{ $records->total() }} موظف</div>
+  <div>{{ $records->onEachSide(1)->links() }}</div>
+</div>
 @endsection
 
 @push('scripts')
@@ -154,6 +174,17 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoney(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
     const earningsSection = detailBody.querySelectorAll('.payroll-detail-section')[1];
     if (earningsSection) {
+      earningsSection.querySelectorAll('.payroll-detail-item').forEach((item) => {
+        if (item.querySelector('span')?.textContent?.includes('الإضافي')) item.remove();
+        const amount = item.querySelector('b')?.textContent?.trim() || '';
+        if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
+      });
+      if (Number(record.day_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي النهاري', payrollMoney(record.day_overtime_amount)));
+      if (Number(record.night_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي الليلي', payrollMoney(record.night_overtime_amount)));
+      detailBody.querySelectorAll('.payroll-detail-section:nth-of-type(3) .payroll-detail-item').forEach((item) => {
+        const amount = item.querySelector('b')?.textContent?.trim() || '';
+        if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
+      });
       if (Number(record.bonus || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('المكافأة', payrollMoney(record.bonus)));
       if (Number(record.incentives || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الحوافز', payrollMoney(record.incentives)));
       if (Number(record.commission || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('العمولة', payrollMoney(record.commission)));
@@ -166,7 +197,7 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   payrollDetailsRows.forEach((row, index) => {
     const record = payrollDetailsData[index];
     if (!record) return;
-    const overtimeCell = row.cells[4];
+    const overtimeCell = row.cells[3];
     if (overtimeCell) {
       const additional = Number(record.additional_amount || 0);
       overtimeCell.textContent = additional.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -192,8 +223,8 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
     bootstrap.Modal.getOrCreateInstance(salaryModal).show();
   };
   if (payrollDetailsTable) {
-    const employeeCodes = @json($records->map(fn ($record) => $record->employee?->employee_code)->values());
-    const netSalaries = @json($records->map(fn ($record) => (float) $record->net_salary)->values());
+    const employeeCodes = @json($records->getCollection()->map(fn ($record) => $record->employee?->employee_code)->values());
+    const netSalaries = @json($records->getCollection()->map(fn ($record) => (float) $record->net_salary)->values());
     [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
       const employeeCell = row.cells[1];
       if (employeeCell && employeeCodes[index] && !employeeCell.querySelector('[data-employee-code]')) {
