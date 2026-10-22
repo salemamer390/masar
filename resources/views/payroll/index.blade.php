@@ -282,3 +282,4 @@ document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], f
   });
 </script>
 @endpush
+

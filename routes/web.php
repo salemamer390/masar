@@ -261,6 +261,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::get('/', [PayrollController::class, 'index'])
             ->middleware('permission:payroll.view')
             ->name('index');
+        Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
+            ->middleware('permission:payroll.view')
+            ->name('employee-salaries');
         Route::get('/settings', [PayrollSettingsController::class, 'index'])
             ->middleware('permission:payroll.settings')
             ->name('settings.index');

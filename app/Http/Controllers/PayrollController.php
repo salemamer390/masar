@@ -14,6 +14,13 @@ use Illuminate\Http\Request;
 
 class PayrollController extends Controller
 {
+    /** Display the prototype employee-payroll drawer as a separate page. */
+    public function employeeSalaries(Request $request)
+    {
+        $request->attributes->set('payroll_view', 'payroll.employee-salaries');
+        return $this->index($request);
+    }
+
     public function index(Request $request)
     {
         $companyId = auth()->user()?->company_id;
@@ -79,7 +86,91 @@ class PayrollController extends Controller
                 + (float) $record->profit_share + (float) $record->other_earnings,
         ])->values();
 
-        return view('payroll.index', compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails'));
+        // Data shape consumed by the approved payroll drawer prototype.
+        // Keeping this adapter here lets us preserve the prototype UI while
+        // replacing its sample JavaScript data with the real payroll records.
+        $prototypePeople = $records->values()->map(function ($record) {
+            $snapshot = (array) ($record->calculation_snapshot ?? []);
+            $inputs = (array) ($snapshot['inputs'] ?? []);
+            $employee = $record->employee;
+            $items = [
+                ['الراتب الأساسي', (float) $record->basic_salary],
+            ];
+            $allowanceItems = 0;
+            foreach ([
+                'housing_allowance' => 'بدل السكن',
+                'transportation_allowance' => 'بدل الانتقال',
+                'meal_allowance' => 'بدل الوجبة',
+                'clothing_allowance' => 'بدل طبيعة العمل',
+            ] as $key => $label) {
+                $value = (float) ($record->{$key} ?? 0);
+                if ($value > 0) {
+                    $items[] = [$label, $value];
+                    $allowanceItems += $value;
+                }
+            }
+            if ($allowanceItems <= 0 && (float) $record->allowances > 0) {
+                $items[] = ['البدلات', (float) $record->allowances];
+            }
+            foreach ([
+                'overtime_amount' => 'الإضافي',
+                'bonus' => 'المكافآت',
+                'incentives' => 'الحوافز',
+                'commission' => 'العمولات',
+                'profit_share' => 'نصيب الأرباح',
+                'other_earnings' => 'استحقاقات أخرى',
+            ] as $key => $label) {
+                if ((float) ($record->{$key} ?? 0) > 0) $items[] = [$label, (float) $record->{$key}];
+            }
+            $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
+            if ($advance > 0) $items[] = ['السلفة المصروفة', $advance];
+            $deductions = [
+                ['تأمين الموظف', (float) $record->employee_insurance],
+                ['الضريبة', (float) $record->income_tax],
+                ['صندوق الشهداء', (float) $record->martyrs_fund],
+                ['خصم الغياب', (float) $record->absence_deduction],
+                ['خصم الجزاءات', (float) $record->penalty_deduction],
+                ['أقساط السلف', (float) $record->loans],
+                ['خصومات أخرى', (float) $record->other_deductions],
+            ];
+            $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
+            $initials = mb_substr((string) ($employee?->full_name ?? '—'), 0, 2);
+            return [
+                'id' => (int) $employee?->id,
+                'code' => (string) ($employee?->employee_code ?? ''),
+                'name' => $employee?->full_name ?? '—',
+                'role' => $employee?->job?->title ?? '—',
+                'dept' => $employee?->department?->name ?? '—',
+                'basic' => (float) $record->basic_salary,
+                'allow' => (float) $record->allowances,
+                'gross' => (float) $record->gross_salary,
+                'entitlements' => (float) data_get($snapshot, 'entitlements', $record->gross_salary),
+                'deduct' => (float) $record->deductions,
+                'totalDeductions' => (float) data_get($snapshot, 'monthly_deductions', $record->deductions),
+                'net' => (float) $record->net_salary,
+                'companyCost' => (float) $record->employee_cost,
+                'state' => $record->status,
+                'initials' => $initials,
+                'structureLabel' => $record->salary_id ? 'هيكل #' . $record->salary_id : 'بدون هيكل',
+                'effectiveFrom' => $record->salary?->effective_from?->format('d/m/Y'),
+                'agreedNet' => (float) ($record->agreed_net_salary ?? 0),
+                'salaryUrl' => $record->salary_id ? route('salaries.index', ['employee_id' => $employee?->id]) : null,
+                'items' => $items,
+                'deductions' => $deductions,
+                'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
+                'absenceDays' => (float) ($record->absence_days ?? 0),
+                'overtimeHours' => (float) ($record->ot_day_hours ?? 0) + (float) ($record->ot_night_hours ?? 0),
+            ];
+        })->values();
+        $prototypeStats = [
+            'cost' => (float) $totalCost,
+            'net' => (float) $totalNet,
+            'deductions' => (float) $records->sum('deductions'),
+            'employees' => $records->count(),
+        ];
+
+        $view = $request->attributes->get('payroll_view', 'payroll.index');
+        return view($view, compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats'));
     }
 
     public function generate(Request $request, PayrollRunService $service)
