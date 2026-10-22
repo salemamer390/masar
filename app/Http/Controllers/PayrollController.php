@@ -139,7 +139,7 @@ class PayrollController extends Controller
                 'housing_allowance' => 'بدل السكن',
                 'transportation_allowance' => 'بدل الانتقال',
                 'meal_allowance' => 'بدل الوجبة',
-                'clothing_allowance' => 'بدل طبيعة العمل',
+                'clothing_allowance' => 'بدل ملبس',
             ] as $key => $label) {
                 $value = (float) ($record->{$key} ?? 0);
                 if ($value > 0) {
@@ -181,6 +181,21 @@ class PayrollController extends Controller
                 'dept' => $employee?->department?->name ?? '—',
                 'basic' => (float) $record->basic_salary,
                 'allow' => (float) $record->allowances,
+                'allowanceItems' => array_values(array_filter([
+                    ['بدل السكن', (float) $record->housing_allowance],
+                    ['بدل الانتقال', (float) $record->transportation_allowance],
+                    ['بدل الوجبة', (float) $record->meal_allowance],
+                    ['بدل ملبس', (float) $record->clothing_allowance],
+                ], fn ($item) => $item[1] > 0)),
+                'additionalItems' => array_values(array_filter([
+                    ['الإضافي', (float) $record->overtime_amount],
+                    ['المكافآت', (float) $record->bonus],
+                    ['الحوافز', (float) $record->incentives],
+                    ['العمولات', (float) $record->commission],
+                    ['نصيب الأرباح', (float) $record->profit_share],
+                    ['استحقاقات أخرى', (float) $record->other_earnings],
+                    ['السلفة المصروفة', (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0))],
+                ], fn ($item) => $item[1] > 0)),
                 'gross' => (float) $record->gross_salary,
                 'entitlements' => (float) data_get($snapshot, 'entitlements', $record->gross_salary),
                 'deduct' => (float) $record->deductions,

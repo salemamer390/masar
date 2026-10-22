@@ -80,6 +80,80 @@
   });
 })();
 </script>
+<script>
+(() => {
+  const items = document.querySelector('#payrollPrototype #earnItems');
+  if (!items) return;
+  const group = (title, names) => {
+    if (items.dataset.grouped === '1') return;
+    const matches = [...items.children].filter((item) => names.has(item.querySelector('span')?.textContent?.trim()));
+    if (!matches.length) return;
+    const wrapper = document.createElement('div'); wrapper.className = 'payslip-collapse-group';
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'payslip-collapse-toggle'; button.textContent = title; button.setAttribute('aria-expanded', 'false');
+    const content = document.createElement('div'); content.className = 'payslip-collapse-content'; content.hidden = true;
+    matches.forEach((item) => content.append(item));
+    button.addEventListener('click', () => { content.hidden = !content.hidden; button.setAttribute('aria-expanded', String(!content.hidden)); });
+    wrapper.append(button, content); items.append(wrapper);
+  };
+  const apply = () => { group('البدلات', new Set(['بدل السكن','بدل الانتقال','بدل الوجبة','بدل ملبس','البدلات'])); group('الإضافي', new Set(['الإضافي','المكافآت','الحوافز','العمولات','نصيب الأرباح','استحقاقات أخرى','السلفة المصروفة'])); if ([...items.children].some((node) => node.classList.contains('payslip-collapse-group'))) items.dataset.grouped = '1'; };
+  const style = document.createElement('style'); style.textContent = '#payrollPrototype .payslip-collapse-group{border:1px solid var(--line);border-radius:9px;margin:6px 0;overflow:hidden}#payrollPrototype .payslip-collapse-toggle{width:100%;border:0;background:#f6f9fe;color:var(--navy);padding:10px;text-align:right;font-weight:800}#payrollPrototype .payslip-collapse-toggle::after{content:"＋";float:left;color:var(--blue)}#payrollPrototype .payslip-collapse-toggle[aria-expanded="true"]::after{content:"−"}#payrollPrototype .payslip-collapse-content{padding:0 8px}'; document.head.append(style);
+  new MutationObserver(apply).observe(items, {childList:true}); apply();
+})();
+</script>
+<script>
+(() => {
+  const items = document.querySelector('#payrollPrototype #earnItems');
+  if (!items) return;
+  const text = (code) => String.fromCharCode(...code.split(',').map(Number));
+  const allowance = new Set([text('1576,1583,1604,32,1575,1604,1587,1603,1606'),text('1576,1583,1604,32,1575,1604,1575,1606,1578,1602,1575,1604'),text('1576,1583,1604,32,1575,1604,1608,1580,1576,1577'),text('1576,1583,1604,32,1605,1604,1576,1587'),text('1575,1604,1576,1583,1604,1575,1578')]);
+  const extra = new Set([text('1575,1604,1573,1590,1575,1601,1610'),text('1575,1604,1605,1603,1575,1601,1570,1578'),text('1575,1604,1581,1608,1575,1601,1586'),text('1575,1604,1593,1605,1608,1604,1575,1578'),text('1606,1589,1610,1576,32,1575,1604,1571,1585,1576,1575,1581'),text('1575,1587,1578,1581,1602,1575,1602,1575,1578,32,1571,1582,1585,1609'),text('1575,1604,1587,1604,1601,1577,32,1575,1604,1605,1589,1585,1608,1601,1577')]);
+  const makeGroup = (title, names) => {
+    if (items.dataset.grouped === '1') return;
+    const matches = [...items.children].filter((node) => names.has(node.querySelector('span')?.textContent?.trim()));
+    if (!matches.length) return;
+    const wrapper = document.createElement('div'); wrapper.className = 'payslip-collapse-group';
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'payslip-collapse-toggle'; button.textContent = title; button.setAttribute('aria-expanded','false');
+    const content = document.createElement('div'); content.className = 'payslip-collapse-content'; content.hidden = true; matches.forEach((node) => content.append(node));
+    button.onclick = () => { content.hidden = !content.hidden; button.setAttribute('aria-expanded', String(!content.hidden)); }; wrapper.append(button, content); items.append(wrapper);
+  };
+  const apply = () => {
+    makeGroup(text('1575,1604,1576,1583,1604,1575,1578'), allowance);
+    makeGroup(text('1575,1604,1573,1590,1575,1601,1610'), extra);
+    if ([...items.children].some((node) => node.classList.contains('payslip-collapse-group'))) items.dataset.grouped = '1';
+  };
+  new MutationObserver(apply).observe(items, { childList: true });
+  apply();
+})();
+</script>
+<script>
+(() => {
+  if (typeof drawer !== 'function') return;
+  const previousDrawer = drawer;
+  const item = (pair) => { const node = document.createElement('div'); node.className = 'item'; node.innerHTML = `<span>${pair[0]}</span><b>${money(pair[1])}</b>`; return node; };
+  const arabic = (codes) => String.fromCharCode(...codes.split(',').map(Number));
+  const collapseStyle = document.createElement('style'); collapseStyle.textContent = '#payrollPrototype .payslip-collapse-toggle{display:flex;align-items:center;gap:10px}#payrollPrototype .payslip-collapse-toggle small{margin-inline-start:auto;color:var(--muted);font-weight:700}#payrollPrototype .payslip-collapse-toggle .payslip-collapse-arrow{font-size:18px;color:var(--blue);line-height:1}#payrollPrototype .payslip-collapse-toggle::after{content:none!important}'; document.head.append(collapseStyle);
+  const group = (title, entries) => {
+    if (!entries?.length) return null;
+    const wrapper = document.createElement('div'); wrapper.className = 'payslip-collapse-group';
+    const total = entries.reduce((sum, entry) => sum + Number(entry[1] || 0), 0);
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'payslip-collapse-toggle'; button.innerHTML = `<span>${title}</span><small>${money(total)} ج.م</small><b class="payslip-collapse-arrow" aria-hidden="true">⌄</b>`; button.setAttribute('aria-expanded', 'false');
+    const content = document.createElement('div'); content.className = 'payslip-collapse-content'; content.hidden = true; entries.forEach((entry) => content.append(item(entry)));
+    button.onclick = () => { content.hidden = !content.hidden; button.setAttribute('aria-expanded', String(!content.hidden)); button.querySelector('.payslip-collapse-arrow').textContent = content.hidden ? '⌄' : '⌃'; }; wrapper.append(button, content); return wrapper;
+  };
+  drawer = function () {
+    previousDrawer();
+    const selectedPerson = typeof selected !== 'undefined' ? selected : null;
+    const container = document.querySelector('#payrollPrototype #earnItems');
+    if (!selectedPerson || !container) return;
+    container.innerHTML = '';
+    if (selectedPerson.items?.[0]) container.append(item(selectedPerson.items[0]));
+    const allowances = group(arabic('1575,1604,1576,1583,1604,1575,1578'), selectedPerson.allowanceItems || []);
+    const additional = group(arabic('1575,1604,1573,1590,1575,1601,1610'), selectedPerson.additionalItems || []);
+    if (allowances) container.append(allowances);
+    if (additional) container.append(additional);
+  };
+})();
+</script>
 @endsection
 
 
