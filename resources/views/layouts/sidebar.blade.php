@@ -22,6 +22,6 @@
   @if(auth()->user()?->isSuperAdmin())<a href="{{ route('subscriptions.index') }}" class="nav-item {{ request()->routeIs('subscriptions.*') ? 'active' : '' }}"><i class="bi bi-boxes"></i><span>الباقات والشركات</span></a>@endif
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'active' : '' }}"><i class="bi bi-person-gear"></i><span>حسابات HR والموظفين</span></a>@endif
   @if(auth()->user()?->hasPermission('users.view') && !auth()->user()?->isSuperAdmin())<a href="{{ route('company.account') }}" class="nav-item {{ request()->routeIs('company.account') ? 'active' : '' }}"><i class="bi bi-building"></i><span>حساب الشركة</span></a>@endif
-  @if(auth()->user()?->isSuperAdmin())<a href="{{ route('payroll.employee-salaries') }}" class="nav-item {{ request()->routeIs('payroll.employee-salaries') ? 'active' : '' }}"><i class="bi bi-person-vcard"></i><span>رواتب الموظفين</span></a>@endif
+  @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.employee-salaries') }}" class="nav-item {{ request()->routeIs('payroll.employee-salaries') ? 'active' : '' }}"><i class="bi bi-person-vcard"></i><span>رواتب الموظفين</span></a>@endif
 </aside>
 <div class="sidebar-overlay" data-sidebar-overlay aria-hidden="true"></div>
