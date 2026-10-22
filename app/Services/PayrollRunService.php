@@ -165,6 +165,21 @@ class PayrollRunService
             });
         $otherEarnings = (float) $otherRequests->filter(fn ($request) => ($request->payload['impact_type'] ?? null) === 'earning')->sum(fn ($request) => (float) ($request->payload['amount'] ?? 0));
         $otherDeductions = (float) $otherRequests->filter(fn ($request) => ($request->payload['impact_type'] ?? null) === 'deduction')->sum(fn ($request) => (float) ($request->payload['amount'] ?? 0));
+        $financialRequests = HrRequest::with('requestType')
+            ->where('employee_id', $employee->id)
+            ->whereNotIn('status', ['Rejected', 'ظ…ط±ظپظˆط¶'])
+            ->where(function ($query) {
+                $query->whereIn('request_type', ['bonus', 'incentive', 'commission', 'profit_share'])
+                    ->orWhereHas('requestType', fn ($type) => $type->whereIn('source_key', ['bonus', 'incentive', 'commission', 'profit_share']));
+            })->get()->filter(function ($request) use ($from, $to) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $date = $payload['request_date'] ?? $request->created_at?->toDateString();
+                return $date && Carbon::parse($date)->betweenIncluded(Carbon::parse($from), Carbon::parse($to));
+            });
+        $financialAmounts = collect(['bonus', 'incentive', 'commission', 'profit_share'])
+            ->mapWithKeys(fn ($source) => [$source => (float) $financialRequests
+                ->filter(fn ($request) => ($request->requestType?->source_key ?: $request->request_type) === $source)
+                ->sum(fn ($request) => (float) data_get($request->payload, 'amount', 0))]);
         $penalties = Penalty::with('penaltyType')->where('employee_id', $employee->id)->whereBetween('penalty_date', [$from, $to])
             ->whereIn('status', ['Approved', 'معتمد'])->get();
         $approvedLeaves = Leave::with('leaveType')->where('employee_id', $employee->id)->where('status', 'Approved')
@@ -178,8 +193,9 @@ class PayrollRunService
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'absence_days' => $absenceRecords->count() + $unpaidLeaveDays, 'penalty_days' => $penaltyDays,
-            'bonus'=>0, 'incentives'=>(float) ($salary?->incentives ?? 0), 'commission'=>(float) ($salary?->commission ?? 0), 'profit_share'=>(float) ($salary?->profit_share ?? 0), 'advance_earnings'=>$advancePlan['grant_amount'], 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings + (float) ($salary?->other_earnings ?? 0), 'other_deductions'=>$otherDeductions,
+            'bonus'=>$financialAmounts['bonus'], 'incentives'=>$financialAmounts['incentive'], 'commission'=>$financialAmounts['commission'], 'profit_share'=>$financialAmounts['profit_share'], 'advance_earnings'=>$advancePlan['grant_amount'], 'loans'=>$advancePlan['amount'], 'advance_details'=>$advancePlan['details'], 'other_earnings'=>$otherEarnings, 'other_deductions'=>$otherDeductions,
             'approved_attendance_ids' => $attendance->pluck('id')->all(), 'approved_overtime_request_ids' => $overtime['request_ids'], 'approved_other_request_ids' => $otherRequests->pluck('id')->all(),
+            'approved_financial_request_ids' => $financialRequests->pluck('id')->all(),
             'absence_attendance_ids' => $absenceRecords->pluck('id')->all(),
             'approved_leave_ids' => $approvedLeaves->pluck('id')->all(), 'approved_penalty_ids' => $penalties->pluck('id')->all(),
         ];
@@ -260,6 +276,7 @@ class PayrollRunService
             });
             $authorizedDay = 0.0;
             $authorizedNight = 0.0;
+            $periodRequestIds = [];
             foreach ($periods as $request) {
                 $payload = is_array($request->payload) ? $request->payload : [];
                 $start = $payload['start_date'] ?? $payload['request_date'] ?? $request->created_at?->toDateString();
@@ -271,10 +288,17 @@ class PayrollRunService
                 $authorizedMinutes = ($hours / $days) * 60;
                 if (($payload['overtime_period'] ?? 'day') === 'night') $authorizedNight += $authorizedMinutes;
                 else $authorizedDay += $authorizedMinutes;
-                $requestIds[] = $request->id;
+                $periodRequestIds[] = $request->id;
             }
-            $dayMinutes += min($potentialDay, $authorizedDay);
-            $nightMinutes += min($potentialNight, $authorizedNight);
+            $earnedDay = min($potentialDay, $authorizedDay);
+            $earnedNight = min($potentialNight, $authorizedNight);
+            $dayMinutes += $earnedDay;
+            $nightMinutes += $earnedNight;
+            // Keep only requests that were backed by actual attendance time;
+            // a request alone must never authorize overtime in the payroll.
+            if ($earnedDay > 0 || $earnedNight > 0) {
+                $requestIds = array_merge($requestIds, $periodRequestIds);
+            }
         }
         return ['day_minutes' => $dayMinutes, 'night_minutes' => $nightMinutes, 'request_ids' => array_values(array_unique($requestIds))];
     }

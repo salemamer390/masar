@@ -142,6 +142,8 @@ class HrRequestController extends Controller
             'advance_request_date' => ['nullable', 'date'],
             'overtime_request_date' => ['nullable', 'date'],
             'other_request_date' => ['nullable', 'date'],
+            'financial_request_date' => ['nullable', 'date'],
+            'financial_amount' => ['nullable', 'numeric', 'gt:0'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
             'duration_days' => ['nullable', 'numeric', 'min:0'],
@@ -185,6 +187,13 @@ class HrRequestController extends Controller
         if ($type->source_key === 'other' && !$request->boolean('affects_payroll')) {
             $validated = array_merge($validated, $request->validate(['other_request_date' => ['required', 'date']]));
         }
+        if (in_array($type->source_key, ['bonus', 'incentive', 'commission', 'profit_share'], true)) {
+            $financialValidated = $request->validate([
+                'financial_request_date' => ['required', 'date'],
+                'financial_amount' => ['required', 'numeric', 'gt:0'],
+            ]);
+            $validated = array_merge($validated, $financialValidated);
+        }
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
@@ -192,6 +201,7 @@ class HrRequestController extends Controller
             'advance' => $validated['advance_request_date'] ?? null,
             'overtime' => $validated['overtime_request_date'] ?? null,
             'other' => $validated['other_request_date'] ?? null,
+            'bonus', 'incentive', 'commission', 'profit_share' => $validated['financial_request_date'] ?? null,
             default => $validated['request_date'] ?? null,
         };
         if ($requestDate) {
@@ -216,7 +226,9 @@ class HrRequestController extends Controller
                     return Carbon::parse($existingDate)->isSameMonth($requestMonth);
                 });
             if ($duplicate) {
-                $errorKey = $type->source_key === 'overtime' ? 'overtime_request_date' : 'request_date';
+                $errorKey = $type->source_key === 'overtime'
+                    ? 'overtime_request_date'
+                    : (in_array($type->source_key, ['bonus', 'incentive', 'commission', 'profit_share'], true) ? 'financial_request_date' : 'request_date');
                 $message = $type->source_key === 'overtime'
                     ? 'يوجد إضافي من نفس النوع لهذا الموظف في نفس اليوم. يمكن إضافة النوع الآخر في اليوم نفسه.'
                     : 'يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن إنشاء طلب آخر من النوع نفسه.';
@@ -243,8 +255,8 @@ class HrRequestController extends Controller
             }
         }
 
-        $payload = $type->source_key === 'advance'
-            ? [
+        if ($type->source_key === 'advance') {
+            $payload = [
                 'request_date' => $validated['advance_request_date'],
                 'amount' => (float) $validated['advance_amount'],
                 'gross_salary' => (float) ($employee->gross_salary ?? 0),
@@ -254,20 +266,38 @@ class HrRequestController extends Controller
                 'previous_outstanding_amount' => $outstandingAdvance['amount'],
                 'previous_outstanding_request_id' => $outstandingAdvance['request_id'],
                 'previous_outstanding_confirmed' => $request->boolean('advance_existing_confirm'),
-            ]
-            : ($type->source_key === 'overtime'
-            ? ['request_date' => $validated['overtime_request_date'], 'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'], 'overtime_period' => $validated['overtime_period']]
-            : ($type->source_key === 'other'
-                ? collect(['request_date' => $validated['other_request_date'] ?? null, 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $validated['impact_type'] ?? null, 'amount' => $validated['impact_amount'] ?? null])->filter(fn ($value) => $value !== null && $value !== '')->all()
-            : collect([
-            'request_date' => $validated['request_date'] ?? null,
-            'start_date' => $validated['start_date'] ?? null,
-            'end_date' => $validated['end_date'] ?? null,
-            'days' => $validated['duration_days'] ?? null,
-            'hours' => $validated['duration_hours'] ?? null,
-            'addition_amount' => $validated['addition_amount'] ?? null,
-            'deduction_amount' => $validated['deduction_amount'] ?? null,
-        ])->filter(fn ($value) => $value !== null && $value !== '')->all()));
+            ];
+        } elseif ($type->source_key === 'overtime') {
+            $payload = [
+                'request_date' => $validated['overtime_request_date'],
+                'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'],
+                'overtime_period' => $validated['overtime_period'],
+            ];
+        } elseif (in_array($type->source_key, ['bonus', 'incentive', 'commission', 'profit_share'], true)) {
+            $payload = [
+                'request_date' => $validated['financial_request_date'],
+                'amount' => (float) $validated['financial_amount'],
+                'affects_payroll' => true,
+                'impact_type' => 'earning',
+            ];
+        } elseif ($type->source_key === 'other') {
+            $payload = collect([
+                'request_date' => $validated['other_request_date'] ?? null,
+                'affects_payroll' => $request->boolean('affects_payroll'),
+                'impact_type' => $validated['impact_type'] ?? null,
+                'amount' => $validated['impact_amount'] ?? null,
+            ])->filter(fn ($value) => $value !== null && $value !== '')->all();
+        } else {
+            $payload = collect([
+                'request_date' => $validated['request_date'] ?? null,
+                'start_date' => $validated['start_date'] ?? null,
+                'end_date' => $validated['end_date'] ?? null,
+                'days' => $validated['duration_days'] ?? null,
+                'hours' => $validated['duration_hours'] ?? null,
+                'addition_amount' => $validated['addition_amount'] ?? null,
+                'deduction_amount' => $validated['deduction_amount'] ?? null,
+            ])->filter(fn ($value) => $value !== null && $value !== '')->all();
+        }
 
         $hrRequest = HrRequest::create([
             'employee_id' => $employee->id,
@@ -354,6 +384,17 @@ class HrRequestController extends Controller
         } elseif ($source === 'other') {
             $data = $request->validate(['other_request_date' => ['required', 'date'], 'affects_payroll' => ['nullable', 'boolean'], 'impact_type' => ['required_if:affects_payroll,1', 'nullable', 'in:earning,deduction'], 'impact_amount' => ['required_if:affects_payroll,1', 'nullable', 'numeric', 'gt:0']]);
             $payload = array_merge($payload, ['request_date' => $data['other_request_date'], 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $data['impact_type'] ?? null, 'amount' => $data['impact_amount'] ?? null]);
+        } elseif (in_array($source, ['bonus', 'incentive', 'commission', 'profit_share'], true)) {
+            $data = $request->validate([
+                'financial_request_date' => ['required', 'date'],
+                'financial_amount' => ['required', 'numeric', 'gt:0'],
+            ]);
+            $payload = array_merge($payload, [
+                'request_date' => $data['financial_request_date'],
+                'amount' => (float) $data['financial_amount'],
+                'affects_payroll' => true,
+                'impact_type' => 'earning',
+            ]);
         } else {
             $data = $request->validate(['request_date' => ['nullable', 'date'], 'start_date' => ['nullable', 'date'], 'end_date' => ['nullable', 'date', 'after_or_equal:start_date'], 'duration_days' => ['nullable', 'numeric', 'min:0'], 'duration_hours' => ['nullable', 'numeric', 'min:0'], 'addition_amount' => ['nullable', 'numeric', 'min:0'], 'deduction_amount' => ['nullable', 'numeric', 'min:0']]);
             $payload = collect(array_merge($payload, ['request_date' => $data['request_date'] ?? null, 'start_date' => $data['start_date'] ?? null, 'end_date' => $data['end_date'] ?? null, 'days' => $data['duration_days'] ?? null, 'hours' => $data['duration_hours'] ?? null, 'addition_amount' => $data['addition_amount'] ?? null, 'deduction_amount' => $data['deduction_amount'] ?? null]))->filter(fn ($value) => $value !== null && $value !== '')->all();

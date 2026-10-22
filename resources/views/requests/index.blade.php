@@ -332,6 +332,24 @@ window.addEventListener('load', () => {
   const syncOther = () => { const isOther = typeMeta[type?.value]?.source === 'other'; otherCard.hidden = !isOther; otherDate.required = isOther; if (isOther && !otherDate.value) otherDate.value = @json(today()->toDateString()); if (!isOther) { otherDate.value = ''; affects.checked = false; syncImpact(); } };
   type?.addEventListener('change', syncOther); syncOther(); syncImpact();
 
+  const financialSources = ['bonus', 'incentive', 'commission', 'profit_share'];
+  const financialCard = document.createElement('div');
+  financialCard.className = 'request-conditional-card financial-request-fields';
+  financialCard.hidden = true;
+  financialCard.innerHTML = '<div class="row g-3"><div class="col-md-6"><label class="form-label">تاريخ الطلب</label><input type="date" name="financial_request_date" class="form-control"></div><div class="col-md-6"><label class="form-label">المبلغ (جنيه)</label><input type="number" name="financial_amount" class="form-control" min="0.01" step="0.01"></div></div>';
+  form.querySelector('.modal-footer')?.before(financialCard);
+  const financialDate = financialCard.querySelector('[name="financial_request_date"]');
+  const financialAmount = financialCard.querySelector('[name="financial_amount"]');
+  const syncFinancial = () => {
+    const active = financialSources.includes(typeMeta[type?.value]?.source);
+    financialCard.hidden = !active;
+    financialDate.required = active;
+    financialAmount.required = active;
+    if (active && !financialDate.value) financialDate.value = @json(today()->toDateString());
+    if (!active) { financialDate.value = ''; financialAmount.value = ''; }
+  };
+  type?.addEventListener('change', syncFinancial); syncFinancial();
+
   const advanceTypeIds = Object.entries(typeMeta).filter(([, meta]) => meta.source === 'advance').map(([id]) => String(id));
   const advanceCard = document.createElement('div');
   advanceCard.className = 'request-conditional-card advance-request-fields';
@@ -544,6 +562,14 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
             overtimeEditPeriod.dispatchEvent(new Event('change', { bubbles: true }));
           }
           if (overtimeEditHours) overtimeEditHours.value = payload.hours ?? '';
+        }
+        const financialCard = editForm.querySelector('.financial-request-fields');
+        if (financialCard && ['bonus', 'incentive', 'commission', 'profit_share'].includes(editingRequest.request_type_source)) {
+          financialCard.hidden = false;
+          const financialDate = financialCard.querySelector('[name="financial_request_date"]');
+          const financialAmount = financialCard.querySelector('[name="financial_amount"]');
+          if (financialDate) { financialDate.value = payload.request_date || ''; financialDate.required = true; }
+          if (financialAmount) { financialAmount.value = payload.amount ?? ''; financialAmount.required = true; }
         }
         set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
         const affects = editForm.querySelector('[name="affects_payroll"]'); if (affects) affects.checked = !!payload.affects_payroll;
