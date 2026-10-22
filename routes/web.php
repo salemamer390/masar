@@ -262,7 +262,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:payroll.view')
             ->name('index');
         Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
-            ->middleware('permission:payroll.view')
+            ->middleware(['permission:payroll.view', 'superadmin'])
             ->name('employee-salaries');
         Route::get('/settings', [PayrollSettingsController::class, 'index'])
             ->middleware('permission:payroll.settings')
@@ -293,7 +293,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:payroll.lock')
             ->name('runs.lock');
         Route::delete('/runs/{payrollRun}', [PayrollController::class, 'destroyRun'])
-            ->middleware('permission:payroll.edit')
+            ->middleware('companymanager')
             ->name('runs.destroy');
         Route::post('/{payrollRecord}/approve', [PayrollController::class, 'approve'])
             ->middleware('permission:payroll.approve')

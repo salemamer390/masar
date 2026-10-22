@@ -457,7 +457,7 @@ class PayrollRunService
     {
         DB::transaction(function () use ($run) {
             $run->refresh();
-            abort_if(!in_array($run->status, ['Draft', 'Approved'], true), 422, 'لا يمكن حذف مسير مقفول أو مصروف.');
+            abort_unless($run->status === 'Locked', 422, 'لا يمكن حذف إلا المسير المقفول نهائيًا.');
             $snapshot = $run->toArray();
             $run->records()->delete();
             $run->delete();

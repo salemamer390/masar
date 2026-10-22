@@ -309,8 +309,10 @@ class PayrollController extends Controller
 
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
+        abort_unless((int) $payrollRun->company_id === (int) auth()->user()?->company_id, 404);
+        abort_unless($payrollRun->status === 'Locked', 422, 'يمكن حذف المسير المقفول نهائيًا فقط من هذا الإجراء.');
         $service->destroyDraft($payrollRun);
-        return back()->with('toast', 'تم حذف مسودة مسير الرواتب وسجلاتها.');
+        return back()->with('toast', 'تم حذف المسير المقفول وسجلاته.');
     }
 
     public function pay(PayrollRecord $payrollRecord)

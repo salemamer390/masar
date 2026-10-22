@@ -6,7 +6,11 @@ class SuperAdminOnly
 {
     public function handle(Request $request, Closure $next)
     {
-        abort_unless($request->user()?->isSuperAdmin(), 403, 'هذه الشاشة متاحة لمدير المنصة فقط.');
+        if (!$request->user()?->isSuperAdmin()) {
+            return redirect()->route('dashboard')
+                ->with('error', 'هذه الشاشة متاحة لمدير المنصة فقط.');
+        }
+
         return $next($request);
     }
 }

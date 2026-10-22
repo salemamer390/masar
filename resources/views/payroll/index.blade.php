@@ -53,19 +53,25 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const note = modal.querySelector('.alert');
   if (note) note.innerHTML += ' <br><strong>وحدة القياس:</strong> الإضافي بالساعات، والغياب والجزاءات بالأيام. القيم المعروضة مأخوذة من السجلات المعتمدة ولا تُكتب يدويًا من هنا.';
 });
-@if(auth()->user()?->hasPermission('payroll.create'))
-document.querySelectorAll('form[action*="/payroll/runs/"][action$="/approve"], form[action*="/payroll/runs/"][action$="/lock"]').forEach((actionForm) => {
-  const runUrl = actionForm.action.replace(/\/(approve|lock)$/, '');
-  const deleteForm = document.createElement('form');
-  deleteForm.method = 'POST';
-  deleteForm.action = runUrl;
-  deleteForm.className = 'd-inline ms-1';
-  deleteForm.innerHTML = `<input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger" title="حذف المسير"><i class="bi bi-trash"></i> حذف</button>`;
-  deleteForm.onsubmit = () => confirm('سيتم حذف المسير وسجلات الموظفين التابعة له. لا يمكن حذف المسير المقفول أو المصروف. هل تريد المتابعة؟');
-  actionForm.after(deleteForm);
-});
-@endif
 </script>
+@if(auth()->user()?->role?->name === 'company_manager')
+<script>
+  const lockedPayrollRuns = @json($runs->values()->map(fn ($run) => [
+    'id' => $run->id,
+    'status' => $run->status,
+  ])->values());
+  const payrollRunsDeleteBase = '{{ url('/payroll/runs') }}';
+  const runsTable = document.querySelector('.panel.table-panel table');
+  if (runsTable) {
+    [...runsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
+      const run = lockedPayrollRuns[index];
+      const actionCell = row.cells[row.cells.length - 1];
+      if (!run || run.status !== 'Locked' || !actionCell || actionCell.querySelector('[data-delete-locked-run]')) return;
+      actionCell.insertAdjacentHTML('beforeend', `<form method="POST" action="${payrollRunsDeleteBase}/${run.id}" class="d-inline ms-1" onsubmit="return confirm('سيتم حذف المسير المقفول وسجلاته نهائيًا. هل تريد المتابعة؟')"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE"><button type="submit" data-delete-locked-run class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف</button></form>`);
+    });
+  }
+</script>
+@endif
 @endpush
 
 @push('scripts')

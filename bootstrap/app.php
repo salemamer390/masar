@@ -14,6 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'superadmin' => \App\Http\Middleware\SuperAdminOnly::class,
+            'companymanager' => \App\Http\Middleware\CompanyManagerOnly::class,
             'subscription' => \App\Http\Middleware\EnsureActiveCompanySubscription::class,
         ]);
     })
