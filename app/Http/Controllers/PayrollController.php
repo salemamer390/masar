@@ -27,7 +27,7 @@ class PayrollController extends Controller
         $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $search = trim((string) $request->input('search', ''));
-        $records = PayrollRecord::with(['employee.department', 'employee.job'])
+        $records = PayrollRecord::with(['employee.department', 'employee.job', 'salary'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())
             ->when($search !== '', function ($query) use ($search) {
@@ -68,6 +68,29 @@ class PayrollController extends Controller
             'status' => $record->status,
             'salary_id' => $record->salary_id,
             'effective_from' => $record->salary?->effective_from?->format('d/m/Y'),
+            // Keep the salary-structure modal tied to the actual structure
+            // referenced by the payroll record, with a snapshot fallback.
+            'structure_basic_salary' => (float) ($record->salary?->basic_salary ?? $record->basic_salary),
+            'structure_allowances' => (float) ($record->salary?->allowances ?? $record->allowances),
+            'structure_housing_allowance' => (float) ($record->salary?->housing_allowance ?? $record->housing_allowance),
+            'structure_transportation_allowance' => (float) ($record->salary?->transportation_allowance ?? $record->transportation_allowance),
+            'structure_meal_allowance' => (float) ($record->salary?->meal_allowance ?? $record->meal_allowance),
+            'structure_clothing_allowance' => (float) ($record->salary?->clothing_allowance ?? $record->clothing_allowance),
+            'structure_gross_salary' => (float) ($record->salary?->gross_salary ?? $record->gross_salary),
+            'structure_net_salary' => (float) ($record->salary?->net_salary ?? $record->agreed_net_salary ?? $record->net_salary),
+            'structure_allowance_limit_pct' => (float) ($record->salary?->allowance_limit_pct ?? 0),
+            'structure_allowance_limit' => (float) ($record->salary?->allowance_limit ?? 0),
+            'structure_allowance_remaining' => (float) ($record->salary?->allowance_remaining ?? 0),
+            'structure_applied_insurance_wage' => (float) ($record->salary?->applied_insurance_wage ?? $record->insurance_wage ?? 0),
+            'structure_no_insurance' => (bool) ($record->salary?->no_insurance ?? false),
+            'structure_employer_insurance' => (float) ($record->salary?->employer_insurance ?? $record->employer_insurance ?? 0),
+            'structure_personal_exemption' => (float) ($record->salary?->personal_exemption ?? 0),
+            'structure_taxable_annual' => (float) ($record->salary?->taxable_annual ?? 0),
+            'structure_martyrs_fund' => (float) ($record->salary?->martyrs_fund ?? $record->martyrs_fund ?? 0),
+            'structure_fixed_deductions' => (float) ($record->salary?->fixed_deductions ?? $record->fixed_deductions ?? 0),
+            'structure_total_deductions' => (float) ($record->salary?->total_deductions ?? $record->deductions ?? 0),
+            'structure_employee_cost' => (float) ($record->salary?->employee_cost ?? $record->employee_cost),
+            'structure_notes' => $record->salary?->notes,
             'basic_salary' => (float) $record->basic_salary,
             'allowances' => (float) $record->allowances,
             'housing_allowance' => (float) $record->housing_allowance,

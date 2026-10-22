@@ -13,7 +13,7 @@ class RoleController extends Controller
     {
         $actor = auth()->user();
         $roles = Role::with('permissions')->withCount('users')
-            ->when(!$actor->isSuperAdmin(), fn ($query) => $query->where('company_id', $actor->company_id))
+            ->when($actor->company_id, fn ($query) => $query->where('company_id', $actor->company_id))
             ->orderByRaw("CASE WHEN name = 'company_manager' THEN 0 ELSE 1 END")
             ->orderBy('display_name')
             ->get();
@@ -58,7 +58,7 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role)
     {
-        if (!auth()->user()->isSuperAdmin() && (int) $role->company_id !== (int) auth()->user()->company_id) abort(403);
+        if (auth()->user()->company_id && (int) $role->company_id !== (int) auth()->user()->company_id) abort(403);
         if ($role->id === 1) return $request->wantsJson() ? response()->json(['success' => false, 'message' => 'لا يمكن تعديل صلاحيات مدير النظام.'], 422) : back()->with('toast', 'لا يمكن تعديل صلاحيات مدير النظام.');
         $data = $request->validate(['display_name' => ['nullable', 'string', 'max:150'], 'description' => ['nullable', 'string', 'max:255'], 'permissions' => ['nullable', 'array'], 'permissions.*' => ['integer', 'exists:permissions,id']]);
         $permissions = $data['permissions'] ?? [];
@@ -74,7 +74,7 @@ class RoleController extends Controller
     public function destroy(Request $request, Role $role)
     {
         $actor = auth()->user();
-        if (!$actor->isSuperAdmin() && (int) $role->company_id !== (int) $actor->company_id) abort(403);
+        if ($actor->company_id && (int) $role->company_id !== (int) $actor->company_id) abort(403);
         if ($role->id === 1 || $role->company_id === null) return $this->deleteResponse($request, false, 'لا يمكن حذف أدوار النظام العامة.', 422);
         if ($role->users()->exists()) return $this->deleteResponse($request, false, 'لا يمكن حذف دور مرتبط بمستخدمين. غيّر أدوارهم أولًا ثم أعد المحاولة.', 409);
         $displayName = $role->display_name;

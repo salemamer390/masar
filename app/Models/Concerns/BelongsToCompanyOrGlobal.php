@@ -8,7 +8,10 @@ trait BelongsToCompanyOrGlobal
     {
         static::addGlobalScope('company_or_global', function (Builder $builder): void {
             $user = Auth::user();
-            if ($user && !$user->isSuperAdmin() && $user->company_id) {
+            // A platform role may still be assigned to a company. In that
+            // case it must remain isolated to that company; only an
+            // unassigned platform account (company_id = null) is global.
+            if ($user && $user->company_id) {
                 $table = $builder->getModel()->getTable();
                 $builder->where(function (Builder $query) use ($table, $user): void {
                     $query->whereNull($table.'.company_id')->orWhere($table.'.company_id', $user->company_id);

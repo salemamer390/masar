@@ -43,7 +43,7 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth', 'subscription'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-    Route::middleware('superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
+    Route::middleware('global_superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
         Route::get('/', [SubscriptionPlanController::class, 'index'])->name('index');
         Route::post('/plans', [SubscriptionPlanController::class, 'store'])->name('plans.store');
         Route::put('/plans/{plan}', [SubscriptionPlanController::class, 'update'])->name('plans.update');

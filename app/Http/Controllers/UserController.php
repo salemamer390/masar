@@ -13,18 +13,18 @@ use App\Models\CompanySubscription;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $query = User::with(['role', 'company', 'directPermissions']);
         $query->where(function ($builder): void {
             $builder->whereDoesntHave('role')
                 ->orWhereHas('role', fn ($roleQuery) => $roleQuery->where('name', '!=', 'company_manager'));
         });
-        if (!auth()->user()->isSuperAdmin()) $query->where('company_id', auth()->user()->company_id);
+        if (auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
         $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
         $users = $query->paginate($perPage)->withQueryString();
         $roles = $this->rolesForActor()->when(!auth()->user()->isSuperAdmin(), fn ($query) => $query->where('id', '!=', 1))->get();
-        $companies = auth()->user()->isSuperAdmin() ? Company::where('status','active')->orderBy('name')->get() : collect([auth()->user()->company])->filter();
+        $companies = auth()->user()->company_id ? collect([auth()->user()->company])->filter() : Company::where('status','active')->orderBy('name')->get();
         $permissions = Permission::orderBy('module')->orderBy('display_name')->get()->groupBy('module');
         $moduleLabels = config('authorization.modules', []);
         $roleLabels = config('authorization.roles', []);

@@ -14,7 +14,7 @@ class CompanyAccountController extends Controller
     {
         $user = auth()->user();
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isSuperAdmin() && !$user->company_id) {
             return redirect()->route('subscriptions.index');
         }
 
