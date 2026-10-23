@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use App\Models\Company;
 use App\Models\Role;
@@ -79,19 +80,25 @@ class AuthController extends Controller
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:190'],
             'owner_name' => ['required', 'string', 'max:150'],
+            'employee_count' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'terms_accepted' => ['accepted'],
         ]);
 
+        // Until public plans are launched, every new company starts with the
+        // standard 1,000-employee plan. The value is never taken from the UI.
+        $data['employee_count'] = 1000;
+
         $plan = SubscriptionPlan::query()
-            ->where('employee_limit', 20)
+            ->where('employee_limit', 1000)
             ->where('is_active', true)
-            ->orderBy('id')
+            ->orderBy('employee_limit')
             ->first();
 
         if (!$plan) {
-            return back()->withErrors(['registration' => 'الباقة الافتراضية لحد 20 موظف غير متاحة حاليًا.'])->withInput();
+            return back()->withErrors(['registration' => 'لا توجد باقة نشطة تناسب عدد الموظفين المختار حاليًا.'])->withInput();
         }
 
         $user = DB::transaction(function () use ($data, $plan): User {
@@ -138,7 +145,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard')->with('toast', 'تم إنشاء الشركة وحساب مديرها وتفعيل باقة 20 موظف بنجاح.');
+        return redirect()->route('dashboard')->with('toast', 'تم إنشاء الشركة وحساب مديرها وتفعيل الباقة المناسبة بنجاح.');
     }
 
     public function logout(Request $request)
@@ -148,5 +155,48 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         return redirect()->route('login');
+    }
+
+    public function sendResetLink(Request $request)
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+
+        // Always use the same response so the page does not reveal whether an
+        // account exists. Laravel stores a hashed, time-limited token and
+        // dispatches the standard password-reset notification.
+        Password::sendResetLink(['email' => $data['email']]);
+
+        return redirect()->route('password.request')->with(
+            'site_success',
+            'إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رابط آمن لإعادة تعيين كلمة المرور.'
+        );
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            return back()->withErrors(['email' => __($status)])->withInput($request->only('email'));
+        }
+
+        return redirect()->route('login')->with(
+            'site_success',
+            'تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'
+        );
     }
 }
