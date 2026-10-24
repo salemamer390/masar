@@ -56,9 +56,16 @@
     $statsJson = json_encode($prototypeStats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 @endphp
 <style>{!! $style !!}</style>
+<style>
+  #payrollPrototype .employee-payroll-actions .btn-success { background:#16a36f; border-color:#16a36f; color:#fff; }
+  #payrollPrototype .employee-payroll-actions .btn-success:hover { background:#118b5e; border-color:#118b5e; color:#fff; }
+  #payrollPrototype .employee-payroll-actions .btn-outline-secondary { background:#fff; border-color:#aeb9c9; color:#52627a; }
+  #payrollPrototype .employee-payroll-actions .btn-primary { background:#1677f9; border-color:#1677f9; color:#fff; }
+  #payrollPrototype .employee-payroll-actions .btn-primary:hover { background:#0e63d6; border-color:#0e63d6; color:#fff; }
+</style>
 <div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
   @if(auth()->user()?->hasPermission('payroll.export'))
-    <a class="btn btn-outline-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}">
+    <a class="btn btn-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}">
       <i class="bi bi-file-earmark-excel"></i> تصدير Excel
     </a>
   @endif
