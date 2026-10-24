@@ -11,6 +11,11 @@
     preg_match('~<main class="page">(.*?)</main>~s', $prototype, $bodyMatch);
     preg_match_all('~<script[^>]*>(.*?)</script>~s', $prototype, $scriptMatches);
     $style = $styleMatch[1] ?? '';
+    $pageBody = $bodyMatch[1] ?? '';
+    $pageBody = preg_replace('~<div class="crumb">.*?</div>~s', '', $pageBody, 1);
+    $pageBody = preg_replace_callback('~<section class="stats">.*?</section>~s', function ($match) {
+        return str_replace(['إجمالي الاستقطاعات', 'عدد الموظفين'], ['إجمالي التأمينات', 'إجمالي الضرائب'], $match[0]);
+    }, $pageBody, 1);
     // Scope prototype styles so the application's original topbar/sidebar
     // remain untouched while the payroll content keeps its exact UI.
     $style = preg_replace('/\.topbar\{[^}]*\}/', '', $style);
@@ -69,16 +74,16 @@
   @endif
 </div>
 <div id="payrollPrototype" class="payroll-prototype-page">
-    {!! $bodyMatch[1] ?? '' !!}
+    {!! $pageBody !!}
 </div>
 {!! $scripts !!}
 <script>
 (() => {
   const stats = {!! $statsJson !!};
   const moneyValue = value => Number(value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-  const statValues = [stats.cost, stats.net, stats.deductions, stats.employees];
+  const statValues = [stats.cost, stats.net, stats.insurance, stats.tax];
   document.querySelectorAll('#payrollPrototype .stats .stat strong').forEach((node, index) => {
-    if (statValues[index] !== undefined) node.innerHTML = moneyValue(statValues[index]) + (index === 3 ? ' <small>موظف</small>' : ' <small>ج.م</small>');
+    if (statValues[index] !== undefined) node.innerHTML = moneyValue(statValues[index]) + ' <small>ج.م</small>';
   });
   if (typeof drawer === 'function') {
     const originalDrawer = drawer;
@@ -209,7 +214,15 @@
 (() => {
   const head = document.querySelector('#payrollPrototype .leftpanel > .panelhead');
   if (!head) return;
-  if (document.querySelector('.employee-payroll-actions')) { document.querySelector('#payrollPrototype #export')?.remove(); return; }
+  const actionBar = document.querySelector('.employee-payroll-actions');
+  if (actionBar) {
+    actionBar.classList.remove('mb-3');
+    actionBar.style.marginInlineStart = 'auto';
+    actionBar.style.marginBottom = '0';
+    head.append(actionBar);
+    document.querySelector('#payrollPrototype #export')?.remove();
+    return;
+  }
   const actions = document.createElement('div');
   actions.className = 'd-flex gap-2 flex-wrap';
   const month = @json($month->format('Y-m-01'));

@@ -231,8 +231,8 @@ class PayrollController extends Controller
         $prototypeStats = [
             'cost' => (float) $totalCost,
             'net' => (float) $totalNet,
-            'deductions' => (float) $recordCollection->sum('deductions'),
-            'employees' => $recordCollection->count(),
+            'insurance' => (float) $totalEmployeeInsurance,
+            'tax' => (float) $totalTax,
         ];
 
         $view = $request->attributes->get('payroll_view', 'payroll.index');
