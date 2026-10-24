@@ -106,6 +106,10 @@ class SubscriptionPlanController extends Controller
             // بيانات المنشأة التأمينية خاصة بكل شركة، لذلك تبدأ الشركة الجديدة
             // بدون بيانات منشأة موروثة من شركة أخرى.
         });
+        // Company creation from the platform is an administrative operation;
+        // initialise its payroll defaults here (public signup intentionally
+        // keeps this work lazy to avoid gateway timeouts on shared hosting).
+        app(\App\Services\PayrollDefaultsService::class)->ensureForCompany((int) $company->id);
         ActivityLog::record('subscription_company_create', "تم إنشاء شركة جديدة: {$company->name}.", $company, null, $company->toArray(), 'subscriptions');
         return back()->with('toast','تم إنشاء الشركة والاشتراك بنجاح.');
     }

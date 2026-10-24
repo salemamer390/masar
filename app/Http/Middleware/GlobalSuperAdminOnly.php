@@ -10,7 +10,7 @@ class GlobalSuperAdminOnly
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        if (!$user?->isSuperAdmin() || $user->company_id) {
+        if (!$user?->isSuperAdmin()) {
             return redirect()->route('dashboard')->with('error', 'هذه الشاشة متاحة لمدير المنصة غير المرتبط بشركة فقط.');
         }
 
