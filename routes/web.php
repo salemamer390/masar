@@ -28,11 +28,51 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\CompanyAccountController;
 use App\Http\Controllers\SubscriptionRenewalController;
+use App\Http\Controllers\MarketingSiteController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+
+// Public marketing pages. Keep the supplied HTML design intact and only add
+// the Laravel behavior needed for authentication and contact forms.
+$sitePage = static function (string $page) {
+    if (Auth::check()) {
+        return redirect()->route('dashboard');
+    }
+
+    $path = base_path('masar_hr_multi_page_site/' . $page);
+    abort_unless(is_file($path), 404);
+    $html = file_get_contents($path);
+    if ($page === 'privacy.html') {
+        $privacy = base_path('masar_hr_multi_page_site/privacy-content.html');
+        if (is_file($privacy)) {
+            $content = file_get_contents($privacy);
+            $html = preg_replace('~<main[^>]*>.*?</main>~s', '<main class="shell">' . $content . '</main>', $html, 1);
+        }
+    }
+    $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\.html"[^>]*>.*?</a>~u', '', $html);
+    $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
+
+    return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+};
+
+Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : $sitePage('index.html'));
+Route::get('/index.html', fn () => Auth::check() ? redirect()->route('dashboard') : $sitePage('index.html'));
+Route::get('/features.html', fn () => $sitePage('features.html'));
+Route::get('/privacy.html', fn () => $sitePage('privacy.html'));
+Route::get('/terms.html', fn () => $sitePage('terms.html'));
+Route::get('/login.html', fn () => redirect()->route('login'));
+
+Route::get('/signup.html', [MarketingSiteController::class, 'signup'])->name('site.signup');
+Route::get('/contact.html', [MarketingSiteController::class, 'contact'])->name('site.contact');
+Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->name('site.contact.submit');
+Route::get('/forgot-password.html', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
+Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 
 // Guest Routes
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
     Route::post('/register/company', [AuthController::class, 'registerCompany'])
         ->middleware('throttle:5,1')
