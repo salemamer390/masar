@@ -11,3 +11,5 @@ Schedule::command('insurance:notify-termination-removal')->dailyAt('08:00')->tim
 Schedule::command('subscriptions:notify-expiring')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('summary:capture')->dailyAt('23:55')->timezone('Africa/Cairo')->withoutOverlapping()
     ->when(fn () => now('Africa/Cairo')->isLastOfMonth());
+// Payroll closing is manual. Late fingerprint imports from the new month may
+// still affect the previous month, so no automatic close is scheduled.

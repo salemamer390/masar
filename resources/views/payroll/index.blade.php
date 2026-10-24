@@ -4,7 +4,32 @@
 <div class="page-head"><div><h1>دورة الرواتب</h1><p>إنشاء، مراجعة، اعتماد وقفل مسير الرواتب مع لقطات حسابية محفوظة.</p></div><div class="d-flex gap-2">@if(auth()->user()?->hasPermission('payroll.settings'))<a class="btn btn-outline-secondary" href="{{ route('payroll.settings.index') }}"><i class="bi bi-gear-fill"></i> إعدادات الحساب</a>@endif @if(auth()->user()?->hasPermission('payroll.export'))<a class="btn btn-light" target="_blank" href="{{ route('payroll.export',['month'=>$month->format('Y-m-01')]) }}"><i class="bi bi-printer"></i> طباعة</a><a class="btn btn-light" href="{{ route('payroll.export',['month'=>$month->format('Y-m-01'),'format'=>'csv']) }}"><i class="bi bi-file-earmark-excel"></i> تصدير CSV</a>@endif</div></div>
 <div class="panel mb-3"><form method="GET" class="row g-2 align-items-end"><div class="col-md-3"><label class="form-label">شهر المسير</label><input type="month" name="month" class="form-control" value="{{ $month->format('Y-m') }}"></div><div class="col-md-2"><button class="btn btn-outline-primary w-100">عرض</button></div></form></div>
 <div class="stat-grid compact">@foreach([['إجمالي الموظفين',$totalEmployees,'blue','people'],['سجلات معتمدة/مقفلة',$reviewedCount,'green','check2-circle'],['مسودات',$pendingReview,'orange','hourglass'],['صافي المسير',format_money($totalNet).' ج.م','purple','cash-stack'],['إجمالي التكلفة',format_money($totalCost).' ج.م','green','wallet2']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>{{ $month->format('m/Y') }}</small></div></div>@endforeach</div>
-<div class="panel table-panel mt-3"><div class="panel-head"><div><h3>مسيرات الرواتب</h3><span>كل انتقال حالة يتطلب صلاحية منفصلة ويُسجّل في سجل التدقيق.</span></div>@if(auth()->user()?->hasPermission('payroll.create'))<form method="POST" action="{{ route('payroll.runs.generate') }}">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m-01') }}"><button class="btn btn-primary"><i class="bi bi-play-fill"></i> إنشاء/تحديث مسودة الشهر</button></form>@endif</div><table class="table align-middle"><thead><tr><th>الشهر</th><th>الحالة</th><th>السجلات</th><th>تم الإنشاء</th><th>الإجراء</th></tr></thead><tbody>@forelse($runs as $run)<tr><td>{{ $run->payroll_month?->format('m/Y') }}</td><td><span class="badge {{ $run->status === 'Locked' ? 'text-bg-dark' : ($run->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $run->status }}</span></td><td>{{ $run->records_count }}</td><td>{{ $run->created_at?->format('d/m/Y H:i') }}</td><td>@if($run->status === 'Draft' && auth()->user()?->hasPermission('payroll.approve'))<form class="d-inline" method="POST" action="{{ route('payroll.runs.approve',$run) }}">@csrf<button class="btn btn-sm btn-outline-success">اعتماد</button></form>@elseif($run->status === 'Approved' && auth()->user()?->hasPermission('payroll.lock'))<form class="d-inline" method="POST" action="{{ route('payroll.runs.lock',$run) }}">@csrf<button class="btn btn-sm btn-outline-dark">قفل نهائي</button></form>@else—@endif</td></tr>@empty<tr><td colspan="5" class="text-center py-4">لا يوجد مسير بعد. يلزم وجود هيكل راتب نشط للموظفين قبل الإنشاء.</td></tr>@endforelse</tbody></table></div>
+<div class="panel table-panel mt-3"><div class="panel-head"><div><h3>مسيرات الرواتب</h3><span>مسودة الشهر الحالي تُحسب حتى اليوم لتعرف مستحق كل موظف لحظيًا، ويُنشأ المسير ويُعتمد ويُقفل تلقائيًا في آخر يوم من الشهر دون تدخل.</span></div>@if(auth()->user()?->hasPermission('payroll.create'))<form method="POST" action="{{ route('payroll.runs.generate') }}">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m-01') }}"><button class="btn btn-primary"><i class="bi bi-play-fill"></i> إنشاء/تحديث مسودة الشهر</button></form>@endif</div>
+@if($errors->has('payroll'))<div class="alert alert-danger m-3">{{ $errors->first('payroll') }}</div>@endif
+<table class="table align-middle"><thead><tr><th>الشهر</th><th>الحالة</th><th>السجلات</th><th>الإقفال التلقائي</th><th>الإجراء</th></tr></thead><tbody>
+@forelse($runs as $run)
+@php($meta = $runMeta[$run->id] ?? ['month_ended' => false, 'closes_on' => ''])
+@php($report = $runReports[$run->id] ?? null)
+@php($statusLabel = ['Draft' => 'مسودة (حتى اليوم)', 'Generating' => 'جارٍ الإنشاء', 'Approved' => 'معتمد', 'Locked' => 'مقفول'][$run->status] ?? $run->status)
+<tr><td>{{ $run->payroll_month?->format('m/Y') }}</td><td><span class="badge {{ $run->status === 'Locked' ? 'text-bg-dark' : ($run->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $statusLabel }}</span></td><td>{{ $run->records_count }}</td><td>@if($run->status === 'Locked')تم {{ $run->locked_at?->format('d/m/Y H:i') }}@else{{ $meta['closes_on'] }}@endif</td>
+<td>
+@if($run->status === 'Draft' && auth()->user()?->hasPermission('payroll.approve'))
+@if($meta['month_ended'])
+<form class="d-inline" method="POST" action="{{ route('payroll.runs.approve',$run) }}">@csrf
+@if($report && count($report['skipped']))<label class="d-block small mb-1"><input type="checkbox" name="confirm_skipped" value="1" required> أؤكد الاعتماد رغم استبعاد {{ count($report['skipped']) }} موظف</label>@endif
+<button class="btn btn-sm btn-outline-success">اعتماد</button></form>
+@else<small class="text-muted">يُعتمد ويُقفل تلقائيًا يوم {{ $meta['closes_on'] }}</small>@endif
+@elseif($run->status === 'Approved' && auth()->user()?->hasPermission('payroll.lock'))
+@if($meta['month_ended'])<form class="d-inline" method="POST" action="{{ route('payroll.runs.lock',$run) }}">@csrf<button class="btn btn-sm btn-outline-dark">قفل نهائي</button></form>@else<small class="text-muted">يُقفل تلقائيًا يوم {{ $meta['closes_on'] }}</small>@endif
+@endif
+@if(auth()->user()?->hasPermission('payroll.delete'))<form class="d-inline ms-1" method="POST" action="{{ route('payroll.runs.destroy',$run) }}" onsubmit="return confirm('سيتم حذف المسير وسجلاته نهائيًا ولا يمكن التراجع. هل تريد المتابعة؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger">حذف</button></form>@endif
+</td></tr>
+@if($report && count($report['skipped']))
+<tr class="table-warning"><td colspan="5"><strong>موظفون مستحقون لم يُنشأ لهم سجل ({{ count($report['skipped']) }} من {{ $report['eligible'] }})</strong><ul class="mb-0 small">@foreach(array_slice($report['skipped'], 0, 50) as $item)<li>{{ $item['name'] }} @if($item['code'])(#{{ $item['code'] }})@endif — {{ $item['reason'] }}</li>@endforeach</ul>@if(count($report['skipped']) > 50)<small>… و{{ count($report['skipped']) - 50 }} آخرين</small>@endif</td></tr>
+@elseif($run->status !== 'Draft' && !empty($run->skipped_report['skipped']))
+<tr class="table-light"><td colspan="5"><small class="text-muted">عند الاعتماد كان {{ count($run->skipped_report['skipped']) }} موظف بدون سجل راتب: @foreach(array_slice($run->skipped_report['skipped'], 0, 10) as $item){{ $item['name'] }}@if(!$loop->last)، @endif @endforeach</small></td></tr>
+@endif
+@empty<tr><td colspan="5" class="text-center py-4">لا يوجد مسير بعد. يلزم وجود هيكل راتب نشط للموظفين قبل الإنشاء.</td></tr>@endforelse</tbody></table></div>
 <div class="panel table-panel mt-3"><div class="panel-head"><div><h3>تفاصيل مسير {{ $month->translatedFormat('F Y') }}</h3><span>الغياب والجزاءات تأتي من السجلات المعتمدة؛ أضف البنود المتغيرة قبل اعتماد المسير.</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>الموظف</th><th>هيكل الراتب</th><th>الراتب الإجمالي</th><th>إضافي</th><th>غياب</th><th>جزاءات</th><th>تأمين الموظف</th><th>الضريبة</th><th>الصافي</th><th>تكلفة الشركة</th><th>الحالة</th><th></th></tr></thead><tbody>@forelse($records as $record)<tr><td><a class="employee-link fw-bold" href="{{ route('employees.show',$record->employee) }}">{{ $record->employee?->full_name }}</a><small class="d-block text-muted">{{ $record->employee?->department?->name }}</small></td><td>@if($record->salary)<a href="{{ route('salaries.index',['employee_id'=>$record->employee_id]) }}" class="small fw-semibold">هيكل #{{ $record->salary_id }}</a><small class="d-block text-muted">ساري من {{ $record->salary->effective_from?->format('d/m/Y') ?? '—' }}</small><small class="d-block text-muted">المتفق عليه: {{ format_money($record->agreed_net_salary) }}</small>@else—@endif</td><td>{{ format_money($record->gross_salary) }}</td><td>{{ format_money($record->overtime_amount) }}</td><td>{{ format_money($record->absence_deduction) }} <small class="text-muted">({{ format_number($record->absence_days) }} يوم)</small></td><td>{{ format_money($record->penalties) }} <small class="text-muted">({{ format_number($record->penalty_days) }} يوم)</small></td><td>{{ format_money($record->employee_insurance) }}</td><td>{{ format_money($record->income_tax) }}</td><td class="fw-bold text-success">{{ format_money($record->net_salary) }}</td><td>{{ format_money($record->employee_cost) }}</td><td><span class="badge {{ $record->is_locked ? 'text-bg-dark' : ($record->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $record->status }}</span></td><td>@if(in_array($record->status,['Draft','قيد الإعداد'],true) && !$record->is_locked && auth()->user()?->hasPermission('payroll.edit'))<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#inputs{{ $record->id }}">مدخلات</button>@endif</td></tr>@empty<tr><td colspan="12" class="text-center py-5">لا توجد سجلات لهذا الشهر.</td></tr>@endforelse</tbody></table></div></div>
 
 <div class="modal fade" id="payrollCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="payrollCardTitle">تفاصيل البطاقة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="payrollCardBody" class="details-grid"></div></div></div></div></div>
@@ -54,24 +79,6 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   if (note) note.innerHTML += ' <br><strong>وحدة القياس:</strong> الإضافي بالساعات، والغياب والجزاءات بالأيام. القيم المعروضة مأخوذة من السجلات المعتمدة ولا تُكتب يدويًا من هنا.';
 });
 </script>
-@if(auth()->user()?->role?->name === 'company_manager')
-<script>
-  const lockedPayrollRuns = @json($runs->values()->map(fn ($run) => [
-    'id' => $run->id,
-    'status' => $run->status,
-  ])->values());
-  const payrollRunsDeleteBase = '{{ url('/payroll/runs') }}';
-  const runsTable = document.querySelector('.panel.table-panel table');
-  if (runsTable) {
-    [...runsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
-      const run = lockedPayrollRuns[index];
-      const actionCell = row.cells[row.cells.length - 1];
-      if (!run || run.status !== 'Locked' || !actionCell || actionCell.querySelector('[data-delete-locked-run]')) return;
-      actionCell.insertAdjacentHTML('beforeend', `<form method="POST" action="${payrollRunsDeleteBase}/${run.id}" class="d-inline ms-1" onsubmit="return confirm('سيتم حذف المسير المقفول وسجلاته نهائيًا. هل تريد المتابعة؟')"><input type="hidden" name="_token" value="{{ csrf_token() }}"><input type="hidden" name="_method" value="DELETE"><button type="submit" data-delete-locked-run class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف</button></form>`);
-    });
-  }
-</script>
-@endif
 @endpush
 
 @push('scripts')

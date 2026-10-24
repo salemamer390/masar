@@ -14,6 +14,7 @@ class PayrollRecord extends Model
         'gross_salary','monthly_total','insurance_wage','employee_insurance','income_tax','martyrs_fund','employer_insurance',
         'employee_cost','fixed_deductions','attendance_deduction','penalties','penalty_deduction','day_overtime_hours','night_overtime_hours','day_overtime_amount','night_overtime_amount','total_overtime','net_salary','status','paid_at','notes','calculation_snapshot','approved_at','approved_by','is_locked',
         'absence_days','penalty_days','ot_day_hours','ot_night_hours','ot_day_amount','ot_night_amount','bonus','incentives','commission','profit_share','loans','other_earnings','other_deductions',
+        'agreed_net_salary','official_holiday_days','official_holiday_amount','weekly_rest_days','weekly_rest_amount',
     ];
 
     protected $casts = [
@@ -23,6 +24,7 @@ class PayrollRecord extends Model
         'employee_cost' => 'decimal:2','fixed_deductions' => 'decimal:2','attendance_deduction' => 'decimal:2','penalties' => 'decimal:2','penalty_deduction' => 'decimal:2','day_overtime_hours' => 'decimal:2','night_overtime_hours' => 'decimal:2','day_overtime_amount' => 'decimal:2','night_overtime_amount' => 'decimal:2','total_overtime' => 'decimal:2',
         'net_salary' => 'decimal:2','paid_at' => 'datetime','calculation_snapshot' => 'array','approved_at' => 'datetime','is_locked' => 'boolean',
         'absence_days'=>'decimal:2','penalty_days'=>'decimal:2','ot_day_hours'=>'decimal:2','ot_night_hours'=>'decimal:2','ot_day_amount'=>'decimal:2','ot_night_amount'=>'decimal:2','bonus'=>'decimal:2','incentives'=>'decimal:2','commission'=>'decimal:2','profit_share'=>'decimal:2','loans'=>'decimal:2','other_earnings'=>'decimal:2','other_deductions'=>'decimal:2',
+        'official_holiday_days'=>'decimal:2','official_holiday_amount'=>'decimal:2','weekly_rest_days'=>'decimal:2','weekly_rest_amount'=>'decimal:2',
     ];
 
     public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }

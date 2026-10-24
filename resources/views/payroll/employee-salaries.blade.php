@@ -2,6 +2,8 @@
 
 @section('title', 'ط¯ظˆط±ط© ط§ظ„ط±ظˆط§طھط¨')
 
+@section('title', 'رواتب الموظفين')
+
 @section('content')
 @php
     $prototype = file_get_contents(base_path('masar_payroll_drawer_uiux (3).html'));

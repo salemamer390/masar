@@ -156,18 +156,26 @@ class SalaryController extends Controller
     }
 
     // يعيد حساب وحفظ كل الهياكل السارية بمنطق الضريبة الحالي (مفيد بعد أي تعديل على الشرائح أو النسب).
-    public function recalculate(PayrollCalculator $calculator)
+    /** Recalculate and save every active salary structure of a company; returns how many were updated. */
+    public function recalculateCompany(PayrollCalculator $calculator, ?int $companyId): int
     {
-        $companyId = auth()->user()?->company_id;
         $count = 0;
         foreach (Salary::where('status', 'Active')
             ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
             ->whereIn('employee_id', $this->eligibleEmployeesForSalary($companyId)->select('id'))
             ->get() as $salary) {
             $this->syncBreakdown($salary, $calculator, true);
-            Salary::syncInsuredSalary((int)$salary->employee_id);
+            Salary::syncInsuredSalary((int) $salary->employee_id);
             $count++;
         }
+
+        return $count;
+    }
+
+    public function recalculate(PayrollCalculator $calculator)
+    {
+        $companyId = auth()->user()?->company_id;
+        $count = $this->recalculateCompany($calculator, $companyId);
         ActivityLog::record('salary_recalculate', "تمت إعادة حساب {$count} هيكل راتب ساري.");
         return back()->with('toast', "تمت إعادة حساب {$count} هيكل راتب وحفظ النتائج. مسيرات الرواتب المعتمدة أو المصروفة لم تتغير.");
     }

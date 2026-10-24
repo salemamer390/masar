@@ -2,19 +2,34 @@
 
 namespace App\Services;
 
+use App\Support\CompanyContext;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
-/** Tax categories and marginal brackets defined by the approved payroll specification. */
+/**
+ * Income-tax categories and marginal brackets. Each company owns its own set
+ * (editable from Settings → شرائح الضرائب); the built-in law table is used when
+ * a company has no rows.
+ */
 class TaxCalculator
 {
-    private ?array $categoriesCache = null;
+    /** @var array<string, array> categories per company, loaded lazily */
+    private array $categoriesCache = [];
+
+    /** Optional fixed categories (used by unit tests, bypasses the database). */
+    private ?array $fixedCategories;
+
+    public function __construct(?array $fixedCategories = null)
+    {
+        $this->fixedCategories = $fixedCategories;
+    }
 
     public function calculate(float $annualTaxableBase): array
     {
-        // The taxable base is deliberately not rounded or rounded down.
+        // The taxable base is deliberately not rounded.
         $base = max(0.0, $annualTaxableBase);
         $categories = $this->categories();
-        $index = 0;
+        $index = count($categories) - 1;
         foreach ($categories as $i => $category) {
             if ($base <= $category['up_to']) { $index = $i; break; }
         }
@@ -43,26 +58,50 @@ class TaxCalculator
 
     private function categories(): array
     {
-        if ($this->categoriesCache !== null) {
-            return $this->categoriesCache;
+        if ($this->fixedCategories !== null) {
+            return $this->fixedCategories;
         }
 
-        if (!DB::getSchemaBuilder()->hasTable('tax_categories') || !DB::getSchemaBuilder()->hasTable('tax_brackets')) {
-            return $this->categoriesCache = $this->defaults();
+        $companyId = CompanyContext::id();
+        $cacheKey = $companyId === null ? 'global' : (string) $companyId;
+        if (isset($this->categoriesCache[$cacheKey])) {
+            return $this->categoriesCache[$cacheKey];
         }
 
-        $rows = DB::table('tax_categories')->orderBy('sort_order')->get();
-        if ($rows->isEmpty()) return $this->categoriesCache = $this->defaults();
+        $schema = DB::getSchemaBuilder();
+        if (!$schema->hasTable('tax_categories') || !$schema->hasTable('tax_brackets')) {
+            return $this->categoriesCache[$cacheKey] = $this->defaults();
+        }
 
-        return $this->categoriesCache = $rows->map(function ($category) {
-            $brackets = DB::table('tax_brackets')->where('tax_category_id', $category->id)->orderBy('from_amount')->get()
+        $query = DB::table('tax_categories')->orderBy('sort_order');
+        if (Schema::hasColumn('tax_categories', 'company_id')) {
+            $query->where('company_id', $companyId);
+        }
+        $rows = $query->get();
+        if ($rows->isEmpty() && $companyId !== null && Schema::hasColumn('tax_categories', 'company_id')) {
+            // Company without its own table yet: fall back to the shared template.
+            $rows = DB::table('tax_categories')->whereNull('company_id')->orderBy('sort_order')->get();
+        }
+        if ($rows->isEmpty()) {
+            return $this->categoriesCache[$cacheKey] = $this->defaults();
+        }
+
+        $bracketsByCategory = DB::table('tax_brackets')
+            ->whereIn('tax_category_id', $rows->pluck('id')->all())
+            ->orderBy('from_amount')
+            ->get()
+            ->groupBy('tax_category_id');
+
+        return $this->categoriesCache[$cacheKey] = $rows->map(function ($category) use ($bracketsByCategory) {
+            $brackets = ($bracketsByCategory[$category->id] ?? collect())
                 ->map(fn ($bracket) => [
                     'from' => (float) $bracket->from_amount,
                     'to' => $bracket->to_amount === null ? INF : (float) $bracket->to_amount,
                     'rate' => (float) $bracket->rate,
-                ])->all();
+                ])->values()->all();
+
             return ['up_to' => $category->max_income === null ? INF : (float) $category->max_income, 'brackets' => $brackets];
-        })->all();
+        })->values()->all();
     }
 
     private function annualForCategory(float $base, array $brackets): float
@@ -77,7 +116,7 @@ class TaxCalculator
         return $tax;
     }
 
-    private function defaults(): array
+    public function defaults(): array
     {
         return [
             ['up_to'=>600000, 'brackets'=>[['from'=>0,'to'=>40000,'rate'=>0],['from'=>40000,'to'=>55000,'rate'=>.10],['from'=>55000,'to'=>70000,'rate'=>.15],['from'=>70000,'to'=>200000,'rate'=>.20],['from'=>200000,'to'=>400000,'rate'=>.225],['from'=>400000,'to'=>INF,'rate'=>.25]]],

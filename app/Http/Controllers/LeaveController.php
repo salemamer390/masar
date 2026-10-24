@@ -70,7 +70,7 @@ class LeaveController extends Controller
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $periodGuard->ensureRangeOpen($start, $end);
         $overlap = Leave::where('id', '!=', $leave->id)->where('employee_id', $data['employee_id'])
-            ->whereNotIn('status', ['Rejected', 'Ù…Ø±ÙÙˆØ¶Ø©'])
+            ->whereNotIn('status', ['Rejected', 'مرفوضة'])
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
         if ($overlap) {
             return $request->wantsJson()

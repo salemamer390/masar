@@ -19,10 +19,10 @@ class PayrollController extends Controller
     public function employeeSalaries(Request $request)
     {
         $request->attributes->set('payroll_view', 'payroll.employee-salaries');
-        return $this->index($request);
+        return $this->index($request, app(PayrollRunService::class));
     }
 
-    public function index(Request $request)
+    public function index(Request $request, PayrollRunService $service)
     {
         $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
@@ -53,10 +53,21 @@ class PayrollController extends Controller
         $totalEmployerInsurance = (clone $summaryQuery)->sum('employer_insurance');
         $totalMartyrs = (clone $summaryQuery)->sum('martyrs_fund');
         $runs = PayrollRun::withCount('records')->when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderByDesc('payroll_month')->limit(12)->get();
+        // Draft runs show who was skipped (and why) before the approve button; every run shows when it closes.
+        $runReports = [];
+        foreach ($runs as $run) {
+            if ($run->status === 'Draft' && $run->company_id) {
+                $runReports[$run->id] = $service->reconciliationReport($run);
+            }
+        }
+        $runMeta = $runs->mapWithKeys(fn ($run) => [$run->id => [
+            'month_ended' => $service->monthHasEnded($run->payroll_month),
+            'closes_on' => $run->payroll_month->copy()->endOfMonth()->format('d/m/Y'),
+        ]])->all();
         $cardDetails = [
             'employees' => Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderBy('full_name')->get(['id','full_name','employee_code']),
-            'reviewed' => $recordCollection->whereIn('status', ['Ù…Ø¹ØªÙ…Ø¯Ø©', 'ØªÙ… Ø§Ù„ØµØ±Ù', 'Approved', 'Paid'])->values(),
-            'drafts' => $recordCollection->whereIn('status', ['Ù‚ÙŠØ¯ Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯', 'Draft'])->values(),
+            'reviewed' => $recordCollection->whereIn('status', ['معتمدة', 'تم الصرف', 'Approved', 'Paid'])->values(),
+            'drafts' => $recordCollection->whereIn('status', ['قيد الإعداد', 'Draft'])->values(),
             'net' => $recordCollection->sortByDesc('net_salary')->values(),
             'cost' => $recordCollection->sortByDesc('employee_cost')->values(),
         ];
@@ -225,52 +236,66 @@ class PayrollController extends Controller
         ];
 
         $view = $request->attributes->get('payroll_view', 'payroll.index');
-        return view($view, compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats'));
+        return view($view, compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta'));
+    }
+
+    /** Payroll always belongs to one company; accounts without a company cannot generate it. */
+    private function requireCompany(): int
+    {
+        $companyId = auth()->user()?->company_id;
+        abort_if(!$companyId, 403, 'حساب بدون شركة لا يمكنه إنشاء مسير رواتب.');
+
+        return (int) $companyId;
+    }
+
+    private function assertSameCompany(PayrollRun $run): void
+    {
+        abort_unless((int) $run->company_id === (int) auth()->user()?->company_id, 404);
     }
 
     public function generate(Request $request, PayrollRunService $service)
     {
-        $companyId = auth()->user()?->company_id;
+        $companyId = $this->requireCompany();
         $targetMonth = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $targetMonth->toDateString())->first();
+        $existing = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $targetMonth->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
             return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا. أنشئ مسيرًا للشهر التالي أو راجع المسير الحالي.']);
         }
-        $run = $service->generate($targetMonth);
+        $service->generate($targetMonth, null, $companyId);
         return back()->with('toast', 'تم إنشاء/تحديث مسودة مسير ' . $targetMonth->translatedFormat('F Y') . ' وحفظ لقطة القواعد المستخدمة.');
     }
 
     public function generateRun(Request $request, PayrollRunService $service)
     {
-        $companyId = auth()->user()?->company_id;
+        $companyId = $this->requireCompany();
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $month->toDateString())->first();
+        $existing = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
             return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.']);
         }
-        $service->generate($month);
+        $service->generate($month, null, $companyId);
         return back()->with('toast', 'تم إنشاء مسير الرواتب كمسودة.');
     }
 
-    public function startGeneration(Request $request)
+    public function startGeneration(Request $request, PayrollRunService $service)
     {
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $companyId = auth()->user()?->company_id;
-        $existing = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))
+        $companyId = $this->requireCompany();
+        $existing = PayrollRun::where('company_id', $companyId)
             ->whereDate('payroll_month', $month->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
             return response()->json(['message' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.'], 422);
         }
 
-        $run = DB::transaction(function () use ($month, $existing) {
+        $run = DB::transaction(function () use ($month, $existing, $companyId) {
             $run = $existing
                 ? PayrollRun::whereKey($existing->id)->lockForUpdate()->firstOrFail()
-                : PayrollRun::create(['payroll_month' => $month->toDateString(), 'status' => 'Generating', 'created_by' => auth()->id()]);
+                : PayrollRun::create(['company_id' => $companyId, 'payroll_month' => $month->toDateString(), 'status' => 'Generating', 'created_by' => auth()->id()]);
             $run->update(['status' => 'Generating', 'created_by' => $run->created_by ?: auth()->id()]);
             return $run;
         });
 
-        $total = $this->eligiblePayrollEmployeeIds($month, $companyId)->count();
+        $total = count($service->payableEmployeeIds($month, $companyId));
         return response()->json(['success' => true, 'run_id' => $run->id, 'month' => $month->toDateString(), 'total' => $total, 'processed' => 0, 'batch_size' => 25]);
     }
 
@@ -278,58 +303,57 @@ class PayrollController extends Controller
     {
         $data = $request->validate(['month' => ['required', 'date'], 'offset' => ['required', 'integer', 'min:0'], 'batch_size' => ['nullable', 'integer', 'min:10', 'max:50']]);
         $month = Carbon::parse($data['month'])->startOfMonth();
-        $companyId = auth()->user()?->company_id;
-        $allIds = $this->eligiblePayrollEmployeeIds($month, $companyId)->values();
+        $companyId = $this->requireCompany();
+        $allIds = collect($service->payableEmployeeIds($month, $companyId))->values();
         $offset = (int) $data['offset'];
         $batchSize = (int) ($data['batch_size'] ?? 25);
         $ids = $allIds->slice($offset, $batchSize)->values()->all();
-        $run = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDate('payroll_month', $month->toDateString())->firstOrFail();
+        $run = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->firstOrFail();
         abort_unless($run->status === 'Generating', 422, 'لا توجد عملية إنشاء نشطة لهذا الشهر.');
-        if ($ids) $service->generate($month, $ids);
+        if ($ids) $service->generate($month, $ids, $companyId);
         $processed = min($offset + count($ids), $allIds->count());
         $complete = $processed >= $allIds->count();
         if ($complete) {
-            $run->records()->when($allIds->isNotEmpty(), fn ($query) => $query->whereNotIn('employee_id', $allIds->all()))->delete();
+            $run->records()->whereNull('paid_at')->when($allIds->isNotEmpty(), fn ($query) => $query->whereNotIn('employee_id', $allIds->all()))->delete();
             $run->update(['status' => 'Draft']);
         }
         return response()->json(['success' => true, 'processed' => $processed, 'total' => $allIds->count(), 'percent' => $allIds->count() ? (int) round(($processed / $allIds->count()) * 100) : 100, 'complete' => $complete]);
     }
 
-    private function eligiblePayrollEmployeeIds(Carbon $month, ?int $companyId)
+    public function approveRun(Request $request, PayrollRun $payrollRun, PayrollRunService $service)
     {
-        $excludedStatuses = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
-        return Employee::query()->when($companyId, fn ($query) => $query->where('company_id', $companyId))
-            ->where(function ($query) use ($excludedStatuses, $month) {
-                $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', $excludedStatuses))
-                    ->orWhere(function ($terminated) use ($month) {
-                        $terminated->whereHas('status', fn ($status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة']))
-                            ->whereBetween('termination_date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()]);
-                    });
-            })->orderBy('id')->pluck('id');
-    }
-
-    public function approveRun(PayrollRun $payrollRun, PayrollRunService $service)
-    {
-        $service->approve($payrollRun);
+        $this->assertSameCompany($payrollRun);
+        try {
+            $service->approve($payrollRun, $request->boolean('confirm_skipped'));
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return back()->withErrors(['payroll' => $e->getMessage()]);
+        }
         return back()->with('toast', 'تم اعتماد مسير الرواتب.');
     }
 
     public function lockRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
-        $service->lock($payrollRun);
+        $this->assertSameCompany($payrollRun);
+        try {
+            $service->lock($payrollRun);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return back()->withErrors(['payroll' => $e->getMessage()]);
+        }
         return back()->with('toast', 'تم قفل مسير الرواتب نهائيًا.');
     }
 
     public function approve(PayrollRecord $payrollRecord)
     {
-        if ($payrollRecord->status === 'تم الصرف') return back()->with('toast', 'هذا الراتب تم صرفه بالفعل.');
-        $payrollRecord->update(['status' => 'معتمدة']);
+        if ($payrollRecord->is_locked || $payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid', 'Locked', 'Approved', 'معتمدة'], true)) {
+            return back()->with('toast', 'لا يمكن تغيير حالة هذا الراتب لأنه معتمد أو مقفل أو مصروف.');
+        }
+        $payrollRecord->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         ActivityLog::record('payroll_approve', "تم اعتماد راتب {$payrollRecord->employee?->full_name}.", $payrollRecord);
         return back()->with('toast', 'تم اعتماد الراتب.');
     }
 
     /** Update variable monthly inputs without changing the employee's fixed salary structure. */
-    public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollCalculator $calculator, PayrollRunService $service)
+    public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollRunService $service)
     {
         abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, 'لا يمكن تعديل مدخلات مسير معتمد أو مقفل.');
         $data = $request->validate([
@@ -340,10 +364,6 @@ class PayrollController extends Controller
         ]);
         $salary = $payrollRecord->salary ?? Salary::find($payrollRecord->salary_id);
         abort_unless($salary, 422, 'لا يوجد هيكل راتب مرتبط بهذا السجل.');
-        $insuranceDueSnapshot = data_get($payrollRecord->calculation_snapshot, 'insurance_due');
-        $insuranceDue = $insuranceDueSnapshot === null
-            ? $this->insuranceDueForExistingRecord($payrollRecord)
-            : (bool) $insuranceDueSnapshot;
         $snapshot = $payrollRecord->calculation_snapshot ?? [];
         $advanceDetails = (array) ($snapshot['advance_details'] ?? []);
         $advanceAvailable = round(collect($advanceDetails)->sum(fn ($detail) => (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0)), 2);
@@ -365,25 +385,17 @@ class PayrollController extends Controller
             return $detail;
         }, $advanceDetails);
         $data['loans'] = $advanceAmount;
-        $inputs = array_merge($data, [
-            'absence_days'=>(float)$payrollRecord->absence_days, 'penalty_days'=>(float)$payrollRecord->penalty_days,
-            'incentives'=>(float) $payrollRecord->incentives, 'commission'=>(float) $payrollRecord->commission, 'profit_share'=>(float) $payrollRecord->profit_share,
-            'advance_earnings'=>(float) data_get($snapshot, 'inputs.advance_earnings', 0),
-        ]);
-        $result = $calculator->monthly((float)$payrollRecord->gross_salary, $inputs, $salary->insurance_wage ? (float)$salary->insurance_wage : null, (bool)$salary->no_insurance || !$insuranceDue);
-        $result = $service->applyStructureStatutoryValues($result, $salary, $insuranceDue);
-        $result = $service->applyProration($result, (float) ($payrollRecord->calculation_snapshot['proration_factor'] ?? 1));
         $before = $payrollRecord->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']);
-        $payrollRecord->update([
-            'ot_day_hours'=>$result['ot_day_hours'], 'ot_night_hours'=>$result['ot_night_hours'], 'ot_day_amount'=>$result['ot_day_amount'], 'ot_night_amount'=>$result['ot_night_amount'],
-            'day_overtime_hours'=>$result['ot_day_hours'], 'night_overtime_hours'=>$result['ot_night_hours'], 'day_overtime_amount'=>$result['ot_day_amount'], 'night_overtime_amount'=>$result['ot_night_amount'],
-            'overtime_amount'=>$result['overtime_amount'], 'total_overtime'=>$result['overtime_amount'], 'bonus'=>$result['bonus'], 'incentives'=>$result['incentives'], 'commission'=>$result['commission'], 'profit_share'=>$result['profit_share'], 'loans'=>$result['loans'],
-            'monthly_total'=>$result['monthly_total'],
-            'other_earnings'=>$result['other_earnings'], 'other_deductions'=>$result['other_deductions'], 'income_tax'=>$result['income_tax'],
-            'absence_deduction'=>$result['absence_deduction'], 'penalty_deduction'=>$result['penalty_deduction'], 'penalties'=>$result['penalty_deduction'],
-            'deductions'=>$result['monthly_deductions'], 'net_salary'=>$result['net_monthly'],
-            'calculation_snapshot'=>array_merge($snapshot, ['insurance_due'=>$insuranceDue, 'advance_earnings'=>$inputs['advance_earnings'], 'advance_details'=>$updatedAdvanceDetails, 'advance_override_rate'=>$advanceRate, 'advance_override_amount'=>$advanceRate !== null ? $advanceAmount : null]),
-        ]);
+        $changes = array_merge(
+            array_intersect_key($data, array_flip(['ot_day_hours', 'ot_night_hours', 'bonus', 'loans', 'other_earnings', 'other_deductions'])),
+            ['advance_details' => $updatedAdvanceDetails]
+        );
+        $recalculated = $service->recalculateRecord($payrollRecord, $changes);
+        $recalculated->update(['calculation_snapshot' => array_merge((array) $recalculated->calculation_snapshot, [
+            'advance_earnings' => (float) data_get($recalculated->calculation_snapshot, 'inputs.advance_earnings', 0),
+            'advance_override_rate' => $advanceRate,
+            'advance_override_amount' => $advanceRate !== null ? $advanceAmount : null,
+        ])]);
         ActivityLog::record('payroll_inputs_update', 'تم تحديث المدخلات المتغيرة لمسير راتب.', $payrollRecord, $before, $payrollRecord->fresh()->only(['ot_day_hours','ot_night_hours','bonus','loans','other_earnings','other_deductions','net_salary']), 'payroll');
         if ($request->wantsJson()) {
             $updatedRecord = $payrollRecord->fresh()->load('employee');
@@ -407,18 +419,25 @@ class PayrollController extends Controller
         return !($hireDate->isSameMonth($month) && !$hireDate->isSameDay($month));
     }
 
+    /** Deleting a run is for the company owner, or any role the owner granted payroll.delete to. */
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
-        abort_unless((int) $payrollRun->company_id === (int) auth()->user()?->company_id, 404);
-        abort_unless($payrollRun->status === 'Locked', 422, 'يمكن حذف المسير المقفول نهائيًا فقط من هذا الإجراء.');
-        $service->destroyDraft($payrollRun);
-        return back()->with('toast', 'تم حذف المسير المقفول وسجلاته.');
+        $this->assertSameCompany($payrollRun);
+        abort_unless(auth()->user()?->hasPermission('payroll.delete'), 403, 'حذف المسير متاح لمدير الشركة أو لدور مُنح هذه الصلاحية.');
+        $service->destroy($payrollRun);
+        return back()->with('toast', 'تم حذف المسير وسجلاته.');
     }
 
     public function pay(PayrollRecord $payrollRecord)
     {
-        if ($payrollRecord->status !== 'معتمدة') return back()->withErrors(['payroll' => 'يجب اعتماد الراتب قبل تسجيل الصرف.']);
-        $payrollRecord->update(['status' => 'تم الصرف', 'paid_at' => now()]);
+        if ($payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid'], true)) {
+            return back()->with('toast', 'هذا الراتب تم صرفه بالفعل.');
+        }
+        if (!in_array($payrollRecord->status, ['Approved', 'Locked', 'معتمدة'], true)) {
+            return back()->withErrors(['payroll' => 'يجب اعتماد الراتب قبل تسجيل الصرف.']);
+        }
+        // A locked record keeps its Locked status; paid_at marks the payment.
+        $payrollRecord->update(['paid_at' => now(), 'status' => $payrollRecord->is_locked ? $payrollRecord->status : 'Paid']);
         ActivityLog::record('payroll_pay', "تم صرف راتب الموظف ({$payrollRecord->employee?->full_name}) لشهر {$payrollRecord->payroll_month->format('m/Y')}.", $payrollRecord);
         return back()->with('toast', 'تم تسجيل صرف الراتب بنجاح.');
     }
@@ -432,22 +451,26 @@ class PayrollController extends Controller
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
         if ($request->string('format')->lower() === 'csv') {
-            $filename = 'tazamun-payroll-' . $month->format('Y-m') . '.csv';
+            $filename = 'payroll-' . $month->format('Y-m') . '.csv';
             return response()->streamDownload(function () use ($records) {
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
-                fputcsv($out, ['الموظف','القسم','صافي المتفق عليه','بدل انتقال','بدل وجبة','بدل سكن','بدل ملابس','إجمالي البدلات','Gross','الأجر التأميني','تأمين الموظف','الضريبة','صندوق أسر الشهداء','الاستقطاعات الإضافية','الصافي','حصة صاحب العمل','تكلفة الموظف','الحالة']);
+                fputcsv($out, ['الموظف', 'كود الموظف', 'القسم', 'صافي المتفق عليه', 'الأساسي', 'إجمالي البدلات', 'الإضافي', 'مكافآت وحوافز وعمولات واستحقاقات أخرى', 'السلفة المصروفة', 'Gross', 'الأجر التأميني', 'تأمين الموظف', 'ضريبة الدخل', 'صندوق أسر الشهداء', 'خصم الغياب', 'خصم الجزاءات', 'قسط السلفة', 'خصومات أخرى', 'إجمالي الخصومات', 'صافي الراتب', 'حصة صاحب العمل', 'تكلفة الموظف', 'أيام مدفوعة', 'الحالة']);
                 foreach ($records as $r) {
+                    $extras = (float) $r->bonus + (float) $r->incentives + (float) $r->commission + (float) $r->profit_share + (float) $r->other_earnings;
                     fputcsv($out, [
-                        $r->employee?->full_name, $r->employee?->department?->name, ($r->net_salary + ($r->fixed_deductions ?? 0) + ($r->attendance_deduction ?? 0)), $r->transportation_allowance, $r->meal_allowance, $r->housing_allowance, $r->clothing_allowance, $r->allowances, $r->gross_salary, $r->insurance_wage,
-                        $r->employee_insurance, $r->income_tax, $r->martyrs_fund, $r->fixed_deductions, $r->net_salary,
-                        $r->employer_insurance, $r->employee_cost, $r->status,
+                        $r->employee?->full_name, $r->employee?->employee_code, $r->employee?->department?->name,
+                        $r->agreed_net_salary, $r->basic_salary, $r->allowances, $r->overtime_amount, round($extras, 2),
+                        data_get($r->calculation_snapshot, 'inputs.advance_earnings', 0),
+                        $r->gross_salary, $r->insurance_wage, $r->employee_insurance, $r->income_tax, $r->martyrs_fund,
+                        $r->absence_deduction, $r->penalty_deduction, $r->loans, $r->other_deductions, $r->deductions, $r->net_salary,
+                        $r->employer_insurance, $r->employee_cost, data_get($r->calculation_snapshot, 'paid_days'), $r->status,
                     ]);
                 }
                 fclose($out);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
         }
 
-        return view('payroll.export', compact('records','month'));
+        return view('payroll.export', compact('records', 'month'));
     }
 }

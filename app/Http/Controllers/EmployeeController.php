@@ -81,11 +81,11 @@ class EmployeeController extends Controller
 
         $employeeCardDetails = [
             'total' => Employee::with(['department', 'status'])->orderBy('full_name')->get(),
-            'active' => Employee::with(['department'])->whereHas('status', fn ($q) => $q->whereIn('name', ['Active', 'Ù†Ø´Ø·']))->orderBy('full_name')->get(),
+            'active' => Employee::with(['department'])->whereHas('status', fn ($q) => $q->whereIn('name', ['Active', 'نشط']))->orderBy('full_name')->get(),
             'departments' => Department::whereHas('employees')->withCount('employees')->orderBy('name')->get(),
             'contracts_due' => Employee::with(['department'])->whereBetween('contract_end_date', [today(), today()->copy()->addDays(30)])->orderBy('contract_end_date')->get(),
             'uninsured' => Employee::with(['department'])->whereDoesntHave('insuranceRecord')->orderBy('full_name')->get(),
-            'on_leave' => Employee::with(['department'])->whereHas('leaves', fn ($q) => $q->whereIn('status', ['Approved', 'Ù…Ø¹ØªÙ…Ø¯'])->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()))->orderBy('full_name')->get(),
+            'on_leave' => Employee::with(['department'])->whereHas('leaves', fn ($q) => $q->whereIn('status', ['Approved', 'معتمد'])->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()))->orderBy('full_name')->get(),
         ];
 
         return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary', 'employeeCardDetails'));

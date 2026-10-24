@@ -241,7 +241,7 @@ class HrRequestController extends Controller
                 'advance_amount' => ['required', 'numeric', 'gt:0'],
             ]);
             $validated = array_merge($validated, $advanceValidated);
-            $limit = (float) ($employee->gross_salary ?? 0) * 0.10;
+            $limit = (float) ($employee->gross_salary ?? 0) * app(\App\Services\PayrollSettingsService::class)->advanceMaxFraction();
             if ((float) $validated['advance_amount'] > $limit) {
                 $request->validate(['advance_over_limit_confirm' => ['accepted']]);
             }
@@ -357,7 +357,7 @@ class HrRequestController extends Controller
         if ($source === 'advance') {
             $data = $request->validate(['advance_request_date' => ['required', 'date'], 'advance_amount' => ['required', 'numeric', 'gt:0']]);
             $gross = (float) ($hrRequest->employee?->gross_salary ?? data_get($payload, 'gross_salary', 0));
-            $payload = array_merge($payload, ['request_date' => $data['advance_request_date'], 'amount' => (float) $data['advance_amount'], 'gross_salary' => $gross, 'limit_amount' => $gross * 0.10, 'exceeds_limit' => (float) $data['advance_amount'] > ($gross * 0.10)]);
+            $payload = array_merge($payload, ['request_date' => $data['advance_request_date'], 'amount' => (float) $data['advance_amount'], 'gross_salary' => $gross, 'limit_amount' => $gross * app(\App\Services\PayrollSettingsService::class)->advanceMaxFraction(), 'exceeds_limit' => (float) $data['advance_amount'] > ($gross * 0.10)]);
         } elseif ($source === 'overtime') {
             if (!$request->filled('overtime_request_date') && $request->filled('request_date')) {
                 $request->merge(['overtime_request_date' => $request->input('request_date')]);

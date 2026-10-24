@@ -28,69 +28,12 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\CompanyAccountController;
 use App\Http\Controllers\SubscriptionRenewalController;
-use App\Http\Controllers\MarketingSiteController;
 use Illuminate\Support\Facades\Route;
-
-// Public marketing site. Keep the supplied static design unchanged while
-// exposing it through Laravel routes; authenticated visitors go straight to
-// the application dashboard when they open the site root.
-$sitePage = static function (string $file) {
-    $html = file_get_contents(base_path('masar_hr_multi_page_site/' . $file));
-    if ($file === 'privacy.html') {
-        $privacyContent = file_get_contents(base_path('masar_hr_multi_page_site/privacy-content.html'));
-        $html = preg_replace('~<div class="card">.*?</div>~s', '<div class="card">' . $privacyContent . '</div>', $html, 1);
-        $html = preg_replace('~(<section class="pagehead">.*?<p>).*?(</p>)~s', '$1نوضح في هذه الصفحة كيفية جمع بياناتك الشخصية واستخدامها وحمايتها.$2', $html, 1);
-    }
-    // Pricing is intentionally hidden until subscription plans are finalized.
-    $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\\.html"[^>]*>.*?</a>~u', '', $html);
-    $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
-    return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
-};
-Route::get('/', fn () => auth()->check()
-    ? redirect()->route('dashboard')
-    : $sitePage('index.html')
-)->name('site.home');
-Route::get('/index.html', fn () => auth()->check()
-    ? redirect()->route('dashboard')
-    : $sitePage('index.html')
-);
-foreach ([
-    'features' => 'features.html',
-    'privacy' => 'privacy.html',
-    'terms' => 'terms.html',
-] as $slug => $file) {
-    Route::get('/' . $slug, fn () => $sitePage($file))->name('site.' . str_replace('-', '.', $slug));
-    Route::get('/' . $file, fn () => $sitePage($file));
-}
-Route::get('/signup', [MarketingSiteController::class, 'signup'])->name('site.signup');
-Route::get('/signup.html', [MarketingSiteController::class, 'signup']);
-Route::get('/login.html', [MarketingSiteController::class, 'login']);
-Route::get('/forgot-password', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
-Route::get('/forgot-password.html', [MarketingSiteController::class, 'forgotPassword']);
-Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
-Route::get('/contact', [MarketingSiteController::class, 'contact'])->name('site.contact');
-Route::get('/contact.html', [MarketingSiteController::class, 'contact']);
-Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->name('site.contact.submit');
-
-// Links used by the supplied dashboard mockup. They open the real application
-// screens (and therefore keep the application's authentication and permission
-// checks) instead of returning a missing static file.
-Route::get('/employees.html', fn () => redirect()->route('employees.index'));
-Route::get('/attendance.html', fn () => redirect()->route('attendance.index'));
-Route::get('/payroll.html', fn () => redirect()->route('payroll.index'));
-Route::get('/reports.html', fn () => redirect()->route('reports.index'));
-Route::get('/company-account.html', fn () => redirect()->route('company.account'));
 
 // Guest Routes
 Route::middleware('guest')->group(function () {
-    Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
-    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])
-        ->middleware('throttle:5,1')
-        ->name('password.email');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])
-        ->middleware('throttle:5,1')
-        ->name('password.update');
     Route::post('/register/company', [AuthController::class, 'registerCompany'])
         ->middleware('throttle:5,1')
         ->name('register.company');
@@ -119,6 +62,8 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     Route::post('/company/renewals', [SubscriptionRenewalController::class, 'store'])
         ->middleware('permission:users.view')
         ->name('company.renewals.store');
+
+    Route::get('/', fn() => redirect()->route('dashboard'));
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])
@@ -221,9 +166,6 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::put('/{attendance}', [AttendanceController::class, 'update'])
             ->middleware('permission:attendance.edit')
             ->name('update');
-        Route::patch('/{attendance}/approve', [AttendanceController::class, 'approve'])
-            ->middleware('permission:attendance.edit')
-            ->name('approve');
         Route::delete('/{attendance}', [AttendanceController::class, 'destroy'])
             ->middleware('permission:attendance.delete')
             ->name('destroy');
@@ -322,6 +264,10 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::put('/settings', [PayrollSettingsController::class, 'update'])
             ->middleware('permission:payroll.settings')
             ->name('settings.update');
+        Route::put('/settings/rules', [PayrollSettingsController::class, 'updateRules'])
+            ->middleware('permission:payroll.settings')->name('settings.rules');
+        Route::put('/settings/tax', [PayrollSettingsController::class, 'updateTax'])
+            ->middleware('permission:payroll.settings')->name('settings.tax');
         Route::put('/settings/operational', [PayrollSettingsController::class, 'updateOperational'])
             ->middleware('permission:payroll.settings')->name('settings.operational.update');
         Route::put('/settings/leaves', [PayrollSettingsController::class, 'updateLeavePolicy'])
@@ -351,7 +297,7 @@ Route::middleware(['auth', 'subscription'])->group(function () {
             ->middleware('permission:payroll.lock')
             ->name('runs.lock');
         Route::delete('/runs/{payrollRun}', [PayrollController::class, 'destroyRun'])
-            ->middleware('companymanager')
+            ->middleware('permission:payroll.delete')
             ->name('runs.destroy');
         Route::post('/{payrollRecord}/approve', [PayrollController::class, 'approve'])
             ->middleware('permission:payroll.approve')

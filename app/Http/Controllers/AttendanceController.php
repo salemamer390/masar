@@ -74,7 +74,7 @@ class AttendanceController extends Controller
         return response()->streamDownload(function () use ($records) {
             $out = fopen('php://output', 'wb');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة', 'الاعتماد'], ',');
+            fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة'], ',');
             foreach ($records as $attendance) {
                 fputcsv($out, [
                     $attendance->attendance_date?->format('d/m/Y'), $attendance->employee?->employee_code,
@@ -83,7 +83,7 @@ class AttendanceController extends Controller
                     sprintf('%02d:%02d', intdiv((int) ($attendance->early_leave_minutes ?? 0), 60), ((int) ($attendance->early_leave_minutes ?? 0)) % 60),
                     sprintf('%02d:%02d', intdiv((int) ($attendance->day_overtime_minutes ?? 0), 60), ((int) ($attendance->day_overtime_minutes ?? 0)) % 60),
                     sprintf('%02d:%02d', intdiv((int) ($attendance->night_overtime_minutes ?? 0), 60), ((int) ($attendance->night_overtime_minutes ?? 0)) % 60),
-                    arabic_label($attendance->status), $attendance->approval_status === 'Approved' ? 'معتمد' : 'مسودة',
+                    arabic_label($attendance->status),
                 ], ',');
             }
             fclose($out);
@@ -164,17 +164,6 @@ class AttendanceController extends Controller
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => $direction === 'in' ? 'تم تسجيل الحضور.' : 'تم تسجيل الانصراف.', 'attendance' => $attendance->fresh()->load('employee.department')])
             : back()->with('toast', $direction === 'in' ? 'تم تسجيل الحضور بنجاح.' : 'تم تسجيل الانصراف بنجاح.');
-    }
-
-    public function approve(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard)
-    {
-        $periodGuard->ensureOpen($attendance->attendance_date);
-        $oldValues = $attendance->only(['approval_status', 'approved_by', 'approved_at']);
-        $attendance->update(['approval_status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
-        ActivityLog::record('attendance_approve', 'Attendance record approved.', $attendance, $oldValues, $attendance->only(['approval_status', 'approved_by', 'approved_at']), 'attendance');
-        return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Attendance record approved.', 'attendance' => $attendance->fresh()])
-            : back()->with('toast', 'تم اعتماد سجل الحضور.');
     }
 
     public function update(Request $request, Attendance $attendance, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)

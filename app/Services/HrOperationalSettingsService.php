@@ -2,22 +2,65 @@
 
 namespace App\Services;
 
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Per-company operational settings (shift times, rest days, night window, holidays).
+ * Results are cached per instance so payroll runs over hundreds of employees
+ * do not query the database for every single day.
+ */
 class HrOperationalSettingsService
 {
+    private array $valueCache = [];
+
+    private array $holidayCache = [];
+
+    public function flush(): void
+    {
+        $this->valueCache = [];
+        $this->holidayCache = [];
+    }
+
+    private function companyKey(): string
+    {
+        return (string) (CompanyContext::id() ?? 'global');
+    }
+
     public function value(string $key, string $default = ''): string
     {
+        $cacheKey = $this->companyKey() . '|' . $key;
+        if (array_key_exists($cacheKey, $this->valueCache)) {
+            return $this->valueCache[$cacheKey] ?? $default;
+        }
+
         $query = DB::table('hr_operational_settings')->where('setting_key', $key);
-        if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
-        return (string) ($query->value('setting_value') ?? $default);
+        $companyId = CompanyContext::id();
+        if ($companyId) $query->where('company_id', $companyId);
+        $value = $query->value('setting_value');
+        $this->valueCache[$cacheKey] = $value === null ? null : (string) $value;
+
+        return (string) ($value ?? $default);
     }
+
     public function start(): string { return $this->value('default_shift_start', '09:00'); }
     public function end(): string { return $this->value('default_shift_end', '17:00'); }
     public function grace(): int { return (int) $this->value('grace_minutes', '15'); }
     public function absenceCutoff(): string { return $this->value('absence_cutoff_time', $this->end()); }
+
+    /** Start of the night window used to split day/night overtime (default 19:00). */
+    public function nightStart(): string { return $this->value('night_start', '19:00'); }
+
+    /** End of the night window used to split day/night overtime (default 07:00). */
+    public function nightEnd(): string { return $this->value('night_end', '07:00'); }
+
+    public function unpaidLeaveAsDeduction(): bool
+    {
+        return filter_var($this->value('unpaid_leave_as_deduction', '1'), FILTER_VALIDATE_BOOLEAN);
+    }
+
     public function weeklyRestPattern(): string
     {
         return str_pad($this->value('weekly_rest_pattern', '0000100'), 7, '0');
@@ -36,13 +79,29 @@ class HrOperationalSettingsService
 
     public function isHoliday(Carbon $date): bool
     {
-        if (!Schema::hasTable('hr_holidays')) {
-            return false;
-        }
-
-        $query = DB::table('hr_holidays')->whereDate('holiday_date', $date->toDateString());
-        if (auth()->check() && !auth()->user()->isSuperAdmin() && auth()->user()->company_id) $query->where('company_id', auth()->user()->company_id);
-        return $query->exists();
+        return isset($this->holidayDates()[$date->toDateString()]);
     }
 
+    /** @return array<string, true> official holiday dates (Y-m-d) of the current company */
+    private function holidayDates(): array
+    {
+        $cacheKey = $this->companyKey();
+        if (isset($this->holidayCache[$cacheKey])) {
+            return $this->holidayCache[$cacheKey];
+        }
+        if (!Schema::hasTable('hr_holidays')) {
+            return $this->holidayCache[$cacheKey] = [];
+        }
+
+        $query = DB::table('hr_holidays');
+        $companyId = CompanyContext::id();
+        if ($companyId) $query->where('company_id', $companyId);
+
+        $dates = [];
+        foreach ($query->pluck('holiday_date') as $date) {
+            $dates[Carbon::parse($date)->toDateString()] = true;
+        }
+
+        return $this->holidayCache[$cacheKey] = $dates;
+    }
 }

@@ -41,9 +41,10 @@ class PayrollCalculator
         $housing = $this->floor0($allowances * $shares['housing']);
         $meal = $this->floor0($allowances * $shares['meal']);
         $clothing = $this->round2($allowances - $transport - $housing - $meal);
-        $insuranceWage = $noInsurance ? 0.0 : $this->clamp($manualInsuranceWage && $manualInsuranceWage > 0 ? $manualInsuranceWage : $basic, $this->settings->insuranceMinimum(), $this->settings->insuranceMaximum());
+        $insuranceBase = $this->settings->insuranceAutomaticBasis() === 'Gross' ? $gross : $basic;
+        $insuranceWage = $noInsurance ? 0.0 : $this->clamp($manualInsuranceWage && $manualInsuranceWage > 0 ? $manualInsuranceWage : $insuranceBase, $this->settings->insuranceMinimum(), $this->settings->insuranceMaximum());
         $employeeInsurance = $this->round2($insuranceWage * $this->settings->employeeInsuranceRate());
-        $annualBase = ($gross - $employeeInsurance - $this->settings->personalExemption()) * 12;
+        $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption()) * 12) - $this->settings->taxDeductibleContributions());
         $tax = $this->tax->calculate($annualBase);
         $martyrs = $this->round2($gross * $this->settings->martyrsFundRate());
         $statutory = $this->round2($employeeInsurance + $tax['monthly_tax'] + $martyrs);
@@ -78,16 +79,35 @@ class PayrollCalculator
         return $this->structure(['salary_type'=>$salary->salary_type ?: 'gross','salary_input'=>$salary->salary_input,'insurance_wage'=>$salary->insurance_wage,'no_insurance'=>$salary->no_insurance,'fixed_deductions'=>$salary->fixed_deductions]);
     }
 
-    /** Calculate the monthly payroll from a fixed gross structure and approved monthly inputs. */
+    /**
+     * Calculate the monthly payroll from a fixed gross structure and the month's inputs.
+     *
+     * Income tax is the structure tax plus an extra tax on the taxable variable
+     * earnings (overtime, rest/holiday work, bonus, incentives, commission, other
+     * earnings and the non-exempt part of profit share). The extra tax annualises
+     * the variable amount on top of the fixed taxable base. Advances are a loan
+     * payout and are never taxed.
+     */
     public function monthly(float $gross, array $monthly = [], ?float $manualInsuranceWage = null, bool $noInsurance = false): array
     {
         $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
+        $basic = (float) $structure['basic_salary'];
+        $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
+        $absenceBase = $this->settings->absenceBasis() === 'Basic' ? $basic : $gross;
+        $penaltyBase = $this->settings->penaltyBasis() === 'Gross' ? $gross : $basic;
+
         $dayHours = max(0, (float)($monthly['ot_day_hours'] ?? 0));
         $nightHours = max(0, (float)($monthly['ot_night_hours'] ?? 0));
-        $hourly = $gross / max(1, $this->settings->hoursDivisor());
+        $holidayDays = max(0, (float)($monthly['official_holiday_days'] ?? 0));
+        $restDays = max(0, (float)($monthly['weekly_rest_days'] ?? 0));
+        $hourly = $overtimeBase / max(1, $this->settings->hoursDivisor());
+        $daily = $overtimeBase / max(1, $this->settings->daysDivisor());
         $otDay = $dayHours * $hourly * $this->settings->dayOvertimeMultiplier();
         $otNight = $nightHours * $hourly * $this->settings->nightOvertimeMultiplier();
-        $overtime = $otDay + $otNight;
+        $otHoliday = $holidayDays * $daily * $this->settings->officialHolidayMultiplier();
+        $otRest = $restDays * $daily * $this->settings->weeklyRestMultiplier();
+        $overtime = $otDay + $otNight + $otHoliday + $otRest;
+
         $bonus = max(0, (float)($monthly['bonus'] ?? 0));
         $incentives = max(0, (float)($monthly['incentives'] ?? 0));
         $commission = max(0, (float)($monthly['commission'] ?? 0));
@@ -95,22 +115,32 @@ class PayrollCalculator
         $advanceEarnings = max(0, (float)($monthly['advance_earnings'] ?? 0));
         $otherEarnings = max(0, (float)($monthly['other_earnings'] ?? 0));
         $absenceDays = max(0, (float)($monthly['absence_days'] ?? 0));
-        $penaltyDays = max(0, (float)($monthly['penalty_days'] ?? 0));
+        $penaltyDaysRequested = max(0, (float)($monthly['penalty_days'] ?? 0));
+        $penaltyCap = $this->settings->penaltyMaxDaysPerMonth();
+        $penaltyDays = $penaltyCap > 0 ? min($penaltyDaysRequested, $penaltyCap) : $penaltyDaysRequested;
         $loans = max(0, (float)($monthly['loans'] ?? 0));
         $otherDeductions = max(0, (float)($monthly['other_deductions'] ?? 0));
-        $tax = $overtime == 0.0 ? $structure['income_tax'] : $this->round2(
-            $structure['income_tax'] + ($this->tax->annualTax($structure['taxable_annual'] + 12 * $overtime) - $structure['annual_tax']) / 12
-        );
-        $absenceDeduction = $absenceDays * $gross / max(1, $this->settings->absenceDailyDivisor());
-        $penaltyDeduction = $penaltyDays * $structure['basic_salary'] / max(1, $this->settings->penaltyDailyDivisor());
-        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $otDay + $otNight + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
-        $monthlyTotal = $structure['gross'] + $otDay + $otNight + $bonus + $incentives + $commission + $profitShare + $advanceEarnings;
+
+        $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
+        $variableTaxable = $overtime + $bonus + $incentives + $commission + $otherEarnings + $profitTaxable;
+        $variableTax = $variableTaxable > 0.0
+            ? $this->round2(($this->tax->annualTax($structure['taxable_annual'] + 12 * $variableTaxable) - $structure['annual_tax']) / 12)
+            : 0.0;
+        $structureTax = (float) $structure['income_tax'];
+        $tax = $this->round2($structureTax + $variableTax);
+
+        $absenceDeduction = $absenceDays * $absenceBase / max(1, $this->settings->absenceDailyDivisor());
+        $penaltyDeduction = $penaltyDays * $penaltyBase / max(1, $this->settings->penaltyDailyDivisor());
+        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $monthlyTotal = $structure['gross'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
         $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
-            'hourly_rate'=>$hourly, 'ot_day_hours'=>$dayHours, 'ot_night_hours'=>$nightHours, 'ot_day_amount'=>$otDay, 'ot_night_amount'=>$otNight,
-            'overtime_amount'=>$otDay + $otNight, 'bonus'=>$bonus, 'incentives'=>$incentives, 'commission'=>$commission, 'profit_share'=>$profitShare, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
-            'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
+            'hourly_rate'=>$hourly, 'daily_rate'=>$daily, 'ot_day_hours'=>$dayHours, 'ot_night_hours'=>$nightHours, 'ot_day_amount'=>$otDay, 'ot_night_amount'=>$otNight,
+            'official_holiday_days'=>$holidayDays, 'official_holiday_amount'=>$otHoliday, 'weekly_rest_days'=>$restDays, 'weekly_rest_amount'=>$otRest,
+            'overtime_amount'=>$overtime, 'bonus'=>$bonus, 'incentives'=>$incentives, 'commission'=>$commission, 'profit_share'=>$profitShare, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
+            'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'penalty_days_requested'=>$penaltyDaysRequested, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
+            'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
             'income_tax'=>$tax, 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
