@@ -51,6 +51,23 @@
     $statsJson = json_encode($prototypeStats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 @endphp
 <style>{!! $style !!}</style>
+<div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
+  @if(auth()->user()?->hasPermission('payroll.export'))
+    <a class="btn btn-outline-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}">
+      <i class="bi bi-file-earmark-excel"></i> تصدير Excel
+    </a>
+  @endif
+  <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
+    <i class="bi bi-printer"></i> طباعة
+  </button>
+  @if(auth()->user()?->hasPermission('payroll.create'))
+    <form method="POST" action="{{ route('payroll.runs.generate') }}" class="d-inline">
+      @csrf
+      <input type="hidden" name="month" value="{{ $month->format('Y-m-01') }}">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> تحديث المسير</button>
+    </form>
+  @endif
+</div>
 <div id="payrollPrototype" class="payroll-prototype-page">
     {!! $bodyMatch[1] ?? '' !!}
 </div>
@@ -186,6 +203,42 @@
     if (allowances) container.append(allowances);
     if (additional) container.append(additional);
   };
+})();
+</script>
+<script>
+(() => {
+  const head = document.querySelector('#payrollPrototype .leftpanel > .panelhead');
+  if (!head) return;
+  if (document.querySelector('.employee-payroll-actions')) { document.querySelector('#payrollPrototype #export')?.remove(); return; }
+  const actions = document.createElement('div');
+  actions.className = 'd-flex gap-2 flex-wrap';
+  const month = @json($month->format('Y-m-01'));
+  const makeButton = (label, icon, handler, primary = false) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn ${primary ? 'primary' : ''}`;
+    button.innerHTML = `<i class="bi ${icon}"></i> ${label}`;
+    button.addEventListener('click', handler);
+    return button;
+  };
+  @if(auth()->user()?->hasPermission('payroll.export'))
+  const exportUrl = @json(route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']));
+  const exportButton = makeButton('تصدير Excel', 'bi-file-earmark-excel', () => { window.location.href = exportUrl; });
+  actions.append(exportButton);
+  @endif
+  const printButton = makeButton('طباعة', 'bi-printer', () => window.print());
+  actions.append(printButton);
+  @if(auth()->user()?->hasPermission('payroll.create'))
+  const refreshButton = makeButton('تحديث المسير', 'bi-arrow-clockwise', () => {
+    const form = document.createElement('form');
+    form.method = 'POST'; form.action = @json(route('payroll.runs.generate'));
+    form.innerHTML = `<input type="hidden" name="_token" value="${document.querySelector('meta[name=csrf-token]')?.content || ''}"><input type="hidden" name="month" value="${month}">`;
+    document.body.append(form); form.submit();
+  }, true);
+  actions.append(refreshButton);
+  @endif
+  head.append(actions);
+  document.querySelector('#payrollPrototype #export')?.remove();
 })();
 </script>
 @endsection
