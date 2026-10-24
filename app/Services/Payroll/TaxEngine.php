@@ -4,6 +4,7 @@ namespace App\Services\Payroll;
 
 use Illuminate\Support\Facades\DB;
 use App\Services\PayrollSettingsService;
+use App\Support\CompanyContext;
 
 class TaxEngine
 {
@@ -48,10 +49,22 @@ class TaxEngine
             $rows = DB::table('tax_brackets as b')
                 ->join('tax_categories as c', 'c.id', '=', 'b.tax_category_id')
                 ->where('c.category_key', $category)
+                ->where(function ($query) {
+                    $companyId = CompanyContext::id();
+                    $companyId === null
+                        ? $query->whereNull('c.company_id')
+                        : $query->where('c.company_id', $companyId);
+                })
                 ->orderBy('b.from_amount')
                 ->get(['b.from_amount as from', 'b.to_amount as to', 'b.rate']);
             if ($rows->isNotEmpty()) {
-                return $rows->map(fn($r) => ['from'=>(float)$r->from, 'to'=>$r->to === null ? INF : (float)$r->to, 'rate'=>(float)$r->rate])->all();
+                return $rows->map(function ($r) {
+                    // Older settings screens stored percentages (10, 15, ...),
+                    // while the calculator uses fractions (0.10, 0.15, ...).
+                    $rate = (float) $r->rate;
+                    if ($rate > 1) $rate /= 100;
+                    return ['from' => (float) $r->from, 'to' => $r->to === null ? INF : (float) $r->to, 'rate' => $rate];
+                })->all();
             }
         }
         $fallback = config('payroll.tax.brackets', []);
