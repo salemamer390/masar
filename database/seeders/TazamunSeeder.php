@@ -12,7 +12,7 @@ class TazamunSeeder extends Seeder
     {
         $now = now();
         foreach (['Human Resources','Marketing','Design','Sales','Administration','Customer Service','Accounts','IT'] as $name) DB::table('departments')->insert(['name'=>$name]);
-        DB::table('jobs')->insert([
+        DB::table('hr_jobs')->insert([
             ['title'=>'HR Manager','job_code'=>null], ['title'=>'Senior Media Buyer','job_code'=>'243105'], ['title'=>'Content Creator','job_code'=>'264101'],
             ['title'=>'Graphic Designer','job_code'=>null], ['title'=>'Video Editor','job_code'=>null], ['title'=>'Marketing Specialist','job_code'=>null],
             ['title'=>'Social Media Specialist','job_code'=>null], ['title'=>'Account Manager','job_code'=>null],
@@ -74,7 +74,7 @@ class TazamunSeeder extends Seeder
 
         $employeeId=DB::table('employees')->insertGetId([
             'employee_code'=>'101','first_name'=>'Amer','middle_name'=>'Salem','last_name'=>null,'full_name'=>'Amer Salem','email'=>'amer.salem@tazamun.local',
-            'department_id'=>DB::table('departments')->where('name','Human Resources')->value('id'), 'job_id'=>DB::table('jobs')->where('title','HR Manager')->value('id'),
+            'department_id'=>DB::table('departments')->where('name','Human Resources')->value('id'), 'job_id'=>DB::table('hr_jobs')->where('title','HR Manager')->value('id'),
             'branch_id'=>DB::table('branches')->where('name','Head Office')->value('id'), 'employment_type_id'=>DB::table('employment_types')->where('name','Full Time')->value('id'),
             'status_id'=>DB::table('employee_statuses')->where('name','Active')->value('id'), 'hire_date'=>'2026-07-29','contract_start_date'=>'2026-07-29','contract_end_date'=>'2027-07-28','created_at'=>$now,'updated_at'=>$now,
         ]);

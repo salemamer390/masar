@@ -10,13 +10,15 @@ CREATE TABLE departments (
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-CREATE TABLE jobs (
+CREATE TABLE hr_jobs (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(150) NOT NULL UNIQUE,
+    company_id BIGINT UNSIGNED NULL,
+    title VARCHAR(150) NOT NULL,
     job_code VARCHAR(50) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY hr_jobs_company_title_unique (company_id, title)
 ) ENGINE=InnoDB;
 
 CREATE TABLE branches (
@@ -140,7 +142,7 @@ CREATE TABLE employees (
     CONSTRAINT fk_employees_department
         FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
     CONSTRAINT fk_employees_job
-        FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE SET NULL,
+        FOREIGN KEY (job_id) REFERENCES hr_jobs(id) ON DELETE SET NULL,
     CONSTRAINT fk_employees_branch
         FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
     CONSTRAINT fk_employees_employment_type
@@ -346,9 +348,9 @@ CREATE TABLE movement_records (
     CONSTRAINT fk_movements_new_department
         FOREIGN KEY (new_department_id) REFERENCES departments(id) ON DELETE SET NULL,
     CONSTRAINT fk_movements_old_job
-        FOREIGN KEY (old_job_id) REFERENCES jobs(id) ON DELETE SET NULL,
+        FOREIGN KEY (old_job_id) REFERENCES hr_jobs(id) ON DELETE SET NULL,
     CONSTRAINT fk_movements_new_job
-        FOREIGN KEY (new_job_id) REFERENCES jobs(id) ON DELETE SET NULL,
+        FOREIGN KEY (new_job_id) REFERENCES hr_jobs(id) ON DELETE SET NULL,
     CONSTRAINT fk_movements_creator
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;

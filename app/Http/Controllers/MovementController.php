@@ -35,7 +35,7 @@ class MovementController extends Controller
             'movement_type_id' => ['required', 'exists:movement_types,id'],
             'movement_date' => ['required', 'date'],
             'new_department_id' => ['nullable', 'exists:departments,id'],
-            'new_job_id' => ['nullable', 'exists:jobs,id'],
+            'new_job_id' => ['nullable', 'exists:hr_jobs,id'],
             'new_salary' => ['nullable', 'numeric', 'min:0'],
             'reason' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:500'],

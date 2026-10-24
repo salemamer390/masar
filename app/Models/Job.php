@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Job extends Model
 {
     use BelongsToCompanyOrGlobal;
+    protected $table = 'hr_jobs';
     protected $fillable = [
         'title',
         'job_code',
