@@ -170,15 +170,19 @@ class PayrollController extends Controller
             if ($allowanceItems <= 0 && (float) $record->allowances > 0) {
                 $items[] = ['البدلات', (float) $record->allowances];
             }
+            $dayOvertimeAmount = max((float) ($record->day_overtime_amount ?? 0), (float) ($record->ot_day_amount ?? 0));
+            $nightOvertimeAmount = max((float) ($record->night_overtime_amount ?? 0), (float) ($record->ot_night_amount ?? 0));
             foreach ([
-                'overtime_amount' => 'الإضافي',
+                'day_overtime_amount' => 'إضافي نهاري',
+                'night_overtime_amount' => 'إضافي ليلي',
                 'bonus' => 'المكافآت',
                 'incentives' => 'الحوافز',
                 'commission' => 'العمولات',
                 'profit_share' => 'نصيب الأرباح',
                 'other_earnings' => 'استحقاقات أخرى',
             ] as $key => $label) {
-                if ((float) ($record->{$key} ?? 0) > 0) $items[] = [$label, (float) $record->{$key}];
+                $value = $key === 'day_overtime_amount' ? $dayOvertimeAmount : ($key === 'night_overtime_amount' ? $nightOvertimeAmount : (float) ($record->{$key} ?? 0));
+                if ($value > 0) $items[] = [$label, $value];
             }
             $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
             if ($advance > 0) $items[] = ['السلفة المصروفة', $advance];
@@ -238,7 +242,8 @@ class PayrollController extends Controller
                     ['بدل ملبس', $displayAllowance('clothing_allowance')],
                 ], fn ($item) => $item[1] > 0)),
                 'additionalItems' => array_values(array_filter([
-                    ['الإضافي', (float) $record->overtime_amount],
+                    ['إضافي نهاري', $dayOvertimeAmount],
+                    ['إضافي ليلي', $nightOvertimeAmount],
                     ['المكافآت', (float) $record->bonus],
                     ['الحوافز', (float) $record->incentives],
                     ['العمولات', (float) $record->commission],
@@ -263,6 +268,9 @@ class PayrollController extends Controller
                 'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
                 'absenceDays' => (float) ($record->absence_days ?? 0),
                 'overtimeHours' => (float) ($record->ot_day_hours ?? 0) + (float) ($record->ot_night_hours ?? 0),
+                'overtimeAmount' => (float) ($record->overtime_amount ?? 0),
+                'dayOvertimeAmount' => max((float) ($record->day_overtime_amount ?? 0), (float) ($record->ot_day_amount ?? 0)),
+                'nightOvertimeAmount' => max((float) ($record->night_overtime_amount ?? 0), (float) ($record->ot_night_amount ?? 0)),
             ];
         })->values();
         $prototypeStats = [
