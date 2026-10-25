@@ -1,7 +1,5 @@
 @extends('layouts.app')
 
-@section('title', 'ط¯ظˆط±ط© ط§ظ„ط±ظˆط§طھط¨')
-
 @section('title', 'رواتب الموظفين')
 
 @section('content')
@@ -50,8 +48,8 @@
     );
     // Search and display the employee code (not the internal employee id).
     $scripts = str_replace('String(p.id).includes(q)', '(String(p.code || \'\').toLowerCase().includes(q)||String(p.id).includes(q))', $scripts);
-    $scripts = str_replace('<small>${p.id}</small>', '<small>ظƒظˆط¯ ط§ظ„ظ…ظˆط¸ظپ: ${p.code || \'â€”\'}</small>', $scripts);
-    $scripts = str_replace("'ط§ظ„ط±ظ‚ظ… ط§ظ„ظˆط¸ظٹظپظٹ: '+selected.id", "'ظƒظˆط¯ ط§ظ„ظ…ظˆط¸ظپ: '+(selected.code || 'â€”')", $scripts);
+    $scripts = str_replace('<small>${p.id}</small>', '<small>كود الموظف: ${p.code || \'—\'}</small>', $scripts);
+    $scripts = str_replace("'ط§ظ„ط±ظ‚ظ… ط§ظ„ظˆط¸ظٹظپظٹ: '+selected.id", "'كود الموظف: '+(selected.code || '—')", $scripts);
     $scripts = str_replace("money(es-ds)+' <small", "money(Number(selected.net ?? (es-ds)))+' <small", $scripts);
     $statsJson = json_encode($prototypeStats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 @endphp
@@ -193,6 +191,8 @@
     document.querySelector('#payrollPrototype #drawer .panelhead p')?.remove();
     document.querySelector('#payrollPrototype #drawer .metas .pill')?.remove();
     const codeNode = document.querySelector('#payrollPrototype #pId');
+    if (codeNode) codeNode.textContent = `الكود الوظيفي: ${selectedPerson.code || selectedPerson.id || ''}`;
+    if (codeNode) codeNode.textContent = `الكود الوظيفي: ${selectedPerson.code || selectedPerson.id || ''}`;
     if (codeNode) codeNode.textContent = `الكود الوظيفي: ${selectedPerson.code || selectedPerson.id || ''}`;
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
     const payslipHtml = () => {
@@ -374,6 +374,9 @@
     drawer?.classList.remove('open');
     drawer?.setAttribute('aria-hidden', 'true');
     if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+    // The prototype rebuilds rows when a payslip opens. Rebind the row
+    // handlers after closing so every row remains clickable.
+    if (typeof window.table === 'function') window.table();
   };
   const open = () => {
     overlay?.classList.add('open');
@@ -394,6 +397,21 @@
   }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
   // Re-enable row interaction if a stale overlay state was left by older code.
   if (!overlay?.classList.contains('open')) close();
+})();
+</script>
+<script>
+(() => {
+  const root = document.getElementById('payrollPrototype');
+  const body = root?.querySelector('#employees');
+  if (!root || !body) return;
+  const bindRows = () => body.querySelectorAll('tr[data-id]').forEach((row) => {
+    if (row.dataset.clickProxy === '1' || typeof row.onclick !== 'function') return;
+    const original = row.onclick;
+    row.onclick = (event) => original.call(row, event);
+    row.dataset.clickProxy = '1';
+  });
+  bindRows();
+  new MutationObserver(bindRows).observe(body, {childList: true});
 })();
 </script>
 @endsection
