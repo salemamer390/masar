@@ -28,6 +28,16 @@
   function openDrawer() { const d = document.getElementById('drawer'), o = document.getElementById('drawerOverlay'); d.classList.add('open'); o.classList.add('open'); d.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
   function closeDrawer() { const d = document.getElementById('drawer'), o = document.getElementById('drawerOverlay'); d.classList.remove('open'); o.classList.remove('open'); d.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
   function drawer() {
+    document.getElementById('earnTotal')?.remove();
+    document.getElementById('deductTotal')?.remove();
+    const profile = document.querySelector('#payrollPrototype .drawer .profile');
+    const drawerClose = document.getElementById('close');
+    if (profile && drawerClose && drawerClose.parentElement !== profile) profile.prepend(drawerClose);
+    document.querySelector('#payrollPrototype .drawer > .panelhead')?.remove();
+    document.querySelector('#payrollPrototype .drawer .dtitle .docicon')?.remove();
+    document.querySelector('#payrollPrototype .drawer .dtitle h2')?.remove();
+    document.querySelector('#payrollPrototype .drawer .dtitle p')?.remove();
+    document.querySelector('#payrollPrototype .drawer .dtitle')?.remove();
     document.getElementById('pName').textContent = selected.name || '—';
     document.getElementById('pRole').textContent = `${selected.role || '—'} · ${selected.dept || '—'}`;
     document.getElementById('pId').textContent = `الكود الوظيفي: ${selected.code || selected.id || '—'}`;

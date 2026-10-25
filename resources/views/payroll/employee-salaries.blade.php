@@ -16,6 +16,11 @@
   .employee-payroll-actions .btn-outline-secondary { background:#fff; border-color:#aeb9c9; color:#52627a; }
   .employee-payroll-actions .btn-primary { background:#1677f9; border-color:#1677f9; color:#fff; }
   .employee-payroll-actions .btn-primary:hover { background:#0e63d6; border-color:#0e63d6; color:#fff; }
+  #payrollPrototype .drawer .profile { position:relative; }
+  #payrollPrototype .drawer .profile > .close { position:absolute; top:10px; left:10px; z-index:2; }
+  #payrollPrototype .salary > h4 { justify-content:center; }
+  #payrollPrototype .drawer .profile { margin:12px 14px 14px; padding:14px 16px; }
+  #payrollPrototype .drawer .section { padding:0 14px 14px; }
 </style>
 
 <div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
