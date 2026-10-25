@@ -821,7 +821,9 @@ class PayrollRunService
             ];
         }
 
-        $fixedEntitlements = (float) $calculation['basic_salary'] + (float) $calculation['allowances'];
+        // The accrued amount is based on the full monthly gross salary
+        // (basic salary plus fixed allowances), divided over 30 days.
+        $fixedEntitlements = (float) ($calculation['gross'] ?? ((float) $calculation['basic_salary'] + (float) $calculation['allowances']));
         $variableEntitlements = (float) $calculation['entitlements'] - $fixedEntitlements;
         $proratedDeductions = (float) ($calculation['income_tax_structure'] ?? 0) + (float) ($calculation['martyrs_fund'] ?? 0);
         $fullDeductions = max(0, (float) $calculation['monthly_deductions'] - $proratedDeductions);
@@ -852,6 +854,7 @@ class PayrollRunService
             'income_tax' => round($proratedStructureTax + $variableTax, 2),
             'martyrs_fund' => round((float) ($calculation['martyrs_fund'] ?? 0) * $factor, 2),
             'entitlements' => $entitlements,
+            'to_date_entitlement' => round($fixedEntitlements * $factor, 2),
             'monthly_total' => $monthlyTotal,
             'monthly_deductions' => $deductions,
             'net_monthly' => round($entitlements - $deductions, 2),

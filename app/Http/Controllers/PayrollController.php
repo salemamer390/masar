@@ -185,9 +185,15 @@ class PayrollController extends Controller
             ];
             $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
             $initials = mb_substr((string) ($employee?->full_name ?? '—'), 0, 2);
+            $grossForPeriod = (float) data_get($snapshot, 'gross', $record->gross_salary);
+            $prorationFactor = min(1, max(0, (float) data_get($snapshot, 'proration_factor', 1)));
+            $toDateEntitlement = (float) data_get(
+                $snapshot,
+                'to_date_entitlement',
+                round($grossForPeriod * $prorationFactor, 2)
+            );
             $displayEntitlements = round(
-                (float) $record->basic_salary
-                + (float) $record->allowances
+                $toDateEntitlement
                 + (float) $record->overtime_amount
                 + (float) $record->bonus
                 + (float) $record->incentives
@@ -233,7 +239,7 @@ class PayrollController extends Controller
                 'effectiveFrom' => $record->salary?->effective_from?->format('d/m/Y'),
                 'agreedNet' => (float) ($record->agreed_net_salary ?? 0),
                 'salaryUrl' => $record->salary_id ? route('salaries.index', ['employee_id' => $employee?->id]) : null,
-                'items' => array_merge([['المستحق حتى اليوم', (float) $record->basic_salary]], array_slice($items, 1)),
+                'items' => array_merge([['المستحق حتى اليوم', $toDateEntitlement]], array_slice($items, 1)),
                 'deductions' => $deductions,
                 'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
                 'absenceDays' => (float) ($record->absence_days ?? 0),
