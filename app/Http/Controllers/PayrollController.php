@@ -142,6 +142,15 @@ class PayrollController extends Controller
             $snapshot = (array) ($record->calculation_snapshot ?? []);
             $inputs = (array) ($snapshot['inputs'] ?? []);
             $employee = $record->employee;
+            $displayFactor = min(1, max(0, (float) data_get($snapshot, 'proration_factor', 1)));
+            $hasProratedFields = array_key_exists('to_date_entitlement', $snapshot);
+            $displayAllowance = static function (string $field) use ($record, $displayFactor, $hasProratedFields): float {
+                $value = (float) ($record->{$field} ?? 0);
+                return $hasProratedFields ? $value : round($value * $displayFactor, 2);
+            };
+            $displayBasic = $hasProratedFields
+                ? (float) $record->basic_salary
+                : round((float) $record->basic_salary * $displayFactor, 2);
             $items = [
                 ['الراتب الأساسي', (float) $record->basic_salary],
             ];
@@ -152,7 +161,7 @@ class PayrollController extends Controller
                 'meal_allowance' => 'بدل الوجبة',
                 'clothing_allowance' => 'بدل ملبس',
             ] as $key => $label) {
-                $value = (float) ($record->{$key} ?? 0);
+                $value = $displayAllowance($key);
                 if ($value > 0) {
                     $items[] = [$label, $value];
                     $allowanceItems += $value;
@@ -185,15 +194,18 @@ class PayrollController extends Controller
             ];
             $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
             $initials = mb_substr((string) ($employee?->full_name ?? '—'), 0, 2);
-            $grossForPeriod = (float) data_get($snapshot, 'gross', $record->gross_salary);
-            $prorationFactor = min(1, max(0, (float) data_get($snapshot, 'proration_factor', 1)));
             $toDateEntitlement = (float) data_get(
                 $snapshot,
                 'to_date_entitlement',
-                round($grossForPeriod * $prorationFactor, 2)
+                $displayBasic
             );
+            $displayAllowances = $displayAllowance('housing_allowance')
+                + $displayAllowance('transportation_allowance')
+                + $displayAllowance('meal_allowance')
+                + $displayAllowance('clothing_allowance');
             $displayEntitlements = round(
                 $toDateEntitlement
+                + $displayAllowances
                 + (float) $record->overtime_amount
                 + (float) $record->bonus
                 + (float) $record->incentives
@@ -217,6 +229,12 @@ class PayrollController extends Controller
                     ['بدل الانتقال', (float) $record->transportation_allowance],
                     ['بدل الوجبة', (float) $record->meal_allowance],
                     ['بدل ملبس', (float) $record->clothing_allowance],
+                ], fn ($item) => $item[1] > 0)),
+                'allowanceItemsProrated' => array_values(array_filter([
+                    ['بدل السكن', $displayAllowance('housing_allowance')],
+                    ['بدل الانتقال', $displayAllowance('transportation_allowance')],
+                    ['بدل الوجبة', $displayAllowance('meal_allowance')],
+                    ['بدل ملبس', $displayAllowance('clothing_allowance')],
                 ], fn ($item) => $item[1] > 0)),
                 'additionalItems' => array_values(array_filter([
                     ['الإضافي', (float) $record->overtime_amount],

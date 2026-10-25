@@ -854,7 +854,7 @@ class PayrollRunService
             'income_tax' => round($proratedStructureTax + $variableTax, 2),
             'martyrs_fund' => round((float) ($calculation['martyrs_fund'] ?? 0) * $factor, 2),
             'entitlements' => $entitlements,
-            'to_date_entitlement' => round($fixedEntitlements * $factor, 2),
+            'to_date_entitlement' => $proratedBasic,
             'monthly_total' => $monthlyTotal,
             'monthly_deductions' => $deductions,
             'net_monthly' => round($entitlements - $deductions, 2),

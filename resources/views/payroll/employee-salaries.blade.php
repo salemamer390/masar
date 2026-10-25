@@ -196,7 +196,7 @@
     if (codeNode) codeNode.textContent = `الكود الوظيفي: ${selectedPerson.code || selectedPerson.id || ''}`;
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
     const payslipHtml = () => {
-      const allowanceItems = selectedPerson.allowanceItems || [];
+      const allowanceItems = selectedPerson.allowanceItemsProrated || selectedPerson.allowanceItems || [];
       const additionalItems = selectedPerson.additionalItems || [];
       const deductions = selectedPerson.deductions || [];
       const earnings = [...(selectedPerson.items?.[0] ? [selectedPerson.items[0]] : []), ...allowanceItems, ...additionalItems];
@@ -216,7 +216,7 @@
     document.querySelector('#payrollPrototype #print')?.addEventListener('click', () => openPayslip(true), {once:true});
     container.innerHTML = '';
     if (selectedPerson.items?.[0]) container.append(item(selectedPerson.items[0]));
-    const allowances = group(arabic('1575,1604,1576,1583,1604,1575,1578'), selectedPerson.allowanceItems || []);
+    const allowances = group(arabic('1575,1604,1576,1583,1604,1575,1578'), selectedPerson.allowanceItemsProrated || selectedPerson.allowanceItems || []);
     const additional = group(arabic('1575,1604,1573,1590,1575,1601,1610'), selectedPerson.additionalItems || []);
     if (allowances) container.append(allowances);
     if (additional) container.append(additional);
