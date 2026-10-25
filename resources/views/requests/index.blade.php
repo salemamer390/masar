@@ -258,7 +258,9 @@ window.addEventListener('load', () => {
 (() => {
   const form = document.querySelector('#requestCreateModal form');
   if (!form) return;
-  const isEditingRequest = form.dataset.editing === '1';
+  // The edit form can be opened through AJAX after this script initializes,
+  // so read the editing state dynamically instead of capturing its initial value.
+  const isEditingRequest = () => form.dataset.editing === '1';
   const employees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name, 'code' => $employee->employee_code])->values());
   const employeeGrossSalaries = @json($employeeGrossSalaries);
   const employeeRequestMonths = @json($employeeRequestMonths);
@@ -405,7 +407,7 @@ window.addEventListener('load', () => {
     advanceConfirm.required = overLimit;
     if (!overLimit) advanceConfirm.checked = false;
     const previous = previousAdvanceForEmployee();
-    if (isEditingRequest) {
+    if (isEditingRequest()) {
       existingAdvanceNotice.hidden = true;
       existingAdvanceConfirmWrap.hidden = true;
       existingAdvanceConfirm.required = false;
@@ -446,7 +448,7 @@ window.addEventListener('load', () => {
   form.addEventListener('submit', (event) => {
     const active = advanceTypeIds.includes(String(type?.value || ''));
     const previous = previousAdvanceForEmployee();
-    if (!isEditingRequest && active && previous && !existingAdvanceConfirm.checked) {
+    if (!isEditingRequest() && active && previous && !existingAdvanceConfirm.checked) {
       event.preventDefault();
       existingAdvanceConfirmWrap.hidden = false;
       existingAdvanceConfirm.required = false;
@@ -459,7 +461,7 @@ window.addEventListener('load', () => {
   form.addEventListener('masar:before-submit', (event) => {
     const active = advanceTypeIds.includes(String(type?.value || ''));
     const previous = previousAdvanceForEmployee();
-    if (isEditingRequest || !active || !previous || existingAdvanceConfirm.checked) return;
+    if (isEditingRequest() || !active || !previous || existingAdvanceConfirm.checked) return;
     event.preventDefault();
     existingAdvanceConfirmWrap.hidden = false;
     existingAdvanceConfirm.required = false;
@@ -789,6 +791,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.closest('#requestCreateModal')) return;
     if (form.action.startsWith(requestBaseUrl + '/') && event.detail?.request?.id) {
+      // Preserve the edited id before resetting the form; the row updater
+      // runs in the following success handler.
+      if (form.dataset.editingId) form.dataset.lastEditedId = form.dataset.editingId;
       form.action = requestBaseUrl;
       form.dataset.editing = '0';
       delete form.dataset.editingId;
@@ -803,8 +808,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     if (!(form instanceof HTMLFormElement)) return;
     if (form.closest('#requestCreateModal')) {
       const item = event.detail?.request || {};
-      if (form.dataset.editingId && requestTableBody) {
-        const row = requestTableBody.querySelector(`tr[data-request-id="${form.dataset.editingId}"]`);
+      const editedRequestId = form.dataset.editingId || form.dataset.lastEditedId;
+      if (editedRequestId && requestTableBody) {
+        const row = requestTableBody.querySelector(`tr[data-request-id="${editedRequestId}"]`);
         if (row) {
           const titleCell = row.children[0];
           const titleLink = titleCell?.querySelector('a');
@@ -819,6 +825,11 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
           if (row.children[3] && editedValue !== undefined) row.children[3].textContent = editedValue || '—';
           if (row.children[3] && item?.value !== undefined) row.children[3].textContent = item.value || '—';
         }
+        const editedDate = item?.request_date || item?.created_at;
+        const editedRow = requestTableBody?.querySelector(`tr[data-request-id="${editedRequestId}"]`);
+        const editedDateCell = editedRow?.querySelector('[data-request-date-cell]') || editedRow?.children[4];
+        if (editedDateCell && editedDate) editedDateCell.textContent = requestDate(editedDate);
+        delete form.dataset.lastEditedId;
       } else if (item && requestTableBody) {
         requestTableBody.querySelector('td[colspan]')?.closest('tr')?.remove();
         requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));

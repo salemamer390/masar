@@ -562,15 +562,31 @@ class PayrollRunService
             $potential = $dayPotential + $nightPotential;
             if ($potential <= 0 || $covering === []) continue;
 
-            $authorized = 0.0;
-            foreach ($covering as $item) $authorized += $item[1];
-            $earned = min($potential, $authorized);
-            if ($earned <= 0) continue;
+            // Authorize each overtime period independently. A night request
+            // must never be used to pay day overtime (and vice versa).
+            $authorizedDay = 0.0;
+            $authorizedNight = 0.0;
+            foreach ($covering as [$request, $minutes]) {
+                $period = data_get($request->payload, 'overtime_period', 'day');
+                if ($period === 'night') {
+                    $authorizedNight += $minutes;
+                } else {
+                    $authorizedDay += $minutes;
+                }
+            }
 
-            $ratio = $earned / $potential;
-            $dayMinutes += $dayPotential * $ratio;
-            $nightMinutes += $nightPotential * $ratio;
-            foreach ($covering as $item) $requestIds[] = $item[0]->id;
+            $earnedDay = min($dayPotential, $authorizedDay);
+            $earnedNight = min($nightPotential, $authorizedNight);
+            if ($earnedDay <= 0 && $earnedNight <= 0) continue;
+
+            $dayMinutes += $earnedDay;
+            $nightMinutes += $earnedNight;
+            foreach ($covering as [$request]) {
+                $period = data_get($request->payload, 'overtime_period', 'day');
+                if (($period === 'night' && $earnedNight > 0) || ($period !== 'night' && $earnedDay > 0)) {
+                    $requestIds[] = $request->id;
+                }
+            }
         }
 
         return [
