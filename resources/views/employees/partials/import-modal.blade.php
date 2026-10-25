@@ -391,6 +391,11 @@
             html += detail('<i class="bi bi-layers"></i> تم اختيار ورقة تلقائيًا',
                 sheets.map((sheet) => '<div>' + (sheet.eligible ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + 'ورقة «' + esc(sheet.name) + '» — ' + (sheet.eligible ? 'مؤهلة للاستيراد (' + num(sheet.rows) + ' صف)' : 'ليست ورقة بيانات موظفين وتم تجاهلها') + '</div>').join(''), false);
         }
+        const kinds = {employees: 'بيانات الموظفين', attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', advances: 'السلف', requests: 'الطلبات/الإضافي', auxiliary: 'ورقة محسوبة/مساعدة', unknown: 'غير معروف'};
+        const classified = sheets.filter((sheet) => sheet.kind && sheet.kind !== 'unknown');
+        if (classified.length) {
+            html += detail('<i class="bi bi-diagram-3"></i> خريطة أوراق الملف', classified.map((sheet) => '<div><i class="bi bi-check-circle text-success"></i> ورقة «' + esc(sheet.name) + '» ← <strong>' + esc(kinds[sheet.kind] || kinds.unknown) + '</strong></div>').join(''), true);
+        }
         if (!mappingInDecisions) { html += mappingCard(data, false); }
         return html;
     }
@@ -467,6 +472,17 @@
         const failed = r.failed || [];
         const warnings = r.warnings || [];
         let html = '';
+        const distributedErrors = [];
+        Object.values(data.distributed || {}).forEach((group) => {
+            (group?.errors || []).forEach((message) => distributedErrors.push(message));
+            Object.values(group || {}).forEach((bucket) => (bucket?.errors || []).forEach((message) => distributedErrors.push(message)));
+        });
+        if (distributedErrors.length) {
+            html += '<div class="alert alert-warning small"><strong>أخطاء توزيع الأوراق:</strong><ul class="mb-0">' + distributedErrors.slice(0, 10).map((message) => '<li>' + esc(message) + '</li>').join('') + '</ul></div>';
+        }
+        if (Number(data.distributed_attendance_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-calendar-check"></i> تم توزيع ' + num(data.distributed_attendance_count) + ' سجل حضور وانصراف تلقائيًا.</div>';
+        if (Number(data.distributed_leave_count || 0) > 0 || Number(data.distributed_penalty_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-diagram-3"></i> تم توزيع ' + num(data.distributed_leave_count || 0) + ' إجازة و' + num(data.distributed_penalty_count || 0) + ' جزاء تلقائيًا.</div>';
+        if (Number(data.distributed_request_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-cash-coin"></i> تم توزيع ' + num(data.distributed_request_count) + ' طلب مالي أو إضافي تلقائيًا.</div>';
         if (data.summary && data.summary.error > 0) {
             html += '<div class="alert alert-warning small">لم يتم استيراد ' + num(data.summary.error) + ' صف بسبب أخطاء في بياناتها.' +
                 ' <button type="button" class="btn btn-sm btn-outline-dark ms-2" data-import-rejected><i class="bi bi-file-earmark-excel"></i> تحميل الصفوف المرفوضة لتصحيحها</button></div>';

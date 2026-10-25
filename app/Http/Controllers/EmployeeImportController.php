@@ -3,6 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Services\Imports\EmployeeImportService;
+use App\Services\Imports\WorkbookAttendanceImporter;
+use App\Services\Imports\WorkbookLeavePenaltyImporter;
+use App\Services\Imports\WorkbookRequestImporter;
+use App\Services\PayrollPeriodGuard;
+use App\Services\PayrollRunService;
 use App\Services\Imports\XlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +17,9 @@ class EmployeeImportController extends Controller
     public function __construct(
         private readonly EmployeeImportService $service,
         private readonly XlsxWriter $writer,
+        private readonly WorkbookAttendanceImporter $attendanceImporter,
+        private readonly WorkbookLeavePenaltyImporter $leavePenaltyImporter,
+        private readonly WorkbookRequestImporter $requestImporter,
     ) {
     }
 
@@ -64,11 +72,59 @@ class EmployeeImportController extends Controller
         }
 
         $result = $this->service->commit($analysis, $companyId);
+        $distributed = [];
+        $extension = strtolower((string) $request->file('file')?->getClientOriginalExtension());
+        if ($extension === 'xlsx' && $request->user()?->hasPermission('attendance.create')) {
+            try {
+                $distributed['attendance'] = $this->attendanceImporter->import(
+                    $request->file('file')->getRealPath(),
+                    $extension,
+                    app(PayrollPeriodGuard::class),
+                    app(PayrollRunService::class),
+                );
+            } catch (\Throwable $exception) {
+                $distributed['attendance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة الحضور: '.$exception->getMessage()]];
+            }
+        }
+        if ($extension === 'xlsx') {
+            try {
+                if ($request->user()?->hasPermission('leaves.create') || $request->user()?->hasPermission('penalties.create')) {
+                    $distributed['leave_penalty'] = $this->leavePenaltyImporter->import(
+                        $request->file('file')->getRealPath(), $extension,
+                        app(PayrollPeriodGuard::class), app(PayrollRunService::class),
+                        (bool) $request->user()?->hasPermission('leaves.create'),
+                        (bool) $request->user()?->hasPermission('penalties.create'),
+                    );
+                }
+            } catch (\Throwable $exception) {
+                $distributed['leave_penalty'] = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()]], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => []]];
+            }
+        }
+        if ($extension === 'xlsx' && $request->user()?->hasPermission('requests.create')) {
+            try {
+                $distributed['requests'] = $this->requestImporter->import(
+                    $request->file('file')->getRealPath(), $extension,
+                    app(PayrollPeriodGuard::class), app(PayrollRunService::class),
+                );
+            } catch (\Throwable $exception) {
+                $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()]];
+            }
+        }
+
+        $attendanceCount = (int) data_get($distributed, 'attendance.imported', 0);
+        $leaveCount = (int) data_get($distributed, 'leave_penalty.leaves.imported', 0);
+        $penaltyCount = (int) data_get($distributed, 'leave_penalty.penalties.imported', 0);
+        $requestCount = (int) data_get($distributed, 'requests.imported', 0);
 
         return response()->json([
             'success' => true,
             'message' => "تم الاستيراد: {$result['created']} موظف جديد، {$result['updated']} تم تحديثهم.",
             'result' => $result,
+            'distributed' => $distributed,
+            'distributed_attendance_count' => $attendanceCount,
+            'distributed_leave_count' => $leaveCount,
+            'distributed_penalty_count' => $penaltyCount,
+            'distributed_request_count' => $requestCount,
         ] + $payload);
     }
 

@@ -186,6 +186,7 @@ class EmployeeImportService
                 'rows' => $info['matched'] ? $info['rows'] : count($sheets[$index]['rows']),
                 'matched' => $info['matched'],
                 'eligible' => $eligible,
+                'kind' => $this->detectWorkbookSheetKind($sheets[$index]['rows'], $info['used']),
             ];
         }
 
@@ -311,6 +312,37 @@ class EmployeeImportService
         }
 
         return false;
+    }
+
+    /** Classify every workbook sheet before any import is committed. */
+    private function detectWorkbookSheetKind(array $rows, array $used): string
+    {
+        $headers = [];
+        foreach (array_slice($rows, 0, 8, true) as $row) {
+            foreach ($row as $value) {
+                $value = $this->key((string) $value);
+                if ($value !== '') $headers[$value] = true;
+            }
+        }
+        $has = function (array $needles) use ($headers): bool {
+            foreach ($needles as $needle) {
+                $needle = $this->key((string) $needle);
+                foreach (array_keys($headers) as $header) {
+                    if (str_contains($header, $needle)) return true;
+                }
+            }
+            return false;
+        };
+
+        if ($has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout'])) return 'attendance';
+        if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type', 'start date'])) return 'leaves';
+        if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])) return 'penalties';
+        if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
+        if ($has(['لوحة المؤشرات', 'حسابات لوحة المؤشرات', 'دليل الاستخدام', 'ملخص شئون العاملين', 'كشف الحضور الشهري'])) return 'auxiliary';
+        if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'overtime', 'bonus', 'commission'])) return 'requests';
+        if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
+
+        return 'unknown';
     }
 
     /**

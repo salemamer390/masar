@@ -68,7 +68,7 @@ class AttendanceImportController extends Controller
                 $periodGuard->ensureOpen($date);
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
-                $status = trim((string) ($row[$map['status'] ?? -1] ?? '')) ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
+                $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
                 $late = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->settings->start());
                 $attendance = Attendance::updateOrCreate(
                     ['employee_id' => $employee->id, 'attendance_date' => $date],
@@ -91,6 +91,12 @@ class AttendanceImportController extends Controller
 
     private function splitHeader(array $rows): array
     {
+        foreach ($rows as $number => $row) {
+            $joined = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
+            if (str_contains($joined, 'التاريخ') && (str_contains($joined, 'كودالموظف') || str_contains($joined, 'اسمالموظف'))) {
+                return [$row, array_filter($rows, fn ($unused, $key) => $key > $number, ARRAY_FILTER_USE_BOTH)];
+            }
+        }
         foreach ($rows as $number => $row) {
             if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) < 2) continue;
             return [$row, array_filter($rows, fn ($unused, $key) => $key > $number, ARRAY_FILTER_USE_BOTH)];
@@ -142,6 +148,7 @@ class AttendanceImportController extends Controller
     private function parseDate(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
     private function parseTime(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->format('H:i') : null; } catch (\Throwable) { return null; } }
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
+    private function status(mixed $value): string { $key = $this->normalise($value); return match (true) { in_array($key, ['متأخر', 'late'], true) => 'Late', in_array($key, ['غائب', 'absent'], true) => 'Absent', in_array($key, ['إجازة', 'leave'], true) => 'Leave', in_array($key, ['حاضر', 'present'], true) => 'Present', default => trim((string) $value) }; }
     private function lateMinutes(?string $checkIn, string $start): int { if (!$checkIn) return 0; return max(0, Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute - (Carbon::parse($start)->hour * 60 + Carbon::parse($start)->minute + $this->settings->grace())); }
     private function earlyLeave(?string $checkOut, string $end): int { if (!$checkOut) return 0; return max(0, Carbon::parse($end)->hour * 60 + Carbon::parse($end)->minute - (Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute)); }
     private function workedHours(?string $in, ?string $out): ?float { if (!$in || !$out) return null; $start = Carbon::parse($in)->hour * 60 + Carbon::parse($in)->minute; $end = Carbon::parse($out)->hour * 60 + Carbon::parse($out)->minute; return round((($end - $start + 1440) % 1440) / 60, 2); }

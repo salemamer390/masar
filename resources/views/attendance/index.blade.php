@@ -183,7 +183,9 @@
     const overtime = records[id] || {day: 0, night: 0};
     const cells = row.children;
     if (cells.length < 2) return;
-    const insertBefore = cells[cells.length - 4];
+    // Keep the dynamically added cells aligned with the static header order:
+    // late, day overtime, night overtime, source, status, actions.
+    const insertBefore = cells[cells.length - 3];
     const day = document.createElement('td'); day.textContent = formatMinutes(overtime.day); day.dataset.label = 'الإضافي النهاري';
     const night = document.createElement('td'); night.textContent = formatMinutes(overtime.night); night.dataset.label = 'الإضافي الليلي';
     row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);

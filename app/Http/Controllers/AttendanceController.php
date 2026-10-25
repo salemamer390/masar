@@ -245,7 +245,11 @@ class AttendanceController extends Controller
         return round((($out - $in + 1440) % 1440) / 60, 2);
     }
 
-    /** Potential overtime shown on attendance; approval is handled separately through HR requests. */
+    /**
+     * Potential overtime shown on attendance; approval is handled separately
+     * through HR requests.  Overtime is the time worked outside the employee's
+     * shift, split according to the company's configured night window.
+     */
     private function decorateOvertime(Attendance $attendance): void
     {
         $employee = $attendance->employee;
@@ -253,19 +257,52 @@ class AttendanceController extends Controller
         $end = $employee?->shift_end ?: $this->hrSettings->end();
         $checkIn = $attendance->check_in;
         $checkOut = $attendance->check_out;
-        $dayMinutes = 0;
-        $nightMinutes = 0;
+        $dayMinutes = 0.0;
+        $nightMinutes = 0.0;
         if ($checkIn && $checkOut) {
-            $in = Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute;
-            $out = Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute;
-            $startMinutes = Carbon::parse($start)->hour * 60 + Carbon::parse($start)->minute;
-            $endMinutes = Carbon::parse($end)->hour * 60 + Carbon::parse($end)->minute;
-            $dayMinutes = max(0, $startMinutes - $in);
-            $nightMinutes = max(0, $out - $endMinutes);
+            $in = $this->timeToMinutes($checkIn);
+            $out = $this->timeToMinutes($checkOut);
+            $startMinutes = $this->timeToMinutes($start);
+            $endMinutes = $this->timeToMinutes($end);
+            if ($endMinutes <= $startMinutes) $endMinutes += 1440;
+            if ($out <= $in) $out += 1440;
+
+            // Only time before the shift or after the shift is potential OT.
+            $segments = [];
+            if ($in < $startMinutes) $segments[] = [$in, min($startMinutes, $out)];
+            if ($out > $endMinutes) $segments[] = [max($endMinutes, $in), $out];
+
+            foreach ($segments as [$from, $to]) {
+                if ($to <= $from) continue;
+                $total = $to - $from;
+                $night = $this->nightOverlap($from, $to);
+                $nightMinutes += $night;
+                $dayMinutes += max(0, $total - $night);
+            }
         }
-        $attendance->setAttribute('day_overtime_minutes', $dayMinutes);
-        $attendance->setAttribute('night_overtime_minutes', $nightMinutes);
-        $attendance->setAttribute('potential_overtime_minutes', $dayMinutes + $nightMinutes);
+        $attendance->setAttribute('day_overtime_minutes', (int) round($dayMinutes));
+        $attendance->setAttribute('night_overtime_minutes', (int) round($nightMinutes));
+        $attendance->setAttribute('potential_overtime_minutes', (int) round($dayMinutes + $nightMinutes));
+    }
+
+    private function timeToMinutes(string $time): int
+    {
+        $parts = explode(':', trim($time));
+        return ((int) ($parts[0] ?? 0) * 60) + (int) ($parts[1] ?? 0);
+    }
+
+    private function nightOverlap(float $from, float $to): float
+    {
+        $nightStart = $this->timeToMinutes($this->hrSettings->nightStart());
+        $nightEnd = $this->timeToMinutes($this->hrSettings->nightEnd());
+        if ($nightEnd <= $nightStart) $nightEnd += 1440;
+
+        $overlap = 0.0;
+        for ($day = -1; $day <= 1; $day++) {
+            $offset = 1440 * $day;
+            $overlap += max(0.0, min($to, $nightEnd + $offset) - max($from, $nightStart + $offset));
+        }
+        return $overlap;
     }
 
     private function decorateOvertimeCollection($attendances): void
