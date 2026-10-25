@@ -52,7 +52,10 @@ $sitePage = static function (string $page) {
     $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\.html"[^>]*>.*?</a>~u', '', $html);
     $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
 
-    return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+    return response($html)
+        ->header('Content-Type', 'text/html; charset=UTF-8')
+        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        ->header('Pragma', 'no-cache');
 };
 
 Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : $sitePage('index.html'));
@@ -80,7 +83,7 @@ Route::middleware('guest')->group(function () {
 });
 
 // Authenticated Routes
-Route::middleware(['auth', 'subscription'])->group(function () {
+Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::middleware('global_superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
@@ -241,6 +244,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
         Route::post('/', [HrRequestController::class, 'store'])
             ->middleware('permission:requests.create')
             ->name('store');
+        Route::get('/{hrRequest}/edit-data', [HrRequestController::class, 'editData'])
+            ->middleware('permission:requests.create')
+            ->name('edit-data');
         Route::put('/{hrRequest}', [HrRequestController::class, 'update'])
             ->middleware('permission:requests.create')
             ->name('update');

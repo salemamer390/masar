@@ -39,7 +39,13 @@ JS);
             ['<input type="email" required placeholder="name@company.com" autocomplete="email">', '<input name="email" type="email" required placeholder="name@company.com" autocomplete="email">'],
             ['<input type="password" required minlength="8" placeholder="أدخل كلمة المرور" autocomplete="current-password">', '<input name="password" type="password" required minlength="8" placeholder="أدخل كلمة المرور" autocomplete="current-password">'],
             ['<label><input type="checkbox"> تذكرني</label>', '<label><input name="remember" type="checkbox" value="1"> تذكرني</label>'],
-        ]);
+        ], <<<'JS'
+<script>
+window.addEventListener('pageshow', function (event) {
+    if (event.persisted || (performance.getEntriesByType('navigation')[0]?.type === 'back_forward')) window.location.reload();
+});
+</script>
+JS);
     }
 
     public function forgotPassword(Request $request)
@@ -115,6 +121,9 @@ JS);
             $html = preg_replace('~<button class="btn primary full">.*?</button>~s', '<div class="field"><label>كلمة المرور الجديدة</label><input name="password" type="password" required minlength="8" autocomplete="new-password"></div><div class="field"><label>تأكيد كلمة المرور</label><input name="password_confirmation" type="password" required minlength="8" autocomplete="new-password"></div><button class="btn primary full">حفظ كلمة المرور</button>', $html, 1);
         }
 
-        return response($html)->header('Content-Type', 'text/html; charset=UTF-8');
+        return response($html)
+            ->header('Content-Type', 'text/html; charset=UTF-8')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 }

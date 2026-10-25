@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'global_superadmin' => \App\Http\Middleware\GlobalSuperAdminOnly::class,
             'companymanager' => \App\Http\Middleware\CompanyManagerOnly::class,
             'subscription' => \App\Http\Middleware\EnsureActiveCompanySubscription::class,
+            'no_auth_cache' => \App\Http\Middleware\PreventAuthenticatedPageCache::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

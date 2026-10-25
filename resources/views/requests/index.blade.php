@@ -614,7 +614,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
             <thead><tr><th>الطلب</th><th>الموظف</th><th>النوع</th><th>التاريخ</th><th>الإجراء</th></tr></thead>
             <tbody>
             @forelse($requests as $hrRequest)
-                <tr data-request-id="{{ $hrRequest->id }}" data-employee-id="{{ $hrRequest->employee_id }}">
+                <tr data-request-id="{{ $hrRequest->id }}" data-employee-id="{{ $hrRequest->employee_id }}" data-request-date="{{ data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toIso8601String() }}">
                     <td>
                         <a href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" class="fw-bold">{{ $hrRequest->title }}</a>
                         @if($hrRequest->details)<div class="text-muted small mt-1">{{ mb_strimwidth($hrRequest->details, 0, 70, '…') }}</div>@endif
@@ -691,6 +691,20 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
 
 @push('scripts')
 <script>
+  // Keep the visible date in sync after editing, before the main success
+  // handler clears the editing marker.
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.closest('#requestCreateModal') || !form.dataset.editingId) return;
+    const dateValue = event.detail?.request?.request_date || event.detail?.request?.created_at;
+    const row = requestTableBody?.querySelector(`tr[data-request-id="${form.dataset.editingId}"]`);
+    const dateCell = row?.children[4];
+    if (dateCell && dateValue) {
+      const parsedDate = new Date(dateValue);
+      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  }, true);
+
   // Stage 5: creation/deletion use the same guarded AJAX path as review actions.
   const requestCreateForm = document.querySelector('#requestCreateModal form');
   // The conditional fields are created by the unified request form script.
@@ -707,6 +721,13 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
   const canDeleteHrRequest = @json(auth()->user()?->hasPermission('requests.delete'));
   const escapeRequestHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const requestDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  document.querySelectorAll('tr[data-request-date]').forEach((row) => {
+    const dateCell = row.children[4];
+    if (dateCell && row.dataset.requestDate) {
+      const parsedDate = new Date(row.dataset.requestDate);
+      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  });
   const requestRow = (item) => {
     const employee = item.employee || {};
     const id = Number(item.id);
@@ -719,6 +740,64 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
     root.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => { const form = methodInput.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف الطلب المعلق؟'; form.removeAttribute('onsubmit'); });
   };
   wireHrRequestAjaxForms();
+  // Edit requests in-place. The edit link fetches the record, fills the
+  // type-specific fields, and opens the existing modal without navigation.
+  document.addEventListener('click', async (event) => {
+    const link = event.target.closest?.('a[href*="?edit="]');
+    if (!link) return;
+    event.preventDefault();
+    const id = new URL(link.href, window.location.href).searchParams.get('edit');
+    if (!id) return;
+    const form = document.querySelector('#requestCreateModal form');
+    if (!form) return;
+    try {
+      const response = await fetch(`${requestBaseUrl}/${id}/edit-data`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+      if (!response.ok) throw new Error('تعذر تحميل بيانات الطلب.');
+      const data = await response.json();
+      const payload = data.payload || {};
+      form.dataset.editing = '1';
+      form.dataset.editingId = String(data.id);
+      form.action = `${requestBaseUrl}/${data.id}`;
+      let method = form.querySelector('input[name="_method"]');
+      if (!method) { method = document.createElement('input'); method.type = 'hidden'; method.name = '_method'; form.prepend(method); }
+      method.value = 'PUT';
+      const lookup = form.querySelector('[name="employee_lookup"]');
+      const employee = form.querySelector('input[name="employee_id"]');
+      if (lookup) lookup.value = data.employee_name || '';
+      if (employee) employee.value = data.employee_id || '';
+      const type = form.querySelector('[name="request_type_id"]');
+      if (type) { type.disabled = false; type.value = data.request_type_id || ''; type.dispatchEvent(new Event('change', { bubbles: true })); type.disabled = true; }
+      form.querySelector('[name="title"]')?.setAttribute('value', data.title || '');
+      const title = form.querySelector('[name="title"]'); if (title) title.value = data.title || '';
+      const details = form.querySelector('[name="details"]'); if (details) details.value = data.details || '';
+      const set = (name, value) => { const field = form.querySelector(`[name="${name}"]`); if (field && value !== undefined && value !== null) field.value = value; };
+      set('advance_amount', payload.amount); set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
+      set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
+      set('financial_request_date', payload.request_date); set('financial_amount', payload.amount); set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
+      set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
+      form.querySelector('[name="advance_amount"]')?.dispatchEvent(new Event('input', { bubbles: true }));
+      form.querySelector('.advance-existing-notice')?.setAttribute('hidden', 'hidden');
+      form.querySelector('.advance-existing-confirm')?.setAttribute('hidden', 'hidden');
+      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = 'تعديل الطلب';
+      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = 'حفظ التعديل';
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCreateModal')).show();
+    } catch (error) { window.showToast?.(error.message || 'تعذر تحميل بيانات الطلب.'); }
+  });
+
+  // Return the form to create mode after an in-place edit is saved.
+  document.addEventListener('masar:success', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.closest('#requestCreateModal')) return;
+    if (form.action.startsWith(requestBaseUrl + '/') && event.detail?.request?.id) {
+      form.action = requestBaseUrl;
+      form.dataset.editing = '0';
+      delete form.dataset.editingId;
+      form.querySelector('input[name="_method"]')?.remove();
+      form.querySelector('[name="request_type_id"]')?.removeAttribute('disabled');
+      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = 'طلب HR جديد';
+      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = 'إرسال الطلب';
+    }
+  });
   document.addEventListener('masar:success', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
@@ -745,6 +824,16 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         requestTableBody.insertAdjacentHTML('afterbegin', requestRow(item));
         const addedRow = requestTableBody.querySelector(`tr[data-request-id="${Number(item.id)}"]`);
         if (addedRow) {
+           // Normalize the legacy client row to request, employee, type,
+           // value, date, actions. The old template still emits a status cell.
+           if (addedRow.children.length === 6) {
+             const valueCell = document.createElement('td');
+             valueCell.dataset.requestValueCell = 'true';
+             valueCell.textContent = item.value || '—';
+             addedRow.insertBefore(valueCell, addedRow.children[3]);
+             addedRow.children[5]?.remove();
+           }
+           if (addedRow.children[4]) addedRow.children[4].textContent = requestDate(item.request_date || item.created_at);
           // Remove a legacy status cell if an old client-side row template
           // was still used by the browser.
           const legacyStatusCell = addedRow.children[4];

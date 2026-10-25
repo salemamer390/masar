@@ -29,7 +29,29 @@ class AttendanceImportController extends Controller
         } catch (\Throwable $exception) {
             return back()->withErrors(['file' => 'تعذر قراءة الملف: ' . $exception->getMessage()]);
         }
-        $rows = $sheets[0]['rows'] ?? [];
+        // Normalize all attendance worksheets into one common schema. Sheets
+        // that do not contain attendance headers are ignored (for example
+        // employee, leave or advance sheets in the same workbook).
+        $mergedRows = [1 => ['employee_code', 'employee_name', 'date', 'check_in', 'check_out', 'status']];
+        $nextRow = 2;
+        foreach ($sheets as $sheet) {
+            $sheetRows = $sheet['rows'] ?? [];
+            if (!$sheetRows) continue;
+            [$sheetHeaders, $sheetData] = $this->splitHeader($sheetRows);
+            $sheetMap = $this->mapHeaders($sheetHeaders);
+            if (!isset($sheetMap['date']) || (!isset($sheetMap['employee_code']) && !isset($sheetMap['employee_name']))) continue;
+            foreach ($sheetData as $sheetRow) {
+                $mergedRows[$nextRow++] = [
+                    $sheetRow[$sheetMap['employee_code'] ?? -1] ?? '',
+                    $sheetRow[$sheetMap['employee_name'] ?? -1] ?? '',
+                    $sheetRow[$sheetMap['date']] ?? '',
+                    $sheetRow[$sheetMap['check_in'] ?? -1] ?? '',
+                    $sheetRow[$sheetMap['check_out'] ?? -1] ?? '',
+                    $sheetRow[$sheetMap['status'] ?? -1] ?? '',
+                ];
+            }
+        }
+        $rows = count($mergedRows) > 1 ? $mergedRows : [];
         if (!$rows) return back()->withErrors(['file' => 'الملف لا يحتوي على سجلات.']);
         [$headers, $data] = $this->splitHeader($rows);
         $map = $this->mapHeaders($headers);
@@ -96,11 +118,25 @@ class AttendanceImportController extends Controller
 
     private function resolveEmployee(mixed $code, mixed $name): ?Employee
     {
-        if (filled($code)) { $employee = Employee::where('employee_code', trim((string) $code))->first(); if ($employee) return $employee; }
+        if (filled($code)) {
+            $employee = Employee::where('employee_code', trim((string) $code))->first();
+            if ($employee) {
+                if (filled($name) && $this->normalisePersonName($employee->full_name) !== $this->normalisePersonName($name)) {
+                    throw new \RuntimeException('كود الموظف لا يطابق اسم الموظف الموجود في النظام.');
+                }
+                return $employee;
+            }
+        }
         if (!filled($name)) return null;
         $matches = Employee::where('full_name', trim((string) $name))->limit(2)->get();
         if ($matches->count() > 1) throw new \RuntimeException('اسم الموظف غير فريد؛ استخدم كود الموظف بدلاً منه.');
         return $matches->first();
+    }
+
+    private function normalisePersonName(mixed $value): string
+    {
+        $value = preg_replace('/\s+/u', ' ', trim((string) $value));
+        return mb_strtolower((string) $value);
     }
 
     private function parseDate(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }

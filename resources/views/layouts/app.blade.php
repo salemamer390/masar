@@ -523,6 +523,14 @@
   })();
 </script>
 
+<script>
+  // A logged-out user must never see an authenticated page restored from the
+  // browser back/forward cache. Reloading makes the auth middleware redirect
+  // to /login immediately.
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) window.location.reload();
+  });
+</script>
 @stack('scripts')
 </body>
 </html>

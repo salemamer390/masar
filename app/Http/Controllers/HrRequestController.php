@@ -127,6 +127,24 @@ class HrRequestController extends Controller
         return view('requests.index', compact('requests', 'requestTypes', 'employees', 'employeeGrossSalaries', 'employeeRequestMonths', 'employeeOvertimeDays', 'employeeAdvanceWarnings', 'stats', 'selectedRequest', 'editingRequest', 'editingRequestData', 'requestValueData', 'requestCardDetails'));
     }
 
+    /** Return edit data without rendering the whole requests page. */
+    public function editData(Request $request, HrRequest $hrRequest)
+    {
+        abort_unless(HrRequest::visibleTo($request->user())->whereKey($hrRequest->getKey())->exists(), 404);
+        $hrRequest->load(['employee', 'requestType']);
+
+        return response()->json([
+            'id' => $hrRequest->id,
+            'title' => $hrRequest->title,
+            'details' => $hrRequest->details,
+            'employee_id' => $hrRequest->employee_id,
+            'employee_name' => $hrRequest->employee?->full_name,
+            'request_type_id' => $hrRequest->request_type_id,
+            'request_type_source' => $hrRequest->requestType?->source_key ?: $hrRequest->request_type,
+            'payload' => $hrRequest->payload,
+        ]);
+    }
+
     public function store(Request $request, PayrollRunService $payrollRuns)
     {
         $user = $request->user();
@@ -329,6 +347,7 @@ class HrRequestController extends Controller
                     'details' => $hrRequest->details,
                     'status' => $hrRequest->status,
                     'created_at' => $hrRequest->created_at?->toIso8601String(),
+                    'request_date' => data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toDateString(),
                     'request_type_label' => $hrRequest->requestType?->display_name ?? $hrRequest->request_type,
                     'value' => $hrRequest->display_value,
                     'employee' => [
@@ -420,6 +439,9 @@ class HrRequestController extends Controller
                     'title' => $updated->title,
                     'details' => $updated->details,
                     'status' => $updated->status,
+                    'created_at' => $updated->created_at?->toIso8601String(),
+                    'request_date' => data_get($updated->payload, 'request_date') ?: $updated->created_at?->toDateString(),
+                    'request_type_label' => $updated->requestType?->display_name ?? $updated->request_type,
                     'value' => $updated->display_value,
                     'display_value' => $updated->display_value,
                 ],
