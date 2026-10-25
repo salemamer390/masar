@@ -185,6 +185,18 @@ class PayrollController extends Controller
             ];
             $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
             $initials = mb_substr((string) ($employee?->full_name ?? '—'), 0, 2);
+            $displayEntitlements = round(
+                (float) $record->basic_salary
+                + (float) $record->allowances
+                + (float) $record->overtime_amount
+                + (float) $record->bonus
+                + (float) $record->incentives
+                + (float) $record->commission
+                + (float) $record->profit_share
+                + (float) $record->other_earnings
+                + (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0)),
+                2
+            );
             return [
                 'id' => (int) $employee?->id,
                 'code' => (string) ($employee?->employee_code ?? ''),
@@ -210,7 +222,7 @@ class PayrollController extends Controller
                     ['السلفة المصروفة', (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0))],
                 ], fn ($item) => $item[1] > 0)),
                 'gross' => (float) $record->gross_salary,
-                'entitlements' => (float) data_get($snapshot, 'entitlements', $record->gross_salary),
+                'entitlements' => $displayEntitlements,
                 'deduct' => (float) $record->deductions,
                 'totalDeductions' => (float) data_get($snapshot, 'monthly_deductions', $record->deductions),
                 'net' => (float) $record->net_salary,
@@ -221,7 +233,7 @@ class PayrollController extends Controller
                 'effectiveFrom' => $record->salary?->effective_from?->format('d/m/Y'),
                 'agreedNet' => (float) ($record->agreed_net_salary ?? 0),
                 'salaryUrl' => $record->salary_id ? route('salaries.index', ['employee_id' => $employee?->id]) : null,
-                'items' => $items,
+                'items' => array_merge([['المستحق حتى اليوم', (float) $record->basic_salary]], array_slice($items, 1)),
                 'deductions' => $deductions,
                 'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
                 'absenceDays' => (float) ($record->absence_days ?? 0),

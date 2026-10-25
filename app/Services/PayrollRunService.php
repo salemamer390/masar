@@ -835,8 +835,22 @@ class PayrollRunService
             + (float) ($calculation['other_earnings'] ?? 0)
             + (float) ($calculation['advance_earnings'] ?? 0), 2);
         $deductions = round(($proratedDeductions * $factor) + $fullDeductions, 2);
+        $proratedBasic = round((float) $calculation['basic_salary'] * $factor, 2);
+        $proratedAllowances = round((float) $calculation['allowances'] * $factor, 2);
+        $proratedStructureTax = round((float) ($calculation['income_tax_structure'] ?? 0) * $factor, 2);
+        $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
 
         return array_merge($calculation, [
+            // Persist the values actually earned during the partial period so
+            // the payroll table and payslip details match the net calculation.
+            'basic_salary' => $proratedBasic,
+            'allowances' => $proratedAllowances,
+            'housing_allowance' => round((float) ($calculation['housing_allowance'] ?? 0) * $factor, 2),
+            'transportation_allowance' => round((float) ($calculation['transportation_allowance'] ?? 0) * $factor, 2),
+            'meal_allowance' => round((float) ($calculation['meal_allowance'] ?? 0) * $factor, 2),
+            'clothing_allowance' => round((float) ($calculation['clothing_allowance'] ?? 0) * $factor, 2),
+            'income_tax' => round($proratedStructureTax + $variableTax, 2),
+            'martyrs_fund' => round((float) ($calculation['martyrs_fund'] ?? 0) * $factor, 2),
             'entitlements' => $entitlements,
             'monthly_total' => $monthlyTotal,
             'monthly_deductions' => $deductions,

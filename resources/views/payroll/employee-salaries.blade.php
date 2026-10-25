@@ -176,6 +176,12 @@
     const selectedPerson = typeof selected !== 'undefined' ? selected : null;
     const container = document.querySelector('#payrollPrototype #earnItems');
     if (!selectedPerson || !container) return;
+    document.querySelector('#payrollPrototype #earnTotal')?.remove();
+    document.querySelector('#payrollPrototype #deductTotal')?.remove();
+    document.querySelectorAll('#payrollPrototype .salary h4').forEach((title) => {
+      title.style.justifyContent = 'center';
+      title.style.textAlign = 'center';
+    });
     const drawerElement = document.querySelector('#payrollPrototype #drawer');
     const profile = drawerElement?.querySelector('.profile');
     const header = drawerElement?.querySelector('.panelhead');
