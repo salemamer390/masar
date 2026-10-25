@@ -216,6 +216,7 @@ class PayrollController extends Controller
                 2
             );
             return [
+                'recordId' => (int) $record->id,
                 'id' => (int) $employee?->id,
                 'code' => (string) ($employee?->employee_code ?? ''),
                 'phone' => (string) ($employee?->phone ?? ''),
@@ -273,6 +274,71 @@ class PayrollController extends Controller
 
         $view = $request->attributes->get('payroll_view', 'payroll.index');
         return view($view, compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta'));
+    }
+
+    /** Render a standalone, print-ready payslip. The screen drawer is not used. */
+    public function payslipPdf(PayrollRecord $payrollRecord)
+    {
+        abort_unless((int) $payrollRecord->company_id === (int) auth()->user()?->company_id, 404);
+
+        $payrollRecord->load(['employee.department', 'employee.job', 'salary']);
+        $snapshot = (array) ($payrollRecord->calculation_snapshot ?? []);
+        $inputs = (array) ($snapshot['inputs'] ?? []);
+        $positive = static fn ($value): bool => (float) $value > 0;
+        $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
+
+        $allowances = array_values(array_filter([
+            ['بدل السكن', (float) $payrollRecord->housing_allowance],
+            ['بدل الانتقال', (float) $payrollRecord->transportation_allowance],
+            ['بدل الوجبة', (float) $payrollRecord->meal_allowance],
+            ['بدل ملبس', (float) $payrollRecord->clothing_allowance],
+        ], fn ($item) => $positive($item[1])));
+        if (!$allowances && (float) $payrollRecord->allowances > 0) {
+            $allowances[] = ['البدلات', (float) $payrollRecord->allowances];
+        }
+
+        $overtime = array_values(array_filter([
+            ['الإضافي النهاري', (float) ($payrollRecord->day_overtime_amount ?: $payrollRecord->ot_day_amount)],
+            ['الإضافي الليلي', (float) ($payrollRecord->night_overtime_amount ?: $payrollRecord->ot_night_amount)],
+            ['الإضافي', (float) $payrollRecord->overtime_amount],
+        ], fn ($item) => $positive($item[1])));
+        if (count($overtime) > 1) {
+            $overtime = array_values(array_filter($overtime, fn ($item) => $item[0] !== 'الإضافي'));
+        }
+
+        $additional = array_values(array_filter([
+            ['المكافآت', (float) $payrollRecord->bonus],
+            ['الحوافز', (float) $payrollRecord->incentives],
+            ['العمولات', (float) $payrollRecord->commission],
+            ['نصيب الأرباح', (float) $payrollRecord->profit_share],
+            ['استحقاقات أخرى', (float) $payrollRecord->other_earnings],
+            ['السلفة المصروفة', $advance],
+        ], fn ($item) => $positive($item[1])));
+
+        $earnings = array_merge(
+            [['المستحق حتى اليوم', (float) data_get($snapshot, 'to_date_entitlement', $payrollRecord->basic_salary)]],
+            $allowances,
+            $overtime,
+            $additional,
+        );
+        $deductions = array_values(array_filter([
+            ['تأمين الموظف', (float) $payrollRecord->employee_insurance],
+            ['الضريبة', (float) $payrollRecord->income_tax],
+            ['صندوق الشهداء', (float) $payrollRecord->martyrs_fund],
+            ['خصم الغياب', (float) $payrollRecord->absence_deduction],
+            ['خصم الجزاءات', (float) $payrollRecord->penalty_deduction],
+            ['قسط السلفة', (float) $payrollRecord->loans],
+            ['استقطاعات أخرى', (float) $payrollRecord->other_deductions],
+        ], fn ($item) => $positive($item[1])));
+
+        return view('payroll.payslip-pdf', [
+            'record' => $payrollRecord,
+            'earnings' => $earnings,
+            'deductions' => $deductions,
+            'earningsTotal' => collect($earnings)->sum(fn ($item) => (float) $item[1]),
+            'deductionsTotal' => collect($deductions)->sum(fn ($item) => (float) $item[1]),
+            'net' => (float) $payrollRecord->net_salary,
+        ]);
     }
 
     /** Payroll always belongs to one company; accounts without a company cannot generate it. */

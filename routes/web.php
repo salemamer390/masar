@@ -357,6 +357,9 @@ Route::middleware(['auth', 'subscription'])->group(function () {
     Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
         ->middleware('permission:payroll.view')
         ->name('payroll.employee-salaries');
+    Route::get('/employee-salaries/{payrollRecord}/payslip-pdf', [PayrollController::class, 'payslipPdf'])
+        ->middleware('permission:payroll.view')
+        ->name('payroll.employee-salaries.payslip-pdf');
 
     // Insurance
     Route::get('/employees/{employee}/forms/s1-editable', [EditableS1Controller::class, 'show'])

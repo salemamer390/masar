@@ -200,8 +200,21 @@
       const additionalItems = selectedPerson.additionalItems || [];
       const deductions = selectedPerson.deductions || [];
       const earnings = [...(selectedPerson.items?.[0] ? [selectedPerson.items[0]] : []), ...allowanceItems, ...additionalItems];
-      const rows = (items) => items.map(([label, amount]) => `<tr><td>${escapeHtml(label)}</td><td>${money(amount)} ج.م</td></tr>`).join('');
-      return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسيمة راتب ${escapeHtml(selectedPerson.name)}</title><style>body{font-family:Arial,sans-serif;background:#f4f7fc;color:#203252;padding:24px}.sheet{max-width:760px;margin:auto;background:#fff;padding:24px;border-radius:14px}h1{margin:0 0 8px;color:#142b55}h2{font-size:16px;margin-top:22px;border-bottom:1px solid #e3eaf4;padding-bottom:8px}table{width:100%;border-collapse:collapse}td{padding:9px;border-bottom:1px solid #edf1f7}td:last-child{font-weight:700;text-align:left}.net{margin-top:20px;padding:14px;background:#eaf3ff;border-radius:10px;font-size:22px;font-weight:800;color:#0969e8}@media print{body{background:#fff;padding:0}.sheet{box-shadow:none}}</style></head><body><main class="sheet"><h1>قسيمة راتب</h1><div>${escapeHtml(selectedPerson.name)} — الكود الوظيفي: ${escapeHtml(selectedPerson.code || selectedPerson.id)}</div><h2>الاستحقاقات</h2><table>${rows(earnings)}</table><h2>الاستقطاعات</h2><table>${rows(deductions)}</table><div class="net">صافي الراتب: ${money(selectedPerson.net || 0)} ج.م</div></main></body></html>`;
+      const rows = (items) => items.length
+        ? items.map(([label, amount]) => `<tr><td class="item-label">${escapeHtml(label)}</td><td class="amount">${money(amount)} <span>ج.م</span></td></tr>`).join('')
+        : '<tr><td colspan="2" class="empty">لا توجد بنود</td></tr>';
+      const monthLabel = escapeHtml(selectedPerson.monthLabel || selectedPerson.payrollMonth || '');
+      return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>قسيمة راتب ${escapeHtml(selectedPerson.name)}</title><style>
+        @page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#24344d;font-family:Arial,Tahoma,sans-serif;direction:rtl;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        body{font-size:12px;line-height:1.6}.sheet{width:100%;max-width:186mm;margin:0 auto;padding:0;background:#fff}.brand{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 0 16px;border-bottom:2px solid #1769e0}.brand h1{font-size:24px;line-height:1.3;margin:0;color:#17365d}.subtitle{font-size:13px;color:#65758b;margin-top:4px}.period{font-size:13px;font-weight:700;color:#17365d;text-align:left;white-space:nowrap}.employee{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px 0;border-bottom:1px solid #e1e8f0}.field{min-width:0}.label{font-size:10px;color:#7586a6;margin-bottom:3px}.value{font-size:12px;font-weight:700;overflow-wrap:anywhere}.section{margin-top:17px;break-inside:avoid;page-break-inside:avoid}.section h2{font-size:14px;color:#17365d;margin:0 0 8px;padding:0 0 7px;border-bottom:1px solid #dce6f2}.section.earnings h2{color:#087f5b}.section.deductions h2{color:#c0392b}table{width:100%;border-collapse:collapse;table-layout:fixed}tr{break-inside:avoid;page-break-inside:avoid}td{padding:8px 10px;border-bottom:1px solid #edf1f7;vertical-align:middle}td.item-label{width:68%;text-align:right;overflow-wrap:anywhere}td.amount{width:32%;text-align:left;direction:ltr;font-weight:700;white-space:nowrap}td.amount span{direction:rtl;display:inline-block;font-weight:400;color:#64748b}.empty{text-align:center;color:#718096;padding:12px}.total{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;padding:10px 12px;background:#f2faf6;border:1px solid #d6efe2;border-radius:7px;font-weight:700;color:#087f5b}.net{margin-top:18px;padding:16px;background:#eef5ff;border:1px solid #d7e7ff;border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:12px;break-inside:avoid;page-break-inside:avoid}.net .caption{font-size:12px;color:#315a8a}.net .number{font-size:23px;line-height:1.3;font-weight:800;color:#1769e0;direction:ltr;white-space:nowrap}.foot{margin-top:18px;padding-top:9px;border-top:1px solid #e1e8f0;color:#8290a4;font-size:9px;text-align:center}.no-print{display:none!important}
+        @media screen{body{background:#f4f7fc;padding:20px}.sheet{max-width:760px;padding:28px;background:#fff;box-shadow:0 8px 28px #142b5514;border-radius:12px}}
+        @media print{html,body{width:100%;background:#fff}.sheet{width:100%;max-width:none;margin:0;padding:0;box-shadow:none;border-radius:0}.section,.employee,.net{break-inside:avoid;page-break-inside:avoid}}
+      </style></head><body><main class="sheet"><header class="brand"><div><h1>MASAR HR</h1><div class="subtitle">قسيمة راتب الموظف</div></div><div class="period">${monthLabel}</div></header>
+      <section class="employee"><div class="field"><div class="label">اسم الموظف</div><div class="value">${escapeHtml(selectedPerson.name)}</div></div><div class="field"><div class="label">الكود الوظيفي</div><div class="value">${escapeHtml(selectedPerson.code || selectedPerson.id)}</div></div><div class="field"><div class="label">القسم / الوظيفة</div><div class="value">${escapeHtml([selectedPerson.department, selectedPerson.jobTitle].filter(Boolean).join(' — ') || '—')}</div></div></section>
+      <section class="section earnings"><h2>الاستحقاقات</h2><table><tbody>${rows(earnings)}</tbody></table></section>
+      <section class="section deductions"><h2>الاستقطاعات</h2><table><tbody>${rows(deductions)}</tbody></table></section>
+      <div class="net"><div><div class="caption">صافي الراتب المستحق</div><div class="label">إجمالي المستحقات بعد خصم الاستقطاعات</div></div><div class="number">${money(selectedPerson.net || 0)} <span style="font-size:11px">ج.م</span></div></div>
+      <footer class="foot">تم إنشاء هذه القسيمة بواسطة MASAR HR</footer></main></body></html>`;
     };
     const openPayslip = (printAfter = false) => { const popup = window.open('', '_blank', 'noopener,noreferrer'); if (!popup) return; popup.document.write(payslipHtml()); popup.document.close(); if (printAfter) popup.addEventListener('load', () => popup.print(), {once:true}); };
     const actions = document.querySelector('#payrollPrototype #drawer .actions');
@@ -211,8 +224,80 @@
       if (!whatsapp.parentElement) actions.append(whatsapp);
       whatsapp.onclick = async () => { const html = payslipHtml(); const file = new File([html], `payslip-${selectedPerson.code || selectedPerson.id}.html`, {type:'text/html'}); if (navigator.canShare?.({files:[file]})) { try { await navigator.share({files:[file], title:'قسيمة الراتب'}); return; } catch (error) { if (error?.name === 'AbortError') return; } } const phone = String(selectedPerson.phone || '').replace(/[^0-9]/g, ''); const message = encodeURIComponent(`قسيمة راتب ${selectedPerson.name} — الكود الوظيفي: ${selectedPerson.code || selectedPerson.id}`); window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener'); };
     }
-    document.querySelector('#payrollPrototype #view')?.addEventListener('click', () => openPayslip(false), {once:true});
-    document.querySelector('#payrollPrototype #pdf')?.addEventListener('click', () => openPayslip(true), {once:true});
+    if (actions) {
+      const whatsappButton = actions.querySelector('[data-whatsapp-payslip-legacy-disabled]');
+      if (whatsappButton) whatsappButton.onclick = async () => {
+        try {
+          const {html2pdf, iframe, target, options} = await buildPdf();
+          const blob = await html2pdf().set(options).from(target).outputPdf('blob'); iframe.remove();
+          const file = new File([blob], options.filename, {type:'application/pdf'});
+          if (navigator.canShare?.({files:[file]})) { await navigator.share({files:[file], title:'قسيمة الراتب'}); return; }
+        } catch (error) { if (error?.name === 'AbortError') return; }
+        const phone = String(selectedPerson.phone || '').replace(/[^0-9]/g, '');
+        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(`قسيمة راتب ${selectedPerson.name}`)}`, '_blank', 'noopener');
+      };
+    }
+    document.querySelector('#payrollPrototype #view')?.remove();
+    /* Legacy client-side HTML capture is intentionally disabled. PDF uses the standalone Blade view below.
+    const loadPdfLibrary = () => new Promise((resolve, reject) => {
+      if (window.html2pdf) return resolve(window.html2pdf);
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.onload = () => resolve(window.html2pdf); script.onerror = reject; document.head.append(script);
+    });
+    const buildPdf = async () => {
+      const html2pdf = await loadPdfLibrary();
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.cssText = 'position:fixed;left:-20000px;top:0;width:794px;height:1123px;border:0;background:#fff;';
+      document.body.append(iframe);
+      const doc = iframe.contentDocument;
+      doc.open();
+      doc.write(payslipHtml());
+      doc.close();
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = () => { if (!settled) { settled = true; resolve(); } };
+        iframe.onload = finish;
+        setTimeout(finish, 500);
+        setTimeout(() => { if (!settled) { settled = true; reject(new Error('PDF document load timeout')); } }, 5000);
+      });
+      if (doc.fonts?.ready) await doc.fonts.ready;
+      const target = doc.querySelector('.sheet');
+      if (!target) { iframe.remove(); throw new Error('Payslip content was not rendered'); }
+      const options = {
+        margin: [8, 8, 8, 8],
+        filename: `payslip-${String(selectedPerson.code || selectedPerson.id).replace(/[^a-zA-Z0-9_-]/g, '')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, windowWidth: 794, scrollX: 0, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['.employee', '.section', '.net', 'tr'] }
+      };
+      return { html2pdf, iframe, target, options };
+    };
+    document.querySelector('#payrollPrototype #pdf-legacy-disabled')?.addEventListener('click', async () => {
+      const button = document.querySelector('#payrollPrototype #pdf'); if (button) button.disabled = true;
+      try { const {html2pdf, iframe, target, options} = await buildPdf(); await html2pdf().set(options).from(target).save(); iframe.remove(); }
+      catch (error) { console.error('Payslip PDF error:', error); alert('تعذر إنشاء ملف PDF. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.'); }
+      finally { if (button) button.disabled = false; }
+    };
+    */
+    const pdfUrl = (recordId) => @json(route('payroll.employee-salaries.payslip-pdf', ['payrollRecord' => '__RECORD__']))
+      .replace('__RECORD__', encodeURIComponent(recordId)) + '?print=1';
+    const legacyWhatsapp = document.querySelector('#payrollPrototype [data-whatsapp-payslip]');
+    if (legacyWhatsapp) legacyWhatsapp.onclick = null;
+    const standaloneWhatsapp = document.querySelector('#payrollPrototype [data-whatsapp-payslip]');
+    if (standaloneWhatsapp) standaloneWhatsapp.onclick = () => {
+      const recordId = selectedPerson?.recordId;
+      if (recordId) window.open(pdfUrl(recordId), '_blank', 'noopener,noreferrer');
+      else alert('تعذر تحديد سجل الراتب.');
+    };
+    const standalonePdf = document.querySelector('#payrollPrototype #pdf');
+    if (standalonePdf) standalonePdf.onclick = () => {
+      const recordId = selectedPerson?.recordId;
+      if (recordId) window.open(pdfUrl(recordId), '_blank', 'noopener,noreferrer');
+      else alert('تعذر تحديد سجل الراتب.');
+    };
     document.querySelector('#payrollPrototype #print')?.addEventListener('click', () => openPayslip(true), {once:true});
     container.innerHTML = '';
     if (selectedPerson.items?.[0]) container.append(item(selectedPerson.items[0]));
@@ -265,6 +350,50 @@
   @endif
   head.append(actions);
   document.querySelector('#payrollPrototype #export')?.remove();
+})();
+</script>
+
+<style id="payroll-drawer-interaction-fix">
+  /* The backdrop must never block employee rows after the payslip closes. */
+  #payrollPrototype .drawer-overlay { pointer-events: none !important; }
+  #payrollPrototype .drawer-overlay.open { pointer-events: auto !important; }
+  #payrollPrototype .drawer[aria-hidden="true"] { pointer-events: none; }
+  #payrollPrototype .drawer[aria-hidden="false"] { pointer-events: auto; }
+  #payrollPrototype #employees tbody tr { position: relative; z-index: 0; pointer-events: auto; }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('payrollPrototype');
+  if (!root) return;
+  const overlay = root.querySelector('#drawerOverlay');
+  const drawer = root.querySelector('#drawer');
+  const close = () => {
+    overlay?.classList.remove('open');
+    overlay?.setAttribute('aria-hidden', 'true');
+    if (overlay) overlay.style.pointerEvents = 'none';
+    drawer?.classList.remove('open');
+    drawer?.setAttribute('aria-hidden', 'true');
+    if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+  };
+  const open = () => {
+    overlay?.classList.add('open');
+    overlay?.setAttribute('aria-hidden', 'false');
+    if (overlay) overlay.style.pointerEvents = 'auto';
+    drawer?.classList.add('open');
+    drawer?.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  };
+  overlay?.addEventListener('click', close);
+  root.querySelector('#close')?.addEventListener('click', close);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+  // Keep backdrop hit-testing synchronized even if legacy drawer code toggles classes.
+  if (overlay) new MutationObserver(() => {
+    const isOpen = overlay.classList.contains('open');
+    overlay.style.pointerEvents = isOpen ? 'auto' : 'none';
+    overlay.setAttribute('aria-hidden', String(!isOpen));
+  }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  // Re-enable row interaction if a stale overlay state was left by older code.
+  if (!overlay?.classList.contains('open')) close();
 })();
 </script>
 @endsection
