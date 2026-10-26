@@ -57,19 +57,23 @@ class LeaveBalanceService
                 'leave_year' => $year,
                 'annual_entitlement' => $annual,
                 'annual_used' => $used,
+                'annual_balance_remaining' => max(0, $annual - $used),
                 'casual_used' => $casual,
                 'advance_used' => $advance,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
-        DB::table('leave_balances')->upsert($rows, ['employee_id', 'leave_year'], ['annual_entitlement', 'annual_used', 'casual_used', 'advance_used', 'updated_at']);
+        // Keep the persisted balance in sync with the current policy/approved
+        // leave calculation before it is displayed in the monthly summary.
+        DB::table('leave_balances')->upsert($rows, ['employee_id', 'leave_year'], ['annual_entitlement', 'annual_used', 'annual_balance_remaining', 'casual_used', 'advance_used', 'updated_at']);
         return collect($rows)->keyBy('employee_id')->map(fn (array $row) => [
             'annual_entitlement' => (float) $row['annual_entitlement'],
             'annual_used' => (float) $row['annual_used'],
+            'annual_balance_remaining' => (float) $row['annual_balance_remaining'],
             'casual_used' => (float) $row['casual_used'],
             'advance_used' => (float) $row['advance_used'],
-            'remaining' => max(0, (float) $row['annual_entitlement'] - (float) $row['annual_used']),
+            'remaining' => (float) $row['annual_balance_remaining'],
         ]);
     }
 
@@ -84,7 +88,9 @@ class LeaveBalanceService
         if ($serviceYears >= (int) $this->policy('annual_long_service_years', '10') || $age >= (int) $this->policy('annual_age_threshold', '50')) $annual = (float) $this->policy('annual_long_service', '30');
         elseif ($serviceYears >= 1) $annual = (float) $this->policy('annual_second_year', '21');
         else $annual = (float) $this->policy('annual_first_year', '15');
-        if ($hire->year === $year && filter_var($this->policy('annual_prorate_first_year', '1'), FILTER_VALIDATE_BOOLEAN)) {
+        // Do not prorate a new employee's annual balance unless the company
+        // explicitly enables that policy in its leave settings.
+        if ($hire->year === $year && filter_var($this->policy('annual_prorate_first_year', '0'), FILTER_VALIDATE_BOOLEAN)) {
             $annual = round($annual * max(0, 12 - $hire->month + 1) / 12, 2);
         }
         return $annual + $extra;
@@ -97,9 +103,9 @@ class LeaveBalanceService
         $casual = $this->approvedDays($employee, $year, fn (LeaveType $type) => $type->policy_code === 'casual');
         $advance = max(0, $used - $annual);
         DB::table('leave_balances')->updateOrInsert(['employee_id' => $employee->id, 'leave_year' => $year], [
-            'annual_entitlement' => $annual, 'annual_used' => $used, 'casual_used' => $casual, 'advance_used' => $advance, 'updated_at' => now(), 'created_at' => now(),
+            'annual_entitlement' => $annual, 'annual_used' => $used, 'annual_balance_remaining' => max(0, $annual - $used), 'casual_used' => $casual, 'advance_used' => $advance, 'updated_at' => now(), 'created_at' => now(),
         ]);
-        return ['annual_entitlement' => $annual, 'annual_used' => $used, 'casual_used' => $casual, 'advance_used' => $advance, 'remaining' => max(0, $annual - $used)];
+        return ['annual_entitlement' => $annual, 'annual_used' => $used, 'annual_balance_remaining' => max(0, $annual - $used), 'casual_used' => $casual, 'advance_used' => $advance, 'remaining' => max(0, $annual - $used)];
     }
 
     public function validateForApproval(Leave $leave, ?int $excludeId = null): void

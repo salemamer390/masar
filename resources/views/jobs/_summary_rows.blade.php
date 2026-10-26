@@ -1,6 +1,6 @@
 @foreach($monthlyRows as $row)
     @php($employee = $row['employee'])
-    <tr>
+    <tr data-employee-id="{{ $employee->id }}">
         <td>{{ $employee->employee_code }}</td>
         <td><a class="employee-link fw-bold" href="{{ route('employees.show', $employee) }}">{{ $employee->full_name }}</a></td>
         <td>{{ $employee->department?->name ?? '—' }}</td>

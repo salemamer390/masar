@@ -65,7 +65,10 @@ if (summaryTable) {
         headRows[1].innerHTML = ['الكود','اسم الموظف','القسم','أيام الحضور','منها حضور متأخر','دقائق التأخير','أيام الغياب','دقائق الانصراف المبكر','إضافي نهاري','إضافي ليلي','سنوية','عارضة','مرضية','بدون أجر','أمومة','أنواع أخرى','إجمالي الإجازات','رصيد الإجازة السنوية المتبقي','عدد الجزاءات','أيام خصم الجزاءات','سلفة','إذن','مأمورية'].map(label => `<th>${label}</th>`).join('');
         summaryTable.tBodies?.[0]?.querySelectorAll('tr').forEach(row => {
             if (row.cells.length < 23) return;
-            const data = summaryData[row.cells[0]?.textContent?.trim()] || {};
+            const code = row.cells[0]?.textContent?.trim() || '';
+            const data = summaryData[String(row.dataset.employeeId || '')]
+                || Object.values(summaryData).find(item => String(item.employee_code || '') === code)
+                || {};
             const cells = Array.from(row.cells);
             const replacement = [...cells.slice(0, 7), ...[
                 data.early_leave_minutes ?? 0, data.day_overtime_minutes ?? 0, data.night_overtime_minutes ?? 0
@@ -76,7 +79,7 @@ if (summaryTable) {
         });
     }
     // The leave section contains seven detail columns; keep its group header aligned.
-    if (headRows?.length >= 1 && headRows[0].cells.length >= 3) headRows[0].cells[2].colSpan = 7;
+    if (headRows?.length >= 1 && headRows[0].cells.length >= 3) headRows[0].cells[2].colSpan = 8;
     const requestLabels = ['عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات'];
     if (headRows?.length >= 2 && headRows[1].cells.length < 23) {
         requestLabels.forEach(label => { const cell = document.createElement('th'); cell.textContent = label; headRows[1].append(cell); });

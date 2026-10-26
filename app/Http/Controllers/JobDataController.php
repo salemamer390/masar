@@ -42,7 +42,9 @@ class JobDataController extends Controller
         $employees = $employeeQuery->paginate($perPage)->withQueryString();
 
         $monthlyRows = $this->buildMonthlyRows($employees->getCollection(), $month);
-        $summaryRowData = $monthlyRows->mapWithKeys(fn (array $row) => [$row['employee']->employee_code => [
+        $summaryRowData = $monthlyRows->mapWithKeys(fn (array $row) => [(string) $row['employee']->id => [
+            'employee_id' => $row['employee']->id,
+            'employee_code' => (string) $row['employee']->employee_code,
             'early_leave_minutes' => $row['early_leave_minutes'],
             'day_overtime_minutes' => $row['day_overtime_minutes'],
             'night_overtime_minutes' => $row['night_overtime_minutes'],
@@ -184,7 +186,7 @@ class JobDataController extends Controller
             $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinMonth($leave, $month)]);
             $leaveByPolicy = fn (string $policy): float => $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $unpaidLeaveDays = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
-            $balance = $balances->get($employee->id, ['remaining' => 0]);
+            $balance = $balances->get($employee->id, ['annual_balance_remaining' => 0]);
             return [
                 'employee' => $employee, 'salary' => $employee->currentSalary,
                 'attendance_days' => $attendanceRows->whereNotIn('status', ['Absent', 'غائب'])->count(),
@@ -198,7 +200,7 @@ class JobDataController extends Controller
                 'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'day')),
                 'night_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'night')),
                 'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),
-                'penalty_count' => $employeePenalties->count(), 'annual_balance_remaining' => $balance['remaining'],
+                'penalty_count' => $employeePenalties->count(), 'annual_balance_remaining' => $balance['annual_balance_remaining'],
                 'advance_request_count' => $this->requestTypeCount($employeeRequests, 'advance'),
                 'permission_request_count' => $this->requestTypeCount($employeeRequests, 'permission'),
                 'mission_request_count' => $this->requestTypeCount($employeeRequests, 'mission'),
