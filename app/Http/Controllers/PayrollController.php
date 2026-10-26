@@ -284,8 +284,39 @@ class PayrollController extends Controller
             'tax' => (float) $totalTax,
         ];
 
+        // Every payroll month that already exists (for the month picker and the "previous payrolls" tab).
+        $runStatuses = PayrollRun::query()
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->get(['payroll_month', 'status'])
+            ->mapWithKeys(fn ($run) => [Carbon::parse($run->payroll_month)->format('Y-m') => $run->status])
+            ->all();
+        $statusLabels = ['Draft' => 'مسودة', 'Approved' => 'معتمد', 'Locked' => 'مغلق'];
+        $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        $payrollHistory = PayrollRecord::query()
+            ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->selectRaw('payroll_month, COUNT(*) as employees, SUM(net_salary) as net, SUM(employee_cost) as cost')
+            ->groupBy('payroll_month')
+            ->orderByDesc('payroll_month')
+            ->get()
+            ->map(function ($row) use ($runStatuses, $statusLabels, $arabicMonths, $month) {
+                $date = Carbon::parse($row->payroll_month);
+                $status = $runStatuses[$date->format('Y-m')] ?? null;
+
+                return [
+                    'month' => $date->format('Y-m-01'),
+                    'label' => $arabicMonths[$date->month - 1] . ' ' . $date->year,
+                    'status' => $status,
+                    'status_label' => $status ? ($statusLabels[$status] ?? $status) : '—',
+                    'employees' => (int) $row->employees,
+                    'net' => (float) $row->net,
+                    'cost' => (float) $row->cost,
+                    'current' => $date->format('Y-m') === $month->format('Y-m'),
+                ];
+            })
+            ->values();
+
         $view = $request->attributes->get('payroll_view', 'payroll.index');
-        return view($view, compact('records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta'));
+        return view($view, compact('payrollHistory', 'records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta'));
     }
 
     /** Render a standalone, print-ready payslip. The screen drawer is not used. */

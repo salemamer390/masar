@@ -59,12 +59,106 @@
   }
   function toast(message) { const t = document.getElementById('toast'); if (!t) return; t.textContent = message; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); }
   ['search', 'dept', 'state'].forEach(id => document.getElementById(id)?.addEventListener('input', table));
-  document.getElementById('prev')?.addEventListener('click', () => { mi = (mi + 11) % 12; drawer(); });
-  document.getElementById('next')?.addEventListener('click', () => { mi = (mi + 1) % 12; drawer(); });
+  // ---- Month navigation: every month change loads that month's payroll from the server.
+  const monthKey = config.month || `${config.year || new Date().getFullYear()}-${String(mi + 1).padStart(2, '0')}-01`;
+  const history = Array.isArray(config.history) ? config.history : [];
+  const goToMonth = (year, monthNumber) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('month', `${year}-${String(monthNumber).padStart(2, '0')}-01`);
+    url.searchParams.delete('page');
+    url.searchParams.delete('edit');
+    window.location.href = url.toString();
+  };
+  const shiftMonth = delta => {
+    const [y, m] = monthKey.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    goToMonth(d.getFullYear(), d.getMonth() + 1);
+  };
+  document.getElementById('prev')?.addEventListener('click', () => shiftMonth(-1));
+  document.getElementById('next')?.addEventListener('click', () => shiftMonth(1));
+
+  // Month picker opened from the period box.
+  const periodBox = document.getElementById('period');
+  let picker = null;
+  const closePicker = () => { picker?.remove(); picker = null; };
+  function openPicker() {
+    if (picker) return closePicker();
+    const [currentYear, currentMonth] = monthKey.split('-').map(Number);
+    let year = currentYear;
+    const withData = new Set(history.map(h => String(h.month).slice(0, 7)));
+    picker = document.createElement('div');
+    picker.className = 'payroll-month-picker';
+    picker.setAttribute('role', 'dialog');
+    picker.setAttribute('aria-label', 'اختيار شهر المسير');
+    const render = () => {
+      picker.innerHTML = `<div class="mp-head"><button type="button" data-mp="next" aria-label="السنة التالية"><i class="bi bi-chevron-right"></i></button><span>${year}</span><button type="button" data-mp="prev" aria-label="السنة السابقة"><i class="bi bi-chevron-left"></i></button></div>` +
+        `<div class="mp-grid">${months.map((name, i) => {
+          const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+          const cls = ['mp-month', withData.has(key) ? 'has-data' : '', year === currentYear && i + 1 === currentMonth ? 'active' : ''].join(' ');
+          return `<button type="button" class="${cls}" data-mp-month="${i + 1}">${name}</button>`;
+        }).join('')}</div><div class="mp-note">النقطة الخضراء = يوجد مسير لهذا الشهر</div>`;
+    };
+    render();
+    document.body.appendChild(picker);
+    const rect = periodBox.getBoundingClientRect();
+    const width = 280;
+    picker.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - picker.offsetHeight - 8)}px`;
+    picker.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 8))}px`;
+    picker.addEventListener('click', e => {
+      const nav = e.target.closest('[data-mp]');
+      if (nav) { year += nav.dataset.mp === 'next' ? 1 : -1; render(); return; }
+      const cell = e.target.closest('[data-mp-month]');
+      if (cell) goToMonth(year, Number(cell.dataset.mpMonth));
+    });
+  }
+  if (periodBox) {
+    periodBox.setAttribute('role', 'button');
+    periodBox.setAttribute('tabindex', '0');
+    periodBox.setAttribute('aria-haspopup', 'dialog');
+    periodBox.title = 'اضغط لاختيار شهر آخر';
+    periodBox.addEventListener('click', e => { e.stopPropagation(); openPicker(); });
+    periodBox.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); } });
+    const label = `${months[mi]} ${config.year || ''}`.trim();
+    if (!periodBox.textContent.includes(months[mi])) {
+      periodBox.innerHTML = `<i class="bi bi-calendar3" aria-hidden="true"></i> <span>${label}</span> <i class="bi bi-chevron-down" aria-hidden="true"></i>`;
+    }
+  }
+  document.addEventListener('click', e => { if (picker && !picker.contains(e.target) && e.target !== periodBox) closePicker(); });
+  window.addEventListener('resize', closePicker);
+
+  // Tabs: current month / previous payrolls.
+  const prototypePage = document.getElementById('payrollPrototype');
+  const actionsBar = document.querySelector('.employee-payroll-actions');
+  const historyPane = document.getElementById('payrollHistoryPane');
+  const showTab = name => {
+    const isHistory = name === 'history';
+    document.querySelectorAll('[data-payroll-tab]').forEach(b => b.classList.toggle('active', b.dataset.payrollTab === name));
+    if (prototypePage) prototypePage.hidden = isHistory;
+    if (historyPane) historyPane.hidden = !isHistory;
+    if (actionsBar && !actionsBar.closest('#payrollPrototype')) actionsBar.hidden = isHistory;
+    if (!isHistory) closeDrawer();
+    if (isHistory) closeDrawer();
+  };
+  document.querySelectorAll('[data-payroll-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.payrollTab)));
+  historyPane?.addEventListener('click', e => {
+    const card = e.target.closest('[data-history-month]');
+    if (!card) return;
+    const [y, m] = card.dataset.historyMonth.split('-').map(Number);
+    goToMonth(y, m);
+  });
+  if (!config.isCurrentMonth && prototypePage) {
+    const banner = document.createElement('div');
+    banner.className = 'payroll-view-banner';
+    banner.innerHTML = `<span><i class="bi bi-eye"></i> أنت تعرض مسير ${months[mi]} ${config.year || ''}</span><button type="button" class="btn btn-sm btn-primary">العودة للشهر الحالي</button>`;
+    banner.querySelector('button').addEventListener('click', () => {
+      const now = new Date();
+      goToMonth(now.getFullYear(), now.getMonth() + 1);
+    });
+    prototypePage.parentNode.insertBefore(banner, document.getElementById('payrollViewTabs')?.nextSibling || prototypePage);
+  }
   document.getElementById('close')?.addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay')?.addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
-  document.getElementById('period')?.addEventListener('click', () => toast(`الفترة المحددة: ${months[mi]} ${config.year || ''}`));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closePicker(); } });
   document.getElementById('export')?.addEventListener('click', () => toast('يمكنك استخدام زر تصدير Excel أعلى الصفحة.'));
   document.getElementById('view')?.remove();
   const pdfButton = document.getElementById('pdf');
