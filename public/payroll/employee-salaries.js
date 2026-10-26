@@ -1,5 +1,6 @@
 (function () {
   const config = window.masarEmployeeSalaries || {};
+  document.querySelector('#payrollPrototype .heading .status')?.remove();
   const people = Array.isArray(config.people) ? config.people : [];
   let selected = people[0] || {};
   let mi = Number(config.monthIndex || 0);
