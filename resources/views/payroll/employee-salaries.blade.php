@@ -26,6 +26,11 @@
   #payrollPrototype .actions .btn:hover { filter:brightness(.94); }
   #payrollPrototype .actions .btn:active { transform:translateY(1px); }
   #payrollPrototype .actions .btn i { font-size:15px; line-height:1; }
+  #payrollPrototype .panelhead > .employee-payroll-actions { margin:0 !important; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  @media (max-width:850px) {
+    #payrollPrototype .panelhead > .employee-payroll-actions { width:100%; }
+    #payrollPrototype .panelhead > .employee-payroll-actions .btn { flex:1; }
+  }
   @media print {
     body.printing-payslip * { visibility:hidden !important; }
     body.printing-payslip #payrollPrototype .drawer,

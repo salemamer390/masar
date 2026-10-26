@@ -145,6 +145,13 @@
   document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.removeAttribute('onclick');
   document.getElementById('print')?.addEventListener('click', () => window.masarPrintPayslip());
   window.addEventListener('afterprint', () => document.body.classList.remove('printing-payslip'));
+  const topActions = document.querySelector('.employee-payroll-actions');
+  const payrollPanelHead = document.querySelector('#payrollPrototype .leftpanel .panelhead');
+  document.getElementById('export')?.remove();
+  if (topActions && payrollPanelHead) {
+    topActions.classList.remove('mb-3');
+    payrollPanelHead.appendChild(topActions);
+  }
   window.masarEmployeeSalariesTable = table;
   table(); drawer(); closeDrawer();
 })();
