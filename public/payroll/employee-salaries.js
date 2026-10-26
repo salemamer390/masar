@@ -91,6 +91,46 @@
     const message = encodeURIComponent(`قسيمة راتب ${selected.name || ''} — الكود الوظيفي: ${selected.code || selected.id || ''}`);
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener');
   });
+  // Replace the text-only WhatsApp handler with native PDF file sharing.
+  const whatsappButton = document.getElementById('whatsapp');
+  if (whatsappButton) {
+    const cleanWhatsappButton = whatsappButton.cloneNode(true);
+    whatsappButton.replaceWith(cleanWhatsappButton);
+    cleanWhatsappButton.addEventListener('click', async () => {
+      if (!config.pdfUrlTemplate || !selected.recordId) return toast('لا توجد قسيمة راتب متاحة لهذا الموظف.');
+      const pdfUrl = config.pdfUrlTemplate.replace('__RECORD__', encodeURIComponent(selected.recordId));
+      const message = `قسيمة راتب ${selected.name || ''} - الكود الوظيفي: ${selected.code || selected.id || ''}`;
+      try {
+        const response = await fetch(pdfUrl, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } });
+        if (!response.ok) throw new Error('PDF download failed');
+        const blob = await response.blob();
+        const safeName = String(selected.name || 'employee').trim().replace(/[^\p{L}\p{N}]+/gu, '-') || 'employee';
+        let fileName = `payslip-${safeName}.pdf`;
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+        if (encodedName) {
+          try { fileName = decodeURIComponent(encodedName); } catch (_) { /* keep fallback */ }
+        }
+        const file = new File([blob], fileName, { type: 'application/pdf' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Payslip', text: message });
+          return;
+        }
+        // WhatsApp Web does not accept programmatic file attachments. Download
+        // the generated file, then open the WhatsApp Web conversation directly.
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        toast('تم تنزيل ملف PDF وفتح واتساب. اختر جهة الاتصال وأرفق الملف.');
+      } catch (error) {
+        if (error?.name !== 'AbortError') toast('تعذر تجهيز ملف PDF للمشاركة.');
+      }
+    });
+  }
   document.getElementById('print')?.addEventListener('click', () => window.print());
   window.masarEmployeeSalariesTable = table;
   table(); drawer(); closeDrawer();
