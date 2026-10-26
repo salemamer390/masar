@@ -144,7 +144,21 @@
   };
   document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.addEventListener('click', event => {
     event.preventDefault();
-    if (config.printUrl) window.open(config.printUrl, '_blank', 'noopener');
+    if (!config.printUrl) return window.print();
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.width = '1px';
+    frame.style.height = '1px';
+    frame.style.right = '-10px';
+    frame.style.bottom = '-10px';
+    frame.style.border = '0';
+    frame.src = config.printUrl;
+    frame.onload = () => {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+      window.setTimeout(() => frame.remove(), 1000);
+    };
+    document.body.appendChild(frame);
   });
   document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.removeAttribute('onclick');
   document.getElementById('print')?.addEventListener('click', () => window.masarPrintPayslip());
