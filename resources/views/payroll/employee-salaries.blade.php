@@ -65,6 +65,7 @@
 window.masarEmployeeSalaries = {
   people: {!! $peopleJson !!},
   stats: @json($prototypeStats),
+  printUrl: @json(route('payroll.export', ['month' => $month->format('Y-m-01')])),
   monthIndex: {{ $monthIndex }},
   year: {{ $month->format('Y') }},
   pdfUrlTemplate: @json(route('payroll.employee-salaries.payslip-pdf', ['payrollRecord' => '__RECORD__']))

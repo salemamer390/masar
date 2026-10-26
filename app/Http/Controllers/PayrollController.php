@@ -634,7 +634,7 @@ class PayrollController extends Controller
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
-        if ($request->string('format')->lower() === 'csv') {
+        if ((string) $request->string('format')->lower() === 'csv') {
             $filename = 'payroll-' . $month->format('Y-m') . '.csv';
             return response()->streamDownload(function () use ($records) {
                 $out = fopen('php://output', 'w');

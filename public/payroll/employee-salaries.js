@@ -144,7 +144,7 @@
   };
   document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.addEventListener('click', event => {
     event.preventDefault();
-    window.masarPrintPayslip();
+    if (config.printUrl) window.open(config.printUrl, '_blank', 'noopener');
   });
   document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.removeAttribute('onclick');
   document.getElementById('print')?.addEventListener('click', () => window.masarPrintPayslip());
