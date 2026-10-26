@@ -12,6 +12,7 @@ use App\Models\PayrollRun;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Mpdf\Mpdf;
 
 class PayrollController extends Controller
 {
@@ -339,13 +340,34 @@ class PayrollController extends Controller
             ['استقطاعات أخرى', (float) $payrollRecord->other_deductions],
         ], fn ($item) => $positive($item[1])));
 
-        return view('payroll.payslip-pdf', [
+        $viewData = [
             'record' => $payrollRecord,
             'earnings' => $earnings,
             'deductions' => $deductions,
             'earningsTotal' => collect($earnings)->sum(fn ($item) => (float) $item[1]),
             'deductionsTotal' => collect($deductions)->sum(fn ($item) => (float) $item[1]),
             'net' => (float) $payrollRecord->net_salary,
+        ];
+
+        $tempDir = storage_path('app/mpdf');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+        $mpdf = new Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'orientation' => 'P',
+            'tempDir' => $tempDir,
+            'default_font' => 'dejavusans',
+            'directionality' => 'rtl',
+        ]);
+        $mpdf->SetTitle('Payslip - ' . ($payrollRecord->employee?->full_name ?? $payrollRecord->id));
+        $mpdf->WriteHTML(view('payroll.payslip-pdf', $viewData)->render());
+
+        return response($mpdf->Output('', 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="payslip-' . $payrollRecord->id . '.pdf"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
     }
 
