@@ -353,20 +353,54 @@ class PayrollController extends Controller
         if (!is_dir($tempDir)) {
             mkdir($tempDir, 0775, true);
         }
-        $mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'orientation' => 'P',
-            'tempDir' => $tempDir,
-            'default_font' => 'dejavusans',
-            'directionality' => 'rtl',
-        ]);
-        $mpdf->SetTitle('Payslip - ' . ($payrollRecord->employee?->full_name ?? $payrollRecord->id));
-        $mpdf->WriteHTML(view('payroll.payslip-pdf', $viewData)->render());
+
+        $employeeCode = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($payrollRecord->employee?->employee_code ?: $payrollRecord->employee_id));
+        $monthName = $payrollRecord->payroll_month?->format('Y-m') ?: 'period';
+        $fileName = 'payslip-' . ($employeeCode ?: $payrollRecord->employee_id) . '-' . $monthName . '.pdf';
+        $title = 'Payslip - ' . ($payrollRecord->employee?->full_name ?? $payrollRecord->id);
+
+        // Try the normal size first, then slightly smaller sizes. Keep automatic page
+        // breaks enabled in every attempt so content is never clipped.
+        $render = function (float $scale, bool $allowPageBreaks) use ($viewData, $tempDir, $title): Mpdf {
+            $mpdf = new Mpdf([
+                'mode' => 'utf-8',
+                'format' => 'A4',
+                'orientation' => 'P',
+                'tempDir' => $tempDir,
+                'default_font' => 'dejavusans',
+                'directionality' => 'rtl',
+                'margin_left' => 14, 'margin_right' => 14,
+                'margin_top' => 14, 'margin_bottom' => 14,
+                'margin_header' => 0, 'margin_footer' => 0,
+                'shrink_tables_to_fit' => 1,
+            ]);
+            if (!$allowPageBreaks) {
+                $mpdf->SetAutoPageBreak(false);
+            }
+            $mpdf->SetTitle($title);
+            $html = view('payroll.payslip-pdf', $viewData + ['scale' => $scale])->render();
+            // The PDF view is server-rendered only; no scripts or buttons may affect pagination.
+            $html = preg_replace('~<script\\b[^>]*>.*?</script>~is', '', $html);
+            $html = preg_replace('~<button\\b[^>]*>.*?</button>~is', '', $html);
+            $mpdf->WriteHTML($html);
+
+            return $mpdf;
+        };
+
+        $mpdf = null;
+        foreach ([1.0, 0.92, 0.84, 0.76] as $scale) {
+            $attempt = $render($scale, true);
+            if ((int) $attempt->page === 1) {
+                $mpdf = $attempt;
+                break;
+            }
+            \Illuminate\Support\Facades\Log::warning('Payslip PDF overflowed one page', ['record' => $payrollRecord->id, 'pages' => (int) $attempt->page, 'scale' => $scale]);
+        }
+        $mpdf ??= $render(0.76, true);
 
         return response($mpdf->Output('', 'S'), 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="payslip-' . $payrollRecord->id . '.pdf"',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
     }

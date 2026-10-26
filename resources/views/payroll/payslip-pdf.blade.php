@@ -1,10 +1,84 @@
+@php
+    // $scale is only used by the controller's fallback attempts (1.0 = normal size).
+    $scale = $scale ?? 1.0;
+    $fs = fn (float $pt) => round($pt * $scale, 1) . 'pt';
+    $pad = fn (float $mm) => round($mm * $scale, 1) . 'mm';
+@endphp
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>قسيمة راتب - {{ $record->employee?->full_name }}</title>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>Payslip</title>
+{{-- mPDF-safe CSS on purpose: tables with explicit column widths, no flex/grid, no
+     page-break-inside, no white-space:nowrap, no direction overrides, no @page. --}}
 <style>
-@page{size:A4;margin:14mm 13mm}body{margin:0;color:#24344d;font-family:dejavusans,sans-serif;font-size:12px;line-height:1.6;direction:rtl}.sheet{width:100%}.brand,.employee,.net,.total{width:100%;border-collapse:collapse}.brand td{vertical-align:top;padding:0 0 12px;border-bottom:2px solid #1769e0}.brand .period{text-align:left;color:#17365d;font-weight:bold}h1{margin:0;color:#17365d;font-size:24px}.muted,.label{color:#71809a}.employee{margin-top:12px}.employee td{width:33.33%;padding:10px 8px;border-bottom:1px solid #dfe7f1;vertical-align:top}.label{font-size:10px;margin-bottom:3px}.value{font-weight:bold}.section{margin-top:17px;page-break-inside:avoid}.section h2{margin:0 0 6px;padding:7px 9px;font-size:16px;border-bottom:1px solid #dfe7f1}.earnings h2{color:#087f5b;background:#e9f8f1}.deductions h2{color:#d63345;background:#fff0f2}.lines{width:100%;border-collapse:collapse}.lines td{padding:7px 9px;border-bottom:1px solid #edf1f7}.lines td:last-child{width:32%;text-align:left;direction:ltr;font-weight:bold;white-space:nowrap}.total td{padding:9px;font-weight:bold}.earnings .total td{color:#087f5b;background:#e9f8f1}.deductions .total td{color:#d63345;background:#fff0f2}.net{margin-top:18px;border:1px solid #d7e7ff;background:#eef5ff}.net td{padding:13px;vertical-align:middle}.net .amount{text-align:left;direction:ltr;color:#1769e0;font-size:22px;font-weight:bold;white-space:nowrap}footer{margin-top:17px;padding-top:7px;border-top:1px solid #e1e8f0;color:#8290a4;font-size:9px;text-align:center}
-</style></head><body><main class="sheet">
-<table class="brand"><tr><td><h1>MASAR HR</h1><div class="muted">قسيمة راتب الموظف</div></td><td class="period">{{ $record->payroll_month?->translatedFormat('F Y') }}</td></tr></table>
-<table class="employee"><tr><td><div class="label">اسم الموظف</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td><td><div class="label">الكود الوظيفي</div><div class="value">{{ $record->employee?->employee_code ?? '—' }}</div></td><td><div class="label">القسم / الوظيفة</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td></tr></table>
-<section class="section earnings"><h2>الاستحقاقات</h2><table class="lines"><tbody>@foreach($earnings as [$label,$amount])<tr><td>{{ $label }}</td><td>{{ number_format($amount,2) }} ج.م</td></tr>@endforeach</tbody></table><table class="total"><tr><td>إجمالي الاستحقاقات</td><td style="text-align:left;direction:ltr">{{ number_format($earningsTotal,2) }} ج.م</td></tr></table></section>
-<section class="section deductions"><h2>الاستقطاعات</h2><table class="lines"><tbody>@forelse($deductions as [$label,$amount])<tr><td>{{ $label }}</td><td>{{ number_format($amount,2) }} ج.م</td></tr>@empty<tr><td colspan="2" style="text-align:center;color:#71809a">لا توجد استقطاعات</td></tr>@endforelse</tbody></table><table class="total"><tr><td>إجمالي الاستقطاعات</td><td style="text-align:left;direction:ltr">{{ number_format($deductionsTotal,2) }} ج.م</td></tr></table></section>
-<table class="net"><tr><td>صافي الراتب المستحق</td><td class="amount">{{ number_format($net,2) }} ج.م</td></tr></table><footer>تم إنشاء هذه القسيمة بواسطة MASAR HR</footer></main></body></html>
+body { font-family: dejavusans; color: #24344d; font-size: {{ $fs(9.5) }}; }
+table { border-collapse: collapse; width: 100%; }
+td { vertical-align: top; }
+.brand-cell { padding-bottom: {{ $pad(2) }}; border-bottom: 0.6mm solid #1769e0; }
+.title { font-size: {{ $fs(16) }}; font-weight: bold; color: #1769e0; }
+.sub { font-size: {{ $fs(9) }}; color: #71809a; }
+.period { font-size: {{ $fs(11) }}; font-weight: bold; text-align: left; }
+.emp td { padding: {{ $pad(2.2) }} {{ $pad(1.5) }}; border-bottom: 0.2mm solid #dfe7f1; }
+.label { font-size: {{ $fs(8) }}; color: #71809a; }
+.value { font-weight: bold; }
+.h-earn { font-size: {{ $fs(12) }}; font-weight: bold; color: #087f5b; background-color: #e9f8f1; padding: {{ $pad(1.8) }} {{ $pad(2) }}; }
+.h-ded { font-size: {{ $fs(12) }}; font-weight: bold; color: #d63345; background-color: #fff0f2; padding: {{ $pad(1.8) }} {{ $pad(2) }}; }
+.line td { padding: {{ $pad(1.6) }} {{ $pad(2) }}; border-bottom: 0.2mm solid #edf1f7; }
+.amt { text-align: left; font-weight: bold; }
+.tot-earn td { padding: {{ $pad(2) }}; font-weight: bold; color: #087f5b; background-color: #e9f8f1; }
+.tot-ded td { padding: {{ $pad(2) }}; font-weight: bold; color: #d63345; background-color: #fff0f2; }
+.net td { padding: {{ $pad(3) }}; background-color: #eef5ff; border: 0.3mm solid #d7e7ff; font-weight: bold; }
+.net .amt { color: #1769e0; font-size: {{ $fs(15) }}; }
+.foot { font-size: {{ $fs(7.5) }}; color: #8290a4; text-align: center; }
+.gap { height: {{ $pad(3.5) }}; }
+</style>
+</head>
+<body>
+
+<table>
+  <tr>
+    <td class="brand-cell" width="65%"><div class="title">MASAR HR</div><div class="sub">Payroll payslip</div></td>
+    <td class="brand-cell period" width="35%">{{ $record->payroll_month?->translatedFormat('F Y') }}</td>
+  </tr>
+</table>
+
+<table class="emp">
+  <tr>
+    <td width="34%"><div class="label">Employee</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td>
+    <td width="22%"><div class="label">Employee code</div><div class="value">{{ $record->employee?->employee_code ?? '—' }}</div></td>
+    <td width="44%"><div class="label">Department / job</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td>
+  </tr>
+</table>
+
+<div class="gap"></div>
+
+<table><tr><td class="h-earn">Earnings</td></tr></table>
+<table class="line">
+  @foreach($earnings as [$label, $amount])
+    <tr><td width="68%">{{ $label }}</td><td width="32%" class="amt">{{ number_format($amount, 2) }} EGP</td></tr>
+  @endforeach
+</table>
+<table class="tot-earn"><tr><td width="68%">Total earnings</td><td width="32%" class="amt">{{ number_format($earningsTotal, 2) }} EGP</td></tr></table>
+
+<div class="gap"></div>
+
+<table><tr><td class="h-ded">Deductions</td></tr></table>
+<table class="line">
+  @forelse($deductions as [$label, $amount])
+    <tr><td width="68%">{{ $label }}</td><td width="32%" class="amt">{{ number_format($amount, 2) }} EGP</td></tr>
+  @empty
+    <tr><td colspan="2" style="text-align:center;color:#71809a;">No deductions</td></tr>
+  @endforelse
+</table>
+<table class="tot-ded"><tr><td width="68%">Total deductions</td><td width="32%" class="amt">{{ number_format($deductionsTotal, 2) }} EGP</td></tr></table>
+
+<div class="gap"></div>
+
+<table class="net"><tr><td width="55%">Net salary</td><td width="45%" class="amt">{{ number_format($net, 2) }} EGP</td></tr></table>
+
+<div class="gap"></div>
+<div class="foot">Generated by MASAR HR</div>
+
+</body>
+</html>
