@@ -175,7 +175,7 @@ class JobDataController extends Controller
             ->groupBy('employee_id');
         $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
-        $balances = $leaveBalanceService->balancesFor($employees, $month->year);
+        $balances = $leaveBalanceService->balancesFor($employees, $month);
 
         return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $balances): array {
             $attendanceRows = $attendance->get($employee->id, collect());
