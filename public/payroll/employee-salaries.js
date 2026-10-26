@@ -5,6 +5,10 @@
   let mi = Number(config.monthIndex || 0);
   const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   const money = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const statValues = [config.stats?.cost, config.stats?.net, config.stats?.insurance, config.stats?.tax];
+  document.querySelectorAll('#payrollPrototype .stats .stat strong').forEach((node, index) => {
+    if (statValues[index] !== undefined) node.textContent = money(statValues[index]);
+  });
   function table() {
     const q = document.getElementById('search').value.trim().toLowerCase();
     const d = document.getElementById('dept').value;
