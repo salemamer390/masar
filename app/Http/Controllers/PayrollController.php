@@ -630,7 +630,7 @@ class PayrollController extends Controller
     {
         $companyId = auth()->user()?->company_id;
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
-        $records = PayrollRecord::with(['employee.department', 'employee.job'])
+        $records = PayrollRecord::with(['employee.department', 'employee.job', 'salary'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
