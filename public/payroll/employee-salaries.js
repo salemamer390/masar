@@ -63,6 +63,16 @@
   document.getElementById('period')?.addEventListener('click', () => toast(`الفترة المحددة: ${months[mi]} ${config.year || ''}`));
   document.getElementById('export')?.addEventListener('click', () => toast('يمكنك استخدام زر تصدير Excel أعلى الصفحة.'));
   document.getElementById('view')?.remove();
+  const pdfButton = document.getElementById('pdf');
+  if (pdfButton) {
+    pdfButton.classList.add('btn-pdf');
+    pdfButton.innerHTML = '<i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>PDF</span>';
+  }
+  const printButton = document.getElementById('print');
+  if (printButton) {
+    printButton.classList.add('btn-print');
+    printButton.innerHTML = '<i class="bi bi-printer" aria-hidden="true"></i><span>طباعة</span>';
+  }
   document.getElementById('pdf')?.addEventListener('click', () => {
     if (!config.pdfUrlTemplate || !selected.recordId) return toast('لا توجد قسيمة راتب متاحة لهذا الموظف.');
     window.location.href = config.pdfUrlTemplate.replace('__RECORD__', encodeURIComponent(selected.recordId));
@@ -72,8 +82,8 @@
     const whatsapp = document.createElement('button');
     whatsapp.type = 'button';
     whatsapp.id = 'whatsapp';
-    whatsapp.className = 'btn whatsapp-payslip-btn';
-    whatsapp.innerHTML = '<i class="bi bi-whatsapp"></i> واتساب';
+    whatsapp.className = 'btn btn-whatsapp whatsapp-payslip-btn';
+    whatsapp.innerHTML = '<i class="bi bi-whatsapp" aria-hidden="true"></i><span>واتساب</span>';
     actions.insertBefore(whatsapp, document.getElementById('print'));
   }
   document.getElementById('whatsapp')?.addEventListener('click', () => {

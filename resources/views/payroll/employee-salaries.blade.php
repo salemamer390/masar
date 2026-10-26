@@ -21,6 +21,14 @@
   #payrollPrototype .salary > h4 { justify-content:center; }
   #payrollPrototype .drawer .profile { margin:12px 14px 14px; padding:14px 16px; }
   #payrollPrototype .drawer .section { padding:0 14px 14px; }
+  #payrollPrototype .actions { display:flex; gap:8px; flex-wrap:wrap; }
+  #payrollPrototype .actions .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; font-weight:800; transition:filter .15s ease, transform .15s ease; }
+  #payrollPrototype .actions .btn:hover { filter:brightness(.94); }
+  #payrollPrototype .actions .btn:active { transform:translateY(1px); }
+  #payrollPrototype .actions .btn i { font-size:15px; line-height:1; }
+  #payrollPrototype .actions .btn-pdf { background:#dc3545; border-color:#dc3545; color:#fff; }
+  #payrollPrototype .actions .btn-print { background:#f3f5f8; border-color:#cbd5e1; color:#334155; }
+  #payrollPrototype .actions .btn-whatsapp { background:#25d366; border-color:#25d366; color:#fff; }
 </style>
 
 <div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
