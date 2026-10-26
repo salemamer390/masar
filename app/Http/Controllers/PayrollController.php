@@ -368,9 +368,13 @@ class PayrollController extends Controller
             mkdir($tempDir, 0775, true);
         }
 
-        $employeeCode = preg_replace('/[^A-Za-z0-9_-]/', '', (string) ($payrollRecord->employee?->employee_code ?: $payrollRecord->employee_id));
+        $employeeName = trim((string) ($payrollRecord->employee?->full_name ?? 'employee'));
+        // Keep the employee's name (including Arabic letters) in the downloaded filename.
+        $employeeName = preg_replace('/[^\pL\pN]+/u', '-', $employeeName) ?: 'employee';
+        $employeeName = trim($employeeName, '-_');
         $monthName = $payrollRecord->payroll_month?->format('Y-m') ?: 'period';
-        $fileName = 'payslip-' . ($employeeCode ?: $payrollRecord->employee_id) . '-' . $monthName . '.pdf';
+        $fileName = 'payslip-' . $employeeName . '-' . $monthName . '.pdf';
+        $encodedFileName = rawurlencode($fileName);
         $title = 'Payslip - ' . ($payrollRecord->employee?->full_name ?? $payrollRecord->id);
 
         // Try the normal size first, then slightly smaller sizes. Keep automatic page
@@ -414,7 +418,7 @@ class PayrollController extends Controller
 
         return response($mpdf->Output('', 'S'), 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"; filename*=UTF-8\'\'' . $encodedFileName,
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);
     }
