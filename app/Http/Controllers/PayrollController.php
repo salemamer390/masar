@@ -13,6 +13,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Mpdf\Mpdf;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PayrollController extends Controller
 {
@@ -633,6 +635,54 @@ class PayrollController extends Controller
         $records = PayrollRecord::with(['employee.department', 'employee.job', 'salary'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
+
+        if (in_array((string) $request->string('format')->lower(), ['xlsx', 'excel'], true)) {
+            $template = resource_path('templates/payroll-template.xlsx');
+            abort_unless(is_file($template), 500, 'Excel template is missing.');
+            $spreadsheet = IOFactory::load($template);
+            $sheet = $spreadsheet->getActiveSheet();
+            $row = 2;
+            foreach ($records as $record) {
+                if ($row > 200) {
+                    $sheet->insertNewRowBefore($row, 1);
+                    $sheet->duplicateStyle($sheet->getStyle('A2:X2'), "A{$row}:X{$row}");
+                }
+                $extras = (float) $record->bonus + (float) $record->incentives + (float) $record->commission + (float) $record->profit_share + (float) $record->other_earnings;
+                $sheet->fromArray([[
+                    $record->employee?->full_name,
+                    $record->employee?->employee_code,
+                    $record->employee?->department?->name,
+                    $record->agreed_net_salary,
+                    $record->basic_salary,
+                    $record->allowances,
+                    $record->overtime_amount,
+                    round($extras, 2),
+                    data_get($record->calculation_snapshot, 'inputs.advance_earnings', 0),
+                    $record->gross_salary,
+                    $record->insurance_wage,
+                    $record->employee_insurance,
+                    $record->income_tax,
+                    $record->martyrs_fund,
+                    $record->absence_deduction,
+                    $record->penalty_deduction,
+                    $record->loans,
+                    $record->other_deductions,
+                    $record->deductions,
+                    $record->net_salary,
+                    $record->employer_insurance,
+                    $record->employee_cost,
+                    data_get($record->calculation_snapshot, 'paid_days'),
+                    $record->status,
+                ]], null, "A{$row}");
+                $row++;
+            }
+            $filename = 'payroll-' . $month->format('Y-m') . '.xlsx';
+            $temporary = tempnam(storage_path('app'), 'payroll-');
+            (new Xlsx($spreadsheet))->save($temporary);
+            return response()->download($temporary, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+        }
 
         if ((string) $request->string('format')->lower() === 'csv') {
             $filename = 'payroll-' . $month->format('Y-m') . '.csv';

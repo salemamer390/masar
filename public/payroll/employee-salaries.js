@@ -166,6 +166,8 @@
   const topActions = document.querySelector('.employee-payroll-actions');
   const payrollPanelHead = document.querySelector('#payrollPrototype .leftpanel .panelhead');
   document.getElementById('export')?.remove();
+  const excelLink = document.querySelector('.employee-payroll-actions a[href*="format=csv"]');
+  if (excelLink) excelLink.href = excelLink.href.replace('format=csv', 'format=xlsx');
   if (topActions && payrollPanelHead) {
     topActions.classList.remove('mb-3');
     payrollPanelHead.appendChild(topActions);
