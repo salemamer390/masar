@@ -163,16 +163,15 @@ class JobDataController extends Controller
         $monthStart = $month->copy()->startOfMonth()->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
         $employeeIds = $employees->pluck('id');
-        $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->where('approval_status', 'Approved')->get()->groupBy('employee_id');
+        $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->get()->groupBy('employee_id');
         $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
         $requests = HrRequest::with('requestType')
             ->whereIn('employee_id', $employeeIds)
-            ->where('status', 'Approved')
             ->whereDate('created_at', '<=', $monthEnd)
             ->get()
             ->filter(fn (HrRequest $request) => $this->requestBelongsToMonth($request, $month))
             ->groupBy('employee_id');
-        $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->where('status', 'Approved')->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
+        $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
         $balances = $leaveBalanceService->balancesFor($employees, $month->year);
 
@@ -196,8 +195,8 @@ class JobDataController extends Controller
                 'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity')),
                 'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0), 'unpaid_leave_days' => $unpaidLeaveDays,
                 'early_leave_minutes' => (int) $attendanceRows->sum('early_leave_minutes'),
-                'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->overtimeMinutes($item, $employee, 'day')),
-                'night_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->overtimeMinutes($item, $employee, 'night')),
+                'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'day')),
+                'night_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'night')),
                 'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),
                 'penalty_count' => $employeePenalties->count(), 'annual_balance_remaining' => $balance['remaining'],
                 'advance_request_count' => $this->requestTypeCount($employeeRequests, 'advance'),
@@ -284,7 +283,55 @@ class JobDataController extends Controller
         $endMinutes = $end->hour * 60 + $end->minute;
         $inMinutes = $checkIn->hour * 60 + $checkIn->minute;
         $outMinutes = $checkOut->hour * 60 + $checkOut->minute;
-        return $period === 'day' ? max(0, $startMinutes - $inMinutes) : max(0, $outMinutes - $endMinutes);
+        if ($endMinutes <= $startMinutes) $endMinutes += 1440;
+        if ($outMinutes <= $inMinutes) $outMinutes += 1440;
+        $segments = [];
+        if ($inMinutes < $startMinutes) $segments[] = [$inMinutes, min($startMinutes, $outMinutes)];
+        if ($outMinutes > $endMinutes) $segments[] = [max($endMinutes, $inMinutes), $outMinutes];
+        $settings = app(\App\Services\HrOperationalSettingsService::class);
+        $nightStart = $this->timeToMinutes($settings->nightStart());
+        $nightEnd = $this->timeToMinutes($settings->nightEnd());
+        if ($nightEnd <= $nightStart) $nightEnd += 1440;
+        $total = 0;
+        foreach ($segments as [$from, $to]) {
+            if ($to <= $from) continue;
+            $night = 0;
+            for ($day = -1; $day <= 1; $day++) {
+                $offset = 1440 * $day;
+                $night += max(0, min($to, $nightEnd + $offset) - max($from, $nightStart + $offset));
+            }
+            $total += $period === 'night' ? $night : max(0, ($to - $from) - $night);
+        }
+        return (int) round($total);
+    }
+
+    private function requestedOvertimeMinutes(Attendance $attendance, Employee $employee, $requests, string $period): int
+    {
+        $actual = $this->overtimeMinutes($attendance, $employee, $period);
+        if ($actual <= 0) return 0;
+        $date = Carbon::parse($attendance->attendance_date)->toDateString();
+        $requested = $requests->filter(function (HrRequest $request) use ($date, $period): bool {
+            if (($request->requestType?->source_key ?: $request->request_type) !== 'overtime') return false;
+            $payload = is_array($request->payload) ? $request->payload : [];
+            $requestDate = $payload['request_date'] ?? $payload['overtime_request_date'] ?? $payload['date'] ?? null;
+            if (!$requestDate) return false;
+            try {
+                return Carbon::parse($requestDate)->toDateString() === $date
+                    && ($payload['overtime_period'] ?? $payload['period'] ?? null) === $period;
+            } catch (\Throwable) {
+                return false;
+            }
+        })->sum(function (HrRequest $request): float {
+            $payload = is_array($request->payload) ? $request->payload : [];
+            return (float) ($payload['hours'] ?? $payload['duration_hours'] ?? $payload['day_overtime_hours'] ?? $payload['night_overtime_hours'] ?? 0) * 60;
+        });
+        return (int) min($actual, max(0, $requested));
+    }
+
+    private function timeToMinutes(string $time): int
+    {
+        $parts = explode(':', trim($time));
+        return ((int) ($parts[0] ?? 0) * 60) + (int) ($parts[1] ?? 0);
     }
 
     private function daysWithinMonth(Leave $leave, Carbon $month): int
