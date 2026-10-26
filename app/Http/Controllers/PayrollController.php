@@ -295,6 +295,7 @@ class PayrollController extends Controller
         $inputs = (array) ($snapshot['inputs'] ?? []);
         $positive = static fn ($value): bool => (float) $value > 0;
         $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
+        $arabic = static fn (string $value): string => html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $allowances = array_values(array_filter([
             ['بدل السكن', (float) $payrollRecord->housing_allowance],
@@ -302,6 +303,9 @@ class PayrollController extends Controller
             ['بدل الوجبة', (float) $payrollRecord->meal_allowance],
             ['بدل ملبس', (float) $payrollRecord->clothing_allowance],
         ], fn ($item) => $positive($item[1])));
+        $allowanceLabels = [$arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x633;&#x643;&#x646;'), $arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x627;&#x646;&#x62a;&#x642;&#x627;&#x644;'), $arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x648;&#x62c;&#x628;&#x629;'), $arabic('&#x628;&#x62f;&#x644; &#x645;&#x644;&#x628;&#x633;')];
+        foreach ($allowances as $index => &$item) { $item[0] = $allowanceLabels[$index] ?? $arabic('&#x627;&#x644;&#x628;&#x62f;&#x644;&#x627;&#x62a;'); }
+        unset($item);
         if (!$allowances && (float) $payrollRecord->allowances > 0) {
             $allowances[] = ['البدلات', (float) $payrollRecord->allowances];
         }
@@ -311,6 +315,9 @@ class PayrollController extends Controller
             ['الإضافي الليلي', (float) ($payrollRecord->night_overtime_amount ?: $payrollRecord->ot_night_amount)],
             ['الإضافي', (float) $payrollRecord->overtime_amount],
         ], fn ($item) => $positive($item[1])));
+        $overtimeLabels = [$arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a; &#x627;&#x644;&#x646;&#x647;&#x627;&#x631;&#x64a;'), $arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a; &#x627;&#x644;&#x644;&#x64a;&#x644;&#x64a;'), $arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a;')];
+        foreach ($overtime as $index => &$item) { $item[0] = $overtimeLabels[$index] ?? $item[0]; }
+        unset($item);
         if (count($overtime) > 1) {
             $overtime = array_values(array_filter($overtime, fn ($item) => $item[0] !== 'الإضافي'));
         }
@@ -324,12 +331,16 @@ class PayrollController extends Controller
             ['السلفة المصروفة', $advance],
         ], fn ($item) => $positive($item[1])));
 
+        $additionalLabels = [$arabic('&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x627;&#x62a;'), $arabic('&#x627;&#x644;&#x62d;&#x648;&#x627;&#x641;&#x632;'), $arabic('&#x627;&#x644;&#x639;&#x645;&#x648;&#x644;&#x627;&#x62a;'), $arabic('&#x646;&#x635;&#x64a;&#x628; &#x627;&#x644;&#x623;&#x631;&#x628;&#x627;&#x62d;'), $arabic('&#x627;&#x633;&#x62a;&#x62d;&#x642;&#x627;&#x642;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;'), $arabic('&#x627;&#x644;&#x633;&#x644;&#x641;&#x629; &#x627;&#x644;&#x645;&#x635;&#x631;&#x648;&#x641;&#x629;')];
+        foreach ($additional as $index => &$item) { $item[0] = $additionalLabels[$index] ?? $item[0]; }
+        unset($item);
         $earnings = array_merge(
             [['المستحق حتى اليوم', (float) data_get($snapshot, 'to_date_entitlement', $payrollRecord->basic_salary)]],
             $allowances,
             $overtime,
             $additional,
         );
+        if (isset($earnings[0])) { $earnings[0][0] = $arabic('&#x627;&#x644;&#x645;&#x633;&#x62a;&#x62d;&#x642; &#x62d;&#x62a;&#x649; &#x627;&#x644;&#x64a;&#x648;&#x645;'); }
         $deductions = array_values(array_filter([
             ['تأمين الموظف', (float) $payrollRecord->employee_insurance],
             ['الضريبة', (float) $payrollRecord->income_tax],
@@ -340,6 +351,9 @@ class PayrollController extends Controller
             ['استقطاعات أخرى', (float) $payrollRecord->other_deductions],
         ], fn ($item) => $positive($item[1])));
 
+        $deductionLabels = [$arabic('&#x62a;&#x623;&#x645;&#x64a;&#x646; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;'), $arabic('&#x627;&#x644;&#x636;&#x631;&#x64a;&#x628;&#x629;'), $arabic('&#x635;&#x646;&#x62f;&#x648;&#x642; &#x627;&#x644;&#x634;&#x647;&#x62f;&#x627;&#x621;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x63a;&#x64a;&#x627;&#x628;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x62c;&#x632;&#x627;&#x621;&#x627;&#x62a;'), $arabic('&#x642;&#x633;&#x637; &#x627;&#x644;&#x633;&#x644;&#x641;&#x629;'), $arabic('&#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;')];
+        foreach ($deductions as $index => &$item) { $item[0] = $deductionLabels[$index] ?? $item[0]; }
+        unset($item);
         $viewData = [
             'record' => $payrollRecord,
             'earnings' => $earnings,
