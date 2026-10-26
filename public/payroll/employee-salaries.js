@@ -131,7 +131,20 @@
       }
     });
   }
-  document.getElementById('print')?.addEventListener('click', () => window.print());
+  window.masarPrintPayslip = () => {
+    const drawer = document.getElementById('drawer');
+    if (!drawer) return window.print();
+    drawer.classList.add('open');
+    document.body.classList.add('printing-payslip');
+    window.setTimeout(() => window.print(), 30);
+  };
+  document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.addEventListener('click', event => {
+    event.preventDefault();
+    window.masarPrintPayslip();
+  });
+  document.querySelector('.employee-payroll-actions button[onclick="window.print()"]')?.removeAttribute('onclick');
+  document.getElementById('print')?.addEventListener('click', () => window.masarPrintPayslip());
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing-payslip'));
   window.masarEmployeeSalariesTable = table;
   table(); drawer(); closeDrawer();
 })();

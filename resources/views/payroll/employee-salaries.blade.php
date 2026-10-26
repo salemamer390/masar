@@ -26,6 +26,16 @@
   #payrollPrototype .actions .btn:hover { filter:brightness(.94); }
   #payrollPrototype .actions .btn:active { transform:translateY(1px); }
   #payrollPrototype .actions .btn i { font-size:15px; line-height:1; }
+  @media print {
+    body.printing-payslip * { visibility:hidden !important; }
+    body.printing-payslip #payrollPrototype .drawer,
+    body.printing-payslip #payrollPrototype .drawer * { visibility:visible !important; }
+    body.printing-payslip #payrollPrototype .drawer { position:absolute !important; inset:0 !important; width:100% !important; max-width:none !important; height:auto !important; overflow:visible !important; transform:none !important; box-shadow:none !important; }
+    body.printing-payslip #payrollPrototype .drawer-overlay,
+    body.printing-payslip #payrollPrototype .actions,
+    body.printing-payslip #payrollPrototype .close { display:none !important; }
+    body.printing-payslip { background:#fff !important; }
+  }
   #payrollPrototype .actions .btn-pdf { background:#dc3545; border-color:#dc3545; color:#fff; }
   #payrollPrototype .actions .btn-print { background:#f3f5f8; border-color:#cbd5e1; color:#334155; }
   #payrollPrototype .actions .btn-whatsapp { background:#25d366; border-color:#25d366; color:#fff; }
