@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Mpdf\Mpdf;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PayrollController extends Controller
@@ -634,6 +635,7 @@ class PayrollController extends Controller
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $records = PayrollRecord::with(['employee.department', 'employee.job', 'salary'])
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->when($request->boolean('approved_only'), fn ($query) => $query->whereIn('status', ['Approved', 'Locked']))
             ->whereDate('payroll_month', $month->toDateString())->orderByDesc('id')->get();
 
         if (in_array((string) $request->string('format')->lower(), ['xlsx', 'excel'], true)) {
@@ -641,6 +643,17 @@ class PayrollController extends Controller
             abort_unless(is_file($template), 500, 'Excel template is missing.');
             $spreadsheet = IOFactory::load($template);
             $sheet = $spreadsheet->getActiveSheet();
+
+            // Keep every template heading visible in Excel. Long Arabic
+            // headings otherwise get clipped in the RTL sheet and appear
+            // blank in some Excel versions.
+            $headerStyle = $sheet->getStyle('A1:X1');
+            $headerStyle->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+                ->setVertical(Alignment::VERTICAL_CENTER)
+                ->setWrapText(true);
+            $sheet->getRowDimension(1)->setRowHeight(58);
+
             $row = 2;
             foreach ($records as $record) {
                 if ($row > 200) {

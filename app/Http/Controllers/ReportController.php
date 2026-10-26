@@ -9,8 +9,8 @@ use App\Models\InsuranceRecord;
 use App\Models\Leave;
 use App\Models\PayrollRecord;
 use App\Models\Salary;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
@@ -25,8 +25,19 @@ class ReportController extends Controller
         return view('reports.show', array_merge(['type' => $type, 'departments' => Department::where('is_active', 1)->orderBy('name')->get()], $data));
     }
 
-    public function export(Request $request, string $type): StreamedResponse
+    public function export(Request $request, string $type)
     {
+        // The payroll report must use the same company-scoped records and
+        // Excel template as the payroll page export. Keeping one generator
+        // prevents the report card from producing a different (CSV) result.
+        if ($type === 'payroll') {
+            // Use the same export data as the payroll page, including draft
+            // records that are still being prepared for the selected month.
+            $request->merge(['format' => 'xlsx']);
+
+            return app(PayrollController::class)->export($request);
+        }
+
         $data = $this->getReportData($type, $request);
         $title = $data['title'] ?? 'report';
 
@@ -160,9 +171,14 @@ class ReportController extends Controller
                 ];
 
             case 'payroll':
+                $companyId = auth()->user()?->company_id;
+                $reportMonth = $request?->filled('month')
+                    ? Carbon::parse($request->input('month'))->startOfMonth()
+                    : now()->startOfMonth();
                 $items = PayrollRecord::with(['employee.department', 'employee.job'])
                     ->whereIn('status', ['Approved', 'Locked'])
-                    ->when($request?->filled('month'), fn ($q) => $q->whereMonth('payroll_month', $request->month))
+                    ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+                    ->whereDate('payroll_month', $reportMonth->toDateString())
                     ->latest('payroll_month')->get();
                 return [
                     'title' => 'Monthly Payroll Report',

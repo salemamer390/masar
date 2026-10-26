@@ -10,5 +10,12 @@
 ['leaves','تقرير الإجازات','الطلبات والأرصدة وحالات الاعتماد','calendar2-check'],
 ['insurance','تقرير التأمينات','التسجيل والأكواد والحالة','shield-check'],
 ['summary','الملخص الإداري','مؤشرات الموارد البشرية الأساسية','bar-chart-fill']
-] as $report)<a class="report-card text-decoration-none" href="{{ route('reports.show',$report[0]) }}"><i class="bi bi-{{ $report[3] }}"></i><b>{{ $report[1] }}</b><span>{{ $report[2] }}</span></a>@endforeach</div>
+] as $report)
+@php
+    $reportUrl = ($report[0] === 'payroll' && auth()->user()?->hasPermission('reports.export_excel'))
+        ? route('reports.export', ['type' => 'payroll', 'month' => now()->format('Y-m-01')])
+        : route('reports.show', $report[0]);
+@endphp
+<a class="report-card text-decoration-none" href="{{ $reportUrl }}"><i class="bi bi-{{ $report[3] }}"></i><b>{{ $report[1] }}</b><span>{{ $report[2] }}</span></a>
+@endforeach</div>
 @endsection
