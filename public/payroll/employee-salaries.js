@@ -126,6 +126,20 @@
   document.addEventListener('click', e => { if (picker && !picker.contains(e.target) && e.target !== periodBox) closePicker(); });
   window.addEventListener('resize', closePicker);
 
+  // Move the two payroll tabs into the payroll table header, replacing the
+  // old panel title while keeping the existing tab behavior.
+  const payrollPanelHeadForTabs = document.querySelector('#payrollPrototype .leftpanel .panelhead');
+  const oldPayrollTabs = document.getElementById('payrollViewTabs');
+  if (payrollPanelHeadForTabs && oldPayrollTabs) {
+    const titleArea = payrollPanelHeadForTabs.querySelector(':scope > div:first-child');
+    if (titleArea) {
+      titleArea.innerHTML = '';
+      oldPayrollTabs.querySelectorAll('[data-payroll-tab]').forEach(tab => titleArea.appendChild(tab.cloneNode(true)));
+      titleArea.classList.add('payroll-inline-tabs');
+    }
+    oldPayrollTabs.remove();
+  }
+
   // Tabs: current month / previous payrolls.
   const prototypePage = document.getElementById('payrollPrototype');
   const actionsBar = document.querySelector('.employee-payroll-actions');

@@ -45,9 +45,12 @@
   #payrollPrototype .actions .btn-pdf { background:#dc3545; border-color:#dc3545; color:#fff; }
   #payrollPrototype .actions .btn-print { background:#f3f5f8; border-color:#cbd5e1; color:#334155; }
   #payrollPrototype .actions .btn-whatsapp { background:#25d366; border-color:#25d366; color:#fff; }
-  .payroll-view-tabs { margin-bottom:14px; }
+  .payroll-view-tabs { display:none !important; }
   .payroll-view-tabs .nav-link { font-weight:800; color:#52627a; }
   .payroll-view-tabs .nav-link.active { color:#1677f9; }
+  #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link { border:1px solid transparent; border-radius:9px; padding:8px 11px; font-weight:800; font-size:12px; color:#52627a; }
+  #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link.active { background:#edf5ff; border-color:#cfe1ff; color:#1677f9; }
   .payroll-view-banner { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:#eef5ff; border:1px solid #cfe1ff; color:#0e4fb3; border-radius:12px; padding:10px 14px; margin-bottom:12px; font-weight:700; }
   .payroll-history-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
   .payroll-history-card { all:unset; box-sizing:border-box; cursor:pointer; display:block; background:#fff; border:1px solid #e1e8f2; border-radius:14px; padding:14px 16px; transition:box-shadow .15s ease, transform .15s ease, border-color .15s ease; }
@@ -124,5 +127,5 @@ window.masarEmployeeSalaries = {
   pdfUrlTemplate: @json(route('payroll.employee-salaries.payslip-pdf', ['payrollRecord' => '__RECORD__']))
 };
 </script>
-<script src="{{ asset('payroll/employee-salaries.js') }}"></script>
+<script src="{{ asset('payroll/employee-salaries.js') }}?v={{ @filemtime(public_path('payroll/employee-salaries.js')) }}"></script>
 @endsection
