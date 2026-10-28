@@ -214,6 +214,22 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
             ->name('destroy');
     });
 
+    // Fingerprint devices and synchronization logs
+    Route::prefix('fingerprint')->name('fingerprint.')->group(function () {
+        Route::get('/devices', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'index'])->middleware('permission:fingerprint-devices.view')->name('devices.index');
+        Route::get('/devices/create', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'create'])->middleware('permission:fingerprint-devices.create')->name('devices.create');
+        Route::post('/devices', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'store'])->middleware('permission:fingerprint-devices.create')->name('devices.store');
+        Route::post('/devices/sync-all', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'syncAll'])->middleware('permission:fingerprint-devices.sync')->name('devices.sync-all');
+        Route::get('/devices/{fingerprintDevice}', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'show'])->middleware('permission:fingerprint-devices.view')->name('devices.show');
+        Route::get('/devices/{fingerprintDevice}/edit', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'edit'])->middleware('permission:fingerprint-devices.update')->name('devices.edit');
+        Route::put('/devices/{fingerprintDevice}', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'update'])->middleware('permission:fingerprint-devices.update')->name('devices.update');
+        Route::delete('/devices/{fingerprintDevice}', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'destroy'])->middleware('permission:fingerprint-devices.delete')->name('devices.destroy');
+        Route::post('/devices/{fingerprintDevice}/test-connection', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'testConnection'])->middleware('permission:fingerprint-devices.test')->name('devices.test');
+        Route::post('/devices/{fingerprintDevice}/retrieve-info', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'retrieveInfo'])->middleware('permission:fingerprint-devices.test')->name('devices.info');
+        Route::post('/devices/{fingerprintDevice}/sync', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'sync'])->middleware('permission:fingerprint-devices.sync')->name('devices.sync');
+        Route::get('/sync-logs', [\App\Http\Controllers\Fingerprint\FingerprintDeviceSyncLogController::class, 'index'])->middleware('permission:fingerprint-sync-logs.view')->name('sync-logs.index');
+    });
+
     // Leaves
     Route::prefix('leaves')->name('leaves.')->group(function () {
         Route::get('/', [LeaveController::class, 'index'])

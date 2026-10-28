@@ -23,6 +23,7 @@ class Employee extends Model
     }
     protected $fillable = [
         'employee_code',
+        'fingerprint_id',
         'first_name',
         'middle_name',
         'last_name',

@@ -13,5 +13,7 @@ Schedule::command('payroll:refresh-drafts')->dailyAt('07:00')->timezone('Africa/
 Schedule::command('payroll:refresh-drafts')->dailyAt('23:55')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('summary:capture')->dailyAt('23:55')->timezone('Africa/Cairo')->withoutOverlapping()
     ->when(fn () => now('Africa/Cairo')->isLastOfMonth());
+Schedule::command('fingerprint:sync-devices')->everyFifteenMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
+Schedule::command('operations:detect-stale-sync')->everyThirtyMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
 // Payroll closing is manual. Late fingerprint imports from the new month may
 // still affect the previous month, so no automatic close is scheduled.
