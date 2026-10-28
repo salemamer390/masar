@@ -391,6 +391,10 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
     Route::get('/employee-salaries', [PayrollController::class, 'employeeSalaries'])
         ->middleware('permission:payroll.view')
         ->name('payroll.employee-salaries');
+    // Backward-compatible URL used by older navigation links.
+    Route::get('/payroll/employee-salaries', [PayrollController::class, 'employeeSalaries'])
+        ->middleware('permission:payroll.view')
+        ->name('payroll.employee-salaries.legacy');
     Route::get('/employee-salaries/{payrollRecord}/payslip-pdf', [PayrollController::class, 'payslipPdf'])
         ->middleware('permission:payroll.view')
         ->name('payroll.employee-salaries.payslip-pdf');
