@@ -10,7 +10,7 @@
   @if(auth()->user()?->hasPermission('requests.view'))<a href="{{ route('requests.index') }}" class="nav-item {{ request()->routeIs('requests.*') ? 'active' : '' }}"><i class="bi bi-file-earmark-text-fill"></i><span>الطلبات</span></a>@endif
   <div class="side-section">الرواتب والتأمينات</div>
   @if(auth()->user()?->hasPermission('salary.view'))<a href="{{ route('salaries.index') }}" class="nav-item {{ request()->routeIs('salaries.*') ? 'active' : '' }}"><i class="bi bi-cash-stack"></i><span>هياكل الرواتب</span></a>@endif
-  @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.index') }}" class="nav-item {{ request()->routeIs('payroll.index') ? 'active' : '' }}"><i class="bi bi-calendar3"></i><span>دورة الرواتب</span></a>@endif
+  @if(auth()->user()?->isSuperAdmin() && auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.index') }}" class="nav-item {{ request()->routeIs('payroll.index') ? 'active' : '' }}"><i class="bi bi-calendar3"></i><span>دورة الرواتب</span></a>@endif
   @if(auth()->user()?->hasPermission('payroll.view'))<a href="{{ route('payroll.employee-salaries') }}" class="nav-item {{ request()->routeIs('payroll.employee-salaries') ? 'active' : '' }}"><i class="bi bi-person-vcard"></i><span>رواتب الموظفين</span></a>@endif
   @if(auth()->user()?->hasPermission('insurance.view'))<a href="{{ route('insurance.index') }}" class="nav-item {{ request()->routeIs('insurance.*') ? 'active' : '' }}"><i class="bi bi-shield-check"></i><span>التأمينات</span></a>@endif
   <div class="side-section">الإدارة والتقارير</div>
