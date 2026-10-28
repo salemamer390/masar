@@ -471,6 +471,11 @@ class PayrollController extends Controller
         abort_unless((int) $run->company_id === (int) auth()->user()?->company_id, 404);
     }
 
+    private function assertSameCompanyRecord(PayrollRecord $record): void
+    {
+        abort_unless((int) $record->company_id === (int) auth()->user()?->company_id, 404);
+    }
+
     public function generate(Request $request, PayrollRunService $service)
     {
         $companyId = $this->requireCompany();
@@ -562,6 +567,7 @@ class PayrollController extends Controller
 
     public function approve(PayrollRecord $payrollRecord)
     {
+        $this->assertSameCompanyRecord($payrollRecord);
         if ($payrollRecord->is_locked || $payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid', 'Locked', 'Approved', 'معتمدة'], true)) {
             return back()->with('toast', 'لا يمكن تغيير حالة هذا الراتب لأنه معتمد أو مقفل أو مصروف.');
         }
@@ -573,6 +579,7 @@ class PayrollController extends Controller
     /** Update variable monthly inputs without changing the employee's fixed salary structure. */
     public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollRunService $service)
     {
+        $this->assertSameCompanyRecord($payrollRecord);
         abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, 'لا يمكن تعديل مدخلات مسير معتمد أو مقفل.');
         $data = $request->validate([
             'ot_day_hours'=>['nullable','numeric','min:0'], 'ot_night_hours'=>['nullable','numeric','min:0'],
@@ -648,6 +655,7 @@ class PayrollController extends Controller
 
     public function pay(PayrollRecord $payrollRecord)
     {
+        $this->assertSameCompanyRecord($payrollRecord);
         if ($payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid'], true)) {
             return back()->with('toast', 'هذا الراتب تم صرفه بالفعل.');
         }

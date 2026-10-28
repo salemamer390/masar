@@ -319,7 +319,6 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
     Route::prefix('payroll')->name('payroll.')->group(function () {
         Route::get('/', [PayrollController::class, 'index'])
             ->middleware('permission:payroll.view')
-            ->middleware('superadmin')
             ->name('index');
         Route::get('/settings', [PayrollSettingsController::class, 'index'])
             ->middleware('permission:payroll.settings')
@@ -343,47 +342,36 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
             ->middleware('permission:payroll.settings')->name('settings.holidays.destroy');
         Route::post('/generate', [PayrollController::class, 'generate'])
             ->middleware('permission:payroll.create')
-            ->middleware('superadmin')
             ->name('generate');
         Route::post('/runs/generate', [PayrollController::class, 'generateRun'])
             ->middleware('permission:payroll.create')
-            ->middleware('superadmin')
             ->name('runs.generate');
         Route::post('/runs/generate/start', [PayrollController::class, 'startGeneration'])
             ->middleware('permission:payroll.create')
-            ->middleware('superadmin')
             ->name('runs.generate.start');
         Route::post('/runs/generate/batch', [PayrollController::class, 'generateBatch'])
             ->middleware('permission:payroll.create')
-            ->middleware('superadmin')
             ->name('runs.generate.batch');
         Route::post('/runs/{payrollRun}/approve', [PayrollController::class, 'approveRun'])
             ->middleware('permission:payroll.approve')
-            ->middleware('superadmin')
             ->name('runs.approve');
         Route::post('/runs/{payrollRun}/lock', [PayrollController::class, 'lockRun'])
             ->middleware('permission:payroll.lock')
-            ->middleware('superadmin')
             ->name('runs.lock');
         Route::delete('/runs/{payrollRun}', [PayrollController::class, 'destroyRun'])
             ->middleware('permission:payroll.delete')
-            ->middleware('superadmin')
             ->name('runs.destroy');
         Route::post('/{payrollRecord}/approve', [PayrollController::class, 'approve'])
             ->middleware('permission:payroll.approve')
-            ->middleware('superadmin')
             ->name('approve');
         Route::put('/{payrollRecord}/inputs', [PayrollController::class, 'updateInputs'])
             ->middleware('permission:payroll.edit')
-            ->middleware('superadmin')
             ->name('inputs.update');
         Route::post('/{payrollRecord}/pay', [PayrollController::class, 'pay'])
             ->middleware('permission:payroll.edit')
-            ->middleware('superadmin')
             ->name('pay');
         Route::get('/export', [PayrollController::class, 'export'])
             ->middleware('permission:payroll.export')
-            ->middleware('superadmin')
             ->name('export');
     });
 
