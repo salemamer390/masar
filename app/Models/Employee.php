@@ -7,20 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\BelongsToCompany;
 
 class Employee extends Model
 {
-    protected static function booted(): void
-    {
-        static::addGlobalScope('company', function (Builder $builder): void {
-            $user = auth()->user();
-            // A company-linked account is always isolated to its company,
-            // including Super Admin accounts. Only an unlinked platform
-            // account (company_id = null) may see all companies.
-            if ($user && $user->company_id) $builder->where($builder->getModel()->getTable().'.company_id', $user->company_id);
-        });
-    }
+    // Company isolation is enforced by the shared trait: the global scope
+    // restricts every read to the actor's company (a company-less platform
+    // account keeps platform-wide visibility), and the saving guard blocks
+    // writes whose company_id does not match the acting company account.
+    use BelongsToCompany;
     protected $fillable = [
         'employee_code',
         'fingerprint_id',
