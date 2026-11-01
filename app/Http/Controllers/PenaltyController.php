@@ -8,18 +8,24 @@ use App\Models\Penalty;
 use App\Models\PenaltyType;
 use App\Services\PayrollPeriodGuard;
 use App\Services\PayrollRunService;
+use App\Services\HrOperationalSettingsService;
 use Illuminate\Http\Request;
 
 class PenaltyController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, HrOperationalSettingsService $hrSettings)
     {
+        $period = $hrSettings->payrollPeriod(today()->copy());
+        $periodStart = $period['start']->toDateString();
+        $periodEnd = $period['end']->toDateString();
         $penalties = Penalty::with(['employee.department', 'employee.job', 'penaltyType'])
             ->when($request->filled('employee_id'), fn ($q) => $q->where('employee_id', $request->employee_id))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $request->from_date))
             ->when($request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $request->to_date))
+            ->when(!$request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $periodStart))
+            ->when(!$request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $periodEnd))
             ->orderByDesc('penalty_date')->orderByDesc('id')
             ->paginate(in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25)->withQueryString();
 
@@ -27,7 +33,7 @@ class PenaltyController extends Controller
         $penaltyTypes = PenaltyType::where('is_active', 1)->get();
 
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
-        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments'));
+        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments', 'periodStart', 'periodEnd'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)

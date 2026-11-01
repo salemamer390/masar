@@ -8,6 +8,8 @@ use App\Models\HrRequest;
 use App\Models\PayrollRecord;
 use App\Models\RequestType;
 use App\Services\PayrollRunService;
+use App\Services\HrOperationalSettingsService;
+use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,13 +17,28 @@ use Illuminate\Validation\ValidationException;
 
 class HrRequestController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, HrOperationalSettingsService $hrSettings)
     {
         $user = $request->user();
+        $period = $hrSettings->payrollPeriod(today()->copy());
+        $periodStart = $period['start']->toDateString();
+        $periodEnd = $period['end']->toDateString();
         $query = HrRequest::query()
             ->with(['employee.department', 'requestType', 'creator', 'reviewer'])
             ->visibleTo($user)
             ->latest('id');
+
+        // By default the list follows the company's configured payroll period.
+        // Explicit filters remain available to review another period.
+        $query->where(function (Builder $dateQuery) use ($periodStart, $periodEnd) {
+            $dateQuery->whereBetween(
+                \Illuminate\Support\Facades\DB::raw("JSON_UNQUOTE(JSON_EXTRACT(payload, '$.request_date'))"),
+                [$periodStart, $periodEnd]
+            )->orWhere(function (Builder $fallback) use ($periodStart, $periodEnd) {
+                $fallback->whereNull(\Illuminate\Support\Facades\DB::raw("JSON_EXTRACT(payload, '$.request_date')"))
+                    ->whereBetween('created_at', [$periodStart.' 00:00:00', $periodEnd.' 23:59:59']);
+            });
+        });
 
         if ($request->filled('status')) {
             $query->where('status', $request->string('status')->toString());

@@ -10,6 +10,9 @@ use Illuminate\Validation\Rule;
 use App\Models\LeaveType;
 use App\Services\PayrollCalculator;
 use App\Services\PayrollDefaultsService;
+use App\Services\AttendanceMetricsService;
+use App\Services\PayrollRunService;
+use App\Services\HrOperationalSettingsService;
 
 class PayrollSettingsController extends Controller
 {
@@ -85,7 +88,7 @@ class PayrollSettingsController extends Controller
         return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', 'تم حفظ إعدادات الإجازات بنجاح.');
     }
 
-    public function updateOperational(Request $request)
+    public function updateOperational(Request $request, AttendanceMetricsService $attendanceMetrics, PayrollRunService $payrollRuns, HrOperationalSettingsService $hrSettings)
     {
         $data = $request->validate([
             'default_shift_start' => ['required', 'date_format:H:i'],
@@ -95,6 +98,8 @@ class PayrollSettingsController extends Controller
             'weekly_rest_pattern' => ['required', 'regex:/^[01]{7}$/'],
             'night_start' => ['nullable', 'date_format:H:i'],
             'night_end' => ['nullable', 'date_format:H:i'],
+            'payroll_period_start_day' => ['required', 'integer', 'min:1', 'max:31'],
+            'payroll_period_end_day' => ['required', 'integer', 'min:1', 'max:31'],
             'unpaid_leave_as_deduction' => ['nullable', 'in:0,1'],
         ]);
         $labels = [
@@ -105,18 +110,24 @@ class PayrollSettingsController extends Controller
             'weekly_rest_pattern' => 'الراحة الأسبوعية (الإثنين إلى الأحد)',
             'night_start' => 'بداية الفترة الليلية للإضافي',
             'night_end' => 'نهاية الفترة الليلية للإضافي',
+            'payroll_period_start_day' => 'بداية فترة المسير (يوم الشهر)',
+            'payroll_period_end_day' => 'نهاية فترة المسير (يوم الشهر)',
             'unpaid_leave_as_deduction' => 'خصم الإجازة بدون أجر من الراتب',
         ];
+        $companyId = (int) auth()->user()->company_id;
         foreach ($data as $key => $value) {
             if ($value === null) continue;
                 DB::table('hr_operational_settings')->updateOrInsert(
-                ['company_id' => auth()->user()->company_id, 'setting_key' => $key],
+                ['company_id' => $companyId, 'setting_key' => $key],
                 ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
             );
         }
         ActivityLog::record('hr_operational_settings_update', 'تم تحديث أوقات الدوام والراحة الأسبوعية.');
+        $hrSettings->flush();
+        $attendanceCount = $attendanceMetrics->recalculateCompany($companyId);
+        $draftCount = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'Operational settings updated.', 'settings' => $data])
+            ? response()->json(['success' => true, 'message' => 'Operational settings updated and calculations refreshed.', 'settings' => $data, 'attendance_updated' => $attendanceCount, 'drafts_refreshed' => $draftCount])
             : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.');
     }
 

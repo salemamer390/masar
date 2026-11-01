@@ -47,6 +47,61 @@ class HrOperationalSettingsService
 
     public function start(): string { return $this->value('default_shift_start', '09:00'); }
     public function end(): string { return $this->value('default_shift_end', '17:00'); }
+
+    /** First day number of the recurring payroll/attendance period. */
+    public function payrollPeriodStartDay(): int
+    {
+        return max(1, min(31, (int) $this->value('payroll_period_start_day', '1')));
+    }
+
+    /** Last day number of the recurring payroll/attendance period. */
+    public function payrollPeriodEndDay(): int
+    {
+        return max(1, min(31, (int) $this->value('payroll_period_end_day', '30')));
+    }
+
+    /**
+     * Resolve the concrete period represented by a payroll month.
+     * If the start day is after the end day, the period crosses two calendar months
+     * (for example 26/25 means 26th of the previous month through 25th of this month).
+     * The supplied month is the month in which the period ends.
+     *
+     * @return array{start: Carbon,end: Carbon}
+     */
+    public function payrollPeriod(Carbon $month): array
+    {
+        $anchor = $month->copy()->startOfMonth();
+        $startDay = $this->payrollPeriodStartDay();
+        $endDay = $this->payrollPeriodEndDay();
+        $endMonth = $anchor->copy();
+        $startMonth = $startDay > $endDay ? $anchor->copy()->subMonth() : $anchor->copy();
+
+        $start = $startMonth->copy()->day(min($startDay, $startMonth->daysInMonth))->startOfDay();
+        $end = $endMonth->copy()->day(min($endDay, $endMonth->daysInMonth))->endOfDay();
+
+        return ['start' => $start, 'end' => $end];
+    }
+
+    /** Return the payroll anchor month that owns a concrete calendar date. */
+    public function payrollMonthForDate(Carbon $date): Carbon
+    {
+        $date = $date->copy()->startOfDay();
+        $period = $this->payrollPeriod($date);
+        if ($date->betweenIncluded($period['start'], $period['end'])) {
+            return $period['end']->copy()->startOfMonth();
+        }
+
+        $startDay = $this->payrollPeriodStartDay();
+        $endDay = $this->payrollPeriodEndDay();
+        if ($startDay > $endDay && $date->day >= $startDay) {
+            return $date->copy()->addMonthNoOverflow()->startOfMonth();
+        }
+        if ($startDay <= $endDay && $date->day < $startDay) {
+            return $date->copy()->subMonthNoOverflow()->startOfMonth();
+        }
+
+        return $date->copy()->startOfMonth();
+    }
     public function grace(): int { return (int) $this->value('grace_minutes', '15'); }
     public function absenceCutoff(): string { return $this->value('absence_cutoff_time', $this->end()); }
 

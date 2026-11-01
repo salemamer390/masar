@@ -111,6 +111,17 @@ class PayrollRunService
         }
     }
 
+    /** Rebuild every editable draft for one company after a calculation rule changes. */
+    public function refreshOpenDraftsForCompany(int $companyId): int
+    {
+        $runs = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)
+            ->where('status', 'Draft')->orderBy('payroll_month')->get();
+        foreach ($runs as $run) {
+            $this->generate($run->payroll_month->copy(), null, $companyId);
+        }
+        return $runs->count();
+    }
+
     /**
      * Insert or update the single record of this employee/month. Paid records and
      * records that belong to another approved/locked run are never touched; a draft
@@ -231,23 +242,29 @@ class PayrollRunService
     private function salaryFor(int $employeeId, Carbon $month): ?Salary
     {
         // A historical salary can be the valid one for a past payroll month.
+        $periodEnd = $this->hrSettings->payrollPeriod($month)['end'];
+
         return Salary::withoutGlobalScopes()
             ->where('employee_id', $employeeId)
-            ->where('effective_from', '<=', $month->copy()->endOfMonth()->toDateString())
+            ->where('effective_from', '<=', $periodEnd->toDateString())
             ->latest('effective_from')->latest('id')->first();
     }
 
     /** Employees whose status allows payroll in this month (before the service-window check). */
     public function eligibleEmployees(Carbon $month, int $companyId, ?array $employeeIds = null): Collection
     {
+        $period = $this->hrSettings->payrollPeriod($month);
+        $periodStart = $period['start']->toDateString();
+        $periodEnd = $period['end']->toDateString();
+
         return Employee::withoutGlobalScopes()->with('status')
             ->where('company_id', $companyId)
             ->when($employeeIds !== null, fn ($query) => $query->whereIn('id', $employeeIds))
-            ->where(function ($query) use ($month) {
+            ->where(function ($query) use ($periodStart, $periodEnd) {
                 $query->whereDoesntHave('status', fn ($status) => $status->whereIn('name', self::EXCLUDED_STATUSES))
-                    ->orWhere(function ($terminated) use ($month) {
+                    ->orWhere(function ($terminated) use ($periodStart, $periodEnd) {
                         $terminated->whereHas('status', fn ($status) => $status->whereIn('name', self::TERMINATED_STATUSES))
-                            ->whereBetween('termination_date', [$month->copy()->startOfMonth()->toDateString(), $month->copy()->endOfMonth()->toDateString()]);
+                            ->whereBetween('termination_date', [$periodStart, $periodEnd]);
                     });
             })
             ->orderBy('id')->get();
@@ -311,10 +328,10 @@ class PayrollRunService
     /** Build payroll inputs from attendance, leaves, penalties and HR requests inside the service window. */
     private function approvedInputs(Employee $employee, Carbon $month, array $structure, array $window): array
     {
-        $from = $month->copy()->startOfMonth()->toDateString();
-        $to = $month->copy()->endOfMonth()->toDateString();
         $windowFrom = $window['start']->copy()->startOfDay();
         $windowTo = $window['end']->copy()->startOfDay();
+        $from = $windowFrom->toDateString();
+        $to = $windowTo->toDateString();
 
         // Attendance (fingerprint import or manual entry) is effective immediately.
         $attendance = Attendance::withoutGlobalScopes()->where('employee_id', $employee->id)
@@ -886,11 +903,17 @@ class PayrollRunService
      */
     public function serviceWindow(Employee $employee, Carbon $month): ?array
     {
-        $monthStart = $month->copy()->startOfMonth();
-        $calendarMonthEnd = $month->copy()->endOfMonth();
-        $monthEnd = $month->isSameMonth(Carbon::today())
-            ? Carbon::today()->startOfDay()
-            : $calendarMonthEnd;
+        $period = $this->hrSettings->payrollPeriod($month);
+        $periodStart = $period['start']->copy()->startOfDay();
+        $periodEnd = $period['end']->copy()->startOfDay();
+        $today = Carbon::today()->startOfDay();
+        $monthStart = $periodStart->copy();
+        $calendarMonthEnd = $periodEnd->copy();
+        // The current period is accrued only through today; a completed
+        // cross-month period remains complete even if its anchor month is current.
+        $monthEnd = $today->betweenIncluded($periodStart, $periodEnd)
+            ? $today
+            : $periodEnd->copy();
         $status = strtolower(trim((string) $employee->status?->name));
         $terminal = in_array($status, ['terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true);
         $eligibleWhileActive = in_array($status, ['', 'active', 'leave', 'إجازة'], true);

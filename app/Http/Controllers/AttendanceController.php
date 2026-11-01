@@ -10,6 +10,7 @@ use App\Services\PayrollPeriodGuard;
 use App\Services\HrOperationalSettingsService;
 use App\Services\DashboardDataService;
 use App\Services\PayrollRunService;
+use App\Services\AttendanceMetricsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -18,13 +19,19 @@ class AttendanceController extends Controller
     public function __construct(
         private readonly HrOperationalSettingsService $hrSettings,
         private readonly DashboardDataService $dashboard,
+        private readonly AttendanceMetricsService $attendanceMetrics,
     )
     {
     }
     public function index(Request $request)
     {
         $today = today();
+        $period = $this->hrSettings->payrollPeriod($today->copy());
+        $periodStart = $period['start']->toDateString();
+        $periodEnd = $period['end']->toDateString();
         $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date')->orderByDesc('id');
+        if (!$request->filled('from_date')) $query->whereDate('attendance_date', '>=', $periodStart);
+        if (!$request->filled('to_date')) $query->whereDate('attendance_date', '<=', $periodEnd);
         if ($request->filled('from_date')) { $query->whereDate('attendance_date', '>=', $request->from_date); }
         if ($request->filled('to_date')) { $query->whereDate('attendance_date', '<=', $request->to_date); }
         if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
@@ -52,13 +59,16 @@ class AttendanceController extends Controller
 
         $defaultShiftStart = $this->hrSettings->start();
         $defaultShiftEnd = $this->hrSettings->end();
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd'));
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd'));
     }
 
     public function export(Request $request)
     {
+        $period = $this->hrSettings->payrollPeriod(today()->copy());
         $query = Attendance::with(['employee.department'])
             ->orderByDesc('attendance_date')->orderByDesc('id');
+        if (!$request->filled('from_date')) $query->whereDate('attendance_date', '>=', $period['start']->toDateString());
+        if (!$request->filled('to_date')) $query->whereDate('attendance_date', '<=', $period['end']->toDateString());
         if ($request->filled('from_date')) $query->whereDate('attendance_date', '>=', $request->date('from_date'));
         if ($request->filled('to_date')) $query->whereDate('attendance_date', '<=', $request->date('to_date'));
         if ($request->filled('employee_id')) $query->where('employee_id', $request->integer('employee_id'));
@@ -101,13 +111,10 @@ class AttendanceController extends Controller
         $employee = Employee::findOrFail($validated['employee_id']);
         $checkIn = $validated['check_in'] ?? null;
         $checkOut = $validated['check_out'] ?? null;
-        $lateMinutes = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->hrSettings->start());
-        $earlyLeaveMinutes = $this->earlyLeaveMinutes($checkOut, $employee->shift_end ?: $this->hrSettings->end());
-        $workedHours = $this->workedHours($checkIn, $checkOut);
-        $status = ($checkIn || $checkOut) ? ($lateMinutes > 0 ? 'Late' : 'Present') : $validated['status'];
+        $metrics = $this->attendanceMetrics->metrics($employee, $checkIn, $checkOut, $validated['status']);
         $attendance = Attendance::updateOrCreate(
             ['employee_id' => $validated['employee_id'], 'attendance_date' => $validated['attendance_date']],
-            ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes, 'worked_hours' => $workedHours, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
+            ['check_in' => $checkIn, 'check_out' => $checkOut, ...$metrics, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
         );
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $attendance->employee_id);
         $this->decorateOvertime($attendance->load('employee.department'));
@@ -151,13 +158,10 @@ class AttendanceController extends Controller
         $now = now()->format('H:i');
         $checkIn = $direction === 'in' ? $now : $attendance->check_in;
         $checkOut = $direction === 'out' ? $now : $attendance->check_out;
-        $lateMinutes = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->hrSettings->start());
+        $metrics = $this->attendanceMetrics->metrics($employee, $checkIn, $checkOut);
         $attendance->fill([
             'check_in' => $checkIn, 'check_out' => $checkOut,
-            'status' => $lateMinutes > 0 ? 'Late' : 'Present',
-            'late_minutes' => $lateMinutes,
-            'early_leave_minutes' => $this->earlyLeaveMinutes($checkOut, $employee->shift_end ?: $this->hrSettings->end()),
-            'worked_hours' => $this->workedHours($checkIn, $checkOut),
+            ...$metrics,
             'source' => 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
         ])->save();
         ActivityLog::record('attendance_clock_'.$direction, 'Attendance clock event recorded.', $attendance, null, $attendance->toArray(), 'attendance');
@@ -186,15 +190,11 @@ class AttendanceController extends Controller
         }
 
         $employee = Employee::findOrFail($validated['employee_id']);
-        $lateMinutes = $this->lateMinutes($validated['check_in'], $employee->shift_start ?: $this->hrSettings->start());
-        $earlyLeaveMinutes = $this->earlyLeaveMinutes($validated['check_out'], $employee->shift_end ?: $this->hrSettings->end());
-        $status = $lateMinutes > 0 ? 'Late' : 'Present';
+        $metrics = $this->attendanceMetrics->metrics($employee, $validated['check_in'], $validated['check_out']);
         $old = $attendance->toArray();
         $attendance->update([
             'employee_id' => $employee->id, 'attendance_date' => $validated['attendance_date'],
-            'check_in' => $validated['check_in'], 'check_out' => $validated['check_out'], 'status' => $status,
-            'late_minutes' => $lateMinutes, 'early_leave_minutes' => $earlyLeaveMinutes,
-            'worked_hours' => $this->workedHours($validated['check_in'], $validated['check_out']),
+            'check_in' => $validated['check_in'], 'check_out' => $validated['check_out'], ...$metrics,
             'source' => $validated['source'] ?? 'manual',
             // أي تعديل يستلزم مراجعة السجل من جديد قبل دخوله في المسير.
             'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
@@ -219,30 +219,6 @@ class AttendanceController extends Controller
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance deleted.', 'attendance_id' => $snapshot['id']])
             : back()->with('toast', 'تم حذف سجل الحضور.');
-    }
-
-    private function lateMinutes(?string $checkIn, string $shiftStart): int
-    {
-        if (!$checkIn) return 0;
-        $actual = Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute;
-        $start = Carbon::parse($shiftStart)->hour * 60 + Carbon::parse($shiftStart)->minute;
-        return $actual > $start + $this->hrSettings->grace() ? $actual - $start : 0;
-    }
-
-    private function earlyLeaveMinutes(?string $checkOut, string $shiftEnd): int
-    {
-        if (!$checkOut) return 0;
-        $actual = Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute;
-        $end = Carbon::parse($shiftEnd)->hour * 60 + Carbon::parse($shiftEnd)->minute;
-        return max(0, $end - $actual);
-    }
-
-    private function workedHours(?string $checkIn, ?string $checkOut): ?float
-    {
-        if (!$checkIn || !$checkOut) return null;
-        $in = Carbon::parse($checkIn)->hour * 60 + Carbon::parse($checkIn)->minute;
-        $out = Carbon::parse($checkOut)->hour * 60 + Carbon::parse($checkOut)->minute;
-        return round((($out - $in + 1440) % 1440) / 60, 2);
     }
 
     /**

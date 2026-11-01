@@ -7,10 +7,14 @@ use Carbon\Carbon;
 
 class PayrollPeriodGuard
 {
+    public function __construct(private readonly HrOperationalSettingsService $operationalSettings) {}
+
     /** Prevent source-data changes that would alter a locked payroll result. */
     public function ensureOpen(string|Carbon $date): void
     {
-        $month = Carbon::parse($date)->startOfMonth()->toDateString();
+        $month = $this->operationalSettings
+            ->payrollMonthForDate(Carbon::parse($date))
+            ->toDateString();
         abort_if(
             PayrollRun::whereDate('payroll_month', $month)->where('status', 'Locked')->exists(),
             422,
@@ -20,11 +24,16 @@ class PayrollPeriodGuard
 
     public function ensureRangeOpen(string|Carbon $from, string|Carbon $to): void
     {
-        $cursor = Carbon::parse($from)->startOfMonth();
-        $last = Carbon::parse($to)->startOfMonth();
+        $cursor = Carbon::parse($from)->startOfDay();
+        $last = Carbon::parse($to)->startOfDay();
+        $checked = [];
         while ($cursor->lte($last)) {
-            $this->ensureOpen($cursor);
-            $cursor->addMonth();
+            $month = $this->operationalSettings->payrollMonthForDate($cursor)->toDateString();
+            if (!isset($checked[$month])) {
+                $this->ensureOpen($cursor);
+                $checked[$month] = true;
+            }
+            $cursor->addDay();
         }
     }
 }

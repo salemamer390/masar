@@ -162,8 +162,9 @@ class JobDataController extends Controller
 
     private function buildMonthlyRows($employees, Carbon $month)
     {
-        $monthStart = $month->copy()->startOfMonth()->toDateString();
-        $monthEnd = $month->copy()->endOfMonth()->toDateString();
+        $period = app(\App\Services\HrOperationalSettingsService::class)->payrollPeriod($month);
+        $monthStart = $period['start']->toDateString();
+        $monthEnd = $period['end']->toDateString();
         $employeeIds = $employees->pluck('id');
         $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->get()->groupBy('employee_id');
         $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
@@ -171,19 +172,21 @@ class JobDataController extends Controller
             ->whereIn('employee_id', $employeeIds)
             ->whereDate('created_at', '<=', $monthEnd)
             ->get()
-            ->filter(fn (HrRequest $request) => $this->requestBelongsToMonth($request, $month))
+            ->filter(fn (HrRequest $request) => $this->requestBelongsToPeriod($request, $period['start'], $period['end']))
             ->groupBy('employee_id');
         $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
         $balances = $leaveBalanceService->balancesFor($employees, $month);
 
-        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $balances): array {
+        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $period, $balances): array {
             $attendanceRows = $attendance->get($employee->id, collect());
             $employeeLeaves = $leaves->get($employee->id, collect());
             $employeePenalties = $penalties->get($employee->id, collect());
             $employeeRequests = $requests->get($employee->id, collect());
             $requestSummary = $this->summarizeRequests($employeeRequests);
-            $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinMonth($leave, $month)]);
+            $periodStart = $period['start'];
+            $periodEnd = $period['end'];
+            $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinPeriod($leave, $periodStart, $periodEnd)]);
             $leaveByPolicy = fn (string $policy): float => $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $unpaidLeaveDays = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $balance = $balances->get($employee->id, ['annual_balance_remaining' => 0]);
@@ -226,20 +229,20 @@ class JobDataController extends Controller
         ])->values()->all();
     }
 
-    private function requestBelongsToMonth(HrRequest $request, Carbon $month): bool
+    private function requestBelongsToPeriod(HrRequest $request, Carbon $periodStart, Carbon $periodEnd): bool
     {
         $payload = is_array($request->payload) ? $request->payload : [];
         $start = $payload['start_date'] ?? $payload['date'] ?? $payload['request_date'] ?? null;
         $end = $payload['end_date'] ?? $start;
         if ($start) {
             try {
-                return Carbon::parse($start)->lte($month->copy()->endOfMonth())
-                    && Carbon::parse($end)->gte($month->copy()->startOfMonth());
+                return Carbon::parse($start)->lte($periodEnd)
+                    && Carbon::parse($end)->gte($periodStart);
             } catch (\Throwable) {
                 // Invalid optional payload dates fall back to created_at.
             }
         }
-        return $request->created_at?->isSameMonth($month) ?? false;
+        return $request->created_at?->betweenIncluded($periodStart, $periodEnd) ?? false;
     }
 
     private function summarizeRequests($requests): array
@@ -336,10 +339,10 @@ class JobDataController extends Controller
         return ((int) ($parts[0] ?? 0) * 60) + (int) ($parts[1] ?? 0);
     }
 
-    private function daysWithinMonth(Leave $leave, Carbon $month): int
+    private function daysWithinPeriod(Leave $leave, Carbon $periodStart, Carbon $periodEnd): int
     {
-        $start = Carbon::parse($leave->start_date)->max($month->copy()->startOfMonth());
-        $end = Carbon::parse($leave->end_date)->min($month->copy()->endOfMonth());
+        $start = Carbon::parse($leave->start_date)->max($periodStart->copy()->startOfDay());
+        $end = Carbon::parse($leave->end_date)->min($periodEnd->copy()->endOfDay());
         return $start->greaterThan($end) ? 0 : $start->diffInDays($end) + 1;
     }
 }
