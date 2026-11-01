@@ -15,6 +15,7 @@ use App\Models\MonthlySummarySnapshot;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Services\LeaveBalanceService;
+use App\Services\OvertimeWindowMatcher;
 
 class JobDataController extends Controller
 {
@@ -313,24 +314,45 @@ class JobDataController extends Controller
     private function requestedOvertimeMinutes(Attendance $attendance, Employee $employee, $requests, string $period): int
     {
         $actual = $this->overtimeMinutes($attendance, $employee, $period);
-        if ($actual <= 0) return 0;
+        if ($actual <= 0 || !$attendance->check_in || !$attendance->check_out) return 0;
         $date = Carbon::parse($attendance->attendance_date)->toDateString();
-        $requested = $requests->filter(function (HrRequest $request) use ($date, $period): bool {
-            if (($request->requestType?->source_key ?: $request->request_type) !== 'overtime') return false;
+
+        $settings = app(\App\Services\HrOperationalSettingsService::class);
+        $segments = OvertimeWindowMatcher::outsideShiftSegments(
+            OvertimeWindowMatcher::timeToMinutes((string) $attendance->check_in) ?? 0,
+            OvertimeWindowMatcher::timeToMinutes((string) $attendance->check_out) ?? 0,
+            OvertimeWindowMatcher::timeToMinutes((string) ($employee->shift_start ?: $settings->start())) ?? 0,
+            OvertimeWindowMatcher::timeToMinutes((string) ($employee->shift_end ?: $settings->end())) ?? 0,
+        );
+
+        $authorized = 0;
+        foreach ($requests as $request) {
+            if (($request->requestType?->source_key ?: $request->request_type) !== 'overtime') continue;
             $payload = is_array($request->payload) ? $request->payload : [];
             $requestDate = $payload['request_date'] ?? $payload['overtime_request_date'] ?? $payload['date'] ?? null;
-            if (!$requestDate) return false;
+            if (!$requestDate) continue;
             try {
-                return Carbon::parse($requestDate)->toDateString() === $date
-                    && ($payload['overtime_period'] ?? $payload['period'] ?? null) === $period;
+                if (Carbon::parse($requestDate)->toDateString() !== $date) continue;
             } catch (\Throwable) {
-                return false;
+                continue;
             }
-        })->sum(function (HrRequest $request): float {
-            $payload = is_array($request->payload) ? $request->payload : [];
-            return (float) ($payload['hours'] ?? $payload['duration_hours'] ?? $payload['day_overtime_hours'] ?? $payload['night_overtime_hours'] ?? 0) * 60;
-        });
-        return (int) min($actual, max(0, $requested));
+            if (($payload['overtime_period'] ?? $payload['period'] ?? null) !== $period) continue;
+            $requested = (float) ($payload['hours'] ?? $payload['duration_hours'] ?? $payload['day_overtime_hours'] ?? $payload['night_overtime_hours'] ?? 0) * 60;
+            if ($requested <= 0) continue;
+
+            $from = OvertimeWindowMatcher::timeToMinutes($payload['from_time'] ?? null);
+            $to = OvertimeWindowMatcher::timeToMinutes($payload['to_time'] ?? null);
+            if ($from === null || $to === null) {
+                // Overtime requests without a time window no longer earn
+                // anything: only actual presence inside the requested window
+                // counts. Amer confirmed these legacy untimed requests are
+                // test data to be removed by the scoped cleanup command.
+                continue;
+            }
+            $authorized += OvertimeWindowMatcher::authorizedMinutes($segments, $from, $to, $requested);
+        }
+
+        return (int) min($actual, max(0, $authorized));
     }
 
     private function timeToMinutes(string $time): int

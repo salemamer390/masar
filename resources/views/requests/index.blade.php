@@ -193,18 +193,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const fields = document.createElement('div');
   fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="day_overtime_hours" class="form-control"></div>';
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="day_overtime_hours" class="form-control"></div><div class="col-12"><div class="d-flex gap-2"><div class="flex-fill"><label class="form-label">من الساعة</label><input type="time" name="from_time" class="form-control" dir="ltr"></div><div class="flex-fill"><label class="form-label">إلى الساعة</label><input type="time" name="to_time" class="form-control" dir="ltr"></div></div></div>';
   modalFooter?.before(fields);
   const date = fields.querySelector('input[type="date"]');
   const period = fields.querySelector('[name="overtime_period"]');
   const hours = fields.querySelector('input[type="number"]');
+  const fromTime = fields.querySelector('[name="from_time"]');
+  const toTime = fields.querySelector('[name="to_time"]');
   period?.addEventListener('change', () => { hours.name = period.value === 'night' ? 'night_overtime_hours' : 'day_overtime_hours'; });
   const sync = () => {
     const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
     fields.hidden = !isOvertime;
-    [date, period, hours].forEach((input) => { if (input) input.required = isOvertime; });
+    [date, period, hours, fromTime, toTime].forEach((input) => { if (input) input.required = isOvertime; });
     if (isOvertime && !date.value) date.value = @json(today()->toDateString());
-    if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; }
+    if (!isOvertime) { date.value = ''; period.value = ''; hours.value = ''; if (fromTime) fromTime.value = ''; if (toTime) toTime.value = ''; }
   };
   type?.addEventListener('change', sync);
   sync();
@@ -552,6 +554,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         }
         set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
         set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
+        set('from_time', payload.from_time); set('to_time', payload.to_time);
         const overtimeEditCard = editForm.querySelector('.overtime-request-fields');
         if (overtimeEditCard && editingRequest.request_type_source === 'overtime') {
           overtimeEditCard.hidden = false;

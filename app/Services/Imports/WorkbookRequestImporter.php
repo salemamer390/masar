@@ -32,7 +32,16 @@ class WorkbookRequestImporter
                     $period = $this->period($row[$map['period'] ?? -1] ?? '');
                     $payload = ['request_date' => $date];
                     if ($source === 'advance') $payload['amount'] = (float) ($row[$map['amount']] ?? 0);
-                    elseif ($source === 'overtime') { $payload['hours'] = (float) ($row[$map['hours'] ?? -1] ?? 0); $payload['overtime_period'] = $period ?: 'day'; }
+                    elseif ($source === 'overtime') {
+                        $payload['hours'] = (float) ($row[$map['hours'] ?? -1] ?? 0); $payload['overtime_period'] = $period ?: 'day';
+                        // Timed overtime only: a request earns just its window's
+                        // overlap with actual attendance, so the window is required.
+                        $from = $this->time($row[$map['from'] ?? -1] ?? null);
+                        $to = $this->time($row[$map['to'] ?? -1] ?? null);
+                        if (!$from || !$to) throw new \RuntimeException('طلب الإضافي يتطلب عمودي «من الساعة» و«إلى الساعة» بصيغة HH:MM.');
+                        if ($from === $to) throw new \RuntimeException('وقت «من الساعة» يجب أن يختلف عن «إلى الساعة».');
+                        $payload['from_time'] = $from; $payload['to_time'] = $to;
+                    }
                     else { $payload['amount'] = (float) ($row[$map['amount'] ?? -1] ?? 0); $payload['affects_payroll'] = true; $payload['impact_type'] = 'earning'; }
                     if (($payload['amount'] ?? $payload['hours'] ?? 0) <= 0) throw new \RuntimeException('قيمة الطلب أو عدد الساعات يجب أن يكون أكبر من صفر.');
                     $duplicate = HrRequest::where('employee_id', $employee->id)->where('request_type_id', $type->id)->get(['payload', 'created_at'])->contains(function (HrRequest $existing) use ($date, $period): bool {
@@ -48,7 +57,7 @@ class WorkbookRequestImporter
     }
 
     private function splitHeader(array $rows): array { foreach ($rows as $number => $row) { $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row))); if (str_contains($key, 'كودالموظف') && (str_contains($key, 'تاريخ') || str_contains($key, 'date'))) return [$row, array_filter($rows, fn ($unused, $line) => $line > $number, ARRAY_FILTER_USE_BOTH)]; } return [[], []]; }
-    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','employee code','code'], 'name' => ['اسم الموظف','employee name','name'], 'date' => ['تاريخ الطلب','تاريخ الإضافي','التاريخ','date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount'], 'hours' => ['عدد الساعات','الساعات','hours'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period'], 'type' => ['نوع الطلب','النوع','request type'], 'details' => ['التفاصيل','السبب','ملاحظات','details']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
+    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','employee code','code'], 'name' => ['اسم الموظف','employee name','name'], 'date' => ['تاريخ الطلب','تاريخ الإضافي','التاريخ','date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount'], 'hours' => ['عدد الساعات','الساعات','hours'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية'], 'type' => ['نوع الطلب','النوع','request type'], 'details' => ['التفاصيل','السبب','ملاحظات','details']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
     private function source(array $row, array $map, array $headers): ?string
     {
         $value = $map['type'] ?? null;
@@ -66,4 +75,5 @@ class WorkbookRequestImporter
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u','',mb_strtolower(trim((string)$value))); }
     private function person(mixed $value): string { return mb_strtolower((string)preg_replace('/\s+/u',' ',trim((string)$value))); }
     private function date(mixed $value): ?string { try{return filled($value)?Carbon::parse($value)->toDateString():null;}catch(\Throwable){return null;} }
+    private function time(mixed $value): ?string { if(!filled($value))return null; $value=trim((string)$value); if(preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/',$value,$m)){ $h=(int)$m[1]; $min=(int)$m[2]; return $h<24&&$min<60?sprintf('%02d:%02d',$h,$min):null; } try{return Carbon::parse($value)->format('H:i');}catch(\Throwable){return null;} }
 }
