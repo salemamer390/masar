@@ -239,10 +239,27 @@ class PayrollRunService
      | Eligibility and reconciliation
      * ------------------------------------------------------------------ */
 
+    /**
+     * The period of a month: the exact dates stored when its run was approved, otherwise the configured period.
+     * Runs approved before the dates were stored have none and keep using the configured period (never guessed).
+     */
+    public function periodFor(Carbon $month): array
+    {
+        $companyId = CompanyContext::id();
+        if ($companyId) {
+            $run = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)
+                ->whereDate('payroll_month', $month->copy()->startOfMonth()->toDateString())
+                ->whereIn('status', ['Approved', 'Locked'])->whereNotNull('period_start')->whereNotNull('period_end')->first();
+            if ($run) return ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
+        }
+
+        return $this->hrSettings->payrollPeriod($month);
+    }
+
     private function salaryFor(int $employeeId, Carbon $month): ?Salary
     {
         // A historical salary can be the valid one for a past payroll month.
-        $periodEnd = $this->hrSettings->payrollPeriod($month)['end'];
+        $periodEnd = $this->periodFor($month)['end'];
 
         return Salary::withoutGlobalScopes()
             ->where('employee_id', $employeeId)
@@ -253,7 +270,7 @@ class PayrollRunService
     /** Employees whose status allows payroll in this month (before the service-window check). */
     public function eligibleEmployees(Carbon $month, int $companyId, ?array $employeeIds = null): Collection
     {
-        $period = $this->hrSettings->payrollPeriod($month);
+        $period = $this->periodFor($month);
         $periodStart = $period['start']->toDateString();
         $periodEnd = $period['end']->toDateString();
 
@@ -729,7 +746,8 @@ class PayrollRunService
             }
 
             $actor = auth()->id();
-            $run->update(['status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now(), 'skipped_report' => $report]);
+            $period = CompanyContext::run((int) $run->company_id, fn () => $this->hrSettings->payrollPeriod($run->payroll_month->copy()->startOfMonth()));
+            $run->update(['period_start' => $period['start']->toDateString(), 'period_end' => $period['end']->toDateString(), 'status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now(), 'skipped_report' => $report]);
             PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $run->id)->whereNotIn('status', self::PAID_STATUSES)
                 ->update(['status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now()]);
             ActivityLog::record(
@@ -920,7 +938,7 @@ class PayrollRunService
      */
     public function serviceWindow(Employee $employee, Carbon $month): ?array
     {
-        $period = $this->hrSettings->payrollPeriod($month);
+        $period = $this->periodFor($month);
         $periodStart = $period['start']->copy()->startOfDay();
         $periodEnd = $period['end']->copy()->startOfDay();
         $today = Carbon::today()->startOfDay();

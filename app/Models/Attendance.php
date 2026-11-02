@@ -9,6 +9,38 @@ use App\Models\Concerns\BelongsToCompany;
 class Attendance extends Model
 {
     use BelongsToCompany;
+
+    /**
+     * No write path (sync, import, manual, recalculation, jobs) can change a closed period.
+     * The check and the write run in one transaction that holds a shared lock on the company
+     * row; closing a period takes the exclusive lock on the same row. So a writer either
+     * commits before the snapshot is read (and is in it) or waits and is then refused.
+     */
+    public function save(array $options = [])
+    {
+        return $this->guardedWrite(fn () => parent::save($options));
+    }
+
+    public function delete()
+    {
+        return $this->guardedWrite(fn () => parent::delete());
+    }
+
+    private function guardedWrite(\Closure $write)
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($write) {
+            $archive = app(\App\Services\AttendancePeriodArchiveService::class);
+            $companyId = $this->company_id ?: \App\Support\CompanyContext::id();
+            $companyId = $companyId ? (int) $companyId : null;
+            if ($companyId) $archive->lockCompanyForWrite($companyId);
+            foreach (array_unique(array_filter([$this->getOriginal('attendance_date'), $this->attendance_date], fn ($d) => $d)) as $date) {
+                $archive->ensureDateOpen($date, $companyId, true);
+            }
+
+            return $write();
+        });
+    }
+
     protected $table = 'attendance';
 
     protected $fillable = [

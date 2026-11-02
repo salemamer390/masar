@@ -200,6 +200,15 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::get('/export', [AttendanceController::class, 'export'])
             ->middleware('permission:attendance.view')
             ->name('export');
+        Route::get('/archive', [AttendanceController::class, 'archiveIndex'])
+            ->middleware('permission:attendance.view')
+            ->name('archive.index');
+        Route::get('/archive/{archive}', [AttendanceController::class, 'archiveShow'])
+            ->middleware('permission:attendance.view')
+            ->name('archive.show');
+        Route::get('/archive/{archive}/export', [AttendanceController::class, 'archiveExport'])
+            ->middleware('permission:attendance.view')
+            ->name('archive.export');
         Route::post('/', [AttendanceController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('store');

@@ -65,7 +65,7 @@ class AttendanceImportController extends Controller
                 if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم غير محدد بشكل فريد.');
                 $date = $this->parseDate($row[$map['date']] ?? null);
                 if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
-                $periodGuard->ensureOpen($date);
+                $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
                 $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');

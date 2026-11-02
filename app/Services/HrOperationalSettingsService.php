@@ -102,6 +102,40 @@ class HrOperationalSettingsService
 
         return $date->copy()->startOfMonth();
     }
+    /**
+     * The payroll period that contains a calendar date, using the company's
+     * configured start/end days (for example 26/25: 28 Nov belongs to 26 Nov - 25 Dec).
+     *
+     * @return array{start: Carbon,end: Carbon}
+     */
+    public function periodContaining(Carbon $date): array
+    {
+        return $this->payrollPeriod($this->payrollMonthForDate($date));
+    }
+
+    /**
+     * The period of a payroll/attendance month for explicit start/end days (used to preview a
+     * settings change before it is saved). Same rules as payrollPeriod().
+     *
+     * @return array{start: Carbon,end: Carbon}
+     */
+    public function payrollPeriodForDays(Carbon $month, int $startDay, int $endDay): array
+    {
+        $anchor = $month->copy()->startOfMonth();
+        $startMonth = $startDay > $endDay ? $anchor->copy()->subMonth() : $anchor->copy();
+
+        return [
+            'start' => $startMonth->copy()->day(min($startDay, $startMonth->daysInMonth))->startOfDay(),
+            'end' => $anchor->copy()->day(min($endDay, $anchor->daysInMonth))->endOfDay(),
+        ];
+    }
+
+    /** Days after a period's end during which its attendance can still be corrected (default 3). */
+    public function attendanceCorrectionDays(): int
+    {
+        return max(0, (int) $this->value('attendance_correction_days', (string) config('attendance.archive_grace_days', 3)));
+    }
+
     public function grace(): int { return (int) $this->value('grace_minutes', '15'); }
     public function absenceCutoff(): string { return $this->value('absence_cutoff_time', $this->end()); }
 
