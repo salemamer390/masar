@@ -581,10 +581,27 @@ class PayrollRunService
 
             // Authorize each overtime period independently. A night request
             // must never be used to pay day overtime (and vice versa).
+            // Timed requests earn only their window's overlap with actual
+            // outside-shift presence (partial overlap earns the partial
+            // duration). Untimed legacy requests earn nothing; Amer confirmed
+            // they are test data removed by the scoped cleanup command.
             $authorizedDay = 0.0;
             $authorizedNight = 0.0;
+            $segments = null;
             foreach ($covering as [$request, $minutes]) {
-                $period = data_get($request->payload, 'overtime_period', 'day');
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $period = data_get($payload, 'overtime_period', 'day');
+                $from = OvertimeWindowMatcher::timeToMinutes($payload['from_time'] ?? null);
+                $to = OvertimeWindowMatcher::timeToMinutes($payload['to_time'] ?? null);
+                if ($from === null || $to === null) continue;
+                $segments ??= OvertimeWindowMatcher::outsideShiftSegments(
+                    $this->minutesOf((string) $record->check_in),
+                    $this->minutesOf((string) $record->check_out),
+                    $this->minutesOf((string) ($employee->shift_start ?: $this->hrSettings->start())),
+                    $this->minutesOf((string) ($employee->shift_end ?: $this->hrSettings->end())),
+                );
+                $minutes = OvertimeWindowMatcher::authorizedMinutes($segments, $from, $to, $minutes);
+                if ($minutes <= 0) continue;
                 if ($period === 'night') {
                     $authorizedNight += $minutes;
                 } else {

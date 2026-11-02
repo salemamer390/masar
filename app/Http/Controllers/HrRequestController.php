@@ -186,6 +186,8 @@ class HrRequestController extends Controller
             'day_overtime_hours' => ['nullable', 'numeric', 'min:0'],
             'night_overtime_hours' => ['nullable', 'numeric', 'min:0'],
             'overtime_period' => ['nullable', 'in:day,night'],
+            'from_time' => ['nullable', 'date_format:H:i'],
+            'to_time' => ['nullable', 'date_format:H:i'],
             'affects_payroll' => ['nullable', 'boolean'],
             'impact_type' => ['nullable', 'in:earning,deduction'],
             'impact_amount' => ['nullable', 'numeric', 'min:0'],
@@ -208,6 +210,8 @@ class HrRequestController extends Controller
                 'overtime_period' => ['required', 'in:day,night'],
                 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'],
                 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'],
+                'from_time' => ['required', 'date_format:H:i'],
+                'to_time' => ['required', 'date_format:H:i', 'different:from_time'],
             ]);
             $validated = array_merge($validated, $overtimeValidated);
         }
@@ -307,6 +311,8 @@ class HrRequestController extends Controller
                 'request_date' => $validated['overtime_request_date'],
                 'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'],
                 'overtime_period' => $validated['overtime_period'],
+                'from_time' => $validated['from_time'],
+                'to_time' => $validated['to_time'],
             ];
         } elseif (in_array($type->source_key, ['bonus', 'incentive', 'commission', 'profit_share'], true)) {
             $payload = [
@@ -398,7 +404,7 @@ class HrRequestController extends Controller
             if (!$request->filled('overtime_request_date') && $request->filled('request_date')) {
                 $request->merge(['overtime_request_date' => $request->input('request_date')]);
             }
-            $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0']]);
+            $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'], 'from_time' => ['required', 'date_format:H:i'], 'to_time' => ['required', 'date_format:H:i', 'different:from_time']]);
             $duplicate = HrRequest::where('id', '!=', $hrRequest->id)
                 ->where('employee_id', $hrRequest->employee_id)
                 ->where('status', '!=', 'Rejected')
@@ -416,7 +422,7 @@ class HrRequestController extends Controller
                 throw ValidationException::withMessages(['overtime_request_date' => 'يوجد إضافي من نفس النوع لهذا الموظف في نفس اليوم.']);
             }
             $hours = $data['overtime_period'] === 'day' ? $data['day_overtime_hours'] : $data['night_overtime_hours'];
-            $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => (float) $hours, 'overtime_period' => $data['overtime_period']]);
+            $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => (float) $hours, 'overtime_period' => $data['overtime_period'], 'from_time' => $data['from_time'], 'to_time' => $data['to_time']]);
         } elseif ($source === 'other') {
             $data = $request->validate(['other_request_date' => ['required', 'date'], 'affects_payroll' => ['nullable', 'boolean'], 'impact_type' => ['required_if:affects_payroll,1', 'nullable', 'in:earning,deduction'], 'impact_amount' => ['required_if:affects_payroll,1', 'nullable', 'numeric', 'gt:0']]);
             $payload = array_merge($payload, ['request_date' => $data['other_request_date'], 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $data['impact_type'] ?? null, 'amount' => $data['impact_amount'] ?? null]);
