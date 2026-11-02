@@ -47,9 +47,9 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
     const response = await fetch(button.dataset.url, {headers:{Accept:'application/json'}});
     if (!response.ok) return;
     const data = await response.json();
-    if (labels.length === 17) labels.push('عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات');
+    // Labels are declared before use and aligned 1:1 with the stored row keys.
     const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','early_leave_minutes','day_overtime_minutes','night_overtime_minutes','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','annual_balance_remaining','penalty_count','penalty_days','advance_request_count','permission_request_count','mission_request_count'];
-    const labels = ['الكود','الموظف','القسم','الحضور','حضور متأخر','دقائق التأخير','الغياب','سنوية','عارضة','مرضية','بدون أجر','أمومة','أخرى','إجمالي الإجازات','الجزاءات','أيام الخصم','الرصيد المتبقي'];
+    const labels = ['الكود','الموظف','القسم','الحضور','حضور متأخر','دقائق التأخير','الغياب','انصراف مبكر (دقيقة)','إضافي نهاري (دقيقة)','إضافي ليلي (دقيقة)','سنوية','عارضة','مرضية','بدون أجر','أمومة','أخرى','إجمالي الإجازات','الرصيد المتبقي','الجزاءات','أيام الخصم','سلفة','إذن','مأمورية'];
     document.getElementById('summaryHistoryBody').innerHTML = '<p class="text-muted">رقم الشهر: '+data.month+'</p><div class="table-responsive"><table class="table table-sm monthly-summary-table"><thead><tr>'+labels.map(label => '<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+data.rows.map(row => '<tr>'+keys.map(key => '<td>'+String(row[key] ?? '—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     document.getElementById('summaryHistoryExport').href = data.export_url;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('summaryHistoryModal')).show();
