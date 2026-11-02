@@ -169,7 +169,7 @@ class JobDataController extends Controller
     private function buildMonthlyRows($employees, Carbon $month)
     {
         $settings = app(\App\Services\HrOperationalSettingsService::class);
-        $period = $settings->payrollPeriod($month);
+        $period = app(\App\Services\PayrollRunService::class)->periodFor($month);
         $monthStart = $period['start']->toDateString();
         $monthEnd = $period['end']->toDateString();
         $employeeIds = $employees->pluck('id');

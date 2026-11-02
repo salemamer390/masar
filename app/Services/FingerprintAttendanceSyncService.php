@@ -64,7 +64,12 @@ class FingerprintAttendanceSyncService extends BaseService
             if (RawAttendanceLog::where('import_hash', $hash)->exists()) { $result['duplicate_count']++; continue; }
             try {
                 RawAttendanceLog::create(['employee_id' => $employee?->id, 'fingerprint_device_id' => $device->id, 'raw_device_user_id' => $punch->rawDeviceUserId, 'source' => AttendanceSource::Fingerprint->value, 'raw_type' => $punch->rawType->value, 'raw_timestamp' => $punch->punchedAt, 'raw_payload' => $punch->payload, 'import_hash' => $hash, 'imported_at' => now(), 'device_id' => (string) $device->id, 'processing_status' => 'processed', 'processed_at' => now()]);
-                if ($employee) $this->upsertAttendance($employee, $punch);
+                // The raw punch is always kept; attendance of a closed period is not touched.
+                if ($employee && app(\App\Services\AttendancePeriodArchiveService::class)->isClosed((int) $employee->company_id, $punch->punchedAt->toDateString())) {
+                    $result['skipped_count']++;
+                } elseif ($employee) {
+                    $this->upsertAttendance($employee, $punch);
+                }
                 $result['imported_count']++;
                 if (!$result['cursor_timestamp'] || $punch->punchedAt->format('Y-m-d H:i:s') >= $result['cursor_timestamp']) { $result['cursor_timestamp'] = $punch->punchedAt->format('Y-m-d H:i:s'); $result['cursor_hash'] = $hash; }
             } catch (Throwable) { $result['failed_count']++; }

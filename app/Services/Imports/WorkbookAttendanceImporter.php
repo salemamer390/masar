@@ -31,7 +31,7 @@ class WorkbookAttendanceImporter
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو بياناته غير مكتملة.');
                     $date = $this->date($row[$map['date']] ?? null);
                     if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
-                    $periodGuard->ensureOpen($date);
+                    $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
                     $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($in || $out) ? 'Present' : 'Absent');

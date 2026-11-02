@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use App\Models\Attendance;
+use App\Models\AttendancePeriodArchive;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Services\PayrollPeriodGuard;
@@ -26,7 +27,7 @@ class AttendanceController extends Controller
     public function index(Request $request)
     {
         $today = today();
-        $period = $this->hrSettings->payrollPeriod($today->copy());
+        $period = $this->hrSettings->periodContaining($today->copy());
         $periodStart = $period['start']->toDateString();
         $periodEnd = $period['end']->toDateString();
         $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date')->orderByDesc('id');
@@ -57,14 +58,15 @@ class AttendanceController extends Controller
         $employees = Employee::orderBy('full_name')->get();
         $departments = Department::where('is_active', 1)->orderBy('name')->get();
 
+        $pendingPeriods = app(\App\Services\AttendancePeriodArchiveService::class)->pendingPeriods();
         $defaultShiftStart = $this->hrSettings->start();
         $defaultShiftEnd = $this->hrSettings->end();
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd'));
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd', 'pendingPeriods'));
     }
 
     public function export(Request $request)
     {
-        $period = $this->hrSettings->payrollPeriod(today()->copy());
+        $period = $this->hrSettings->periodContaining(today()->copy());
         $query = Attendance::with(['employee.department'])
             ->orderByDesc('attendance_date')->orderByDesc('id');
         if (!$request->filled('from_date')) $query->whereDate('attendance_date', '>=', $period['start']->toDateString());
@@ -107,7 +109,7 @@ class AttendanceController extends Controller
             'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'], 'status' => ['required', 'string', 'max:50'],
             'late_minutes' => ['nullable', 'integer', 'min:0'], 'source' => ['nullable', 'string', 'max:50'],
         ]);
-        $periodGuard->ensureOpen($validated['attendance_date']);
+        $periodGuard->ensureOpen($validated['attendance_date']); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($validated['attendance_date']);
         $employee = Employee::findOrFail($validated['employee_id']);
         $checkIn = $validated['check_in'] ?? null;
         $checkOut = $validated['check_out'] ?? null;
@@ -143,7 +145,7 @@ class AttendanceController extends Controller
             'attendance_date' => ['nullable', 'date'],
         ]);
         $date = $validated['attendance_date'] ?? today()->toDateString();
-        $periodGuard->ensureOpen($date);
+        $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
         $employee = Employee::findOrFail($validated['employee_id']);
         $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'attendance_date' => $date]);
         if ($direction === 'in' && $attendance->check_in) {
@@ -178,8 +180,8 @@ class AttendanceController extends Controller
             'status' => ['required', 'string', 'max:50'], 'source' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $periodGuard->ensureOpen($attendance->attendance_date);
-        $periodGuard->ensureOpen($validated['attendance_date']);
+        $periodGuard->ensureOpen($attendance->attendance_date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($attendance->attendance_date);
+        $periodGuard->ensureOpen($validated['attendance_date']); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($validated['attendance_date']);
         $duplicate = Attendance::query()->where('employee_id', $validated['employee_id'])
             ->whereDate('attendance_date', $validated['attendance_date'])
             ->where('id', '!=', $attendance->id)->exists();
@@ -211,7 +213,7 @@ class AttendanceController extends Controller
 
     public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
-        $periodGuard->ensureOpen($attendance->attendance_date);
+        $periodGuard->ensureOpen($attendance->attendance_date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($attendance->attendance_date);
         $snapshot = $attendance->toArray();
         $attendance->delete();
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $snapshot['employee_id']);
@@ -281,8 +283,47 @@ class AttendanceController extends Controller
         return $overlap;
     }
 
-    private function decorateOvertimeCollection($attendances): void
+    public function decorateOvertimeCollection($attendances): void
     {
         $attendances->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
+    }
+
+    /** «الشهور السابقة»: saved attendance of finished payroll periods. */
+    public function archiveIndex()
+    {
+        $archives = AttendancePeriodArchive::where('status', AttendancePeriodArchive::CLOSED)->orderByDesc('period_end')->get();
+        $current = $this->hrSettings->periodContaining(today()->copy());
+
+        return view('attendance.archive', ['archives' => $archives, 'archive' => null, 'rows' => [], 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
+    }
+
+    public function archiveShow(AttendancePeriodArchive $archive)
+    {
+        abort_unless($archive->isClosed(), 404);
+        $archives = AttendancePeriodArchive::where('status', AttendancePeriodArchive::CLOSED)->orderByDesc('period_end')->get();
+        $current = $this->hrSettings->periodContaining(today()->copy());
+
+        return view('attendance.archive', ['archives' => $archives, 'archive' => $archive, 'rows' => $archive->rows, 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
+    }
+
+    public function archiveExport(AttendancePeriodArchive $archive)
+    {
+        abort_unless($archive->isClosed(), 404);
+        $filename = 'attendance-archive-' . $archive->period_start->format('Y-m-d') . '_' . $archive->period_end->format('Y-m-d') . '.csv';
+        $hm = fn ($m) => sprintf('%02d:%02d', intdiv((int) $m, 60), ((int) $m) % 60);
+
+        return response()->streamDownload(function () use ($archive, $hm) {
+            $out = fopen('php://output', 'wb');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة'], ',');
+            foreach ($archive->rows as $row) {
+                fputcsv($out, [
+                    $row['date'] ? Carbon::parse($row['date'])->format('d/m/Y') : '', $row['employee_code'], $row['employee_name'], $row['department'],
+                    $row['check_in'], $row['check_out'], $hm($row['late_minutes']), $hm($row['early_leave_minutes']),
+                    $hm($row['day_overtime_minutes']), $hm($row['night_overtime_minutes']), arabic_label($row['status']),
+                ], ',');
+            }
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

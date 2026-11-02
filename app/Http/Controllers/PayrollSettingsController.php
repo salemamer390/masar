@@ -95,18 +95,27 @@ class PayrollSettingsController extends Controller
             'default_shift_end' => ['required', 'date_format:H:i'],
             'absence_cutoff_time' => ['required', 'date_format:H:i'],
             'grace_minutes' => ['required', 'integer', 'min:0', 'max:1440'],
+            'attendance_correction_days' => ['nullable', 'integer', 'min:0', function ($attribute, $value, $fail) {
+                // The only real limit: the closing date (period end + days + 1) must stay a valid database date (year <= 9999).
+                try { $ok = \Carbon\Carbon::today()->addDays((int) $value + 62)->year <= 9999; } catch (\Throwable) { $ok = false; }
+                if (!$ok) $fail('عدد أيام التصحيح كبير لدرجة إن تاريخ القفل مش هيكون تاريخ صحيح.');
+            }],
             'weekly_rest_pattern' => ['required', 'regex:/^[01]{7}$/'],
             'night_start' => ['nullable', 'date_format:H:i'],
             'night_end' => ['nullable', 'date_format:H:i'],
             'payroll_period_start_day' => ['required', 'integer', 'min:1', 'max:31'],
             'payroll_period_end_day' => ['required', 'integer', 'min:1', 'max:31'],
             'unpaid_leave_as_deduction' => ['nullable', 'in:0,1'],
+            'confirm_close_pending' => ['nullable', 'in:0,1'],
         ]);
+        $confirmClose = ($data['confirm_close_pending'] ?? '0') === '1';
+        unset($data['confirm_close_pending']);
         $labels = [
             'default_shift_start' => 'بداية الدوام الافتراضية',
             'default_shift_end' => 'نهاية الدوام الافتراضية',
             'absence_cutoff_time' => 'وقت احتساب الغياب اليومي',
             'grace_minutes' => 'فترة السماح بالدقائق',
+            'attendance_correction_days' => 'أيام تصحيح الحضور بعد نهاية الفترة',
             'weekly_rest_pattern' => 'الراحة الأسبوعية (الإثنين إلى الأحد)',
             'night_start' => 'بداية الفترة الليلية للإضافي',
             'night_end' => 'نهاية الفترة الليلية للإضافي',
@@ -115,12 +124,61 @@ class PayrollSettingsController extends Controller
             'unpaid_leave_as_deduction' => 'خصم الإجازة بدون أجر من الراتب',
         ];
         $companyId = (int) auth()->user()->company_id;
-        foreach ($data as $key => $value) {
-            if ($value === null) continue;
+        $blocked = null;
+        $needsConfirm = null;
+        $notes = [];
+        try { DB::transaction(function () use ($companyId, $data, $labels, $hrSettings, $confirmClose, &$blocked, &$needsConfirm, &$notes) {
+            // One writer per company: settings saves, the archive job and attendance writers queue here.
+            DB::table('companies')->where('id', $companyId)->lockForUpdate()->first();
+            $hrSettings->flush();
+            [$oldStart, $oldEnd] = \App\Support\CompanyContext::run($companyId, fn () => [$hrSettings->payrollPeriodStartDay(), $hrSettings->payrollPeriodEndDay()]);
+            // Finished periods are saved with their current boundaries before new settings can apply.
+            app(\App\Services\AttendancePeriodArchiveService::class)->archiveEndedPeriods($companyId);
+            $daysChanged = $oldStart !== (int) $data['payroll_period_start_day'] || $oldEnd !== (int) $data['payroll_period_end_day'];
+            if ($daysChanged) {
+                $impact = app(\App\Services\PeriodChangeImpactService::class)->detect($companyId, (int) $data['payroll_period_start_day'], (int) $data['payroll_period_end_day']);
+                $notes = $impact['notes'];
+                if ($impact['blocking']) {
+                    $blocked = $impact['blocking'];
+                    throw new \DomainException('period-change-rejected'); // rolls the whole transaction back
+                }
+            }
+            if ($daysChanged) {
+                // The user confirms that periods still in their correction window are closed and saved now.
+                $archives = app(\App\Services\AttendancePeriodArchiveService::class);
+                $pending = $archives->pendingPeriods($companyId);
+                if ($pending->isNotEmpty()) {
+                    if (!$confirmClose) {
+                        $needsConfirm = $pending->map(fn ($a) => $a->period_start->format('d/m/Y') . ' - ' . $a->period_end->format('d/m/Y'))->all();
+                        throw new \DomainException('period-change-needs-confirmation');
+                    }
+                    foreach ($pending as $archive) $archives->close($archive);
+                }
+            }
+            foreach ($data as $key => $value) {
+                if ($value === null) continue;
                 DB::table('hr_operational_settings')->updateOrInsert(
-                ['company_id' => $companyId, 'setting_key' => $key],
-                ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
-            );
+                    ['company_id' => $companyId, 'setting_key' => $key],
+                    ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
+                );
+            }
+        }); } catch (\DomainException $rejected) {
+            if (!$blocked && !$needsConfirm) throw $rejected;
+        }
+        if ($needsConfirm && !$blocked) {
+            $hrSettings->flush();
+            $message = 'تغيير بداية أو نهاية فترة المسير هيقفل ويحفظ سجل الحضور للفترات اللي لسه في مهلة التصحيح، وبعدها مش هيتعدل. ما اتحفظش أي تغيير لحد ما تأكد.';
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'needs_confirmation' => true, 'message' => $message, 'periods' => $needsConfirm], 409)
+                : back()->withInput()->with('period_confirm', ['message' => $message, 'periods' => $needsConfirm]);
+        }
+        if ($blocked) {
+            $hrSettings->flush();
+            $message = 'ما اتحفظش تغيير بداية ونهاية فترة المسير لأن الفترة الجديدة فيها أيام اتحسبت قبل كده. الإعدادات الحالية اتساب زي ما هي، ومفيش أي مسير أو سجل اتغيّر.';
+            $lines = array_column($blocked, 'text');
+            return $request->wantsJson()
+                ? response()->json(['success' => false, 'message' => $message, 'overlaps' => $blocked], 422)
+                : back()->withInput()->withErrors(['payroll_period' => array_merge([$message], $lines)]);
         }
         ActivityLog::record('hr_operational_settings_update', 'تم تحديث أوقات الدوام والراحة الأسبوعية.');
         $hrSettings->flush();
@@ -128,7 +186,7 @@ class PayrollSettingsController extends Controller
         $draftCount = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Operational settings updated and calculations refreshed.', 'settings' => $data, 'attendance_updated' => $attendanceCount, 'drafts_refreshed' => $draftCount])
-            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.');
+            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.')->with('period_notes', array_column($notes, 'text'));
     }
 
     public function storeHoliday(Request $request)

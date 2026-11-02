@@ -29,14 +29,23 @@ class AttendanceMetricsService
     {
         return CompanyContext::run($companyId, function () {
             $updated = 0;
+            // Dates of an archived (closed) period keep the values they were saved with.
+            $closed = app(AttendancePeriodArchiveService::class)->closedRanges((int) CompanyContext::id());
             Attendance::withoutGlobalScopes()->with('employee')
                 ->where('company_id', CompanyContext::id())
+                ->where(function ($query) use ($closed) {
+                    foreach ($closed as [$from, $to]) $query->whereNotBetween('attendance_date', [$from, $to]);
+                })
                 ->chunkById(500, function ($rows) use (&$updated): void {
                     foreach ($rows as $attendance) {
                         if (!$attendance->employee) continue;
                         $values = $this->metrics($attendance->employee, $attendance->check_in, $attendance->check_out, $attendance->status);
-                        $attendance->forceFill($values)->saveQuietly();
-                        $updated++;
+                        try {
+                            $attendance->forceFill($values)->saveQuietly();
+                            $updated++;
+                        } catch (\Symfony\Component\HttpKernel\Exception\HttpException) {
+                            // closed while we were running: keep its saved value
+                        }
                     }
                 });
             return $updated;
