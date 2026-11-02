@@ -27,15 +27,14 @@ class JobDataController extends Controller
         $monthStart = $month->copy()->startOfMonth()->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
 
-        $employeeQuery = Employee::select([
+        $employeeQuery = $this->applyEmployeeFilters(
+            Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
                 'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
                 'leave_entitlement_category', 'manual_annual_balance',
-            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
-            ->when($request->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
-            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
-            ->when($request->filled('contract_status'), function ($q) use ($request) { return $request->contract_status === 'active' ? $q->where(function ($x) { $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()); }) : $q->whereDate('contract_end_date', '<', today()); })
-            ->orderByDesc('id');
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary']),
+            $request
+        )->orderByDesc('id');
 
         $perPage = in_array((int) $request->input('per_page', 50), [25, 50, 100, 200], true)
             ? (int) $request->input('per_page', 50)
@@ -87,21 +86,14 @@ class JobDataController extends Controller
         $month = $request->filled('month')
             ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth()
             : now()->startOfMonth();
-        $employees = Employee::select([
+        $employees = $this->applyEmployeeFilters(
+            Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
                 'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
                 'leave_entitlement_category', 'manual_annual_balance',
-            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary'])
-            ->when($request->filled('search'), fn ($q) => $q->where(fn ($x) => $x
-                ->where('full_name', 'like', '%'.$request->input('search').'%')
-                ->orWhere('employee_code', 'like', '%'.$request->input('search').'%')))
-            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->input('department_id')))
-            ->when($request->filled('contract_status'), function ($q) use ($request) {
-                return $request->input('contract_status') === 'active'
-                    ? $q->where(fn ($x) => $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()))
-                    : $q->whereDate('contract_end_date', '<', today());
-            })
-            ->orderByDesc('id')->paginate(
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary']),
+            $request
+        )->orderByDesc('id')->paginate(
                 in_array((int) $request->input('per_page', 50), [25, 50, 100, 200], true)
                     ? (int) $request->input('per_page', 50)
                     : 50
@@ -142,8 +134,12 @@ class JobDataController extends Controller
     public function export(Request $request)
     {
         $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
-        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
-            ->with(['department:id,name', 'job:id,title', 'currentSalary'])->orderBy('id')->get();
+        // Export the same filtered set the screen shows, not the whole company.
+        $employees = $this->applyEmployeeFilters(
+            Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
+                ->with(['department:id,name', 'job:id,title', 'currentSalary']),
+            $request
+        )->orderBy('id')->get();
         return $this->excelResponse($this->snapshotRows($this->buildMonthlyRows($employees, $month)), $month);
     }
 
@@ -161,17 +157,30 @@ class JobDataController extends Controller
         return $this->excelResponse($snapshot->rows, $snapshot->summary_month);
     }
 
+    /** Apply the screen's employee filters (search, department, contract status) to any employee query. */
+    private function applyEmployeeFilters($query, Request $request)
+    {
+        return $query
+            ->when($request->filled('search'), fn ($q) => $q->where(function ($x) use ($request) { $x->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%'); }))
+            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
+            ->when($request->filled('contract_status'), function ($q) use ($request) { return $request->contract_status === 'active' ? $q->where(function ($x) { $x->whereNull('contract_end_date')->orWhereDate('contract_end_date', '>=', today()); }) : $q->whereDate('contract_end_date', '<', today()); });
+    }
+
     private function buildMonthlyRows($employees, Carbon $month)
     {
-        $period = app(\App\Services\HrOperationalSettingsService::class)->payrollPeriod($month);
+        $settings = app(\App\Services\HrOperationalSettingsService::class);
+        $period = $settings->payrollPeriod($month);
         $monthStart = $period['start']->toDateString();
         $monthEnd = $period['end']->toDateString();
         $employeeIds = $employees->pluck('id');
         $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->get()->groupBy('employee_id');
         $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
+        // No created_at prefilter here: a request entered after its owning
+        // period closed must still count in that period. requestBelongsToPeriod
+        // decides membership from the payload dates, falling back to created_at
+        // only when the payload carries no date.
         $requests = HrRequest::with('requestType')
             ->whereIn('employee_id', $employeeIds)
-            ->whereDate('created_at', '<=', $monthEnd)
             ->get()
             ->filter(fn (HrRequest $request) => $this->requestBelongsToPeriod($request, $period['start'], $period['end']))
             ->groupBy('employee_id');
@@ -179,7 +188,7 @@ class JobDataController extends Controller
         $leaveBalanceService = app(LeaveBalanceService::class);
         $balances = $leaveBalanceService->balancesFor($employees, $month);
 
-        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $period, $balances): array {
+        return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $period, $balances, $settings): array {
             $attendanceRows = $attendance->get($employee->id, collect());
             $employeeLeaves = $leaves->get($employee->id, collect());
             $employeePenalties = $penalties->get($employee->id, collect());
@@ -187,7 +196,7 @@ class JobDataController extends Controller
             $requestSummary = $this->summarizeRequests($employeeRequests);
             $periodStart = $period['start'];
             $periodEnd = $period['end'];
-            $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinPeriod($leave, $periodStart, $periodEnd)]);
+            $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinPeriod($leave, $periodStart, $periodEnd, $settings)]);
             $leaveByPolicy = fn (string $policy): float => $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType?->policy_code === $policy)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $unpaidLeaveDays = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && !$leave->leaveType->is_paid)->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0);
             $balance = $balances->get($employee->id, ['annual_balance_remaining' => 0]);
@@ -361,11 +370,38 @@ class JobDataController extends Controller
         return ((int) ($parts[0] ?? 0) * 60) + (int) ($parts[1] ?? 0);
     }
 
-    private function daysWithinPeriod(Leave $leave, Carbon $periodStart, Carbon $periodEnd): int
+    /**
+     * Leave days inside the period, measured in working days per the company
+     * calendar (weekly rest days and official holidays excluded), matching how
+     * the leave's own days value was computed when it was saved. A leave fully
+     * inside the period keeps its stored authoritative duration; a clipped
+     * leave is counted exactly within the overlap window, not prorated by raw
+     * calendar days. When the company does not exclude rest/holidays from
+     * leaves, the overlap's plain calendar days are used.
+     */
+    private function daysWithinPeriod(Leave $leave, Carbon $periodStart, Carbon $periodEnd, \App\Services\HrOperationalSettingsService $settings): float
     {
-        $start = Carbon::parse($leave->start_date)->max($periodStart->copy()->startOfDay());
-        $end = Carbon::parse($leave->end_date)->min($periodEnd->copy()->endOfDay());
-        return $start->greaterThan($end) ? 0 : $start->diffInDays($end) + 1;
+        $start = Carbon::parse($leave->start_date)->startOfDay();
+        $end = Carbon::parse($leave->end_date)->startOfDay();
+        $overlapStart = $start->greaterThan($periodStart) ? $start : $periodStart->copy()->startOfDay();
+        $overlapEnd = $end->lessThan($periodEnd) ? $end : $periodEnd->copy()->startOfDay();
+        if ($overlapStart->gt($overlapEnd)) return 0.0;
+
+        if (! $settings->excludeRestAndHolidaysFromLeave()) {
+            return (float) ($overlapStart->diffInDays($overlapEnd) + 1);
+        }
+
+        $fullyInside = $start->gte($periodStart->copy()->startOfDay()) && $end->lte($periodEnd->copy()->startOfDay());
+        if ($fullyInside && $leave->days !== null) {
+            return (float) $leave->days;
+        }
+
+        $days = 0;
+        for ($date = $overlapStart->copy(); $date->lte($overlapEnd); $date->addDay()) {
+            if ($settings->isWeeklyRest($date) || $settings->isHoliday($date)) continue;
+            $days++;
+        }
+        return (float) $days;
     }
 }
 
