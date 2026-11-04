@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="stat-grid compact">
     @foreach([
         ['إجمالي الطلبات', $stats['all'], 'blue', 'file-earmark-text'],
-        ['طلبات معلقة', $stats['pending'], 'orange', 'hourglass-split'],
-        ['طلبات معتمدة', $stats['approved'], 'green', 'check-circle'],
-        ['طلبات مرفوضة', $stats['rejected'], 'red', 'x-circle'],
+
+        ['طلبات مؤكدة', $stats['approved'], 'green', 'check-circle'],
+        ['طلبات ملغاة', $stats['rejected'], 'red', 'x-circle'],
     ] as $statIndex => $stat)
         <div class="stat-card clickable-card request-kpi-card" data-request-kpi="{{ $statIndex }}">
             <div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div>
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </select>
     <select name="status" onchange="this.form.submit()">
         <option value="">كل الحالات</option>
-        @foreach(['Pending'=>'معلق','Manager Approved'=>'بانتظار HR','Approved'=>'معتمد','Rejected'=>'مرفوض'] as $value => $label)
+        @foreach(['Approved'=>'مؤكد','Rejected'=>'ملغى'] as $value => $label)
             <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
         @endforeach
     </select>
@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="details-grid-full"><label>سبب الرفض</label><p class="mb-0 text-danger">{{ $selectedRequest->rejection_reason }}</p></div>
         @endif
     </div>
-    @if($selectedRequest->status === 'Pending' || $selectedRequest->status === 'Manager Approved')
+    @if(false)
         @if(auth()->user()?->hasPermission('requests.approve'))
             <div class="d-flex gap-2 px-3 pb-3">
                 <form method="POST" action="{{ route('requests.approve', $selectedRequest) }}">@csrf @method('PATCH')<button class="btn btn-success"><i class="bi bi-check-lg"></i> اعتماد</button></form>
@@ -483,7 +483,9 @@ window.addEventListener('load', () => {
         ? overtimeCard?.querySelector('[name="overtime_request_date"], [name="request_date"]')
         : source === 'other'
           ? otherDate
-          : null;
+          : ['permission', 'mission'].includes(source)
+            ? form.querySelector('[data-excuse-card] [name="request_date"]')
+            : null;
     form.querySelectorAll('[name="request_date"]').forEach((input) => {
       input.disabled = input !== activeDate;
     });
@@ -494,7 +496,7 @@ window.addEventListener('load', () => {
 @endpush
 @push('scripts')
 <script>
-const requestCardData=@json($requestCardDetails);const requestKeys=['all','pending','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المعلقة','الطلبات المعتمدة','الطلبات المرفوضة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
+const requestCardData=@json($requestCardDetails);const requestKeys=['all','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المؤكدة','الطلبات الملغاة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
 </script>
 @endpush
 
@@ -554,7 +556,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         }
         set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
         set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
-        set('from_time', payload.from_time); set('to_time', payload.to_time);
+        set('permission_from_time', payload.from_time); set('permission_to_time', payload.to_time); set('from_time', payload.from_time); set('to_time', payload.to_time);
         const overtimeEditCard = editForm.querySelector('.overtime-request-fields');
         if (overtimeEditCard && editingRequest.request_type_source === 'overtime') {
           overtimeEditCard.hidden = false;
@@ -578,7 +580,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
         }
         set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
         const affects = editForm.querySelector('[name="affects_payroll"]'); if (affects) affects.checked = !!payload.affects_payroll;
-        set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
+        set('permission_from_time', payload.from_time); set('permission_to_time', payload.to_time); set('from_time', payload.from_time); set('to_time', payload.to_time); set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
         editForm.dispatchEvent(new Event('change', { bubbles: true }));
       };
       applyEditingFields();
@@ -630,7 +632,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
                     <td>
                         <div class="d-flex gap-1 align-items-center">
                             <a class="btn btn-sm btn-light" href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" title="التفاصيل"><i class="bi bi-eye"></i></a>
-                            @if(in_array($hrRequest->status, ['Pending', 'Manager Approved'], true) && auth()->user()?->hasPermission('requests.approve'))
+                            @if(false)
                                 <form method="POST" action="{{ route('requests.approve', $hrRequest) }}">@csrf @method('PATCH')<button class="btn btn-sm btn-outline-success" title="اعتماد"><i class="bi bi-check-lg"></i></button></form>
                                 <form method="POST" action="{{ route('requests.reject', $hrRequest) }}">@csrf @method('PATCH')<input type="hidden" name="rejection_reason" value="تم الرفض من شاشة الطلبات"><button class="btn btn-sm btn-outline-danger" title="رفض"><i class="bi bi-x-lg"></i></button></form>
                             @endif
@@ -779,7 +781,10 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','pendi
       set('advance_amount', payload.amount); set('overtime_request_date', payload.request_date); set('overtime_period', payload.overtime_period);
       set('day_overtime_hours', payload.overtime_period === 'day' ? payload.hours : ''); set('night_overtime_hours', payload.overtime_period === 'night' ? payload.hours : '');
       set('financial_request_date', payload.request_date); set('financial_amount', payload.amount); set('other_request_date', payload.request_date); set('impact_amount', payload.amount); set('impact_type', payload.impact_type);
-      set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
+      if (['permission', 'mission'].includes(@json($requestTypes->mapWithKeys(fn ($item) => [$item->id => $item->source_key]))[data.request_type_id])) {
+        form.querySelector('[data-excuse-card] [name="request_date"]').value = payload.request_date || '';
+      }
+      set('permission_from_time', payload.from_time); set('permission_to_time', payload.to_time); set('from_time', payload.from_time); set('to_time', payload.to_time); set('request_date', payload.request_date); set('start_date', payload.start_date); set('end_date', payload.end_date); set('duration_days', payload.days); set('duration_hours', payload.hours); set('addition_amount', payload.addition_amount); set('deduction_amount', payload.deduction_amount);
       form.querySelector('[name="advance_amount"]')?.dispatchEvent(new Event('input', { bubbles: true }));
       form.querySelector('.advance-existing-notice')?.setAttribute('hidden', 'hidden');
       form.querySelector('.advance-existing-confirm')?.setAttribute('hidden', 'hidden');
@@ -928,5 +933,46 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
   form.removeAttribute('onsubmit');
 });
+</script>
+@endpush
+
+@push('scripts')
+<script>
+// Permission windows have a position within the shift, not only a duration.
+(() => {
+  const form = document.querySelector('#requestCreateModal form');
+  const type = form?.querySelector('[name="request_type_id"]');
+  if (!form || !type) return;
+  const sources = @json($requestTypes->mapWithKeys(fn ($item) => [$item->id => $item->source_key]));
+  const card = document.createElement('div');
+  card.className = 'row g-2 mt-2';
+  card.dataset.excuseCard = 'true';
+  card.innerHTML = '<div class="col-12 text-muted small">الإذن يغطي وقته المحدد فقط. المأمورية تغطي أيام العمل داخل الفترة.</div><div class="col-12"><label class="form-label">تاريخ الطلب</label><input type="date" name="request_date" class="form-control"></div><div class="col-6" data-mission><label class="form-label">من تاريخ</label><input type="date" name="start_date" class="form-control"></div><div class="col-6" data-mission><label class="form-label">إلى تاريخ</label><input type="date" name="end_date" class="form-control"></div><div class="col-6" data-permission><label class="form-label">من الساعة</label><input type="time" name="permission_from_time" class="form-control" dir="ltr"></div><div class="col-6" data-permission><label class="form-label">إلى الساعة</label><input type="time" name="permission_to_time" class="form-control" dir="ltr"></div>';
+  form.querySelector('.modal-body').append(card);
+  const sync = () => {
+    const source = sources[type.value];
+    const active = ['permission', 'mission'].includes(source);
+    card.hidden = !active;
+    card.querySelectorAll('input').forEach(input => {
+      const forPermission = input.closest('[data-permission]');
+      const forMission = input.closest('[data-mission]');
+      const enabled = active && (!forPermission || source === 'permission') && (!forMission || source === 'mission');
+      input.disabled = !enabled;
+      input.required = enabled && !forMission;
+      if (forPermission || forMission) input.parentElement.hidden = !enabled;
+    });
+    if (active && !card.querySelector('[name="request_date"]').value) card.querySelector('[name="request_date"]').value = @json(today()->toDateString());
+  };
+  type.addEventListener('change', sync);
+  document.getElementById('requestCreateModal')?.addEventListener('shown.bs.modal', () => {
+    sync();
+    const initialEditing = @json($editingRequestData);
+    const editing = initialEditing && String(initialEditing.id) === String(form.dataset.editingId) ? initialEditing : null;
+    if (editing && ['permission', 'mission'].includes(editing.request_type_source)) {
+      card.querySelectorAll('input').forEach(input => input.value = editing.payload?.[input.name.replace('permission_', '')] || '');
+    }
+  });
+  sync();
+})();
 </script>
 @endpush

@@ -38,7 +38,7 @@ class LeaveBalanceService
         $cycleEnd = $cycles->max(fn (array $cycle) => $cycle['end']->timestamp);
         $leaves = Leave::with('leaveType')
             ->whereIn('employee_id', $ids)
-            ->where('status', 'Approved')
+            ->effective()
             ->whereDate('start_date', '<=', Carbon::createFromTimestamp($cycleEnd)->toDateString())
             ->whereDate('end_date', '>=', Carbon::createFromTimestamp($cycleStart)->toDateString())
             ->get()
@@ -163,14 +163,14 @@ class LeaveBalanceService
 
     private function occurrences(Employee $employee, LeaveType $type, ?int $excludeId): int
     {
-        $query = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->where('status', 'Approved');
+        $query = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->effective();
         if ($excludeId) $query->where('id', '!=', $excludeId);
         return $query->count();
     }
 
     private function approvedDays(Employee $employee, int $year, callable $filter, ?int $excludeId = null): float
     {
-        $query = Leave::with('leaveType')->where('employee_id', $employee->id)->where('status', 'Approved')->whereYear('start_date', $year);
+        $query = Leave::with('leaveType')->where('employee_id', $employee->id)->effective()->whereYear('start_date', $year);
         if ($excludeId) $query->where('id', '!=', $excludeId);
         return (float) $query->get()->filter(fn (Leave $leave) => $leave->leaveType && $filter($leave->leaveType))->sum('days');
     }
@@ -199,7 +199,7 @@ class LeaveBalanceService
     {
         $query = Leave::with('leaveType')
             ->where('employee_id', $employee->id)
-            ->where('status', 'Approved')
+            ->effective()
             ->whereDate('start_date', '<=', $cycle['end'])
             ->whereDate('end_date', '>=', $cycle['start']);
         if ($excludeId) $query->where('id', '!=', $excludeId);

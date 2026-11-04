@@ -15,10 +15,15 @@ class PayrollPeriodGuard
         $month = $this->operationalSettings
             ->payrollMonthForDate(Carbon::parse($date))
             ->toDateString();
+        $day = Carbon::parse($date)->toDateString();
         abort_if(
-            PayrollRun::whereDate('payroll_month', $month)->where('status', 'Locked')->exists(),
+            PayrollRun::whereIn('status', ['Approved', 'Locked', 'Paid'])
+                ->where(fn ($q) => $q
+                    ->where(fn ($range) => $range->whereDate('period_start', '<=', $day)->whereDate('period_end', '>=', $day))
+                    ->orWhere(fn ($legacy) => $legacy->whereNull('period_start')->whereDate('payroll_month', $month)))
+                ->exists(),
             422,
-            'This payroll period is locked. Create an authorized adjustment instead.'
+            'This payroll period is finalized. Create an authorized adjustment instead.'
         );
     }
 
@@ -26,6 +31,9 @@ class PayrollPeriodGuard
     {
         $cursor = Carbon::parse($from)->startOfDay();
         $last = Carbon::parse($to)->startOfDay();
+        abort_if(PayrollRun::whereIn('status', ['Approved', 'Locked', 'Paid'])
+            ->whereDate('period_start', '<=', $last)->whereDate('period_end', '>=', $cursor)->exists(),
+            422, 'This payroll date range overlaps a finalized period.');
         $checked = [];
         while ($cursor->lte($last)) {
             $month = $this->operationalSettings->payrollMonthForDate($cursor)->toDateString();

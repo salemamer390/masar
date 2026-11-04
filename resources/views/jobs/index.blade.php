@@ -4,7 +4,7 @@
 <div class="page-head"><div><h1>ملخص الشهر</h1><p>كشف الحضور والإجازات والجزاءات والأرصدة خلال الفترة المحددة.</p></div><span class="badge-soft info px-3 py-2"><i class="bi bi-calendar3"></i> {{ $month->format('m/Y') }}</span></div>
 <form class="filter-bar d-flex flex-wrap gap-2 mb-3" method="GET" data-server-live-search="true"><input type="month" name="month" class="form-control" value="{{ $month->format('Y-m') }}"><div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="بحث بالاسم أو الكود"></div><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select><button class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button><a class="btn btn-light" href="{{ route('jobs.index') }}">مسح</a></form>
 <div class="d-flex gap-2 flex-wrap mb-3"><button class="btn btn-primary" type="button" data-summary-tab="current"><i class="bi bi-table"></i> ملخص الشهر الحالي</button><button class="btn btn-light" type="button" data-summary-tab="history"><i class="bi bi-clock-history"></i> سجل الملخص</button><a class="btn btn-outline-success" href="{{ route('jobs.export', ['month' => $month->format('Y-m')]) }}"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a><form method="POST" action="{{ route('jobs.summary-history.store') }}" class="d-inline">@csrf<input type="hidden" name="month" value="{{ $month->format('Y-m') }}"><button class="btn btn-outline-primary"><i class="bi bi-save"></i> حفظ في السجل</button></form></div>
-<div id="summaryCurrent"><div class="panel table-panel"><div class="panel-head"><div><h3>ملخص حركة الموظفين</h3><span>السجلات المعتمدة داخل الفترة المحددة.</span></div></div><div class="table-responsive"><table class="table align-middle monthly-summary-table"><thead><tr><th colspan="3">الموظف</th><th colspan="4">الحضور والغياب</th><th colspan="6">الإجازات المعتمدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th>الرصيد</th><th colspan="6">الطلبات المعتمدة</th></tr><tr><th>الكود</th><th>اسم الموظف</th><th>القسم</th><th>أيام الحضور</th><th>منها حضور متأخر</th><th>دقائق التأخير</th><th>أيام الغياب</th><th>سنوية</th><th>عارضة</th><th>مرضية</th><th>بدون أجر</th><th>أمومة</th><th>أنواع أخرى</th><th>إجمالي الإجازات</th><th>عدد الجزاءات</th><th>أيام خصم الجزاءات</th><th>رصيد الإجازة السنوية المتبقي</th><th>عدد الطلبات</th><th>أيام الطلبات</th><th>ساعات الطلبات</th><th>إضافات</th><th>خصومات</th><th>أنواع الطلبات</th></thead><tbody>
+<div id="summaryCurrent"><div class="panel table-panel"><div class="panel-head"><div><h3>ملخص حركة الموظفين</h3><span>السجلات مؤكدة فور تسجيلها. الغياب حتى آخر يوم عمل مكتمل فقط؛ الإذن يُعفي وقته والمأمورية تُعفي أيامها.</span></div></div><div class="table-responsive"><table class="table align-middle monthly-summary-table"><thead><tr><th colspan="3">الموظف</th><th colspan="4">الحضور والغياب</th><th colspan="6">الإجازات المؤكدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th>الرصيد</th><th colspan="6">الطلبات المؤكدة</th></tr><tr><th>الكود</th><th>اسم الموظف</th><th>القسم</th><th>أيام الحضور</th><th>منها حضور متأخر</th><th>دقائق التأخير</th><th>أيام الغياب</th><th>سنوية</th><th>عارضة</th><th>مرضية</th><th>بدون أجر</th><th>أمومة</th><th>أنواع أخرى</th><th>إجمالي الإجازات</th><th>عدد الجزاءات</th><th>أيام خصم الجزاءات</th><th>رصيد الإجازة السنوية المتبقي</th><th>عدد الطلبات</th><th>أيام الطلبات</th><th>ساعات الطلبات</th><th>إضافات</th><th>خصومات</th><th>أنواع الطلبات</th></thead><tbody>
 @forelse($monthlyRows as $row) @php($employee=$row['employee'])<tr><td>{{ $employee->employee_code }}</td><td><a class="employee-link fw-bold" href="{{ route('employees.show',$employee) }}">{{ $employee->full_name }}</a></td><td>{{ $employee->department?->name ?? '—' }}</td><td>{{ format_number($row['attendance_days']) }}</td><td>{{ format_number($row['late_days']) }}</td><td>{{ format_number($row['late_minutes']) }}</td><td>{{ format_number($row['absence_days']) }}</td><td>{{ format_number($row['annual_leave_days']) }}</td><td>{{ format_number($row['casual_leave_days']) }}</td><td>{{ format_number($row['sick_leave_days']) }}</td><td>{{ format_number($row['unpaid_leave_days']) }}</td><td>{{ format_number($row['maternity_leave_days']) }}</td><td>{{ format_number($row['other_leave_days']) }}</td><td>{{ format_number($row['total_leave_days']) }}</td><td>{{ format_number($row['penalty_count']) }}</td><td>{{ format_number($row['penalty_days']) }}</td><td><span class="badge-soft success">{{ format_number($row['annual_balance_remaining']) }} يوم</span></td><td>{{ format_number($row['approved_request_count']) }}</td><td>{{ format_number($row['request_days']) }}</td><td>{{ format_number($row['request_hours']) }}</td><td>{{ format_number($row['request_additions']) }}</td><td>{{ format_number($row['request_deductions']) }}</td><td>{{ $row['request_types'] ?: '—' }}</td></tr>@empty<tr><td colspan="23" class="text-center py-5">لا توجد بيانات مطابقة للفترة أو الفلاتر الحالية.</td></tr>@endforelse
 </tbody></table></div></div></div>
 @if($employees->hasPages())
@@ -61,7 +61,7 @@ if (summaryTable) {
     const headRows = summaryTable.tHead?.rows;
     const summaryData = @json($summaryRowData);
     if (headRows?.length >= 2) {
-        headRows[0].innerHTML = '<th colspan="3">الموظف</th><th colspan="7">الحضور والغياب</th><th colspan="8">الإجازات المعتمدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th colspan="3">الطلبات المعتمدة</th>';
+        headRows[0].innerHTML = '<th colspan="3">الموظف</th><th colspan="7">الحضور والغياب</th><th colspan="8">الإجازات المؤكدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th colspan="3">الطلبات المؤكدة</th>';
         headRows[1].innerHTML = ['الكود','اسم الموظف','القسم','أيام الحضور','منها حضور متأخر','دقائق التأخير','أيام الغياب','دقائق الانصراف المبكر','إضافي نهاري','إضافي ليلي','سنوية','عارضة','مرضية','بدون أجر','أمومة','أنواع أخرى','إجمالي الإجازات','رصيد الإجازة السنوية المتبقي','عدد الجزاءات','أيام خصم الجزاءات','سلفة','إذن','مأمورية'].map(label => `<th>${label}</th>`).join('');
         summaryTable.tBodies?.[0]?.querySelectorAll('tr').forEach(row => {
             if (row.cells.length < 23) return;
@@ -83,7 +83,7 @@ if (summaryTable) {
     const requestLabels = ['عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات'];
     if (headRows?.length >= 2 && headRows[1].cells.length < 23) {
         requestLabels.forEach(label => { const cell = document.createElement('th'); cell.textContent = label; headRows[1].append(cell); });
-        const group = document.createElement('th'); group.colSpan = requestLabels.length; group.textContent = 'الطلبات المعتمدة';
+        const group = document.createElement('th'); group.colSpan = requestLabels.length; group.textContent = 'الطلبات المؤكدة';
         headRows[0].append(group);
     }
 }
@@ -97,3 +97,27 @@ serverSearchInput?.addEventListener('input', () => {
 </script>
 @endsection
 
+
+@push('scripts')
+<script>
+// A read on focus keeps a summary left open in another tab current, without background polling.
+(() => {
+  let refreshing = false;
+  const refresh = async () => {
+    if (refreshing || document.hidden || document.getElementById('summaryCurrent')?.hidden) return;
+    refreshing = true;
+    try {
+      const url = new URL(@json(route('jobs.rows')), location.origin);
+      url.search = location.search;
+      const response = await fetch(url, {headers: {Accept: 'application/json'}});
+      if (!response.ok) return;
+      const data = await response.json();
+      const body = document.querySelector('.monthly-summary-table tbody');
+      if (body && typeof data.html === 'string') body.innerHTML = data.html;
+    } finally { refreshing = false; }
+  };
+  window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+})();
+</script>
+@endpush

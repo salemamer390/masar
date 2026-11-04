@@ -8,6 +8,7 @@ use App\Models\HrRequest;
 use App\Models\PayrollRecord;
 use App\Models\RequestType;
 use App\Services\PayrollRunService;
+use App\Services\PayrollPeriodGuard;
 use App\Services\HrOperationalSettingsService;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
@@ -41,7 +42,7 @@ class HrRequestController extends Controller
         });
 
         if ($request->filled('status')) {
-            $query->where('status', $request->string('status')->toString());
+            $request->status === 'Approved' ? $query->effective() : $query->where('status', $request->string('status')->toString());
         }
 
         if ($request->filled('type')) {
@@ -113,14 +114,14 @@ class HrRequestController extends Controller
         $statsQuery = HrRequest::visibleTo($user);
         $stats = [
             'all' => (clone $statsQuery)->count(),
-            'pending' => (clone $statsQuery)->where('status', 'Pending')->count(),
-            'approved' => (clone $statsQuery)->where('status', 'Approved')->count(),
+            'pending' => 0,
+            'approved' => (clone $statsQuery)->effective()->count(),
             'rejected' => (clone $statsQuery)->where('status', 'Rejected')->count(),
         ];
         $requestCardDetails = [
             'all' => (clone $statsQuery)->with('employee')->latest('id')->get(),
-            'pending' => (clone $statsQuery)->with('employee')->where('status', 'Pending')->latest('id')->get(),
-            'approved' => (clone $statsQuery)->with('employee')->where('status', 'Approved')->latest('id')->get(),
+            'pending' => collect(),
+            'approved' => (clone $statsQuery)->with('employee')->effective()->latest('id')->get(),
             'rejected' => (clone $statsQuery)->with('employee')->where('status', 'Rejected')->latest('id')->get(),
         ];
         $editingRequest = null;
@@ -233,6 +234,9 @@ class HrRequestController extends Controller
             ]);
             $validated = array_merge($validated, $financialValidated);
         }
+        if (in_array($type->source_key, ['permission', 'mission'], true)) {
+            $validated = array_merge($validated, $this->validateExcuse($request, $type->source_key));
+        }
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
@@ -243,10 +247,11 @@ class HrRequestController extends Controller
             'bonus', 'incentive', 'commission', 'profit_share' => $validated['financial_request_date'] ?? null,
             default => $validated['request_date'] ?? null,
         };
+        app(PayrollPeriodGuard::class)->ensureRangeOpen($validated['start_date'] ?? $requestDate ?? today()->toDateString(), $validated['end_date'] ?? $requestDate ?? today()->toDateString());
         if ($requestDate) {
             $requestMonth = Carbon::parse($requestDate)->startOfMonth();
             $duplicateQuery = HrRequest::where('employee_id', $employee->id)
-                ->where('status', '!=', 'Rejected')
+                ->effective()
                 // Requests of different types may coexist in the same
                 // month (for example, an advance and overtime). Prevent
                 // only a duplicate of the selected request type.
@@ -258,6 +263,7 @@ class HrRequestController extends Controller
                 ->contains(function (HrRequest $existing) use ($requestMonth, $type, $requestDate, $validated): bool {
                     $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
                     if (!$existingDate) return false;
+                    if (in_array($type->source_key, ['permission', 'mission'], true)) return false;
                     if ($type->source_key === 'overtime') {
                         return Carbon::parse($existingDate)->isSameDay(Carbon::parse($requestDate))
                             && data_get($existing->payload, 'overtime_period') === ($validated['overtime_period'] ?? null);
@@ -335,6 +341,8 @@ class HrRequestController extends Controller
                 'end_date' => $validated['end_date'] ?? null,
                 'days' => $validated['duration_days'] ?? null,
                 'hours' => $validated['duration_hours'] ?? null,
+                'from_time' => $validated['from_time'] ?? null,
+                'to_time' => $validated['to_time'] ?? null,
                 'addition_amount' => $validated['addition_amount'] ?? null,
                 'deduction_amount' => $validated['deduction_amount'] ?? null,
             ])->filter(fn ($value) => $value !== null && $value !== '')->all();
@@ -381,7 +389,7 @@ class HrRequestController extends Controller
             ]);
         }
 
-        return back()->with('toast', 'تم إنشاء الطلب وإرساله للمراجعة.');
+        return back()->with('toast', 'تم تسجيل الطلب وتأكيده فورًا.');
     }
 
     public function update(Request $request, HrRequest $hrRequest, PayrollRunService $payrollRuns)
@@ -407,7 +415,7 @@ class HrRequestController extends Controller
             $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'], 'from_time' => ['required', 'date_format:H:i'], 'to_time' => ['required', 'date_format:H:i', 'different:from_time']]);
             $duplicate = HrRequest::where('id', '!=', $hrRequest->id)
                 ->where('employee_id', $hrRequest->employee_id)
-                ->where('status', '!=', 'Rejected')
+                ->effective()
                 ->where(function ($query) use ($hrRequest) {
                     $query->where('request_type_id', $hrRequest->request_type_id)
                         ->orWhere('request_type', $hrRequest->request_type);
@@ -439,8 +447,12 @@ class HrRequestController extends Controller
             ]);
         } else {
             $data = $request->validate(['request_date' => ['nullable', 'date'], 'start_date' => ['nullable', 'date'], 'end_date' => ['nullable', 'date', 'after_or_equal:start_date'], 'duration_days' => ['nullable', 'numeric', 'min:0'], 'duration_hours' => ['nullable', 'numeric', 'min:0'], 'addition_amount' => ['nullable', 'numeric', 'min:0'], 'deduction_amount' => ['nullable', 'numeric', 'min:0']]);
-            $payload = collect(array_merge($payload, ['request_date' => $data['request_date'] ?? null, 'start_date' => $data['start_date'] ?? null, 'end_date' => $data['end_date'] ?? null, 'days' => $data['duration_days'] ?? null, 'hours' => $data['duration_hours'] ?? null, 'addition_amount' => $data['addition_amount'] ?? null, 'deduction_amount' => $data['deduction_amount'] ?? null]))->filter(fn ($value) => $value !== null && $value !== '')->all();
+            if (in_array($source, ['permission', 'mission'], true)) $data = array_merge($data, $this->validateExcuse($request, $source));
+            $payload = collect(array_merge($payload, ['request_date' => $data['request_date'] ?? null, 'start_date' => $data['start_date'] ?? null, 'end_date' => $data['end_date'] ?? null, 'days' => $data['duration_days'] ?? null, 'hours' => $data['duration_hours'] ?? null, 'from_time' => $data['from_time'] ?? null, 'to_time' => $data['to_time'] ?? null, 'addition_amount' => $data['addition_amount'] ?? null, 'deduction_amount' => $data['deduction_amount'] ?? null]))->filter(fn ($value) => $value !== null && $value !== '')->all();
         }
+        $guard = app(PayrollPeriodGuard::class);
+        $guard->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
+        $guard->ensureRangeOpen($payload['start_date'] ?? $payload['request_date'] ?? today()->toDateString(), $payload['end_date'] ?? $payload['request_date'] ?? today()->toDateString());
         $old = $hrRequest->only(['title', 'details', 'payload', 'status']);
         $hrRequest->update(array_merge($validated, ['payload' => $payload ?: null,
             'status' => 'Approved',
@@ -484,7 +496,7 @@ class HrRequestController extends Controller
     {
         $advances = HrRequest::with('requestType')
             ->whereIn('employee_id', $employeeIds)
-            ->where('status', 'Approved')
+            ->effective()
             ->where(function ($query) {
                 $query->where('request_type', 'advance')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
@@ -508,12 +520,32 @@ class HrRequestController extends Controller
         return $result;
     }
 
+    private function validateExcuse(Request $request, string $source): array
+    {
+        if ($source === 'permission' && $request->has('permission_from_time')) {
+            $request->merge(['from_time' => $request->input('permission_from_time'), 'to_time' => $request->input('permission_to_time')]);
+        }
+        $data = $request->validate([
+            'request_date' => ['required', 'date'],
+            'start_date' => ['required_with:end_date', 'nullable', 'date'],
+            'end_date' => ['required_with:start_date', 'nullable', 'date', 'after_or_equal:start_date'],
+            'from_time' => [$source === 'permission' ? 'required' : 'nullable', 'date_format:H:i'],
+            'to_time' => [$source === 'permission' ? 'required' : 'nullable', 'date_format:H:i', 'different:from_time'],
+        ]);
+        // A permission is one dated interval; a mission may span several days.
+        if ($source === 'permission') {
+            $data['start_date'] = $data['end_date'] = $data['request_date'];
+        }
+        return $data;
+    }
+
     public function approve(HrRequest $hrRequest, Request $request)
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
         abort_unless($user->hasPermission('requests.approve'), 403, 'لا توجد صلاحية لاعتماد الطلبات.');
-        abort_unless(in_array($hrRequest->status, ['Pending', 'Manager Approved'], true), 422, 'هذا الطلب ليس في حالة تسمح بالاعتماد.');
+        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, 'الطلب ملغى.');
+        app(PayrollPeriodGuard::class)->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
 
         $old = $hrRequest->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason']);
         $hrRequest->update([
@@ -529,12 +561,13 @@ class HrRequestController extends Controller
             : back()->with('toast', 'تم اعتماد الطلب.');
     }
 
-    public function reject(HrRequest $hrRequest, Request $request)
+    public function reject(HrRequest $hrRequest, Request $request, PayrollRunService $payrollRuns)
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
         abort_unless($user->hasPermission('requests.approve'), 403, 'لا توجد صلاحية لمراجعة الطلبات.');
-        abort_unless(in_array($hrRequest->status, ['Pending', 'Manager Approved'], true), 422, 'هذا الطلب ليس في حالة تسمح بالرفض.');
+        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, 'الطلب ملغى بالفعل.');
+        app(PayrollPeriodGuard::class)->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
 
         $validated = $request->validate([
             'rejection_reason' => ['nullable', 'string', 'max:5000'],
@@ -546,6 +579,7 @@ class HrRequestController extends Controller
             'reviewed_at' => now(),
             'rejection_reason' => $validated['rejection_reason'] ?? null,
         ]);
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $hrRequest->employee_id);
         ActivityLog::record('request_reject', "تم رفض الطلب: {$hrRequest->title}.", $hrRequest, $old, $hrRequest->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason']), 'requests');
 
         return $request->wantsJson()
@@ -558,6 +592,7 @@ class HrRequestController extends Controller
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
         abort_unless($user->hasPermission('requests.delete'), 403);
+        app(PayrollPeriodGuard::class)->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
         $snapshot = $hrRequest->toArray();
         $deletedEmployeeId = (int) $hrRequest->employee_id;
         $deletedRequestDate = data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toDateString();

@@ -52,7 +52,7 @@ class DashboardController extends Controller
         $pendingRequests = $allPendingRequests->take(5)->values();
         $pendingRequestsCount = $allPendingRequests->count();
         $requestsIndexUrl = $this->requests->listingUrl($user);
-        $recentLeaves = $can('leaves.view') ? Leave::with(['employee', 'leaveType'])->whereIn('status', ['Approved', 'Rejected'])->latest('approved_at')->latest('updated_at')->latest('id')->limit(7)->get() : collect();
+        $recentLeaves = $can('leaves.view') ? Leave::with(['employee', 'leaveType'])->latest('approved_at')->latest('updated_at')->latest('id')->limit(7)->get() : collect();
         $recentEmployees = collect();
         if ($can('employees.view')) {
             $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereBetween('hire_date', [$currentMonth, $currentMonth->copy()->endOfMonth()])->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();

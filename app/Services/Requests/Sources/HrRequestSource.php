@@ -36,17 +36,12 @@ class HrRequestSource implements UnifiedRequestSource
 
     public function listingUrl(RequestType $type): string
     {
-        return route('requests.index', ['type' => $type->code, 'status' => 'Pending']);
+        return route('requests.index', ['type' => $type->code]);
     }
 
     private function present(HrRequest $request, RequestType $type, User $user): array
     {
-        $status = match ($request->status) {
-            'Approved' => ['معتمد', 'success'],
-            'Rejected' => ['مرفوض', 'danger'],
-            'Manager Approved' => ['بانتظار HR', 'info'],
-            default => ['معلق', 'warning'],
-        };
+        $status = in_array($request->status, HrRequest::inactiveStatuses(), true) ? ['ملغى', 'danger'] : ['مؤكد', 'success'];
 
         return [
             'id' => $type->code.':'.$request->getKey(),
@@ -64,7 +59,7 @@ class HrRequestSource implements UnifiedRequestSource
             'status_class' => $status[1],
             'details_url' => route('requests.index', ['request' => $request->id]),
             'listing_url' => $this->listingUrl($type),
-            'can_approve' => in_array($request->status, ['Pending', 'Manager Approved'], true) && $user->hasPermission('requests.approve'),
+            'can_approve' => false,
             'approve_url' => route('requests.approve', $request),
             'reject_url' => route('requests.reject', $request),
             'source' => $request,

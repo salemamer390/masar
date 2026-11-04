@@ -27,7 +27,7 @@ class EmployeeLeaveStatusService
         }
 
         $employeeIdsOnLeave = Leave::query()
-            ->whereIn('status', ['Approved', 'معتمد'])
+            ->effective()
             ->whereDate('start_date', '<=', $date)
             ->whereDate('end_date', '>=', $date)
             ->pluck('employee_id')

@@ -16,11 +16,21 @@ class AttendanceMetricsService
     {
         $start = $employee->shift_start ?: $this->settings->start();
         $end = $employee->shift_end ?: $this->settings->end();
-        $late = $this->lateMinutes($checkIn, $start);
+        $shiftStart = $this->timeToMinutes($start);
+        $shiftEnd = $this->timeToMinutes($end);
+        $night = $shiftEnd <= $shiftStart;
+        if ($night) $shiftEnd += 1440;
+        $in = $checkIn ? $this->timeToMinutes($checkIn) : null;
+        $out = $checkOut ? $this->timeToMinutes($checkOut) : null;
+        // On an overnight shift, the early-morning clock belongs to the next
+        // calendar day. Allow a pre-shift arrival on the attendance day.
+        if ($night && $in !== null && $in < $shiftStart - 360) $in += 1440;
+        if ($out !== null && (($in !== null && $out <= $in) || ($night && $in === null && $out < $shiftStart))) $out += 1440;
+        $late = $in !== null && $in > $shiftStart + $this->settings->grace() ? $in - $shiftStart : 0;
         return [
             'late_minutes' => $late,
-            'early_leave_minutes' => $this->earlyLeaveMinutes($checkOut, $end),
-            'worked_hours' => $this->workedHours($checkIn, $checkOut),
+            'early_leave_minutes' => $out !== null ? max(0, $shiftEnd - $out) : 0,
+            'worked_hours' => $in !== null && $out !== null ? round(max(0, $out - $in) / 60, 2) : null,
             'status' => ($checkIn || $checkOut) ? ($late > 0 ? 'Late' : 'Present') : ($fallbackStatus ?: 'Absent'),
         ];
     }
@@ -50,27 +60,6 @@ class AttendanceMetricsService
                 });
             return $updated;
         });
-    }
-
-    private function lateMinutes(?string $checkIn, string $shiftStart): int
-    {
-        if (!$checkIn) return 0;
-        $actual = $this->timeToMinutes($checkIn);
-        $start = $this->timeToMinutes($shiftStart);
-        return $actual > $start + $this->settings->grace() ? $actual - $start : 0;
-    }
-
-    private function earlyLeaveMinutes(?string $checkOut, string $shiftEnd): int
-    {
-        if (!$checkOut) return 0;
-        return max(0, $this->timeToMinutes($shiftEnd) - $this->timeToMinutes($checkOut));
-    }
-
-    private function workedHours(?string $checkIn, ?string $checkOut): ?float
-    {
-        if (!$checkIn || !$checkOut) return null;
-        $minutes = ($this->timeToMinutes($checkOut) - $this->timeToMinutes($checkIn) + 1440) % 1440;
-        return round($minutes / 60, 2);
     }
 
     private function timeToMinutes(string $time): int

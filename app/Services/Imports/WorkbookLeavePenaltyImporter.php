@@ -51,7 +51,15 @@ class WorkbookLeavePenaltyImporter
                 $days = is_numeric($row[$map['days'] ?? -1] ?? null) ? (float) $row[$map['days']] : $this->workingDays($start, $end);
                 $exists = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->whereDate('start_date', $start)->whereDate('end_date', $end)->exists();
                 if ($exists) throw new \RuntimeException('سجل الإجازة موجود بالفعل.');
-                Leave::create(['employee_id' => $employee->id, 'leave_type_id' => $type->id, 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'reason' => $row[$map['reason'] ?? -1] ?? null, 'status' => $status, 'approved_by' => $status === 'Approved' ? auth()->id() : null, 'approved_at' => $status === 'Approved' ? now() : null]);
+                $leave = new Leave(['employee_id' => $employee->id, 'leave_type_id' => $type->id, 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'reason' => $row[$map['reason'] ?? -1] ?? null, 'status' => $status, 'approved_by' => $status === 'Approved' ? auth()->id() : null, 'approved_at' => $status === 'Approved' ? now() : null]);
+                if ($status === 'Approved') {
+                    $overlap = Leave::effective()->where('employee_id', $employee->id)->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
+                    if ($overlap) throw new \RuntimeException('يوجد طلب إجازة متداخل مع هذه المدة.');
+                    app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+                }
+                $leave->save();
+                app(\App\Services\LeaveBalanceService::class)->sync($employee, Carbon::parse($start));
+                app(\App\Services\EmployeeLeaveStatusService::class)->sync();
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
             } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; }
         }
@@ -97,6 +105,6 @@ class WorkbookLeavePenaltyImporter
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
     private function person(mixed $value): string { return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim((string) $value))); }
     private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
-    private function status(mixed $value): string { $key = $this->normalise($value); return str_contains($key, 'رفض') || $key === 'rejected' ? 'Rejected' : (str_contains($key, 'اعتمد') || $key === 'approved' ? 'Approved' : 'Pending'); }
+    private function status(mixed $value): string { $key = $this->normalise($value); return str_contains($key, 'رفض') || $key === 'rejected' ? 'Rejected' : 'Approved'; }
     private function workingDays(string $start, string $end): float { return (float) (Carbon::parse($start)->diffInDays(Carbon::parse($end)) + 1); }
 }

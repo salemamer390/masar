@@ -74,7 +74,7 @@ class EmployeeController extends Controller
             'contracts_due' => Employee::whereBetween('contract_end_date', [today(), today()->copy()->addDays(30)])->count(),
             'uninsured' => Employee::whereDoesntHave('insuranceRecord')->count(),
             'on_leave' => Employee::whereHas('leaves', fn ($leave) => $leave
-                ->whereIn('status', ['Approved', 'معتمد'])
+                ->effective()
                 ->whereDate('start_date', '<=', today())
                 ->whereDate('end_date', '>=', today()))->count(),
         ];
@@ -85,7 +85,7 @@ class EmployeeController extends Controller
             'departments' => Department::whereHas('employees')->withCount('employees')->orderBy('name')->get(),
             'contracts_due' => Employee::with(['department'])->whereBetween('contract_end_date', [today(), today()->copy()->addDays(30)])->orderBy('contract_end_date')->get(),
             'uninsured' => Employee::with(['department'])->whereDoesntHave('insuranceRecord')->orderBy('full_name')->get(),
-            'on_leave' => Employee::with(['department'])->whereHas('leaves', fn ($q) => $q->whereIn('status', ['Approved', 'معتمد'])->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()))->orderBy('full_name')->get(),
+            'on_leave' => Employee::with(['department'])->whereHas('leaves', fn ($q) => $q->effective()->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today()))->orderBy('full_name')->get(),
         ];
 
         return view('employees.index', compact('employees', 'departments', 'statuses', 'employeeSummary', 'employeeCardDetails'));
@@ -126,13 +126,13 @@ class EmployeeController extends Controller
         if ($leaveBalance === null && $employee->profileDetail?->annual_leave_days !== null) {
             $leaveBalance = (float) $employee->profileDetail->annual_leave_days;
         }
-        $leaveUsed = $employee->leaves->whereIn('status', ['Approved', 'معتمدة'])->sum('days');
-        $leavePending = $employee->leaves->whereIn('status', ['Pending', 'Manager Approved', 'قيد الاعتماد'])->count();
+        $leaveUsed = $employee->leaves->whereNotIn('status', \App\Models\Leave::inactiveStatuses())->sum('days');
+        $leavePending = 0;
         $lastLeave = $employee->leaves->first()?->start_date?->format('d/m/Y') ?? '—';
 
         // Penalty mini stats
         $penaltyTotal = $employee->penalties->count();
-        $penaltyClosed = $employee->penalties->whereIn('status', ['Approved', 'مغلقة', 'Closed'])->count();
+        $penaltyClosed = $employee->penalties->whereNotIn('status', \App\Models\Penalty::inactiveStatuses())->count();
         $penaltyOpen = $penaltyTotal - $penaltyClosed;
         $lastPenalty = $employee->penalties->first()?->penalty_date?->format('d/m/Y') ?? '—';
 

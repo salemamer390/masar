@@ -10,6 +10,7 @@ use App\Models\Concerns\BelongsToCompany;
 class HrRequest extends Model
 {
     use BelongsToCompany;
+    use \App\Models\Concerns\ImmediatelyEffective;
     protected $fillable = [
         'employee_id',
         'request_type',
@@ -67,6 +68,13 @@ class HrRequest extends Model
     public function getDisplayValueAttribute(): string
     {
         $source = $this->requestType?->source_key ?: $this->request_type;
+        if ($source === 'permission' && data_get($this->payload, 'from_time') && data_get($this->payload, 'to_time')) {
+            return data_get($this->payload, 'from_time').' - '.data_get($this->payload, 'to_time');
+        }
+        if ($source === 'mission' && (data_get($this->payload, 'start_date') || data_get($this->payload, 'request_date'))) {
+            $from = data_get($this->payload, 'start_date') ?: data_get($this->payload, 'request_date');
+            return $from.' - '.(data_get($this->payload, 'end_date') ?: $from);
+        }
         if ($source === 'advance') return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
         if ($source === 'overtime') return number_format((float) data_get($this->payload, 'hours', 0) * 60, 0).' دقيقة';
         if ($source === 'other' && data_get($this->payload, 'amount') !== null) return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
@@ -101,6 +109,7 @@ class HrRequest extends Model
 
     public function getStatusLabelAttribute(): string
     {
+        if (!in_array($this->status, self::inactiveStatuses(), true)) return 'مؤكد';
         return match ($this->status) {
             'Approved' => 'معتمد',
             'Rejected' => 'مرفوض',
@@ -110,6 +119,7 @@ class HrRequest extends Model
 
     public function getStatusBadgeClassAttribute(): string
     {
+        if (!in_array($this->status, self::inactiveStatuses(), true)) return 'success';
         return match ($this->status) {
             'Approved' => 'success',
             'Rejected' => 'danger',

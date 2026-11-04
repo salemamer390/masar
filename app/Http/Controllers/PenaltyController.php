@@ -21,7 +21,7 @@ class PenaltyController extends Controller
         $penalties = Penalty::with(['employee.department', 'employee.job', 'penaltyType'])
             ->when($request->filled('employee_id'), fn ($q) => $q->where('employee_id', $request->employee_id))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('status'), fn ($q) => $request->status === 'Approved' ? $q->effective() : $q->where('status', $request->status))
             ->when($request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $request->from_date))
             ->when($request->filled('to_date'), fn ($q) => $q->whereDate('penalty_date', '<=', $request->to_date))
             ->when(!$request->filled('from_date'), fn ($q) => $q->whereDate('penalty_date', '>=', $periodStart))
@@ -97,6 +97,7 @@ class PenaltyController extends Controller
     public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
+        abort_if(in_array($penalty->status, Penalty::inactiveStatuses(), true), 422, 'الجزاء ملغى.');
         $penalty->update([
             'status' => 'Approved',
             'closed_at' => now(),
