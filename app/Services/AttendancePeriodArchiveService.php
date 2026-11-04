@@ -151,6 +151,7 @@ class AttendancePeriodArchiveService
                     'night_start' => $this->settings->nightStart(),
                     'night_end' => $this->settings->nightEnd(),
                     'weekly_rest_pattern' => $this->settings->weeklyRestPattern(),
+                    'pending_punch_exceptions' => \App\Models\AttendanceImportDay::where('resolution','pending')->whereBetween('work_date',[$start->toDateString(),$end->toDateString()])->count(),
                 ],
                 'captured_at' => now(),
             ])->save();
