@@ -7,9 +7,12 @@
 <div class="attendance-today-label"><i class="bi bi-calendar-day"></i> اليوم — {{ today()->locale('ar')->translatedFormat('l d/m/Y') }}</div>
 <div class="attendance-stat-grid">@foreach([['حاضر اليوم',$presentToday,'green','person-check'],['غياب اليوم',$absentToday,'red','person-x'],['متأخرون',$lateToday,'orange','clock-history'],['متوسط الحضور',$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>اليوم</small></div></div>@endforeach</div>
 <div class="attendance-toolbar">
-<nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a></nav>
+<nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">استثناءات البصمات <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
 
 </div>
+@if(\App\Models\AttendanceImportDay::where('resolution','pending')->exists())
+<div class="alert alert-warning">توجد بصمات تحتاج مراجعة قبل قفل الفترة. <a href="{{ route('attendance.exceptions.index') }}">فتح الاستثناءات</a></div>
+@endif
 @foreach($pendingPeriods as $pending)<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-hourglass-split"></i> الفترة السابقة {{ $pending->period_start->format('d/m/Y') }} - {{ $pending->period_end->format('d/m/Y') }} ما زالت متاحة للتصحيح حتى {{ $pending->closes_on->copy()->subDay()->format('d/m/Y') }}، وبعدها تتقفل وتتحفظ في «الشهور السابقة». <a href="{{ route('attendance.index', ['from_date' => $pending->period_start->toDateString(), 'to_date' => $pending->period_end->toDateString()]) }}">عرض حضور الفترة</a></div>@endforeach
 <p class="text-muted small mb-2">الفترة الحالية: من {{ \Carbon\Carbon::parse($periodStart)->format('d/m/Y') }} إلى {{ \Carbon\Carbon::parse($periodEnd)->format('d/m/Y') }}</p>
 @if($errors->any())
@@ -401,10 +404,10 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     <div class="modal fade attendance-import-modal" id="attendanceImportModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
         <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet me-2"></i>استيراد سجلات الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
-        <form method="POST" action="{{ route('attendance.import') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('attendance.import.preview') }}" enctype="multipart/form-data">
           @csrf
           <div class="modal-body">
-            <div class="import-help mb-3">يجب أن يحتوي الملف على عمود <strong>التاريخ</strong> وعمود <strong>كود الموظف</strong> أو <strong>اسم الموظف</strong>. الأعمدة الاختيارية: الحضور، الانصراف، الحالة. يتم تحديث سجل الموظف داخل شركتك فقط.</div>
+            <div class="import-help mb-3">يدعم الملف ثلاثة أشكال: سجلات يومية (صف لكل موظف ويوم)، أو بصمات خام (صف لكل بصمة)، أو ورقة لكل موظف. المطابقة بكود الموظف — البصمة الأولى للحضور والثانية للانصراف، والاسم للمراجعة فقط. تُعرض معاينة قبل الحفظ لتأكيد الورقة وتعيين الأعمدة. لا يُحفظ أي شيء قبل اعتمادك.</div>
             <label class="form-label" for="attendanceImportFile">ملف السجلات</label>
             <input class="form-control" id="attendanceImportFile" type="file" name="file" accept=".xlsx,.csv,.txt" required>
             <div class="form-text">الحد الأقصى 20MB. السجلات المكررة لنفس الموظف والتاريخ يتم تحديثها.</div>
