@@ -16,5 +16,6 @@ Schedule::command('summary:capture')->dailyAt('23:55')->timezone('Africa/Cairo')
 Schedule::command('attendance:archive-periods')->dailyAt('00:10')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('fingerprint:sync-devices')->everyFifteenMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('operations:detect-stale-sync')->everyThirtyMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
+Schedule::call(fn () => \App\Http\Controllers\AttendanceImportController::purgeStaleImportFiles())->hourly()->name('attendance-import-prune')->withoutOverlapping();
 // Payroll closing is manual. Late fingerprint imports from the new month may
 // still affect the previous month, so no automatic close is scheduled.

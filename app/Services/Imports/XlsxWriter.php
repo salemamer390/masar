@@ -30,23 +30,58 @@ class XlsxWriter
             throw new RuntimeException('تعذر إنشاء ملف Excel.');
         }
 
-        $zip->addFromString('[Content_Types].xml', $this->contentTypes());
+        $this->writeSheetsWith($zip, [['name' => $sheetName, 'rows' => array_merge([array_values($headers)], array_map('array_values', $rows))]]);
+    }
+
+    /**
+     * Write a workbook with several sheets. Each sheet is
+     * ['name' => string, 'rows' => array<int, array<int, string>>] and every
+     * row is written verbatim from the first spreadsheet row.
+     *
+     * @param array<int, array{name: string, rows: array<int, array<int, string>>}> $sheets
+     */
+    public function writeSheets(string $path, array $sheets): void
+    {
+        if (!class_exists(ZipArchive::class)) {
+            throw new RuntimeException('امتداد PHP المسمى zip غير مفعّل على الخادم.');
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('تعذر إنشاء ملف Excel.');
+        }
+
+        $this->writeSheetsWith($zip, $sheets);
+    }
+
+    /**
+     * @param array<int, array{name: string, rows: array<int, array<int, string>>}> $sheets
+     */
+    private function writeSheetsWith(ZipArchive $zip, array $sheets): void
+    {
+        $zip->addFromString('[Content_Types].xml', $this->contentTypes(count($sheets)));
         $zip->addFromString('_rels/.rels', $this->rootRels());
-        $zip->addFromString('xl/workbook.xml', $this->workbook($sheetName));
-        $zip->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRels());
+        $zip->addFromString('xl/workbook.xml', $this->workbook($sheets));
+        $zip->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRels(count($sheets)));
         $zip->addFromString('xl/styles.xml', $this->styles());
-        $zip->addFromString('xl/worksheets/sheet1.xml', $this->sheet($headers, $rows));
+        foreach (array_values($sheets) as $index => $sheet) {
+            $zip->addFromString('xl/worksheets/sheet' . ($index + 1) . '.xml', $this->sheet($sheet['rows']));
+        }
         $zip->close();
     }
 
-    private function contentTypes(): string
+    private function contentTypes(int $sheetCount = 1): string
     {
+        $overrides = '';
+        for ($i = 1; $i <= $sheetCount; $i++) {
+            $overrides .= '<Override PartName="/xl/worksheets/sheet' . $i . '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+        }
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
             . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
             . '<Default Extension="xml" ContentType="application/xml"/>'
             . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-            . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            . $overrides
             . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
             . '</Types>';
     }
@@ -59,21 +94,26 @@ class XlsxWriter
             . '</Relationships>';
     }
 
-    private function workbook(string $sheetName): string
+    private function workbook(array $sheets): string
     {
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<workbook xmlns="' . self::NS_MAIN . '" xmlns:r="' . self::NS_REL . '">'
-            . '<sheets><sheet name="' . $this->escape(mb_substr($sheetName, 0, 31)) . '" sheetId="1" r:id="rId1"/></sheets>'
-            . '</workbook>';
+        $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<workbook xmlns="' . self::NS_MAIN . '" xmlns:r="' . self::NS_REL . '"><sheets>';
+        foreach (array_values($sheets) as $index => $sheet) {
+            $id = $index + 1;
+            $xml .= '<sheet name="' . $this->escape(mb_substr($sheet['name'], 0, 31)) . '" sheetId="' . $id . '" r:id="rId' . $id . '"/>';
+        }
+        return $xml . '</sheets></workbook>';
     }
 
-    private function workbookRels(): string
+    private function workbookRels(int $sheetCount = 1): string
     {
-        return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            . '<Relationship Id="rId1" Type="' . self::NS_REL . '/worksheet" Target="worksheets/sheet1.xml"/>'
-            . '<Relationship Id="rId2" Type="' . self::NS_REL . '/styles" Target="styles.xml"/>'
-            . '</Relationships>';
+        $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+        for ($i = 1; $i <= $sheetCount; $i++) {
+            $xml .= '<Relationship Id="rId' . $i . '" Type="' . self::NS_REL . '/worksheet" Target="worksheets/sheet' . $i . '.xml"/>';
+        }
+        $xml .= '<Relationship Id="rId' . ($sheetCount + 1) . '" Type="' . self::NS_REL . '/styles" Target="styles.xml"/>';
+        return $xml . '</Relationships>';
     }
 
     private function styles(): string
@@ -98,28 +138,25 @@ class XlsxWriter
      * @param array<int, string> $headers
      * @param array<int, array<int, string>> $rows
      */
-    private function sheet(array $headers, array $rows): string
+    /**
+     * @param array<int, array<int, string>> $rows written verbatim from row 1
+     */
+    private function sheet(array $rows): string
     {
-        $columns = max(1, count($headers));
+        $columns = max(1, max(array_map('count', $rows ?: [[]])));
         $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             . '<worksheet xmlns="' . self::NS_MAIN . '">'
             . '<sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
             . '<cols><col min="1" max="' . $columns . '" width="24" customWidth="1"/></cols>'
             . '<sheetData>';
 
-        $xml .= '<row r="1">';
-        foreach (array_values($headers) as $index => $header) {
-            $xml .= $this->cell($index, 1, (string) $header, 1);
-        }
-        $xml .= '</row>';
-
-        $rowNumber = 1;
+        $rowNumber = 0;
         foreach ($rows as $row) {
             $rowNumber++;
             $xml .= '<row r="' . $rowNumber . '">';
             foreach (array_values($row) as $index => $value) {
                 if ((string) $value !== '') {
-                    $xml .= $this->cell($index, $rowNumber, (string) $value, 2);
+                    $xml .= $this->cell($index, $rowNumber, (string) $value, $rowNumber === 1 ? 1 : 2);
                 }
             }
             $xml .= '</row>';
