@@ -79,13 +79,26 @@ class FingerprintAttendanceSyncService extends BaseService
 
     private function upsertAttendance(Employee $employee, FingerprintRawPunch $punch): void
     {
-        $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'attendance_date' => $punch->punchedAt->toDateString()]);
+        $date = $punch->punchedAt->toDateString();
+        $start = OvertimeWindowMatcher::timeToMinutes($employee->shift_start ?: app(HrOperationalSettingsService::class)->start());
+        $end = OvertimeWindowMatcher::timeToMinutes($employee->shift_end ?: app(HrOperationalSettingsService::class)->end());
+        $minute = $punch->punchedAt->hour * 60 + $punch->punchedAt->minute;
+        if ($end <= $start && (($punch->rawType->value === 'check_out' && $minute < $start) || ($punch->rawType->value === 'check_in' && $minute < $start - 360))) {
+            $date = $punch->punchedAt->subDay()->toDateString();
+        }
+        $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'attendance_date' => $date]);
         $time = $punch->punchedAt->format('H:i:s');
-        if ($punch->rawType->value === 'check_out') { if (!$attendance->check_out || $time > $attendance->check_out) $attendance->check_out = $time; }
-        elseif (!$attendance->check_in || $time < $attendance->check_in) $attendance->check_in = $time;
+        $timeline = static function (?string $clock) use ($start, $end): int {
+            $m = OvertimeWindowMatcher::timeToMinutes($clock) ?? -1;
+            return $m >= 0 && $end <= $start && $m < $start - 360 ? $m + 1440 : $m;
+        };
+        if ($punch->rawType->value === 'check_out') {
+            if (!$attendance->check_out || $timeline($time) > $timeline($attendance->check_out)) $attendance->check_out = $time;
+        } elseif (!$attendance->check_in || $timeline($time) < $timeline($attendance->check_in)) $attendance->check_in = $time;
         $attendance->source = AttendanceSource::Fingerprint->value;
         $attendance->approval_status = 'Approved';
-        $attendance->status = $attendance->check_in ? 'Present' : 'Absent';
+        $attendance->forceFill(app(AttendanceMetricsService::class)->metrics($employee, $attendance->check_in, $attendance->check_out, $attendance->status));
         $attendance->save();
+        app(PayrollRunService::class)->refreshEmployeeInOpenDrafts((int) $employee->id);
     }
 }

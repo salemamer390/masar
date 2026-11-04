@@ -31,8 +31,8 @@ class JobDataController extends Controller
             Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
                 'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
-                'leave_entitlement_category', 'manual_annual_balance',
-            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary']),
+                'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id',
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary', 'status']),
             $request
         )->orderByDesc('id');
 
@@ -90,8 +90,8 @@ class JobDataController extends Controller
             Employee::select([
                 'id', 'employee_code', 'full_name', 'department_id', 'job_id',
                 'branch_id', 'employment_type_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end',
-                'leave_entitlement_category', 'manual_annual_balance',
-            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary']),
+                'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id',
+            ])->with(['department:id,name', 'job:id,title', 'branch:id,name', 'employmentType:id,name', 'currentSalary', 'status']),
             $request
         )->orderByDesc('id')->paginate(
                 in_array((int) $request->input('per_page', 50), [25, 50, 100, 200], true)
@@ -111,11 +111,13 @@ class JobDataController extends Controller
     public function captureSnapshot(Carbon $month, ?int $createdBy = null): MonthlySummarySnapshot
     {
         $month = $month->copy()->startOfMonth();
-        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end', 'leave_entitlement_category', 'manual_annual_balance'])
-            ->with(['department:id,name', 'job:id,title', 'currentSalary'])->orderBy('id')->get();
+        $existing = MonthlySummarySnapshot::where('company_id', auth()->user()->company_id)->whereDate('summary_month', $month)->first();
+        if ($existing) return $existing;
+        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end', 'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id'])
+            ->with(['department:id,name', 'job:id,title', 'currentSalary', 'status'])->orderBy('id')->get();
         $rows = $this->snapshotRows($this->buildMonthlyRows($employees, $month));
 
-        return MonthlySummarySnapshot::updateOrCreate(
+        return MonthlySummarySnapshot::firstOrCreate(
             ['company_id' => auth()->user()->company_id, 'summary_month' => $month->toDateString()],
             ['rows' => $rows, 'employee_count' => count($rows), 'created_by' => $createdBy ?? auth()->id()]
         );
@@ -136,8 +138,8 @@ class JobDataController extends Controller
         $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
         // Export the same filtered set the screen shows, not the whole company.
         $employees = $this->applyEmployeeFilters(
-            Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance'])
-                ->with(['department:id,name', 'job:id,title', 'currentSalary']),
+            Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id', 'shift_start', 'shift_end'])
+                ->with(['department:id,name', 'job:id,title', 'currentSalary', 'status']),
             $request
         )->orderBy('id')->get();
         return $this->excelResponse($this->snapshotRows($this->buildMonthlyRows($employees, $month)), $month);
@@ -173,18 +175,18 @@ class JobDataController extends Controller
         $monthStart = $period['start']->toDateString();
         $monthEnd = $period['end']->toDateString();
         $employeeIds = $employees->pluck('id');
-        $attendance = Attendance::whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->get()->groupBy('employee_id');
-        $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->whereIn('status', ['Approved', 'معتمد'])->get()->groupBy('employee_id');
+        $attendance = Attendance::effective()->whereIn('employee_id', $employeeIds)->whereBetween('attendance_date', [$monthStart, $monthEnd])->get()->groupBy('employee_id');
+        $penalties = Penalty::with('penaltyType')->whereIn('employee_id', $employeeIds)->whereBetween('penalty_date', [$monthStart, $monthEnd])->effective()->get()->groupBy('employee_id');
         // No created_at prefilter here: a request entered after its owning
         // period closed must still count in that period. requestBelongsToPeriod
         // decides membership from the payload dates, falling back to created_at
         // only when the payload carries no date.
-        $requests = HrRequest::with('requestType')
+        $requests = HrRequest::effective()->with('requestType')
             ->whereIn('employee_id', $employeeIds)
             ->get()
             ->filter(fn (HrRequest $request) => $this->requestBelongsToPeriod($request, $period['start'], $period['end']))
             ->groupBy('employee_id');
-        $leaves = Leave::with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
+        $leaves = Leave::effective()->with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
         $balances = $leaveBalanceService->balancesFor($employees, $month);
 
@@ -194,6 +196,7 @@ class JobDataController extends Controller
             $employeePenalties = $penalties->get($employee->id, collect());
             $employeeRequests = $requests->get($employee->id, collect());
             $requestSummary = $this->summarizeRequests($employeeRequests);
+            $daily = app(\App\Services\EmployeePeriodMetrics::class)->calculate($employee, $period['start'], $period['end'], $attendanceRows, $employeeLeaves, $employeeRequests);
             $periodStart = $period['start'];
             $periodEnd = $period['end'];
             $leaveDays = $employeeLeaves->mapWithKeys(fn (Leave $leave): array => [$leave->id => $this->daysWithinPeriod($leave, $periodStart, $periodEnd, $settings)]);
@@ -202,14 +205,14 @@ class JobDataController extends Controller
             $balance = $balances->get($employee->id, ['annual_balance_remaining' => 0]);
             return [
                 'employee' => $employee, 'salary' => $employee->currentSalary,
-                'attendance_days' => $attendanceRows->whereNotIn('status', ['Absent', 'غائب'])->count(),
-                'late_days' => $attendanceRows->filter(fn (Attendance $item) => in_array($item->status, ['Late', 'متأخر'], true) || (int) $item->late_minutes > 0)->count(),
-                'late_minutes' => (int) $attendanceRows->sum('late_minutes'),
-                'absence_days' => $attendanceRows->filter(fn (Attendance $item) => in_array($item->status, ['Absent', 'غائب'], true))->count(),
+                'attendance_days' => $daily['attendance_days'],
+                'late_days' => $daily['late_days'],
+                'late_minutes' => $daily['late_minutes'],
+                'absence_days' => $daily['absence_days'],
                 'annual_leave_days' => $leaveByPolicy('annual'), 'casual_leave_days' => $leaveByPolicy('casual'), 'sick_leave_days' => $leaveByPolicy('sick'), 'maternity_leave_days' => $leaveByPolicy('maternity'),
                 'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity')),
                 'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0), 'unpaid_leave_days' => $unpaidLeaveDays,
-                'early_leave_minutes' => (int) $attendanceRows->sum('early_leave_minutes'),
+                'early_leave_minutes' => $daily['early_leave_minutes'],
                 'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'day')),
                 'night_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'night')),
                 'penalty_days' => $employeePenalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0),

@@ -21,6 +21,8 @@ class PayrollRunService
     /** Records in these states were already paid out and are never rewritten by a regeneration. */
     private const PAID_STATUSES = ['Paid', 'تم الصرف'];
 
+    private const FINAL_RECORD_STATUSES = ['Approved', 'معتمدة', 'معتمد', 'Locked', 'مغلق', 'مقفلة', 'Paid', 'تم الصرف'];
+
     private const EXCLUDED_STATUSES = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
 
     private const TERMINATED_STATUSES = ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'];
@@ -75,7 +77,9 @@ class PayrollRunService
                 }
 
                 // Records that no longer qualify (status change, salary removed...) leave the draft.
-                $stale = PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $run->id)->whereNull('paid_at');
+                $stale = PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $run->id)->whereNull('paid_at')
+                    ->where(fn ($q) => $q->whereNull('is_locked')->orWhere('is_locked', false))
+                    ->whereNotIn('status', self::FINAL_RECORD_STATUSES);
                 if ($employeeIds === null) {
                     if ($eligibleIds) $stale->whereNotIn('employee_id', $eligibleIds);
                     $stale->delete();
@@ -144,7 +148,7 @@ class PayrollRunService
         }
 
         if ($existing->company_id !== null && (int) $existing->company_id !== $companyId) return false;
-        if ($existing->is_locked || $existing->paid_at !== null || in_array($existing->status, self::PAID_STATUSES, true)) return false;
+        if ($existing->is_locked || $existing->paid_at !== null || in_array($existing->status, self::FINAL_RECORD_STATUSES, true)) return false;
 
         if ($existing->payroll_run_id !== null && (int) $existing->payroll_run_id !== (int) $run->id) {
             $other = PayrollRun::withoutGlobalScopes()->find($existing->payroll_run_id);
@@ -351,11 +355,11 @@ class PayrollRunService
         $to = $windowTo->toDateString();
 
         // Attendance (fingerprint import or manual entry) is effective immediately.
-        $attendance = Attendance::withoutGlobalScopes()->where('employee_id', $employee->id)
+        $attendance = Attendance::withoutGlobalScopes()->effective()->where('employee_id', $employee->id)
             ->whereBetween('attendance_date', [$windowFrom->toDateString(), $windowTo->toDateString()])->get();
         $absenceRecords = $attendance->filter(fn (Attendance $record) => in_array($record->status, ['Absent', 'غياب'], true));
 
-        $approvedLeaves = Leave::withoutGlobalScopes()->with('leaveType')->where('employee_id', $employee->id)->where('status', 'Approved')
+        $approvedLeaves = Leave::withoutGlobalScopes()->with('leaveType')->where('employee_id', $employee->id)->effective()
             ->whereDate('start_date', '<=', $windowTo->toDateString())->whereDate('end_date', '>=', $windowFrom->toDateString())->get();
         $unpaidDates = [];
         if ($this->hrSettings->unpaidLeaveAsDeduction()) {
@@ -364,12 +368,10 @@ class PayrollRunService
                 foreach ($this->leaveDatesWithin($leave, $windowFrom, $windowTo) as $date) $unpaidDates[$date] = true;
             }
         }
-        // A day that is both an unpaid leave and an "Absent" attendance row is deducted once.
-        $absentDates = $absenceRecords
-            ->map(fn (Attendance $record) => $record->attendance_date->toDateString())
-            ->unique()
-            ->reject(fn (string $date) => isset($unpaidDates[$date]));
-        $absenceDays = $absentDates->count() + count($unpaidDates);
+        $excuses = $this->requestsInMonth($employee, ['permission', 'mission'], $from, $to, false);
+        $daily = app(EmployeePeriodMetrics::class)->calculate($employee, $windowFrom, $windowTo, $attendance, $approvedLeaves, $excuses);
+        // Leave is already excluded from absence; unpaid leave is added exactly once.
+        $absenceDays = $daily['absence_days'] + count($unpaidDates);
 
         $overtime = $this->earnedOvertime($employee, $attendance);
 
@@ -384,7 +386,7 @@ class PayrollRunService
                 ->sum(fn ($request) => (float) data_get($request->payload, 'amount', 0))]);
 
         $penalties = Penalty::withoutGlobalScopes()->with('penaltyType')->where('employee_id', $employee->id)->whereBetween('penalty_date', [$from, $to])
-            ->whereIn('status', ['Approved', 'معتمد'])->get();
+            ->effective()->get();
         $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
         $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross']);
 
@@ -408,15 +410,21 @@ class PayrollRunService
     {
         return HrRequest::withoutGlobalScopes()->with('requestType')
             ->where('employee_id', $employee->id)
-            ->whereNotIn('status', ['Rejected', 'مرفوض'])
+            ->effective()
             ->where(function ($query) use ($sources) {
                 $query->whereIn('request_type', $sources)
                     ->orWhereHas('requestType', fn ($type) => $type->whereIn('source_key', $sources));
             })->get()->filter(function ($request) use ($from, $to, $honorPayrollFlag) {
                 $payload = is_array($request->payload) ? $request->payload : [];
                 if ($honorPayrollFlag && array_key_exists('affects_payroll', $payload) && !filter_var($payload['affects_payroll'], FILTER_VALIDATE_BOOLEAN)) return false;
-                $date = $payload['request_date'] ?? $payload['start_date'] ?? $request->created_at?->toDateString();
-                return $date && Carbon::parse($date)->betweenIncluded(Carbon::parse($from), Carbon::parse($to));
+                $source = $request->requestType?->source_key ?: $request->request_type;
+                if (!in_array($source, ['permission', 'mission'], true)) {
+                    $date = $payload['request_date'] ?? $payload['start_date'] ?? $request->created_at?->toDateString();
+                    return $date && Carbon::parse($date)->betweenIncluded(Carbon::parse($from), Carbon::parse($to));
+                }
+                $date = $payload['start_date'] ?? $payload['request_date'] ?? $payload['date'] ?? $request->created_at?->toDateString();
+                $end = $payload['end_date'] ?? $date;
+                return $date && Carbon::parse($date)->lte(Carbon::parse($to)) && Carbon::parse($end)->gte(Carbon::parse($from));
             })->values();
     }
 
@@ -455,7 +463,7 @@ class PayrollRunService
     {
         $requests = HrRequest::withoutGlobalScopes()->with('requestType')
             ->where('employee_id', $employee->id)
-            ->whereNotIn('status', ['Rejected', 'مرفوض'])
+            ->effective()
             ->where(function ($query) {
                 $query->where('request_type', 'advance')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
@@ -563,7 +571,7 @@ class PayrollRunService
     {
         $requests = HrRequest::withoutGlobalScopes()->with('requestType')
             ->where('employee_id', $employee->id)
-            ->whereNotIn('status', ['Rejected', 'مرفوض'])
+            ->effective()
             ->where(function ($query) {
                 $query->where('request_type', 'overtime')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'overtime'));

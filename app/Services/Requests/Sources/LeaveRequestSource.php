@@ -31,17 +31,12 @@ class LeaveRequestSource implements UnifiedRequestSource
 
     public function listingUrl(RequestType $type): string
     {
-        return route('leaves.index', ['status' => 'Pending']);
+        return route('leaves.index', []);
     }
 
     private function present(Leave $leave, RequestType $type, User $user): array
     {
-        $status = match ($leave->status) {
-            'Manager Approved' => ['بانتظار HR', 'info'],
-            'Approved' => ['معتمد', 'success'],
-            'Rejected' => ['مرفوض', 'danger'],
-            default => ['بانتظار المدير', 'warning'],
-        };
+        $status = in_array($leave->status, Leave::inactiveStatuses(), true) ? ['ملغى', 'danger'] : ['مؤكد', 'success'];
 
         return [
             'id' => $type->code.':'.$leave->getKey(),
@@ -59,7 +54,7 @@ class LeaveRequestSource implements UnifiedRequestSource
             'status_class' => $status[1],
             'details_url' => route('leaves.index', ['status' => $leave->status]),
             'listing_url' => $this->listingUrl($type),
-            'can_approve' => in_array($leave->status, ['Pending', 'Manager Approved'], true) && $user->hasPermission('leaves.approve'),
+            'can_approve' => false,
             'approve_url' => route('leaves.approve', $leave),
             'reject_url' => route('leaves.reject', $leave),
             'source' => $leave,

@@ -18,7 +18,7 @@ class UnifiedRequestService
      */
     public function pending(User $user, ?int $limit = 5, ?string $search = null): Collection
     {
-        $requests = $this->collect($user, self::PENDING_STATUSES);
+        $requests = collect();
 
         if ($search !== null && $search !== '') {
             $needle = mb_strtolower($search);

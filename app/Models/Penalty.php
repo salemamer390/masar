@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToCompany;
 class Penalty extends Model
 {
     use BelongsToCompany;
+    use \App\Models\Concerns\ImmediatelyEffective;
     protected $fillable = [
         'employee_id',
         'penalty_type_id',
@@ -48,6 +49,7 @@ class Penalty extends Model
 
     public function getStatusBadgeClassAttribute(): string
     {
+        if (!in_array($this->status, self::inactiveStatuses(), true)) return 'success';
         return match ($this->status) {
             'مغلقة', 'Closed', 'معتمد', 'Approved' => 'success',
             'قيد المتابعة', 'Open', 'Pending' => 'warning',

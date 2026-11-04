@@ -166,6 +166,7 @@ class AttendanceController extends Controller
             ...$metrics,
             'source' => 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null,
         ])->save();
+        app(PayrollRunService::class)->refreshEmployeeInOpenDrafts((int) $employee->id);
         ActivityLog::record('attendance_clock_'.$direction, 'Attendance clock event recorded.', $attendance, null, $attendance->toArray(), 'attendance');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => $direction === 'in' ? 'تم تسجيل الحضور.' : 'تم تسجيل الانصراف.', 'attendance' => $attendance->fresh()->load('employee.department')])
@@ -208,7 +209,7 @@ class AttendanceController extends Controller
         $this->decorateOvertime($fresh);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance updated.', 'attendance' => $fresh])
-            : back()->with('toast', 'تم تحديث سجل الحضور وإعادته للمراجعة.');
+            : back()->with('toast', 'تم تحديث سجل الحضور وتأكيده فورًا.');
     }
 
     public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)

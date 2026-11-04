@@ -35,10 +35,10 @@ class WorkbookAttendanceImporter
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
                     $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($in || $out) ? 'Present' : 'Absent');
-                    $late = $this->late($in, $employee->shift_start ?: $this->settings->start());
+                    $metrics = app(\App\Services\AttendanceMetricsService::class)->metrics($employee, $in, $out, $status);
                     Attendance::updateOrCreate(
                         ['employee_id' => $employee->id, 'attendance_date' => $date],
-                        ['check_in' => $in, 'check_out' => $out, 'status' => $late > 0 ? 'Late' : $status, 'late_minutes' => $late, 'early_leave_minutes' => $this->early($out, $employee->shift_end ?: $this->settings->end()), 'worked_hours' => $this->worked($in, $out), 'source' => 'import', 'approval_status' => 'Approved']
+                        ['check_in' => $in, 'check_out' => $out, ...$metrics, 'source' => 'import', 'approval_status' => 'Approved']
                     );
                     $affected[] = (int) $employee->id;
                     $imported++;

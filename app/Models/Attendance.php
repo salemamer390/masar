@@ -9,6 +9,7 @@ use App\Models\Concerns\BelongsToCompany;
 class Attendance extends Model
 {
     use BelongsToCompany;
+    use \App\Models\Concerns\ImmediatelyEffective;
 
     /**
      * No write path (sync, import, manual, recalculation, jobs) can change a closed period.

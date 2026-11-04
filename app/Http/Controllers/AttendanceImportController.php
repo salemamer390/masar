@@ -69,10 +69,10 @@ class AttendanceImportController extends Controller
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
                 $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
-                $late = $this->lateMinutes($checkIn, $employee->shift_start ?: $this->settings->start());
+                $metrics = app(\App\Services\AttendanceMetricsService::class)->metrics($employee, $checkIn, $checkOut, $status);
                 $attendance = Attendance::updateOrCreate(
                     ['employee_id' => $employee->id, 'attendance_date' => $date],
-                    ['check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $late > 0 ? 'Late' : $status, 'late_minutes' => $late, 'early_leave_minutes' => $this->earlyLeave($checkOut, $employee->shift_end ?: $this->settings->end()), 'worked_hours' => $this->workedHours($checkIn, $checkOut), 'source' => 'import', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
+                    ['check_in' => $checkIn, 'check_out' => $checkOut, ...$metrics, 'source' => 'import', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
                 );
                 $affectedEmployeeIds[] = (int) $employee->id;
                 $imported++;

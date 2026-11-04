@@ -60,7 +60,7 @@ class DashboardDataService
         $employees = $this->attendanceEmployeesFor($user, $date)->get(['id', 'full_name', 'employee_code', 'shift_start', 'shift_end']);
         $records = Attendance::whereDate('attendance_date', $date)->whereIn('employee_id', $employees->pluck('id'))
             ->get()->keyBy('employee_id');
-        $onLeave = Leave::where('status', 'Approved')->whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date)
+        $onLeave = Leave::effective()->whereDate('start_date', '<=', $date)->whereDate('end_date', '>=', $date)
             ->whereIn('employee_id', $employees->pluck('id'))->pluck('id', 'employee_id');
         $cutoffReached = now()->gte(Carbon::parse($date->toDateString().' '.$this->settings->absenceCutoff()));
         $states = collect();
