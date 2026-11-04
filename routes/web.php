@@ -212,9 +212,17 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::post('/', [AttendanceController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('store');
+        Route::post('/import/preview', [\App\Http\Controllers\AttendanceImportController::class, 'preview'])
+            ->middleware('permission:attendance.create')
+            ->name('import.preview');
         Route::post('/import', [\App\Http\Controllers\AttendanceImportController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('import');
+        Route::get('/exceptions', [\App\Http\Controllers\AttendanceExceptionController::class,'index'])->middleware('permission:attendance.view')->name('exceptions.index');
+        Route::get('/import-batches/{batch}', [\App\Http\Controllers\AttendanceExceptionController::class,'batch'])->middleware(['permission:attendance.view','permission:attendance.edit'])->name('exceptions.batch');
+        Route::get('/exceptions/{day}', [\App\Http\Controllers\AttendanceExceptionController::class,'show'])->middleware('permission:attendance.view')->name('exceptions.show');
+        Route::put('/exceptions/{day}', [\App\Http\Controllers\AttendanceExceptionController::class,'update'])->middleware(['permission:attendance.view','permission:attendance.edit'])->name('exceptions.update');
+        Route::delete('/exceptions/{day}', [\App\Http\Controllers\AttendanceExceptionController::class,'destroy'])->middleware(['permission:attendance.view','permission:attendance.delete'])->name('exceptions.destroy');
         Route::put('/{attendance}', [AttendanceController::class, 'update'])
             ->middleware('permission:attendance.edit')
             ->name('update');
