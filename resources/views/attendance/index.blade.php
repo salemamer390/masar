@@ -4,21 +4,127 @@
 @if(session('attendance_import_errors'))
 <div class="alert alert-warning mt-3"><strong>مراجعة استيراد الحضور:</strong><ul class="mb-0 mt-2">@foreach(session('attendance_import_errors') as $importError)<li>{{ $importError }}</li>@endforeach</ul></div>
 @endif
-<div class="page-head"><div><h1>الحضور والانصراف</h1><p>عرض سجلات الحضور والانصراف حسب الفترة والموظف والقسم.</p></div>@if(auth()->user()?->hasPermission('attendance.create'))<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceModal"><i class="bi bi-plus-lg"></i> تسجيل حضور</button>@endif</div>
+<div class="attendance-today-label"><i class="bi bi-calendar-day"></i> اليوم — {{ today()->locale('ar')->translatedFormat('l d/m/Y') }}</div>
+<div class="attendance-stat-grid">@foreach([['حاضر اليوم',$presentToday,'green','person-check'],['غياب اليوم',$absentToday,'red','person-x'],['متأخرون',$lateToday,'orange','clock-history'],['متوسط الحضور',$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>اليوم</small></div></div>@endforeach</div>
+<div class="attendance-toolbar">
 <nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a></nav>
+
+</div>
 @foreach($pendingPeriods as $pending)<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-hourglass-split"></i> الفترة السابقة {{ $pending->period_start->format('d/m/Y') }} - {{ $pending->period_end->format('d/m/Y') }} ما زالت متاحة للتصحيح حتى {{ $pending->closes_on->copy()->subDay()->format('d/m/Y') }}، وبعدها تتقفل وتتحفظ في «الشهور السابقة». <a href="{{ route('attendance.index', ['from_date' => $pending->period_start->toDateString(), 'to_date' => $pending->period_end->toDateString()]) }}">عرض حضور الفترة</a></div>@endforeach
 <p class="text-muted small mb-2">الفترة الحالية: من {{ \Carbon\Carbon::parse($periodStart)->format('d/m/Y') }} إلى {{ \Carbon\Carbon::parse($periodEnd)->format('d/m/Y') }}</p>
-<div class="stat-grid compact attendance-stat-grid">@foreach([['حاضر اليوم',$presentToday,'green','person-check'],['غياب اليوم',$absentToday,'red','person-x'],['متأخرون',$lateToday,'orange','clock-history'],['متوسط الحضور',$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>اليوم</small></div></div>@endforeach</div>
-<form class="filter-bar d-flex flex-wrap gap-2" method="GET"><input type="date" name="from_date" class="form-control" value="{{ request('from_date') }}" title="من تاريخ"><input type="date" name="to_date" class="form-control" value="{{ request('to_date') }}" title="إلى تاريخ"><select name="employee_id" class="form-select"><option value="">كل الموظفين</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected(request('employee_id')==$employee->id)>{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id')==$department->id)>{{ $department->name }}</option>@endforeach</select><button class="btn btn-primary"><i class="bi bi-funnel"></i> عرض</button><a class="btn btn-light" href="{{ route('attendance.index') }}">مسح</a></form>
-<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>التاريخ</th><th>الموظف</th><th>القسم</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>المصدر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>@forelse($attendances as $attendance)<tr><td>{{ $attendance->attendance_date?->format('d/m/Y') }}</td><td><a class="employee-link fw-bold" href="{{ route('employees.show', $attendance->employee) }}">{{ $attendance->employee?->full_name }}</a><small class="d-block text-muted">#{{ $attendance->employee?->employee_code }}</small></td><td>{{ $attendance->employee?->department?->name ?? '—' }}</td><td>{{ $attendance->check_in ?? '—' }}</td><td>{{ $attendance->check_out ?? '—' }}</td><td>{{ $attendance->formatted_late }}</td><td>{{ arabic_label($attendance->source ?? 'manual') }}</td><td><span class="badge-soft {{ $attendance->status_badge_class }}">{{ arabic_label($attendance->status) }}</span></td><td>@if(auth()->user()?->hasPermission('attendance.edit'))<div class="d-flex gap-1"><button class="btn btn-sm btn-outline-primary attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $attendance->id }}" data-employee-id="{{ $attendance->employee_id }}" data-date="{{ $attendance->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $attendance->check_in }}" data-check-out="{{ $attendance->check_out }}" data-status="{{ $attendance->status }}" data-source="{{ $attendance->source ?? 'manual' }}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="{{ route('attendance.destroy', $attendance) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form></div>@endif</td></tr>@empty<tr><td colspan="9" class="text-center py-5">لا توجد سجلات ضمن الفترة المحددة.</td></tr>@endforelse</tbody></table></div></div>
+@if($errors->any())
+<div class="alert alert-danger py-2 px-3 small mb-2">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>
+@endif
+@php
+$advancedFilters = request()->filled('from_date') || request()->filled('to_date') || request()->filled('employee_id') || request()->filled('department_id');
+@endphp
+<form class="filter-bar attendance-filters" method="GET" data-server-live-search="true">
+<div class="attendance-filter-main">
+<div class="attendance-filter-controls">
+<div class="search-table attendance-filter-search"><i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}"></div>
+<select name="state" class="form-select" title="الحالة"><option value="">كل الحالات</option><option value="present" @selected(request('state')==='present')>حاضر</option><option value="late" @selected(request('state')==='late')>متأخر</option><option value="absent" @selected(request('state')==='absent')>غائب</option><option value="not_recorded" @selected(request('state')==='not_recorded')>لم يُسجَّل بعد</option></select>
+
+<button type="button" class="attendance-more-filters{{ $advancedFilters ? ' active' : '' }}" data-target="attendanceFilterExtra" aria-expanded="{{ $advancedFilters ? 'true' : 'false' }}"><i class="bi bi-sliders"></i> فلاتر متقدمة</button>
+</div>
+<div class="attendance-filter-actions">@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceModal"><i class="bi bi-plus-lg"></i> تسجيل حضور</button>@endif<a class="btn btn-light" href="{{ route('attendance.export') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" title="تصدير النتائج الحالية"><i class="bi bi-file-earmark-spreadsheet"></i> تصدير CSV</a>@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#attendanceImportModal"><i class="bi bi-file-earmark-arrow-up"></i> استيراد</button>@endif</div>
+</div>
+<div class="attendance-filter-extra" id="attendanceFilterExtra"{{ $advancedFilters ? '' : ' hidden' }}>
+<input type="date" name="from_date" class="form-control" value="{{ request('from_date') }}" title="من تاريخ"><input type="date" name="to_date" class="form-control" value="{{ request('to_date') }}" title="إلى تاريخ"><select name="employee_id" class="form-select"><option value="">كل الموظفين</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected(request('employee_id')==$employee->id)>{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id')==$department->id)>{{ $department->name }}</option>@endforeach</select>
+</div>
+</form>
+<div class="attendance-period-totals">
+<span class="totals-title">إجمالي الفترة حتى {{ $classifyTo->format('d/m/Y') }}:</span>
+<span><i class="bi bi-person-check text-success"></i> حضور <b>{{ $periodTotals['present'] }}</b> يوم</span>
+<span><i class="bi bi-clock-history" style="color:#b9780b"></i> تأخير <b>{{ $periodTotals['late'] }}</b> يوم</span>
+<span><i class="bi bi-person-x text-danger"></i> غياب <b>{{ $periodTotals['absent'] }}</b> يوم</span>
+</div>
+<div class="attendance-legend small text-muted">
+<span><span class="legend-swatch legend-late"></span> يوم به تأخير</span>
+<span><span class="legend-swatch legend-absent"></span> يوم غياب (بلا بصمة)</span>
+<span><span class="legend-swatch legend-pending"></span> اليوم الحالي قبل ميعاد القفل</span>
+<span><span class="legend-swatch legend-rejected"></span> سجل مرفوض (لا يُحتسب)</span>
+</div>
+<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>التاريخ</th><th>الموظف</th><th>القسم</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>المصدر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
+@forelse($attendances as $row)
+<tr class="{{ $row['row_class'] }}"
+@if($row['virtual'])
+data-virtual="1" data-employee-id="{{ $row['employee']?->id }}" data-date="{{ $row['date'] }}"
+@else
+data-attendance-id="{{ $row['model']->id }}"
+@endif
+><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
+@if($row['virtual'] && auth()->user()?->hasPermission('attendance.create'))
+<button class="btn btn-sm btn-outline-primary attendance-quick-add" data-bs-toggle="modal" data-bs-target="#attendanceModal" data-employee-id="{{ $row['employee']?->id }}" data-date="{{ $row['date'] }}" title="تسجيل بصمة لهذا اليوم"><i class="bi bi-plus-lg"></i> تسجيل</button>
+@endif
+@if(!$row['virtual'] && (auth()->user()?->hasPermission('attendance.edit') || auth()->user()?->hasPermission('attendance.delete')))
+<div class="attendance-row-actions">@if(auth()->user()?->hasPermission('attendance.edit'))<button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $row['model']->id }}" data-employee-id="{{ $row['model']->employee_id }}" data-date="{{ $row['model']->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $row['model']->check_in }}" data-check-out="{{ $row['model']->check_out }}" data-status="{{ $row['model']->status }}" data-source="{{ $row['model']->source ?? 'manual' }}" title="تعديل"><i class="bi bi-pencil"></i></button>@endif @if(auth()->user()?->hasPermission('attendance.delete'))<form method="POST" action="{{ route('attendance.destroy', $row['model']) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form>@endif</div>
+@endif
+</td></tr>
+@empty
+<tr><td colspan="9" class="text-center py-5">لا توجد سجلات ضمن الفترة المحددة.</td></tr>
+@endforelse
+</tbody></table></div></div>
 <x-pagination-controls :paginator="$attendances" />
+@php
+$recordModels = $attendances->getCollection()->pluck('model')->filter()->values();
+@endphp
 <div class="modal fade" id="attendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input class="form-control" type="date" name="attendance_date" value="{{ date('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">الحالة</label><select class="form-select" name="status" required><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">الحضور <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_in" required></div><div class="col-6"><label class="form-label">الانصراف <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_out" required></div><div class="col-6"><label class="form-label">دقائق التأخير</label><input class="form-control" type="number" min="0" name="late_minutes" value="0"></div><div class="col-6"><label class="form-label">المصدر</label><select class="form-select" name="source"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل API</option></select></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
 <div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>تعديل سجل الحضور</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">الحالة</label><select name="status" id="editAttendanceStatus" class="form-select"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">المصدر</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل نظامي</option></select></div></div><p class="small text-muted mt-3 mb-0">سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>
-@push('styles')<style>.attendance-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.attendance-tab{padding:8px 16px;border-radius:12px;border:1px solid #d9e2ef;background:#fff;color:#33415c;text-decoration:none;font-weight:600}.attendance-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}</style>@endpush
-@push('styles')<style>.attendance-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.attendance-stat-grid .stat-card{min-height:96px;padding:13px 15px;gap:11px}.attendance-stat-grid .stat-icon{width:42px;height:42px;min-width:42px;border-radius:11px;font-size:18px}.attendance-stat-grid .stat-card b{font-size:21px}.attendance-stat-grid .stat-card small{font-size:10px}@media(max-width:900px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.attendance-stat-grid{grid-template-columns:1fr}.attendance-stat-grid .stat-card{min-height:82px}}</style>@endpush
+@push('styles')<style>.attendance-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.attendance-tab{padding:8px 16px;border-radius:12px;border:1px solid #d9e2ef;background:#fff;color:#33415c;text-decoration:none;font-weight:600}.attendance-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
+.attendance-row-late td{background:#fff8e1}.attendance-row-absent td{background:#fdecef}.attendance-row-pending td{background:#f1f5f9}
+.attendance-row-rejected td{background:#eef0f3;color:#6b7280}
+.attendance-period-totals{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#f7f9fc;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:12px;margin:10px 0 6px}
+.attendance-period-totals .totals-title{font-weight:700;color:#33415c}
+.attendance-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+.legend-swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
+.legend-late{background:#fff8e1}.legend-absent{background:#fdecef}.legend-pending{background:#f1f5f9}.legend-rejected{background:#eef0f3}
+.table-responsive .table td:first-child,.table-responsive .table th:first-child{width:96px;min-width:96px}
+.table-responsive .table td:nth-child(2),.table-responsive .table th:nth-child(2){position:sticky;inset-inline-start:96px;background:#fff;z-index:1}
+@media(max-width:700px){
+.table-panel .table{display:block;width:100%;min-width:0}
+.table-panel .table tbody{display:block;width:100%}
+.table-panel .table tbody td{white-space:normal}
+.table-panel .table tbody td:first-child{width:auto;min-width:0}
+.table-panel .table tbody td:nth-child(2){position:static}
+}
+.table-responsive .attendance-row-late td:nth-child(2){background:#fff8e1}
+.table-responsive .attendance-row-absent td:nth-child(2){background:#fdecef}
+.table-responsive .attendance-row-pending td:nth-child(2){background:#f1f5f9}
+.table-responsive .attendance-row-rejected td:nth-child(2){background:#eef0f3}.attendance-filter-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;padding-inline-start:10px;border-inline-start:1px dashed #e2e8f0}.attendance-filter-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}.attendance-row-actions{display:flex;gap:6px;align-items:center}.attendance-row-actions form{display:inline-flex}.attendance-row-btn{width:32px;height:32px;border-radius:9px;border:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background .15s,color .15s}.attendance-row-edit{background:#eaf1fe;color:#2563eb}.attendance-row-edit:hover{background:#2563eb;color:#fff}.attendance-row-delete{background:#fdecec;color:#dc2626}.attendance-row-delete:hover{background:#dc2626;color:#fff}.attendance-quick-add{border-radius:9px}</style>@endpush
+@push('styles')<style>.attendance-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.attendance-stat-grid .stat-card{min-height:96px;padding:13px 15px;gap:11px}.attendance-stat-grid .stat-icon{width:42px;height:42px;min-width:42px;border-radius:11px;font-size:18px}.attendance-stat-grid .stat-card b{font-size:21px}.attendance-stat-grid .stat-card small{font-size:10px}@media(max-width:900px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.attendance-stat-grid .stat-card{min-height:82px}}</style>@endpush
+@push('scripts')
+<script>
+(() => {
+  const attendanceFiltersForm = document.querySelector('form.attendance-filters');
+  if (!attendanceFiltersForm) return;
+  let attendanceSearchTimer = null;
+  const submitAttendanceFilters = () => {
+    clearTimeout(attendanceSearchTimer);
+    attendanceFiltersForm.requestSubmit();
+  };
+  attendanceFiltersForm.querySelectorAll('input[type="date"]').forEach((dateInput) => {
+    dateInput.addEventListener('change', submitAttendanceFilters);
+  });
+  const attendanceSearchInput = attendanceFiltersForm.querySelector('input[name="search"]');
+  if (attendanceSearchInput) {
+    attendanceSearchInput.addEventListener('input', () => {
+      clearTimeout(attendanceSearchTimer);
+      attendanceSearchTimer = setTimeout(submitAttendanceFilters, 600);
+    });
+    attendanceSearchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitAttendanceFilters();
+      }
+    });
+  }
+})();
+</script>
+@endpush
 @push('scripts')<script>document.querySelectorAll('.attendance-edit-btn').forEach(button=>button.addEventListener('click',()=>{const d=button.dataset;const form=document.getElementById('editAttendanceForm');const time=(value)=>String(value||'').slice(0,5);form.action=`{{ url('/attendance') }}/${d.id}`;document.getElementById('editAttendanceEmployee').value=d.employeeId;document.getElementById('editAttendanceDate').value=d.date;document.getElementById('editAttendanceCheckIn').value=time(d.checkIn);document.getElementById('editAttendanceCheckOut').value=time(d.checkOut);document.getElementById('editAttendanceStatus').value=d.status;document.getElementById('editAttendanceSource').value=d.source;}));</script>@endpush
 @push('scripts')
 <script>
+(() => {
   const attendanceBaseUrl = @json(url('/attendance'));
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const attendanceTableBody = document.querySelector('.table-panel table tbody');
@@ -42,7 +148,7 @@
       <td>${escapeAttendanceHtml(attendance.check_in)}</td><td>${escapeAttendanceHtml(attendance.check_out)}</td>
       <td>${attendanceLate(attendance.late_minutes)}</td><td>${escapeAttendanceHtml(attendance.source || 'manual')}</td>
       <td><span class="badge-soft ${statusClass}">${statusLabel}</span></td>
-      <td><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-primary attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${String(attendance.attendance_date || '').slice(0, 10)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form></div></td>
+      <td><div class="attendance-row-actions"><button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${String(attendance.attendance_date || '').slice(0, 10)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form></div></td>
     </tr>`;
   };
   const wireAttendanceAjaxForms = (root = document) => {
@@ -82,8 +188,33 @@
     document.getElementById('editAttendanceSource').value = d.source;
   });
 
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.attendance-quick-add');
+    if (!button) return;
+    const modal = document.getElementById('attendanceModal');
+    if (!modal) return;
+    const employeeSelect = modal.querySelector('select[name="employee_id"]');
+    const dateInput = modal.querySelector('input[name="attendance_date"]');
+    if (employeeSelect && button.dataset.employeeId) employeeSelect.value = button.dataset.employeeId;
+    if (dateInput && button.dataset.date) dateInput.value = button.dataset.date;
+  });
+
+  document.querySelectorAll('.attendance-more-filters').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const extra = document.getElementById(toggle.dataset.target);
+      if (!extra) return;
+      const show = extra.hasAttribute('hidden');
+      extra.toggleAttribute('hidden', !show);
+      toggle.classList.toggle('active', show);
+      toggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+    });
+  });
+
   const upsertAttendanceRow = (attendance) => {
     if (!attendanceTableBody || !attendance?.id) return;
+    const savedEmployeeId = attendance.employee?.id ?? attendance.employee_id;
+    const savedDate = String(attendance.attendance_date || '').slice(0, 10);
+    attendanceTableBody.querySelectorAll(`tr[data-virtual="1"][data-employee-id="${savedEmployeeId}"][data-date="${savedDate}"]`).forEach((virtualRow) => virtualRow.remove());
     const oldRow = attendanceTableBody.querySelector(`tr[data-attendance-id="${attendance.id}"]`);
     if (oldRow) oldRow.outerHTML = attendanceRow(attendance);
     else {
@@ -105,6 +236,7 @@
     }
   });
 
+})();
 </script>
 @endpush
 @push('scripts')
@@ -178,20 +310,22 @@
 (() => {
   const table = document.querySelector('.table-panel table');
   if (!table) return;
-  const records = @json($attendances->getCollection()->mapWithKeys(fn ($attendance) => [$attendance->id => ['day' => (int) $attendance->day_overtime_minutes, 'night' => (int) $attendance->night_overtime_minutes]]));
-  const rowOrder = @json($attendances->getCollection()->pluck('id')->values());
+  const records = @json($recordModels->mapWithKeys(fn ($attendance) => [$attendance->id => ['day' => (int) $attendance->day_overtime_minutes, 'night' => (int) $attendance->night_overtime_minutes]]));
+  const rowOrder = @json($recordModels->pluck('id')->values());
   const formatMinutes = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, '0')}:${String(Number(minutes || 0) % 60).padStart(2, '0')}`;
   const addOvertimeColumns = (row) => {
     if (!row || row.dataset.overtimeColumns === '1') return;
-    const id = row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1] || rowOrder[[...row.parentElement.children].indexOf(row)];
-    const overtime = records[id] || {day: 0, night: 0};
+    const isVirtual = row.dataset.virtual === '1';
+    const id = isVirtual ? null : (row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1] || rowOrder[[...row.parentElement.children].indexOf(row)]);
+    const overtime = (id && records[id]) || null;
     const cells = row.children;
     if (cells.length < 2) return;
     // Keep the dynamically added cells aligned with the static header order:
     // late, day overtime, night overtime, source, status, actions.
+    // Synthesized absence/pending rows have no record, so their overtime is blank.
     const insertBefore = cells[cells.length - 3];
-    const day = document.createElement('td'); day.textContent = formatMinutes(overtime.day); day.dataset.label = 'الإضافي النهاري';
-    const night = document.createElement('td'); night.textContent = formatMinutes(overtime.night); night.dataset.label = 'الإضافي الليلي';
+    const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = 'الإضافي النهاري';
+    const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = 'الإضافي الليلي';
     row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);
     row.dataset.overtimeColumns = '1';
   };
@@ -216,24 +350,6 @@
   .attendance-filter-search{min-width:240px;flex:1 1 260px}
   @media(max-width:600px){.attendance-filter-search{min-width:100%;flex-basis:100%}}
 </style>
-@endpush
-@push('scripts')
-<script>
-(() => {
-  const filter = document.querySelector('form.filter-bar');
-  if (!filter || filter.querySelector('[name="search"]')) return;
-  const wrapper = document.createElement('div');
-  wrapper.className = 'search-table attendance-filter-search';
-  wrapper.innerHTML = '<i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}">';
-  filter.prepend(wrapper);
-  const exportLink = document.createElement('a');
-  exportLink.className = 'btn btn-outline-success attendance-export-trigger';
-  exportLink.href = '{{ route('attendance.export') }}' + (window.location.search || '');
-  exportLink.innerHTML = '<i class="bi bi-file-earmark-spreadsheet"></i> تصدير CSV';
-  exportLink.title = 'تصدير النتائج الحالية';
-  filter.append(exportLink);
-})();
-</script>
 @endpush
 @push('styles')
 <style>
@@ -262,28 +378,27 @@
 @endpush
 @push('styles')
 <style>
-  .attendance-page-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-inline-start:auto}
-  .attendance-page-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:10px;white-space:nowrap;font-size:13px}
-  @media(max-width:700px){.attendance-page-actions{width:100%;margin-top:10px;justify-content:flex-start;overflow-x:auto}.attendance-page-actions .btn{min-height:36px;padding:7px 10px;font-size:12px;flex:0 0 auto}.page-head{flex-wrap:wrap}}
+  .attendance-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 6px}
+  .attendance-toolbar .attendance-tabs{margin:0}
+  .attendance-toolbar-actions{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex-wrap:nowrap}
+  .attendance-toolbar-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}
+  .attendance-today-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#52617c;margin:10px 0 6px}
+  .attendance-filters.filter-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin-bottom:12px}
+  .attendance-filters .form-select,.attendance-filters .form-control{min-width:0;flex:0 1 auto;height:36px;min-height:36px;font-size:12.5px;padding:6px 10px}
+  .attendance-filters .search-table{height:36px;flex:1 1 240px;min-width:180px}
+  .attendance-filters .search-table input{font-size:12.5px}
+  .attendance-filter-main{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;justify-content:space-between;width:100%;align-self:stretch}.attendance-filter-controls{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;flex-wrap:nowrap}.attendance-filter-controls .search-table{flex:1 1 200px;min-width:160px;max-width:420px}.attendance-filter-controls select[name="state"]{flex:0 0 auto}
+  .attendance-filter-main select[name="state"]{width:auto;min-width:130px;flex:0 0 auto}
+  .attendance-filter-main .btn{height:36px;min-height:36px;padding:6px 12px;font-size:12.5px;border-radius:9px;display:inline-flex;align-items:center;gap:6px}
+  .attendance-more-filters{background:none;border:0;color:#2563eb;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:6px 4px;white-space:nowrap;flex:0 0 auto}
+  .attendance-more-filters:hover{text-decoration:underline}
+  .attendance-filter-extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px dashed #dbe4f0;padding-top:8px}
+  .attendance-filter-extra input[type="date"]{width:auto;flex:0 0 auto}
+  .attendance-filter-extra select{max-width:260px}
+  @media(max-width:700px){.attendance-toolbar-actions{width:100%;margin-inline-start:0;justify-content:flex-start;overflow-x:auto}.attendance-filter-main .attendance-filter-search{min-width:100%;flex-basis:100%}}
+
+  @media(max-width:640px){.attendance-filter-main{flex-wrap:wrap}.attendance-filter-controls{flex-wrap:wrap;width:100%}.attendance-filter-actions{border-inline-start:0;padding-inline-start:0;width:100%;margin-inline-start:0}}
 </style>
-@endpush
-@push('scripts')
-<script>
-(() => {
-  setTimeout(() => {
-    const head = document.querySelector('.page-head');
-    if (!head || head.querySelector('.attendance-page-actions')) return;
-    const actions = document.createElement('div');
-    actions.className = 'attendance-page-actions';
-    const title = head.firstElementChild;
-    const existing = [...head.children].filter((child) => child !== title);
-    existing.forEach((child) => actions.append(child));
-    const exportLink = document.querySelector('.attendance-export-trigger');
-    if (exportLink) actions.prepend(exportLink);
-    if (actions.children.length) head.append(actions);
-  }, 0);
-})();
-</script>
 @endpush
 @push('scripts')
 <script>
@@ -306,14 +421,7 @@
 @push('scripts')
 <script>
 (() => {
-  const head = document.querySelector('.page-head');
-  if (!head || document.getElementById('attendanceImportModal')) return;
-  const actions = head.querySelector('.page-head-actions') || head.querySelector('.actions') || head;
-  const button = document.createElement('button');
-  button.type = 'button'; button.className = 'btn btn-outline-primary attendance-import-trigger';
-  button.setAttribute('data-bs-toggle', 'modal'); button.setAttribute('data-bs-target', '#attendanceImportModal');
-  button.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> استيراد سجلات';
-  actions.append(button);
+  if (document.getElementById('attendanceImportModal')) return;
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal fade attendance-import-modal" id="attendanceImportModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
@@ -372,7 +480,7 @@
   const table = document.querySelector('.table-panel table');
   if (!table) return;
   @php
-    $attendanceDetails = $attendances->getCollection()->mapWithKeys(function ($attendance) {
+    $attendanceDetails = $recordModels->mapWithKeys(function ($attendance) {
       return [$attendance->id => [
       'employee' => $attendance->employee?->full_name,
       'code' => $attendance->employee?->employee_code,
