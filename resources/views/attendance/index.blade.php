@@ -7,9 +7,12 @@
 <div class="attendance-today-label"><i class="bi bi-calendar-day"></i> اليوم — {{ today()->locale('ar')->translatedFormat('l d/m/Y') }}</div>
 <div class="attendance-stat-grid">@foreach([['حاضر اليوم',$presentToday,'green','person-check'],['غياب اليوم',$absentToday,'red','person-x'],['متأخرون',$lateToday,'orange','clock-history'],['متوسط الحضور',$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>اليوم</small></div></div>@endforeach</div>
 <div class="attendance-toolbar">
-<nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a></nav>
+<nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">استثناءات البصمات <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
 
 </div>
+@if(\App\Models\AttendanceImportDay::where('resolution','pending')->exists())
+<div class="alert alert-warning">توجد بصمات تحتاج مراجعة قبل قفل الفترة. <a href="{{ route('attendance.exceptions.index') }}">فتح الاستثناءات</a></div>
+@endif
 @foreach($pendingPeriods as $pending)<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-hourglass-split"></i> الفترة السابقة {{ $pending->period_start->format('d/m/Y') }} - {{ $pending->period_end->format('d/m/Y') }} ما زالت متاحة للتصحيح حتى {{ $pending->closes_on->copy()->subDay()->format('d/m/Y') }}، وبعدها تتقفل وتتحفظ في «الشهور السابقة». <a href="{{ route('attendance.index', ['from_date' => $pending->period_start->toDateString(), 'to_date' => $pending->period_end->toDateString()]) }}">عرض حضور الفترة</a></div>@endforeach
 <p class="text-muted small mb-2">الفترة الحالية: من {{ \Carbon\Carbon::parse($periodStart)->format('d/m/Y') }} إلى {{ \Carbon\Carbon::parse($periodEnd)->format('d/m/Y') }}</p>
 @if($errors->any())
@@ -22,7 +25,7 @@ $advancedFilters = request()->filled('from_date') || request()->filled('to_date'
 <div class="attendance-filter-main">
 <div class="attendance-filter-controls">
 <div class="search-table attendance-filter-search"><i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}"></div>
-<select name="state" class="form-select" title="الحالة"><option value="">كل الحالات</option><option value="present" @selected(request('state')==='present')>حاضر</option><option value="late" @selected(request('state')==='late')>متأخر</option><option value="absent" @selected(request('state')==='absent')>غائب</option><option value="not_recorded" @selected(request('state')==='not_recorded')>لم يُسجَّل بعد</option></select>
+<select name="state" class="form-select" title="الحالة"><option value="">كل الحالات</option><option value="present" @selected(request('state')==='present')>حاضر</option><option value="late" @selected(request('state')==='late')>متأخر</option><option value="absent" @selected(request('state')==='absent')>غائب</option></select>
 
 <button type="button" class="attendance-more-filters{{ $advancedFilters ? ' active' : '' }}" data-target="attendanceFilterExtra" aria-expanded="{{ $advancedFilters ? 'true' : 'false' }}"><i class="bi bi-sliders"></i> فلاتر متقدمة</button>
 </div>
@@ -39,24 +42,14 @@ $advancedFilters = request()->filled('from_date') || request()->filled('to_date'
 <span><i class="bi bi-person-x text-danger"></i> غياب <b>{{ $periodTotals['absent'] }}</b> يوم</span>
 </div>
 <div class="attendance-legend small text-muted">
-<span><span class="legend-swatch legend-late"></span> يوم به تأخير</span>
-<span><span class="legend-swatch legend-absent"></span> يوم غياب (بلا بصمة)</span>
-<span><span class="legend-swatch legend-pending"></span> اليوم الحالي قبل ميعاد القفل</span>
+<span><span class="legend-swatch legend-late"></span> سجل به تأخير</span>
+<span><span class="legend-swatch legend-absent"></span> سجل غياب مسجَّل</span>
 <span><span class="legend-swatch legend-rejected"></span> سجل مرفوض (لا يُحتسب)</span>
 </div>
 <div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>التاريخ</th><th>الموظف</th><th>القسم</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>المصدر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
 @forelse($attendances as $row)
-<tr class="{{ $row['row_class'] }}"
-@if($row['virtual'])
-data-virtual="1" data-employee-id="{{ $row['employee']?->id }}" data-date="{{ $row['date'] }}"
-@else
-data-attendance-id="{{ $row['model']->id }}"
-@endif
-><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
-@if($row['virtual'] && auth()->user()?->hasPermission('attendance.create'))
-<button class="btn btn-sm btn-outline-primary attendance-quick-add" data-bs-toggle="modal" data-bs-target="#attendanceModal" data-employee-id="{{ $row['employee']?->id }}" data-date="{{ $row['date'] }}" title="تسجيل بصمة لهذا اليوم"><i class="bi bi-plus-lg"></i> تسجيل</button>
-@endif
-@if(!$row['virtual'] && (auth()->user()?->hasPermission('attendance.edit') || auth()->user()?->hasPermission('attendance.delete')))
+<tr class="{{ $row['row_class'] }}" data-attendance-id="{{ $row['model']->id }}"><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
+@if(auth()->user()?->hasPermission('attendance.edit') || auth()->user()?->hasPermission('attendance.delete'))
 <div class="attendance-row-actions">@if(auth()->user()?->hasPermission('attendance.edit'))<button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $row['model']->id }}" data-employee-id="{{ $row['model']->employee_id }}" data-date="{{ $row['model']->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $row['model']->check_in }}" data-check-out="{{ $row['model']->check_out }}" data-status="{{ $row['model']->status }}" data-source="{{ $row['model']->source ?? 'manual' }}" title="تعديل"><i class="bi bi-pencil"></i></button>@endif @if(auth()->user()?->hasPermission('attendance.delete'))<form method="POST" action="{{ route('attendance.destroy', $row['model']) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form>@endif</div>
 @endif
 </td></tr>
@@ -71,13 +64,13 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 <div class="modal fade" id="attendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input class="form-control" type="date" name="attendance_date" value="{{ date('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">الحالة</label><select class="form-select" name="status" required><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">الحضور <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_in" required></div><div class="col-6"><label class="form-label">الانصراف <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_out" required></div><div class="col-6"><label class="form-label">دقائق التأخير</label><input class="form-control" type="number" min="0" name="late_minutes" value="0"></div><div class="col-6"><label class="form-label">المصدر</label><select class="form-select" name="source"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل API</option></select></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
 <div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>تعديل سجل الحضور</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">الحالة</label><select name="status" id="editAttendanceStatus" class="form-select"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">المصدر</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل نظامي</option></select></div></div><p class="small text-muted mt-3 mb-0">سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>
 @push('styles')<style>.attendance-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.attendance-tab{padding:8px 16px;border-radius:12px;border:1px solid #d9e2ef;background:#fff;color:#33415c;text-decoration:none;font-weight:600}.attendance-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
-.attendance-row-late td{background:#fff8e1}.attendance-row-absent td{background:#fdecef}.attendance-row-pending td{background:#f1f5f9}
+.attendance-row-late td{background:#fff8e1}.attendance-row-absent td{background:#fdecef}
 .attendance-row-rejected td{background:#eef0f3;color:#6b7280}
 .attendance-period-totals{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#f7f9fc;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:12px;margin:10px 0 6px}
 .attendance-period-totals .totals-title{font-weight:700;color:#33415c}
 .attendance-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
 .legend-swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
-.legend-late{background:#fff8e1}.legend-absent{background:#fdecef}.legend-pending{background:#f1f5f9}.legend-rejected{background:#eef0f3}
+.legend-late{background:#fff8e1}.legend-absent{background:#fdecef}.legend-rejected{background:#eef0f3}
 .table-responsive .table td:first-child,.table-responsive .table th:first-child{width:96px;min-width:96px}
 .table-responsive .table td:nth-child(2),.table-responsive .table th:nth-child(2){position:sticky;inset-inline-start:96px;background:#fff;z-index:1}
 @media(max-width:700px){
@@ -89,8 +82,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 }
 .table-responsive .attendance-row-late td:nth-child(2){background:#fff8e1}
 .table-responsive .attendance-row-absent td:nth-child(2){background:#fdecef}
-.table-responsive .attendance-row-pending td:nth-child(2){background:#f1f5f9}
-.table-responsive .attendance-row-rejected td:nth-child(2){background:#eef0f3}.attendance-filter-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;padding-inline-start:10px;border-inline-start:1px dashed #e2e8f0}.attendance-filter-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}.attendance-row-actions{display:flex;gap:6px;align-items:center}.attendance-row-actions form{display:inline-flex}.attendance-row-btn{width:32px;height:32px;border-radius:9px;border:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background .15s,color .15s}.attendance-row-edit{background:#eaf1fe;color:#2563eb}.attendance-row-edit:hover{background:#2563eb;color:#fff}.attendance-row-delete{background:#fdecec;color:#dc2626}.attendance-row-delete:hover{background:#dc2626;color:#fff}.attendance-quick-add{border-radius:9px}</style>@endpush
+.table-responsive .attendance-row-rejected td:nth-child(2){background:#eef0f3}.attendance-filter-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;padding-inline-start:10px;border-inline-start:1px dashed #e2e8f0}.attendance-filter-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}.attendance-row-actions{display:flex;gap:6px;align-items:center}.attendance-row-actions form{display:inline-flex}.attendance-row-btn{width:32px;height:32px;border-radius:9px;border:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background .15s,color .15s}.attendance-row-edit{background:#eaf1fe;color:#2563eb}.attendance-row-edit:hover{background:#2563eb;color:#fff}.attendance-row-delete{background:#fdecec;color:#dc2626}.attendance-row-delete:hover{background:#dc2626;color:#fff}</style>@endpush
 @push('styles')<style>.attendance-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.attendance-stat-grid .stat-card{min-height:96px;padding:13px 15px;gap:11px}.attendance-stat-grid .stat-icon{width:42px;height:42px;min-width:42px;border-radius:11px;font-size:18px}.attendance-stat-grid .stat-card b{font-size:21px}.attendance-stat-grid .stat-card small{font-size:10px}@media(max-width:900px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.attendance-stat-grid .stat-card{min-height:82px}}</style>@endpush
 @push('scripts')
 <script>
@@ -188,17 +180,6 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     document.getElementById('editAttendanceSource').value = d.source;
   });
 
-  document.addEventListener('click', (event) => {
-    const button = event.target.closest('.attendance-quick-add');
-    if (!button) return;
-    const modal = document.getElementById('attendanceModal');
-    if (!modal) return;
-    const employeeSelect = modal.querySelector('select[name="employee_id"]');
-    const dateInput = modal.querySelector('input[name="attendance_date"]');
-    if (employeeSelect && button.dataset.employeeId) employeeSelect.value = button.dataset.employeeId;
-    if (dateInput && button.dataset.date) dateInput.value = button.dataset.date;
-  });
-
   document.querySelectorAll('.attendance-more-filters').forEach((toggle) => {
     toggle.addEventListener('click', () => {
       const extra = document.getElementById(toggle.dataset.target);
@@ -214,7 +195,6 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     if (!attendanceTableBody || !attendance?.id) return;
     const savedEmployeeId = attendance.employee?.id ?? attendance.employee_id;
     const savedDate = String(attendance.attendance_date || '').slice(0, 10);
-    attendanceTableBody.querySelectorAll(`tr[data-virtual="1"][data-employee-id="${savedEmployeeId}"][data-date="${savedDate}"]`).forEach((virtualRow) => virtualRow.remove());
     const oldRow = attendanceTableBody.querySelector(`tr[data-attendance-id="${attendance.id}"]`);
     if (oldRow) oldRow.outerHTML = attendanceRow(attendance);
     else {
@@ -315,14 +295,12 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const formatMinutes = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, '0')}:${String(Number(minutes || 0) % 60).padStart(2, '0')}`;
   const addOvertimeColumns = (row) => {
     if (!row || row.dataset.overtimeColumns === '1') return;
-    const isVirtual = row.dataset.virtual === '1';
-    const id = isVirtual ? null : (row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1] || rowOrder[[...row.parentElement.children].indexOf(row)]);
+    const id = row.dataset.attendanceId || row.querySelector('form[action*="/attendance/"]')?.action.match(/\/attendance\/(\d+)/)?.[1] || rowOrder[[...row.parentElement.children].indexOf(row)];
     const overtime = (id && records[id]) || null;
     const cells = row.children;
     if (cells.length < 2) return;
     // Keep the dynamically added cells aligned with the static header order:
     // late, day overtime, night overtime, source, status, actions.
-    // Synthesized absence/pending rows have no record, so their overtime is blank.
     const insertBefore = cells[cells.length - 3];
     const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = 'الإضافي النهاري';
     const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = 'الإضافي الليلي';
@@ -426,10 +404,10 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     <div class="modal fade attendance-import-modal" id="attendanceImportModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
         <div class="modal-header"><h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet me-2"></i>استيراد سجلات الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
-        <form method="POST" action="{{ route('attendance.import') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ route('attendance.import.preview') }}" enctype="multipart/form-data">
           @csrf
           <div class="modal-body">
-            <div class="import-help mb-3">يجب أن يحتوي الملف على عمود <strong>التاريخ</strong> وعمود <strong>كود الموظف</strong> أو <strong>اسم الموظف</strong>. الأعمدة الاختيارية: الحضور، الانصراف، الحالة. يتم تحديث سجل الموظف داخل شركتك فقط.</div>
+            <div class="import-help mb-3">يدعم الملف ثلاثة أشكال: سجلات يومية (صف لكل موظف ويوم)، أو بصمات خام (صف لكل بصمة)، أو ورقة لكل موظف. المطابقة بكود الموظف — البصمة الأولى للحضور والثانية للانصراف، والاسم للمراجعة فقط. تُعرض معاينة قبل الحفظ لتأكيد الورقة وتعيين الأعمدة. لا يُحفظ أي شيء قبل اعتمادك.</div>
             <label class="form-label" for="attendanceImportFile">ملف السجلات</label>
             <input class="form-control" id="attendanceImportFile" type="file" name="file" accept=".xlsx,.csv,.txt" required>
             <div class="form-text">الحد الأقصى 20MB. السجلات المكررة لنفس الموظف والتاريخ يتم تحديثها.</div>

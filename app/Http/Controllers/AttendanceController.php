@@ -63,8 +63,8 @@ class AttendanceController extends Controller
 
     public function export(Request $request)
     {
-        // Same scoped rows as the screen, including synthesized absence and the
-        // state filter, so the file never disagrees with what the user sees.
+        // Same scoped records as the screen, including the state filter, so
+        // the file never disagrees with what the user sees.
         $data = $this->buildRows($request);
         $filename = 'attendance-' . now()->format('Y-m-d-His') . '.csv';
 
@@ -83,7 +83,7 @@ class AttendanceController extends Controller
                     $minutes($model?->early_leave_minutes !== null ? (int) $model->early_leave_minutes : null),
                     $minutes($model?->day_overtime_minutes !== null ? (int) $model->day_overtime_minutes : null),
                     $minutes($model?->night_overtime_minutes !== null ? (int) $model->night_overtime_minutes : null),
-                    $row['status_label'] . ($row['virtual'] ? ' (محتسَب)' : ''),
+                    $row['status_label'],
                 ], ',');
             }
             fclose($out);
@@ -91,9 +91,9 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Rows shown on the attendance page and exported: real records plus
-     * synthesized absence/pending rows through today, classified by the same
-     * per-day path as the monthly summary and payroll.
+     * Rows shown on the attendance page and exported: actual fingerprint
+     * records only, whether imported or added manually. A day with no record
+     * simply does not appear here; the monthly summary owns absence accounting.
      *
      * @return array{rows: \Illuminate\Support\Collection, periodTotals: array, classifyTo: Carbon, periodStart: string, periodEnd: string}
      */
@@ -102,7 +102,7 @@ class AttendanceController extends Controller
         $request->validate([
             'from_date' => ['nullable', 'date'],
             'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
-            'state' => ['nullable', 'in:present,late,absent,not_recorded'],
+            'state' => ['nullable', 'in:present,late,absent'],
         ]);
 
         $today = today();
@@ -134,6 +134,10 @@ class AttendanceController extends Controller
             ->orderByDesc('attendance_date')->orderByDesc('id')->get();
         $records->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
 
+        // Recorded days are classified by the same per-day path as the monthly
+        // summary and payroll, so a permission-covered late stays present and
+        // an absent record on a leave day stays leave. Days without records
+        // are never synthesized into rows.
         $metrics = app(\App\Services\EmployeePeriodMetrics::class);
         $effectiveRecords = $records->filter(fn (Attendance $record) => !in_array($record->approval_status, Attendance::inactiveStatuses(), true));
         $leaves = \App\Models\Leave::effective()->whereIn('employee_id', $employeeIds)
@@ -142,42 +146,44 @@ class AttendanceController extends Controller
             ->filter(fn (\App\Models\HrRequest $item) => in_array($item->requestType?->source_key ?: $item->request_type, ['permission', 'mission'], true))
             ->groupBy('employee_id');
 
-        $periodTotals = ['present' => 0, 'late' => 0, 'absent' => 0.0];
-        $classifyTo = $to->gt($today) ? $today->copy()->startOfDay() : $to->copy();
         $dayLookup = [];
-        $rows = collect();
-        if ($classifyTo->gte($from)) {
-            $recordsByEmployee = $effectiveRecords->groupBy('employee_id');
-            foreach ($filteredEmployees as $employee) {
-                $days = $metrics->days($employee, $from, $classifyTo,
-                    $recordsByEmployee->get($employee->id, collect()),
-                    $leaves->get($employee->id, collect()),
-                    $requests->get($employee->id, collect()));
-                foreach ($days as $day) {
-                    $dayLookup[$employee->id . '|' . $day['date']] = $day;
-                    if ($day['present']) $periodTotals['present']++;
-                    if ($day['state'] === 'late') $periodTotals['late']++;
-                    if ($day['state'] === 'absent') $periodTotals['absent'] += (float) $day['absence_days'];
-                    if ($day['state'] === 'absent' && !$day['has_record'] && (float) $day['absence_days'] > 0) {
-                        $fraction = (float) $day['absence_days'];
-                        $rows->push([
-                            'virtual' => true, 'model' => null, 'employee' => $employee, 'date' => $day['date'], 'state' => 'absent',
-                            'status_label' => $fraction < 1 ? 'غائب (جزئي)' : 'غائب',
-                            'badge_class' => 'danger', 'row_class' => 'attendance-row-absent',
-                        ]);
-                    } elseif ($day['state'] === 'not_recorded' && $day['infer_missing'] && $day['date'] === $today->toDateString()) {
-                        $rows->push([
-                            'virtual' => true, 'model' => null, 'employee' => $employee, 'date' => $day['date'], 'state' => 'not_recorded',
-                            'status_label' => 'لم يُسجَّل بعد', 'badge_class' => 'secondary', 'row_class' => 'attendance-row-pending',
-                        ]);
-                    }
-                }
+        $recordsByEmployee = $effectiveRecords->groupBy('employee_id');
+        foreach ($filteredEmployees as $employee) {
+            foreach ($metrics->days($employee, $from, $to,
+                $recordsByEmployee->get($employee->id, collect()),
+                $leaves->get($employee->id, collect()),
+                $requests->get($employee->id, collect())) as $day) {
+                $dayLookup[$employee->id . '|' . $day['date']] = $day;
             }
         }
-        foreach ($records as $record) {
-            $day = $dayLookup[$record->employee_id . '|' . $record->attendance_date?->toDateString()] ?? null;
-            $rows->push($this->recordRow($record, $day));
+
+        $rows = $records->map(fn (Attendance $record) => $this->recordRow($record, $dayLookup[$record->employee_id . '|' . $record->attendance_date?->toDateString()] ?? null));
+
+        // Totals come from the shared per-day classification, once per
+        // employee/day: a late day counts as attended (the summary's present
+        // flag includes late), a partially excused absence keeps its fraction,
+        // duplicate records on one day never double-count, and future days are
+        // not counted. Rows themselves stay one per record.
+        $recordedKeys = $effectiveRecords
+            ->map(fn (Attendance $record) => $record->employee_id . '|' . $record->attendance_date?->toDateString())
+            ->unique();
+        $rowByKey = $rows->keyBy(fn (array $row) => ($row['employee']?->id ?? '') . '|' . $row['date']);
+        $presentDays = 0; $lateDays = 0; $absentDays = 0.0;
+        foreach ($recordedKeys as $key) {
+            $day = $dayLookup[$key] ?? null;
+            $keyDate = substr((string) $key, (int) strpos((string) $key, '|') + 1);
+            if ($keyDate > $today->toDateString()) continue; // future days are never counted, whatever the state
+            $state = $day['state'] ?? $rowByKey->get($key)['state'] ?? null;
+            if (in_array($state, ['present', 'late'], true)) $presentDays++;
+            if ($state === 'late') $lateDays++;
+            if ($state === 'absent') $absentDays += (float) ($day['absence_days'] ?? $rowByKey->get($key)['absence_days'] ?? 0);
         }
+        $periodTotals = [
+            'present' => $presentDays,
+            'late' => $lateDays,
+            'absent' => round($absentDays, 2),
+        ];
+
         if ($request->filled('state')) {
             $wantedState = $request->string('state')->toString();
             $rows = $rows->filter(fn ($row) => $row['state'] === $wantedState);
@@ -188,18 +194,18 @@ class AttendanceController extends Controller
             fn ($a, $b) => ($b['model']?->id ?? 0) <=> ($a['model']?->id ?? 0),
         ])->values();
 
-        $periodTotals['absent'] = round($periodTotals['absent'], 2);
-        return ['rows' => $rows, 'periodTotals' => $periodTotals, 'classifyTo' => $classifyTo, 'periodStart' => $periodStart, 'periodEnd' => $periodEnd];
+        return ['rows' => $rows, 'periodTotals' => $periodTotals, 'classifyTo' => $to->copy()->min($today), 'periodStart' => $periodStart, 'periodEnd' => $periodEnd];
     }
 
     /**
      * A real record row derives its state and color from the same day
-     * classification that drives the totals, so they can never disagree;
-     * records outside the classified range keep their raw status.
+     * classification that drives the monthly summary, so they can never
+     * disagree; records whose day falls outside classification keep their raw
+     * status. Rejected/cancelled records stay visible but never count.
      */
     private function recordRow(Attendance $record, ?array $day): array
     {
-        $base = ['virtual' => false, 'model' => $record, 'employee' => $record->employee, 'date' => $record->attendance_date?->toDateString()];
+        $base = ['model' => $record, 'employee' => $record->employee, 'date' => $record->attendance_date?->toDateString(), 'absence_days' => 0.0];
         if (in_array($record->approval_status, Attendance::inactiveStatuses(), true)) {
             $cancelled = in_array($record->approval_status, ['Cancelled', 'Canceled', 'ملغي', 'ملغى', 'ملغاة'], true);
             return [...$base, 'state' => 'rejected',
@@ -208,6 +214,7 @@ class AttendanceController extends Controller
         }
         if ($day !== null) {
             $fraction = (float) ($day['absence_days'] ?? 0);
+            $base['absence_days'] = $day['state'] === 'absent' ? $fraction : 0.0;
             [$state, $label, $badge, $class] = match ($day['state']) {
                 'present' => ['present', 'حاضر', 'success', ''],
                 'late' => ['late', 'متأخر', 'warning', 'attendance-row-late'],
@@ -220,23 +227,19 @@ class AttendanceController extends Controller
                 'holiday' => ['holiday', 'أجازة رسمية', 'secondary', ''],
                 'before_hire' => ['outside_service', 'قبل التعيين', 'secondary', ''],
                 'after_termination' => ['outside_service', 'بعد نهاية الخدمة', 'secondary', ''],
-                // «لم يُسجَّل بعد» describes only today before the cutoff; a past
-                // not_recorded day (e.g. a non-inferring employee) keeps the raw status.
-                'not_recorded' => $record->attendance_date?->isToday()
-                    ? ['not_recorded', 'لم يُسجَّل بعد', 'secondary', 'attendance-row-pending']
-                    : [null, null, null, null],
+                'not_recorded' => [null, null, null, null],
                 default => [null, null, null, null],
             };
             if ($state !== null) {
                 return [...$base, 'state' => $state, 'status_label' => $label, 'badge_class' => $badge, 'row_class' => $class];
             }
-            // Unlisted states (e.g. future) fall through to the raw status below.
+            // A recorded day can never be «not_recorded»; fall through to raw status.
         }
         $late = (int) ($record->late_minutes ?? 0) > 0 || in_array($record->status, ['Late', 'متأخر'], true);
         $absent = in_array($record->status, ['Absent', 'غائب', 'غياب'], true);
         $onLeave = in_array($record->status, ['On Leave', 'Leave', 'إجازة', 'اجازة'], true);
         $state = $absent ? 'absent' : ($late ? 'late' : ($onLeave ? 'leave' : 'present'));
-        return [...$base, 'state' => $state,
+        return [...$base, 'state' => $state, 'absence_days' => $absent ? 1.0 : 0.0,
             'status_label' => arabic_label($record->status), 'badge_class' => $record->status_badge_class,
             'row_class' => $absent ? 'attendance-row-absent' : ($late ? 'attendance-row-late' : '')];
     }

@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
@@ -35,6 +36,7 @@ class CompanyIsolationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Storage::fake('local');
 
         $status = EmployeeStatus::firstOrCreate(['name' => 'Active']);
         $this->statusId = $status->id;
@@ -160,8 +162,14 @@ class CompanyIsolationTest extends TestCase
             . "9002,Employee Bravo B,2026-10-15,09:00,17:00,Present\n";
         $file = UploadedFile::fake()->createWithContent('attendance.csv', $csv);
 
+        $preview = $this->actingAs($this->userA)
+            ->post(route('attendance.import.preview'), ['file' => $file]);
+        $preview->assertOk();
+        preg_match('/name="import_token" value="([0-9a-f-]{36})"/', $preview->getContent(), $tokenMatch);
+        preg_match('/name="preview_key" id="previewKey" value="([0-9a-f]{64})"/', $preview->getContent(), $keyMatch);
+
         $this->actingAs($this->userA)
-            ->post(route('attendance.import'), ['file' => $file])
+            ->post(route('attendance.import'), ['import_token' => $tokenMatch[1], 'unit' => 'sheet-0', 'map' => [], 'options' => [], 'preview_key' => $keyMatch[1]])
             ->assertSessionDoesntHaveErrors();
 
         $this->assertDatabaseHas('attendance', [
@@ -170,6 +178,28 @@ class CompanyIsolationTest extends TestCase
         ]);
         $this->assertDatabaseMissing('attendance', [
             'employee_id' => $this->employeeB->id,
+        ]);
+    }
+
+    public function test_attendance_import_token_cannot_be_used_from_another_company(): void
+    {
+        $csv = "employee_code,employee_name,date,check_in,check_out,status\n"
+            . "9001,Employee Alpha A,2026-10-15,09:00,17:00,Present\n";
+        $file = UploadedFile::fake()->createWithContent('attendance.csv', $csv);
+
+        $preview = $this->actingAs($this->userA)
+            ->post(route('attendance.import.preview'), ['file' => $file]);
+        $preview->assertOk();
+        preg_match('/name="import_token" value="([0-9a-f-]{36})"/', $preview->getContent(), $tokenMatch);
+        preg_match('/name="preview_key" id="previewKey" value="([0-9a-f]{64})"/', $preview->getContent(), $keyMatch);
+
+        $this->actingAs($this->userB)
+            ->post(route('attendance.import'), ['import_token' => $tokenMatch[1], 'unit' => 'sheet-0', 'map' => [], 'options' => [], 'preview_key' => $keyMatch[1]])
+            ->assertSessionHasErrors('file');
+
+        $this->assertDatabaseMissing('attendance', [
+            'employee_id' => $this->employeeA->id,
+            'attendance_date' => '2026-10-15',
         ]);
     }
 
