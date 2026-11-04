@@ -6,27 +6,33 @@ use App\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
-/** One day is classified once, for both the monthly summary and open payroll. */
+/** One day is classified once, for the attendance page, the monthly summary and open payroll. */
 class EmployeePeriodMetrics
 {
     public function __construct(private readonly HrOperationalSettingsService $settings) {}
 
-    public function calculate(Employee $employee, Carbon $from, Carbon $to, Collection $attendance, Collection $leaves, Collection $requests): array
+    /**
+     * Per-day classification over [$from, $to]. Each entry:
+     * date, state (future|before_hire|after_termination|present|late|leave|mission|rest|holiday|absent|not_recorded),
+     * records (Collection), has_record, present, explicit_absent, infer_missing,
+     * late_minutes, early_leave_minutes, absence_days (fraction).
+     */
+    public function days(Employee $employee, Carbon $from, Carbon $to, Collection $attendance, Collection $leaves, Collection $requests): array
     {
-        $result = ['attendance_days' => 0, 'late_days' => 0, 'late_minutes' => 0, 'early_leave_minutes' => 0, 'absence_days' => 0.0];
+        $days = [];
         $byDate = $attendance->groupBy(fn ($a) => $a->attendance_date->toDateString());
-        $status = $employee->status?->name;
-        $inferMissing = in_array($status, ['Active', 'نشط', 'Leave', 'إجازة'], true)
-            || ($employee->termination_date && in_array($status, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true));
+        $inferMissing = $this->infersMissing($employee);
         for ($date = $from->copy()->startOfDay(); $date->lte($to); $date->addDay()) {
-            if ($date->isFuture() && !$date->isToday()) continue;
-            if ($employee->hire_date && $date->lt($employee->hire_date->copy()->startOfDay())) continue;
-            if ($employee->termination_date && $date->gt($employee->termination_date->copy()->startOfDay())) continue;
             $key = $date->toDateString();
             $rows = $byDate->get($key, collect());
+            $blank = ['date' => $key, 'records' => $rows, 'has_record' => $rows->isNotEmpty(), 'present' => false,
+                'explicit_absent' => false, 'infer_missing' => $inferMissing,
+                'late_minutes' => 0, 'early_leave_minutes' => 0, 'absence_days' => 0.0];
+            if ($date->isFuture() && !$date->isToday()) { $days[] = array_merge($blank, ['state' => 'future']); continue; }
+            if ($employee->hire_date && $date->lt($employee->hire_date->copy()->startOfDay())) { $days[] = array_merge($blank, ['state' => 'before_hire']); continue; }
+            if ($employee->termination_date && $date->gt($employee->termination_date->copy()->startOfDay())) { $days[] = array_merge($blank, ['state' => 'after_termination']); continue; }
             $present = $rows->filter(fn ($a) => $a->check_in || $a->check_out || in_array($a->status, ['Present', 'Late', 'حاضر', 'متأخر'], true));
             $isPresent = $present->isNotEmpty();
-            if ($isPresent) $result['attendance_days']++;
             [$shiftStart, $shiftEnd] = $this->shift($employee, $date);
             $mission = false;
             $permissions = [];
@@ -64,17 +70,45 @@ class EmployeePeriodMetrics
                 if ($clockIns->isNotEmpty()) $late = max(0, $late - $this->covered($permissions, $shiftStart->timestamp, min($shiftEnd->timestamp, $clockIns->first()->timestamp)));
                 if ($clockOuts->isNotEmpty()) $early = max(0, $early - $this->covered($permissions, max($shiftStart->timestamp, $clockOuts->last()->timestamp), $shiftEnd->timestamp));
             }
-            $result['late_minutes'] += $late;
-            $result['early_leave_minutes'] += $early;
-            if ($late > 0) $result['late_days']++;
-            if ($isPresent || $leave || $mission || $this->settings->isWeeklyRest($date) || $this->settings->isHoliday($date)) continue;
             $explicitAbsent = $rows->contains(fn ($a) => in_array($a->status, ['Absent', 'غائب', 'غياب'], true));
+            $day = array_merge($blank, [
+                'present' => $isPresent,
+                'explicit_absent' => $explicitAbsent,
+                'late_minutes' => $late,
+                'early_leave_minutes' => $early,
+            ]);
+            if ($isPresent) { $days[] = array_merge($day, ['state' => $late > 0 ? 'late' : 'present']); continue; }
+            if ($leave) { $days[] = array_merge($day, ['state' => 'leave']); continue; }
+            if ($mission) { $days[] = array_merge($day, ['state' => 'mission']); continue; }
+            if ($this->settings->isWeeklyRest($date)) { $days[] = array_merge($day, ['state' => 'rest']); continue; }
+            if ($this->settings->isHoliday($date)) { $days[] = array_merge($day, ['state' => 'holiday']); continue; }
             $cutoff = Carbon::parse($key.' '.$this->settings->absenceCutoff());
             if ($shiftEnd->day !== $shiftStart->day && $cutoff->lt($shiftStart)) $cutoff->addDay();
-            if (!$explicitAbsent && (!$inferMissing || now()->lt($cutoff))) continue;
+            if (!$explicitAbsent && (!$inferMissing || now()->lt($cutoff))) { $days[] = array_merge($day, ['state' => 'not_recorded']); continue; }
             $shiftMinutes = max(1, (int) round(($shiftEnd->timestamp - $shiftStart->timestamp) / 60));
             $excused = $this->covered($permissions, $shiftStart->timestamp, $shiftEnd->timestamp);
-            $result['absence_days'] += max(0, 1 - $excused / $shiftMinutes);
+            $days[] = array_merge($day, ['state' => 'absent', 'absence_days' => max(0, 1 - $excused / $shiftMinutes)]);
+        }
+        return $days;
+    }
+
+    /** Whether days without any record count as absence for this employee. */
+    public function infersMissing(Employee $employee): bool
+    {
+        $status = $employee->status?->name;
+        return in_array($status, ['Active', 'نشط', 'Leave', 'إجازة'], true)
+            || ($employee->termination_date && in_array($status, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true));
+    }
+
+    public function calculate(Employee $employee, Carbon $from, Carbon $to, Collection $attendance, Collection $leaves, Collection $requests): array
+    {
+        $result = ['attendance_days' => 0, 'late_days' => 0, 'late_minutes' => 0, 'early_leave_minutes' => 0, 'absence_days' => 0.0];
+        foreach ($this->days($employee, $from, $to, $attendance, $leaves, $requests) as $day) {
+            if ($day['present']) $result['attendance_days']++;
+            $result['late_minutes'] += $day['late_minutes'];
+            $result['early_leave_minutes'] += $day['early_leave_minutes'];
+            if ($day['late_minutes'] > 0) $result['late_days']++;
+            $result['absence_days'] += $day['absence_days'];
         }
         $result['absence_days'] = round($result['absence_days'], 4);
         return $result;
