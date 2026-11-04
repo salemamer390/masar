@@ -17,6 +17,9 @@ use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
+    /** Widest date span the page will synthesize per-day rows for. */
+    private const MAX_RANGE_DAYS = 92;
+
     public function __construct(
         private readonly HrOperationalSettingsService $hrSettings,
         private readonly DashboardDataService $dashboard,
@@ -26,27 +29,17 @@ class AttendanceController extends Controller
     }
     public function index(Request $request)
     {
-        $today = today();
-        $period = $this->hrSettings->periodContaining($today->copy());
-        $periodStart = $period['start']->toDateString();
-        $periodEnd = $period['end']->toDateString();
-        $query = Attendance::with(['employee.department', 'employee.job'])->orderByDesc('attendance_date')->orderByDesc('id');
-        if (!$request->filled('from_date')) $query->whereDate('attendance_date', '>=', $periodStart);
-        if (!$request->filled('to_date')) $query->whereDate('attendance_date', '<=', $periodEnd);
-        if ($request->filled('from_date')) { $query->whereDate('attendance_date', '>=', $request->from_date); }
-        if ($request->filled('to_date')) { $query->whereDate('attendance_date', '<=', $request->to_date); }
-        if ($request->filled('employee_id')) { $query->where('employee_id', $request->employee_id); }
-        if ($request->filled('department_id')) { $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->department_id)); }
-        if ($request->filled('search')) {
-            $search = trim($request->string('search')->toString());
-            $query->whereHas('employee', fn ($employee) => $employee
-                ->where('full_name', 'like', "%{$search}%")
-                ->orWhere('employee_code', 'like', "%{$search}%"));
-        }
+        $data = $this->buildRows($request);
+        $rows = $data['rows'];
 
         $perPage = in_array((int) $request->input('per_page', 25), [25, 50, 100, 200], true) ? (int) $request->input('per_page', 25) : 25;
-        $attendances = $query->paginate($perPage)->withQueryString();
-        $attendances->getCollection()->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
+        $page = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $attendances = new \Illuminate\Pagination\LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(), $rows->count(), $perPage, $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        $today = today();
         $todaySummary = $this->dashboard->attendance($request->user(), $today);
         $presentToday = $todaySummary['counts']['present'];
         $absentToday = $todaySummary['counts']['absent'];
@@ -61,45 +54,191 @@ class AttendanceController extends Controller
         $pendingPeriods = app(\App\Services\AttendancePeriodArchiveService::class)->pendingPeriods();
         $defaultShiftStart = $this->hrSettings->start();
         $defaultShiftEnd = $this->hrSettings->end();
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd', 'pendingPeriods'));
+        $periodTotals = $data['periodTotals'];
+        $classifyTo = $data['classifyTo'];
+        $periodStart = $data['periodStart'];
+        $periodEnd = $data['periodEnd'];
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd', 'pendingPeriods', 'periodTotals', 'classifyTo'));
     }
 
     public function export(Request $request)
     {
-        $period = $this->hrSettings->periodContaining(today()->copy());
-        $query = Attendance::with(['employee.department'])
-            ->orderByDesc('attendance_date')->orderByDesc('id');
-        if (!$request->filled('from_date')) $query->whereDate('attendance_date', '>=', $period['start']->toDateString());
-        if (!$request->filled('to_date')) $query->whereDate('attendance_date', '<=', $period['end']->toDateString());
-        if ($request->filled('from_date')) $query->whereDate('attendance_date', '>=', $request->date('from_date'));
-        if ($request->filled('to_date')) $query->whereDate('attendance_date', '<=', $request->date('to_date'));
-        if ($request->filled('employee_id')) $query->where('employee_id', $request->integer('employee_id'));
-        if ($request->filled('department_id')) $query->whereHas('employee', fn ($q) => $q->where('department_id', $request->integer('department_id')));
-        if ($request->filled('search')) {
-            $search = trim((string) $request->input('search'));
-            $query->whereHas('employee', fn ($q) => $q->where('full_name', 'like', "%{$search}%")->orWhere('employee_code', 'like', "%{$search}%"));
-        }
-        $records = $query->get();
-        $this->decorateOvertimeCollection($records);
+        // Same scoped rows as the screen, including synthesized absence and the
+        // state filter, so the file never disagrees with what the user sees.
+        $data = $this->buildRows($request);
         $filename = 'attendance-' . now()->format('Y-m-d-His') . '.csv';
 
-        return response()->streamDownload(function () use ($records) {
+        return response()->streamDownload(function () use ($data) {
             $out = fopen('php://output', 'wb');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة'], ',');
-            foreach ($records as $attendance) {
+            foreach ($data['rows'] as $row) {
+                $model = $row['model'];
+                $minutes = fn (?int $value) => $value === null ? '—' : sprintf('%02d:%02d', intdiv($value, 60), $value % 60);
                 fputcsv($out, [
-                    $attendance->attendance_date?->format('d/m/Y'), $attendance->employee?->employee_code,
-                    $attendance->employee?->full_name, $attendance->employee?->department?->name,
-                    $attendance->check_in, $attendance->check_out, $attendance->formatted_late,
-                    sprintf('%02d:%02d', intdiv((int) ($attendance->early_leave_minutes ?? 0), 60), ((int) ($attendance->early_leave_minutes ?? 0)) % 60),
-                    sprintf('%02d:%02d', intdiv((int) ($attendance->day_overtime_minutes ?? 0), 60), ((int) ($attendance->day_overtime_minutes ?? 0)) % 60),
-                    sprintf('%02d:%02d', intdiv((int) ($attendance->night_overtime_minutes ?? 0), 60), ((int) ($attendance->night_overtime_minutes ?? 0)) % 60),
-                    arabic_label($attendance->status),
+                    \Carbon\Carbon::parse($row['date'])->format('d/m/Y'), $row['employee']?->employee_code,
+                    $row['employee']?->full_name, $row['employee']?->department?->name,
+                    $model?->check_in ?? '—', $model?->check_out ?? '—',
+                    $model ? $model->formatted_late : '—',
+                    $minutes($model?->early_leave_minutes !== null ? (int) $model->early_leave_minutes : null),
+                    $minutes($model?->day_overtime_minutes !== null ? (int) $model->day_overtime_minutes : null),
+                    $minutes($model?->night_overtime_minutes !== null ? (int) $model->night_overtime_minutes : null),
+                    $row['status_label'] . ($row['virtual'] ? ' (محتسَب)' : ''),
                 ], ',');
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * Rows shown on the attendance page and exported: real records plus
+     * synthesized absence/pending rows through today, classified by the same
+     * per-day path as the monthly summary and payroll.
+     *
+     * @return array{rows: \Illuminate\Support\Collection, periodTotals: array, classifyTo: Carbon, periodStart: string, periodEnd: string}
+     */
+    private function buildRows(Request $request): array
+    {
+        $request->validate([
+            'from_date' => ['nullable', 'date'],
+            'to_date' => ['nullable', 'date', 'after_or_equal:from_date'],
+            'state' => ['nullable', 'in:present,late,absent,not_recorded'],
+        ]);
+
+        $today = today();
+        $period = $this->hrSettings->periodContaining($today->copy());
+        $periodStart = $period['start']->toDateString();
+        $periodEnd = $period['end']->toDateString();
+        $from = $request->filled('from_date') ? Carbon::parse($request->string('from_date')->toString())->startOfDay() : $period['start']->copy()->startOfDay();
+        $to = $request->filled('to_date') ? Carbon::parse($request->string('to_date')->toString())->startOfDay() : $period['end']->copy()->startOfDay();
+        if ($from->diffInDays($to) > self::MAX_RANGE_DAYS) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'to_date' => 'نطاق العرض يتجاوز ' . self::MAX_RANGE_DAYS . ' يومًا. قلّص الفترة ثم أعد العرض.',
+            ]);
+        }
+
+        $employeesQuery = Employee::with(['department', 'status'])->orderBy('full_name');
+        if ($request->filled('employee_id')) $employeesQuery->where('id', $request->employee_id);
+        if ($request->filled('department_id')) $employeesQuery->where('department_id', $request->department_id);
+        if ($request->filled('search')) {
+            $search = trim($request->string('search')->toString());
+            $employeesQuery->where(fn ($q) => $q->where('full_name', 'like', "%{$search}%")->orWhere('employee_code', 'like', "%{$search}%"));
+        }
+        $filteredEmployees = $employeesQuery->get();
+        $employeeIds = $filteredEmployees->pluck('id');
+
+        $records = Attendance::with(['employee.department', 'employee.job'])
+            ->whereIn('employee_id', $employeeIds)
+            ->whereDate('attendance_date', '>=', $from->toDateString())
+            ->whereDate('attendance_date', '<=', $to->toDateString())
+            ->orderByDesc('attendance_date')->orderByDesc('id')->get();
+        $records->each(fn (Attendance $attendance) => $this->decorateOvertime($attendance));
+
+        $metrics = app(\App\Services\EmployeePeriodMetrics::class);
+        $effectiveRecords = $records->filter(fn (Attendance $record) => !in_array($record->approval_status, Attendance::inactiveStatuses(), true));
+        $leaves = \App\Models\Leave::effective()->whereIn('employee_id', $employeeIds)
+            ->whereDate('start_date', '<=', $to->toDateString())->whereDate('end_date', '>=', $from->toDateString())->get()->groupBy('employee_id');
+        $requests = \App\Models\HrRequest::effective()->with('requestType')->whereIn('employee_id', $employeeIds)->get()
+            ->filter(fn (\App\Models\HrRequest $item) => in_array($item->requestType?->source_key ?: $item->request_type, ['permission', 'mission'], true))
+            ->groupBy('employee_id');
+
+        $periodTotals = ['present' => 0, 'late' => 0, 'absent' => 0.0];
+        $classifyTo = $to->gt($today) ? $today->copy()->startOfDay() : $to->copy();
+        $dayLookup = [];
+        $rows = collect();
+        if ($classifyTo->gte($from)) {
+            $recordsByEmployee = $effectiveRecords->groupBy('employee_id');
+            foreach ($filteredEmployees as $employee) {
+                $days = $metrics->days($employee, $from, $classifyTo,
+                    $recordsByEmployee->get($employee->id, collect()),
+                    $leaves->get($employee->id, collect()),
+                    $requests->get($employee->id, collect()));
+                foreach ($days as $day) {
+                    $dayLookup[$employee->id . '|' . $day['date']] = $day;
+                    if ($day['present']) $periodTotals['present']++;
+                    if ($day['state'] === 'late') $periodTotals['late']++;
+                    if ($day['state'] === 'absent') $periodTotals['absent'] += (float) $day['absence_days'];
+                    if ($day['state'] === 'absent' && !$day['has_record'] && (float) $day['absence_days'] > 0) {
+                        $fraction = (float) $day['absence_days'];
+                        $rows->push([
+                            'virtual' => true, 'model' => null, 'employee' => $employee, 'date' => $day['date'], 'state' => 'absent',
+                            'status_label' => $fraction < 1 ? 'غائب (جزئي)' : 'غائب',
+                            'badge_class' => 'danger', 'row_class' => 'attendance-row-absent',
+                        ]);
+                    } elseif ($day['state'] === 'not_recorded' && $day['infer_missing'] && $day['date'] === $today->toDateString()) {
+                        $rows->push([
+                            'virtual' => true, 'model' => null, 'employee' => $employee, 'date' => $day['date'], 'state' => 'not_recorded',
+                            'status_label' => 'لم يُسجَّل بعد', 'badge_class' => 'secondary', 'row_class' => 'attendance-row-pending',
+                        ]);
+                    }
+                }
+            }
+        }
+        foreach ($records as $record) {
+            $day = $dayLookup[$record->employee_id . '|' . $record->attendance_date?->toDateString()] ?? null;
+            $rows->push($this->recordRow($record, $day));
+        }
+        if ($request->filled('state')) {
+            $wantedState = $request->string('state')->toString();
+            $rows = $rows->filter(fn ($row) => $row['state'] === $wantedState);
+        }
+        $rows = $rows->sortBy([
+            fn ($a, $b) => strcmp((string) $b['date'], (string) $a['date']),
+            fn ($a, $b) => strcmp((string) ($a['employee']?->full_name ?? ''), (string) ($b['employee']?->full_name ?? '')),
+            fn ($a, $b) => ($b['model']?->id ?? 0) <=> ($a['model']?->id ?? 0),
+        ])->values();
+
+        $periodTotals['absent'] = round($periodTotals['absent'], 2);
+        return ['rows' => $rows, 'periodTotals' => $periodTotals, 'classifyTo' => $classifyTo, 'periodStart' => $periodStart, 'periodEnd' => $periodEnd];
+    }
+
+    /**
+     * A real record row derives its state and color from the same day
+     * classification that drives the totals, so they can never disagree;
+     * records outside the classified range keep their raw status.
+     */
+    private function recordRow(Attendance $record, ?array $day): array
+    {
+        $base = ['virtual' => false, 'model' => $record, 'employee' => $record->employee, 'date' => $record->attendance_date?->toDateString()];
+        if (in_array($record->approval_status, Attendance::inactiveStatuses(), true)) {
+            $cancelled = in_array($record->approval_status, ['Cancelled', 'Canceled', 'ملغي', 'ملغى', 'ملغاة'], true);
+            return [...$base, 'state' => 'rejected',
+                'status_label' => arabic_label($record->status) . ($cancelled ? ' (ملغي)' : ' (مرفوض)'),
+                'badge_class' => 'secondary', 'row_class' => 'attendance-row-rejected'];
+        }
+        if ($day !== null) {
+            $fraction = (float) ($day['absence_days'] ?? 0);
+            [$state, $label, $badge, $class] = match ($day['state']) {
+                'present' => ['present', 'حاضر', 'success', ''],
+                'late' => ['late', 'متأخر', 'warning', 'attendance-row-late'],
+                'absent' => $fraction > 0
+                    ? ['absent', $fraction < 1 ? 'غائب (جزئي)' : 'غائب', 'danger', 'attendance-row-absent']
+                    : ['excused', 'غائب (مغطى بإذن)', 'info', ''],
+                'leave' => ['leave', 'إجازة', 'info', ''],
+                'mission' => ['mission', 'مهمة', 'info', ''],
+                'rest' => ['rest', 'راحة أسبوعية', 'secondary', ''],
+                'holiday' => ['holiday', 'أجازة رسمية', 'secondary', ''],
+                'before_hire' => ['outside_service', 'قبل التعيين', 'secondary', ''],
+                'after_termination' => ['outside_service', 'بعد نهاية الخدمة', 'secondary', ''],
+                // «لم يُسجَّل بعد» describes only today before the cutoff; a past
+                // not_recorded day (e.g. a non-inferring employee) keeps the raw status.
+                'not_recorded' => $record->attendance_date?->isToday()
+                    ? ['not_recorded', 'لم يُسجَّل بعد', 'secondary', 'attendance-row-pending']
+                    : [null, null, null, null],
+                default => [null, null, null, null],
+            };
+            if ($state !== null) {
+                return [...$base, 'state' => $state, 'status_label' => $label, 'badge_class' => $badge, 'row_class' => $class];
+            }
+            // Unlisted states (e.g. future) fall through to the raw status below.
+        }
+        $late = (int) ($record->late_minutes ?? 0) > 0 || in_array($record->status, ['Late', 'متأخر'], true);
+        $absent = in_array($record->status, ['Absent', 'غائب', 'غياب'], true);
+        $onLeave = in_array($record->status, ['On Leave', 'Leave', 'إجازة', 'اجازة'], true);
+        $state = $absent ? 'absent' : ($late ? 'late' : ($onLeave ? 'leave' : 'present'));
+        return [...$base, 'state' => $state,
+            'status_label' => arabic_label($record->status), 'badge_class' => $record->status_badge_class,
+            'row_class' => $absent ? 'attendance-row-absent' : ($late ? 'attendance-row-late' : '')];
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
