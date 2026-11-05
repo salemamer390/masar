@@ -4,15 +4,6 @@ return [
     // Internal Tazamun salary-structure rule.
     'allowances_rate' => 0.25,
 
-    // Month-end job: generate, approve and lock every company's payroll without user action.
-    'auto_close' => [
-        'enabled' => false,
-        // 0 = close on the last day of the month. N = close N days after month end
-        // (use a grace period when fingerprint files are uploaded after month end).
-        'days_after_month_end' => 0,
-        'time' => '23:55',
-    ],
-
     // Work on a weekly rest day or official holiday is paid only when an overtime request covers that date.
     'rest_work_requires_request' => true,
 
