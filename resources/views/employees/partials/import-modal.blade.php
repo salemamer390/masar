@@ -128,7 +128,7 @@
     let busy = false;
     let needsReload = false;
     let lastData = null;
-    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' };
+    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' };
     let sheetsStepUsed = false;
     let table = { tab: 'all', query: '', limit: PAGE };
 
@@ -190,6 +190,7 @@
         body.append('mappings', JSON.stringify(state.mappings));
         body.append('sheet_kinds', JSON.stringify(state.sheetKinds));
         body.append('domain_mappings', JSON.stringify(state.domainMappings));
+        body.append('penalty_fixes', JSON.stringify(state.penaltyFixes));
         body.append('review_token', state.reviewToken || '');
         body.append('ack_dates', withAck && ackBox() && ackBox().checked ? '1' : '0');
         body.append('ack_updates', withAck && updateAckBox() && updateAckBox().checked ? '1' : '0');
@@ -406,7 +407,7 @@
             html += detail('<i class="bi bi-layers"></i> تم اختيار ورقة تلقائيًا',
                 sheets.map((sheet) => '<div>' + (sheet.eligible ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + 'ورقة «' + esc(sheet.name) + '» — ' + (sheet.eligible ? 'مؤهلة للاستيراد (' + num(sheet.rows) + ' صف)' : 'ليست ورقة بيانات موظفين وتم تجاهلها') + '</div>').join(''), false);
         }
-        const kinds = data.kind_labels || {employees: 'بيانات الموظفين', attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', advances: 'السلف', requests: 'الطلبات/الإضافي', auxiliary: 'ورقة محسوبة/مساعدة', unknown: 'غير معروفة'};
+        const kinds = data.kind_labels || {employees: 'بيانات الموظفين', attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', advances: 'السلف', requests: 'الطلبات/الإضافي', auxiliary: 'تجاهل', unknown: 'غير معروفة'};
         const classified = sheets.filter((sheet) => sheet.kind && sheet.kind !== 'unknown');
         if (classified.length) {
             html += detail('<i class="bi bi-diagram-3"></i> خريطة أوراق الملف', classified.map((sheet) => '<div><i class="bi bi-check-circle text-success"></i> ورقة «' + esc(sheet.name) + '» ← <strong>' + esc(kinds[sheet.kind] || kinds.unknown) + '</strong></div>').join(''), true);
@@ -417,8 +418,23 @@
             const d = domains[key];
             let line = '<div><i class="bi bi-check-circle text-success"></i> ' + domainLabels[key] + ': سيُستورد <strong>' + num(d.imported) + '</strong> سجل';
             if (d.skipped > 0) { line += ' · <span class="text-danger">' + num(d.skipped) + ' صف مرفوض</span>'; }
+            if (key === 'penalties' && d.excluded > 0) { line += ' · <span class="text-muted">' + num(d.excluded) + ' صف استبعدته</span>'; }
             line += '</div>';
-            if (d.errors && d.errors.length) {
+            const penaltyFailures = key === 'penalties' ? (d.failures || []) : [];
+            if (penaltyFailures.length) {
+                const types = data.penalty_types || [];
+                line += penaltyFailures.map((f) => {
+                    const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
+                    const who = vals.filter((v) => String(v).trim() !== '').slice(0, 2).map(esc).join(' / ');
+                    const chosenFix = ((state.penaltyFixes || {})[f.sheet] || {})[f.line] || '';
+                    const sel = '<select class="form-select form-select-sm d-inline-block w-auto" data-penalty-fix="1" data-penalty-sheet="' + esc(f.sheet) + '" data-penalty-line="' + esc(f.line) + '">'
+                        + '<option value="">— بدون قرار —</option>'
+                        + '<option value="__exclude__"' + (chosenFix === '__exclude__' ? ' selected' : '') + '>استبعاد الصف نهائيًا</option>'
+                        + types.map((t) => '<option value="' + esc(t) + '"' + (chosenFix === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>';
+                    return '<div class="small text-danger ms-3">' + esc(f.sheet) + ' / صف ' + num(f.line) + (who ? ' (' + who + ')' : '') + ': ' + esc((f.errors || [])[0] || '') + '</div>'
+                        + '<div class="small ms-3 mb-1">صحّح نوع الجزاء أو استبعد الصف: ' + sel + '</div>';
+                }).join('');
+            } else if (d.errors && d.errors.length) {
                 line += d.errors.map((message) => '<div class="small text-danger ms-3">' + esc(message) + '</div>').join('');
             }
             return line;
@@ -542,11 +558,14 @@
         sheets.forEach((sheet) => {
             const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
             const corrected = state.sheetKinds[sheet.name] && state.sheetKinds[sheet.name] !== sheet.detected_kind;
+            const sheetId = 'sheetBody' + sheets.indexOf(sheet);
             html += '<div class="border rounded p-2 mb-2">'
                 + '<div class="d-flex flex-wrap align-items-center gap-2">'
+                + '<button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" data-sheet-toggle="' + sheetId + '" title="عرض/إخفاء التفاصيل"><i class="bi bi-chevron-down"></i></button>'
                 + '<div class="fw-semibold"><i class="bi bi-file-earmark-spreadsheet text-success"></i> ' + esc(sheet.name) + ' <span class="text-muted small">(' + num(sheet.rows) + ' صف)</span></div>'
                 + '<select class="form-select form-select-sm ms-auto" style="max-width:230px" data-sheet-kind="' + esc(sheet.name) + '">' + sheetKindOptions(chosen) + '</select>'
                 + '</div>'
+                + '<div id="' + sheetId + '" hidden>'
                 + '<div class="small mt-1 ' + (corrected ? 'text-warning-emphasis' : 'text-muted') + '">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + (corrected ? ' — اخترت نوعًا مختلفًا وسيُحترم اختيارك' : '') + '</div>'
                 + domainMappingEditor(data, sheet, chosen)
                 + ((sheet.sample || []).length
@@ -554,9 +573,9 @@
                       + sheet.sample.map((row) => '<tr>' + row.map((cell) => '<td class="text-truncate" style="max-width:140px">' + esc(cell) + '</td>').join('') + '</tr>').join('')
                       + '</tbody></table></div>'
                     : '')
-                + '</div>';
+                + '</div></div>';
         });
-        html += '<div class="form-text"><i class="bi bi-info-circle"></i> الأوراق من نوع «ورقة مساعدة» أو «تجاهل» أو «غير معروفة» لا تدخل أي استيراد فعلي.</div>';
+        html += '<div class="form-text"><i class="bi bi-info-circle"></i> الأوراق من نوع «تجاهل» أو «غير معروفة» لا تدخل أي استيراد فعلي.</div>';
         sheetsList.innerHTML = html;
     }
 
@@ -631,7 +650,7 @@
         fileInput.value = '';
         lastData = null;
         lastResult = null;
-        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' };
+        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' };
         sheetsStepUsed = false;
         sheetsList.innerHTML = '';
         box.verdict.innerHTML = '';
@@ -680,7 +699,7 @@
     }
 
     // ---- events ---------------------------------------------------------------
-    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
     btn.preview.addEventListener('click', () => {
         const fromSheets = !steps.sheets.hidden;
         runPreview(btn.preview, fromSheets ? 'جارٍ تحديث المراجعة...' : 'جارٍ فحص الملف...', false, fromSheets ? 'preview' : null);
@@ -690,6 +709,15 @@
         showAlert('');
         const onPreview = !steps.preview.hidden;
         showStep(onPreview && sheetsStepUsed ? 'sheets' : 'upload');
+    });
+    sheetsList.addEventListener('click', (event) => {
+        const toggle = event.target.closest('[data-sheet-toggle]');
+        if (!toggle) { return; }
+        const body = sheetsList.querySelector('#' + toggle.getAttribute('data-sheet-toggle'));
+        if (!body) { return; }
+        body.hidden = !body.hidden;
+        const icon = toggle.querySelector('i');
+        if (icon) { icon.className = body.hidden ? 'bi bi-chevron-down' : 'bi bi-chevron-up'; }
     });
     sheetsList.addEventListener('change', (event) => {
         const fieldSelect = event.target.closest('select[data-domain-field]');
@@ -717,6 +745,16 @@
 
     function onChange(event) {
         const target = event.target;
+        const fixSelect = target.closest('select[data-penalty-fix]');
+        if (fixSelect) {
+            const fixSheet = fixSelect.getAttribute('data-penalty-sheet');
+            const fixLine = fixSelect.getAttribute('data-penalty-line');
+            state.penaltyFixes[fixSheet] = state.penaltyFixes[fixSheet] || {};
+            if (fixSelect.value === '') { delete state.penaltyFixes[fixSheet][fixLine]; }
+            else { state.penaltyFixes[fixSheet][fixLine] = fixSelect.value; }
+            runPreview(null, '', true);
+            return;
+        }
         if (target.matches('input[name="import_sheet"]')) {
             state.sheet = target.value;
             runPreview(null, '', true);
