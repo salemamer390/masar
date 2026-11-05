@@ -20,7 +20,7 @@ class WorkbookAttendanceImporter
     public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns): array
     {
         $sheets = $this->reader->readAll($path, $extension);
-        $imported = 0; $skipped = 0; $errors = []; $affected = [];
+        $imported = 0; $skipped = 0; $errors = []; $failures = []; $affected = [];
         foreach ($sheets as $sheet) {
             [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
             $map = $this->mapHeaders($headers);
@@ -45,11 +45,12 @@ class WorkbookAttendanceImporter
                 } catch (\Throwable $exception) {
                     $skipped++;
                     if (count($errors) < 25) $errors[] = "{$sheet['name']} / الصف {$line}: {$exception->getMessage()}";
+                    if (count($failures) < 100) $failures[] = ['sheet' => $sheet['name'], 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]];
                 }
             }
         }
         foreach (array_unique($affected) as $employeeId) $payrollRuns->refreshEmployeeInOpenDrafts($employeeId);
-        return compact('imported', 'skipped', 'errors');
+        return compact('imported', 'skipped', 'errors', 'failures');
     }
 
     private function splitHeader(array $rows): array
@@ -88,14 +89,21 @@ class WorkbookAttendanceImporter
     private function employee(mixed $code, mixed $name): ?Employee
     {
         if (filled($code)) {
-            $employee = Employee::where('employee_code', trim((string) $code))->first();
-            if ($employee) {
-                if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) throw new \RuntimeException('كود الموظف لا يطابق الاسم.');
-                return $employee;
-            }
+            $code = trim((string) $code);
+            $employee = Employee::where('employee_code', $code)->first();
+            // A supplied code is a load-bearing identifier: an unknown code is
+            // rejected with an explicit reason, never swapped for a name match.
+            if (!$employee) throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.');
+            if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) throw new \RuntimeException('كود الموظف لا يطابق الاسم.');
+            return $employee;
         }
         if (!filled($name)) return null;
-        return Employee::where('full_name', trim((string) $name))->first();
+        // A bare name matches only when it identifies exactly one employee of
+        // the company (the tenant global scope applies) - duplicates and
+        // conflicts are rejected and parked for review, never silently picked.
+        $matches = Employee::where('full_name', trim((string) $name))->get();
+        if ($matches->count() > 1) throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.');
+        return $matches->first();
     }
 
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
