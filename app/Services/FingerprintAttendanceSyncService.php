@@ -161,15 +161,25 @@ class FingerprintAttendanceSyncService extends BaseService
         $deviceLabel = 'جهاز ' . ($device?->name ?? 'البصمة');
         $punchRows = $logs->map(fn (RawAttendanceLog $log) => ['at' => $log->raw_timestamp->format('Y-m-d H:i:s'), 'ref' => $deviceLabel . ' · ' . $log->raw_type->value])->all();
 
+        if ($day && $day->resolution === 'resolved') {
+            // A reviewer already decided this day: later syncs only grow the audit
+            // trail. They never recommit or overwrite the saved attendance, even
+            // when the raw punches now look regular on their own.
+            if (!$regular) {
+                // A new irregularity after the review re-opens the day for a fresh
+                // look; the saved attendance record is still left untouched.
+                $this->updateDayWithRevision($day, $punchRows, $issue, 'pending', 'sync-append', 'وصلت بصمة جديدة بعد المراجعة وأعادت اليوم للانتظار', $day->attendance_id);
+            } else {
+                $this->updateDayWithRevision($day, $punchRows, $day->issue, 'resolved', 'sync-append', 'مزامنة جهاز البصمة حدّثت بصمات اليوم', $day->attendance_id);
+            }
+            return;
+        }
+
         if ($regular) {
             $attendance = $this->commitRegularDay($employee, $workDate, $ins->first(), $outs->first());
-            if ($day && $day->resolution === 'pending') {
-                // Amer's rule (2026-11-05): when the missing exit punch arrives and the
-                // day is complete, it is recorded automatically instead of waiting for review.
+            if ($day) { // pending: Amer's rule (2026-11-05) - the exit punch arrived and the day is complete
                 $this->updateDayWithRevision($day, $punchRows, null, 'resolved', 'sync-resolve', 'وصلت بصمة الانصراف واكتمل اليوم بالمزامنة، فسُجّل تلقائيًا', $attendance->id);
                 $result['auto_resolved']++;
-            } elseif ($day) {
-                $this->updateDayWithRevision($day, $punchRows, $day->issue, $day->resolution, 'sync-append', 'مزامنة جهاز البصمة حدّثت بصمات اليوم', $day->attendance_id);
             }
             return;
         }
@@ -187,13 +197,6 @@ class FingerprintAttendanceSyncService extends BaseService
                 'issue' => $issue, 'resolution' => 'pending',
             ]);
             $result['exception_days']++;
-            return;
-        }
-
-        if ($day->resolution === 'resolved') {
-            // A new irregularity appeared after a human review: re-open the day for a
-            // fresh look. The reviewer's saved attendance record is left untouched.
-            $this->updateDayWithRevision($day, $punchRows, $issue, 'pending', 'sync-append', 'وصلت بصمة جديدة بعد المراجعة وأعادت اليوم للانتظار', $day->attendance_id);
             return;
         }
 
