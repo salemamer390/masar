@@ -95,4 +95,40 @@ class FingerprintExceptionsSyncTest extends TestCase
         $this->assertSame(0, Attendance::count());
         $this->assertSame(0, AttendanceImportDay::count());
     }
+
+    public function test_reviewers_correction_is_never_overwritten_by_a_later_regular_sync(): void
+    {
+        $this->punch('2026-11-01 09:00', RawAttendanceType::CheckIn);
+        $day = AttendanceImportDay::firstOrFail();
+        // Reviewer corrects the day by hand: picks their own times, saves, day resolved.
+        $corrected = Attendance::create(['employee_id' => $this->employee->id, 'attendance_date' => '2026-11-01', 'check_in' => '10:00:00', 'check_out' => '16:00:00', 'status' => 'Present', 'source' => 'import', 'approval_status' => 'Approved']);
+        $day->update(['resolution' => 'resolved', 'issue' => null, 'attendance_id' => $corrected->id]);
+
+        // The real exit punch arrives later: raw punches now look regular.
+        $this->punch('2026-11-01 17:00', RawAttendanceType::CheckOut);
+
+        $record = Attendance::firstOrFail();
+        $this->assertSame('10:00:00', $record->check_in);
+        $this->assertSame('16:00:00', $record->check_out);
+        $this->assertSame('import', $record->source);
+        $day = $day->fresh();
+        $this->assertSame('resolved', $day->resolution);
+        $this->assertTrue(AttendancePunchRevision::where('import_day_id', $day->id)->where('action', 'sync-append')->exists());
+    }
+
+    public function test_overnight_shift_exit_punch_auto_resolves_the_shift_start_day(): void
+    {
+        $this->employee->update(['shift_start' => '22:00', 'shift_end' => '06:00']);
+        $this->punch('2026-11-01 22:00', RawAttendanceType::CheckIn);
+        $day = AttendanceImportDay::firstOrFail();
+        $this->assertSame('2026-11-01', $day->work_date->toDateString());
+        $this->assertSame('missing', $day->issue);
+
+        $this->punch('2026-11-02 05:00', RawAttendanceType::CheckOut);
+        $record = Attendance::firstOrFail();
+        $this->assertSame('2026-11-01', $record->attendance_date->toDateString());
+        $this->assertSame('22:00:00', $record->check_in);
+        $this->assertSame('05:00:00', $record->check_out);
+        $this->assertSame('resolved', $day->fresh()->resolution);
+    }
 }
