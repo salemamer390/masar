@@ -10,6 +10,11 @@ use App\Services\PayrollRunService;
 use Carbon\Carbon;
 
 /** Imports attendance sheets found in a workbook after employee import. */
+/**
+ * When the user reviews the import, their confirmed per-sheet header row and
+ * column mapping drive the parser directly; without a review the importer
+ * falls back to its own header detection.
+ */
 class WorkbookAttendanceImporter
 {
     public function __construct(
@@ -17,13 +22,41 @@ class WorkbookAttendanceImporter
         private readonly HrOperationalSettingsService $settings,
     ) {}
 
-    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns): array
+    public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'التاريخ', 'in' => 'وقت الحضور', 'out' => 'وقت الانصراف', 'status' => 'الحالة'];
+
+    /** Detected header row + field map for one sheet, exposed for the review UI. */
+    public function detectConfig(array $rows): ?array
+    {
+        foreach ($rows as $number => $row) {
+            $joined = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
+            if (str_contains($joined, 'التاريخ') && (str_contains($joined, 'كودالموظف') || str_contains($joined, 'اسمالموظف'))) {
+                return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
+            }
+        }
+        foreach ($rows as $number => $row) {
+            if (count(array_filter($row, fn ($value) => trim((string) $value) !== '')) < 2) continue;
+            return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
+        }
+
+        return null;
+    }
+
+    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, ?array $onlySheets = null, ?array $configs = null): array
     {
         $sheets = $this->reader->readAll($path, $extension);
         $imported = 0; $skipped = 0; $errors = []; $failures = []; $affected = [];
         foreach ($sheets as $sheet) {
-            [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
-            $map = $this->mapHeaders($headers);
+            if ($onlySheets !== null && !in_array((string) $sheet['name'], $onlySheets, true)) continue;
+            $config = $configs[$sheet['name']] ?? null;
+            if ($config !== null) {
+                $headerRow = (int) ($config['header_row'] ?? -1);
+                $headers = $sheet['rows'][$headerRow] ?? [];
+                $rows = array_filter($sheet['rows'] ?? [], fn ($unused, $line) => $line > $headerRow, ARRAY_FILTER_USE_BOTH);
+                $map = array_map('intval', $config['map'] ?? []);
+            } else {
+                [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
+                $map = $this->mapHeaders($headers);
+            }
             if (!isset($map['date']) || (!isset($map['code']) && !isset($map['name']))) continue;
             foreach ($rows as $line => $row) {
                 try {
