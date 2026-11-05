@@ -10,10 +10,17 @@ return new class extends Migration
     // their dates are never guessed or backfilled.
     public function up(): void
     {
-        Schema::table('payroll_runs', function (Blueprint $table) {
-            $table->date('period_start')->nullable()->after('payroll_month');
-            $table->date('period_end')->nullable()->after('period_start');
-        });
+        // Partial-install safe: add only the missing columns.
+        if (!Schema::hasColumn('payroll_runs', 'period_start')) {
+            Schema::table('payroll_runs', function (Blueprint $table) {
+                $table->date('period_start')->nullable()->after('payroll_month');
+            });
+        }
+        if (!Schema::hasColumn('payroll_runs', 'period_end')) {
+            Schema::table('payroll_runs', function (Blueprint $table) {
+                $table->date('period_end')->nullable()->after('period_start');
+            });
+        }
     }
 
     public function down(): void
