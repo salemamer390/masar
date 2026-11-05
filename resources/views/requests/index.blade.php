@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fields = document.createElement('div');
   fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="day_overtime_hours" class="form-control"></div><div class="col-12"><div class="d-flex gap-2"><div class="flex-fill"><label class="form-label">من الساعة</label><input type="time" name="from_time" class="form-control" dir="ltr"></div><div class="flex-fill"><label class="form-label">إلى الساعة</label><input type="time" name="to_time" class="form-control" dir="ltr"></div></div></div>';
+  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات (تُحسب تلقائيًا من المدة)</label><input type="number" step="0.25" name="day_overtime_hours" class="form-control" readonly tabindex="-1"></div><div class="col-12"><div class="d-flex gap-2"><div class="flex-fill"><label class="form-label">من الساعة</label><input type="time" name="from_time" class="form-control" dir="ltr"></div><div class="flex-fill"><label class="form-label">إلى الساعة</label><input type="time" name="to_time" class="form-control" dir="ltr"></div></div></div>';
   modalFooter?.before(fields);
   const date = fields.querySelector('input[type="date"]');
   const period = fields.querySelector('[name="overtime_period"]');
@@ -201,6 +201,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const fromTime = fields.querySelector('[name="from_time"]');
   const toTime = fields.querySelector('[name="to_time"]');
   period?.addEventListener('change', () => { hours.name = period.value === 'night' ? 'night_overtime_hours' : 'day_overtime_hours'; });
+  // Hours are derived from the from/to window; an end at or before the
+  // start crosses midnight (overnight overtime).
+  const syncHoursFromWindow = () => {
+    if (!fromTime?.value || !toTime?.value) return;
+    const [fh, fm] = fromTime.value.split(':').map(Number);
+    const [th, tm] = toTime.value.split(':').map(Number);
+    let minutes = (th * 60 + tm) - (fh * 60 + fm);
+    if (minutes <= 0) minutes += 1440;
+    hours.value = String(Math.round((minutes / 60) * 100) / 100);
+  };
+  [fromTime, toTime].forEach((input) => { input?.addEventListener('input', syncHoursFromWindow); input?.addEventListener('change', syncHoursFromWindow); });
   const sync = () => {
     const isOvertime = overtimeTypeIds.map(String).includes(String(type?.value || ''));
     fields.hidden = !isOvertime;
@@ -320,9 +331,9 @@ window.addEventListener('load', () => {
     const hasSame = existing.includes(period);
     const hasOther = existing.filter((value) => value !== period).map((value) => labels[value] || value);
     overtimeWarning.hidden = !hasSame && !hasOther.length;
-    overtimeWarning.className = `overtime-existing-notice ${hasSame ? 'is-danger' : 'is-info'}`;
+    overtimeWarning.className = 'overtime-existing-notice is-info';
     overtimeWarning.innerHTML = hasSame
-      ? `<i class="bi bi-exclamation-triangle"></i> يوجد ${labels[period] || 'إضافي'} لهذا الموظف في نفس اليوم، ولا يمكن تكراره.`
+      ? `<i class="bi bi-exclamation-circle"></i> يوجد ${labels[period] || 'إضافي'} لهذا الموظف في نفس اليوم؛ سيُسجَّل الطلب مع تنبيه بالتكرار.`
       : `<i class="bi bi-info-circle"></i> يوجد ${hasOther.join(' و ')} في هذا اليوم. يمكنك إضافة ${labels[period] || 'النوع الآخر'} أيضًا.`;
   };
   overtimeCard?.querySelector('[name="overtime_request_date"]')?.addEventListener('change', syncOvertimeWarning);

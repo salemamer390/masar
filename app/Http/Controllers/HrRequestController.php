@@ -209,8 +209,9 @@ class HrRequestController extends Controller
             $overtimeValidated = $request->validate([
                 'overtime_request_date' => ['required', 'date'],
                 'overtime_period' => ['required', 'in:day,night'],
-                'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'],
-                'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'],
+                // Hours are derived from the from/to window; posted values are ignored.
+                'day_overtime_hours' => ['nullable', 'numeric', 'gt:0'],
+                'night_overtime_hours' => ['nullable', 'numeric', 'gt:0'],
                 'from_time' => ['required', 'date_format:H:i'],
                 'to_time' => ['required', 'date_format:H:i', 'different:from_time'],
             ]);
@@ -248,38 +249,12 @@ class HrRequestController extends Controller
             default => $validated['request_date'] ?? null,
         };
         app(PayrollPeriodGuard::class)->ensureRangeOpen($validated['start_date'] ?? $requestDate ?? today()->toDateString(), $validated['end_date'] ?? $requestDate ?? today()->toDateString());
-        if ($requestDate) {
-            $requestMonth = Carbon::parse($requestDate)->startOfMonth();
-            $duplicateQuery = HrRequest::where('employee_id', $employee->id)
-                ->effective()
-                // Requests of different types may coexist in the same
-                // month (for example, an advance and overtime). Prevent
-                // only a duplicate of the selected request type.
-                ->where(function ($query) use ($type) {
-                    $query->where('request_type_id', $type->id)
-                        ->orWhere('request_type', $type->code);
-                });
-            $duplicate = $duplicateQuery->get(['payload', 'created_at'])
-                ->contains(function (HrRequest $existing) use ($requestMonth, $type, $requestDate, $validated): bool {
-                    $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
-                    if (!$existingDate) return false;
-                    if (in_array($type->source_key, ['permission', 'mission'], true)) return false;
-                    if ($type->source_key === 'overtime') {
-                        return Carbon::parse($existingDate)->isSameDay(Carbon::parse($requestDate))
-                            && data_get($existing->payload, 'overtime_period') === ($validated['overtime_period'] ?? null);
-                    }
-                    return Carbon::parse($existingDate)->isSameMonth($requestMonth);
-                });
-            if ($duplicate) {
-                $errorKey = $type->source_key === 'overtime'
-                    ? 'overtime_request_date'
-                    : (in_array($type->source_key, ['bonus', 'incentive', 'commission', 'profit_share'], true) ? 'financial_request_date' : 'request_date');
-                $message = $type->source_key === 'overtime'
-                    ? 'يوجد إضافي من نفس النوع لهذا الموظف في نفس اليوم. يمكن إضافة النوع الآخر في اليوم نفسه.'
-                    : 'يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن إنشاء طلب آخر من النوع نفسه.';
-                throw ValidationException::withMessages([$errorKey => $message]);
-            }
-        }
+        // Duplicate policy: advance and bonus cannot repeat inside the same
+        // month (hard block); other dated types only warn with the existing
+        // request's date; permission and mission never warn.
+        $duplicateWarning = $requestDate
+            ? $this->enforceDuplicatePolicy($employee, $type, $requestDate, $validated['overtime_period'] ?? null)
+            : null;
         if ($type->source_key === 'advance') {
             $advanceValidated = $request->validate([
                 'advance_request_date' => ['required', 'date'],
@@ -315,7 +290,7 @@ class HrRequestController extends Controller
         } elseif ($type->source_key === 'overtime') {
             $payload = [
                 'request_date' => $validated['overtime_request_date'],
-                'hours' => $validated[$validated['overtime_period'] === 'day' ? 'day_overtime_hours' : 'night_overtime_hours'],
+                'hours' => $this->overtimeWindowHours($validated['from_time'], $validated['to_time']),
                 'overtime_period' => $validated['overtime_period'],
                 'from_time' => $validated['from_time'],
                 'to_time' => $validated['to_time'],
@@ -372,6 +347,7 @@ class HrRequestController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'HR request created.',
+                'warning' => $duplicateWarning,
                 'request' => [
                     'id' => $hrRequest->id,
                     'title' => $hrRequest->title,
@@ -389,6 +365,11 @@ class HrRequestController extends Controller
             ]);
         }
 
+        if ($duplicateWarning) {
+            // The layout suppresses the warning alert when a success toast is
+            // also flashed, so fold the success wording into the warning.
+            return back()->with('warning', 'تم تسجيل الطلب وتأكيده فورًا. ' . $duplicateWarning);
+        }
         return back()->with('toast', 'تم تسجيل الطلب وتأكيده فورًا.');
     }
 
@@ -412,25 +393,8 @@ class HrRequestController extends Controller
             if (!$request->filled('overtime_request_date') && $request->filled('request_date')) {
                 $request->merge(['overtime_request_date' => $request->input('request_date')]);
             }
-            $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['required_if:overtime_period,day', 'nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['required_if:overtime_period,night', 'nullable', 'numeric', 'gt:0'], 'from_time' => ['required', 'date_format:H:i'], 'to_time' => ['required', 'date_format:H:i', 'different:from_time']]);
-            $duplicate = HrRequest::where('id', '!=', $hrRequest->id)
-                ->where('employee_id', $hrRequest->employee_id)
-                ->effective()
-                ->where(function ($query) use ($hrRequest) {
-                    $query->where('request_type_id', $hrRequest->request_type_id)
-                        ->orWhere('request_type', $hrRequest->request_type);
-                })->get(['payload', 'created_at'])
-                ->contains(function (HrRequest $existing) use ($data): bool {
-                    $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
-                    return $existingDate
-                        && Carbon::parse($existingDate)->isSameDay(Carbon::parse($data['overtime_request_date']))
-                        && data_get($existing->payload, 'overtime_period') === $data['overtime_period'];
-                });
-            if ($duplicate) {
-                throw ValidationException::withMessages(['overtime_request_date' => 'يوجد إضافي من نفس النوع لهذا الموظف في نفس اليوم.']);
-            }
-            $hours = $data['overtime_period'] === 'day' ? $data['day_overtime_hours'] : $data['night_overtime_hours'];
-            $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => (float) $hours, 'overtime_period' => $data['overtime_period'], 'from_time' => $data['from_time'], 'to_time' => $data['to_time']]);
+            $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['nullable', 'numeric', 'gt:0'], 'from_time' => ['required', 'date_format:H:i'], 'to_time' => ['required', 'date_format:H:i', 'different:from_time']]);
+            $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => $this->overtimeWindowHours($data['from_time'], $data['to_time']), 'overtime_period' => $data['overtime_period'], 'from_time' => $data['from_time'], 'to_time' => $data['to_time']]);
         } elseif ($source === 'other') {
             $data = $request->validate(['other_request_date' => ['required', 'date'], 'affects_payroll' => ['nullable', 'boolean'], 'impact_type' => ['required_if:affects_payroll,1', 'nullable', 'in:earning,deduction'], 'impact_amount' => ['required_if:affects_payroll,1', 'nullable', 'numeric', 'gt:0']]);
             $payload = array_merge($payload, ['request_date' => $data['other_request_date'], 'affects_payroll' => $request->boolean('affects_payroll'), 'impact_type' => $data['impact_type'] ?? null, 'amount' => $data['impact_amount'] ?? null]);
@@ -450,6 +414,12 @@ class HrRequestController extends Controller
             if (in_array($source, ['permission', 'mission'], true)) $data = array_merge($data, $this->validateExcuse($request, $source));
             $payload = collect(array_merge($payload, ['request_date' => $data['request_date'] ?? null, 'start_date' => $data['start_date'] ?? null, 'end_date' => $data['end_date'] ?? null, 'days' => $data['duration_days'] ?? null, 'hours' => $data['duration_hours'] ?? null, 'from_time' => $data['from_time'] ?? null, 'to_time' => $data['to_time'] ?? null, 'addition_amount' => $data['addition_amount'] ?? null, 'deduction_amount' => $data['deduction_amount'] ?? null]))->filter(fn ($value) => $value !== null && $value !== '')->all();
         }
+        $updateType = $hrRequest->requestType
+            ?: (new RequestType())->forceFill(['id' => null, 'code' => (string) $hrRequest->request_type, 'source_key' => $source, 'display_name' => (string) $hrRequest->request_type]);
+        $updateRequestDate = $payload['request_date'] ?? $payload['start_date'] ?? null;
+        $duplicateWarning = $updateRequestDate
+            ? $this->enforceDuplicatePolicy($hrRequest->employee, $updateType, (string) $updateRequestDate, $payload['overtime_period'] ?? null, $hrRequest->id)
+            : null;
         $guard = app(PayrollPeriodGuard::class);
         $guard->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
         $guard->ensureRangeOpen($payload['start_date'] ?? $payload['request_date'] ?? today()->toDateString(), $payload['end_date'] ?? $payload['request_date'] ?? today()->toDateString());
@@ -469,6 +439,7 @@ class HrRequestController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'تم تعديل الطلب.',
+                'warning' => $duplicateWarning,
                 'request' => [
                     'id' => $updated->id,
                     'title' => $updated->title,
@@ -482,9 +453,75 @@ class HrRequestController extends Controller
                 ],
             ]);
         }
-        return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'تم تعديل الطلب.', 'request' => $hrRequest->fresh(['employee', 'requestType'])])
-            : redirect()->route('requests.index')->with('toast', 'تم تعديل الطلب بنجاح.');
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'تم تعديل الطلب.', 'warning' => $duplicateWarning, 'request' => $hrRequest->fresh(['employee', 'requestType'])]);
+        }
+        if ($duplicateWarning) {
+            return redirect()->route('requests.index')->with('warning', 'تم تعديل الطلب بنجاح. ' . $duplicateWarning);
+        }
+        return redirect()->route('requests.index')->with('toast', 'تم تعديل الطلب بنجاح.');
+    }
+
+    /**
+     * Overtime hours are the from/to window length. A window whose end is at
+     * or before its start crosses midnight (overnight overtime); validation
+     * rejects equal bounds, so the duration is always positive.
+     */
+    private function overtimeWindowHours(string $from, string $to): float
+    {
+        [$fromHour, $fromMinute] = array_map('intval', explode(':', $from));
+        [$toHour, $toMinute] = array_map('intval', explode(':', $to));
+        $minutes = ($toHour * 60 + $toMinute) - ($fromHour * 60 + $fromMinute);
+        if ($minutes <= 0) $minutes += 1440;
+        return round($minutes / 60, 2);
+    }
+
+    /**
+     * Same-employee duplicate policy. An advance or bonus may not repeat
+     * inside the same month (hard block). Other dated types only warn, and
+     * the warning carries the existing request's date; overtime repeats are
+     * detected per day and period. Permission and mission never warn.
+     *
+     * @return string|null warning when a duplicate was allowed through
+     */
+    private function enforceDuplicatePolicy(Employee $employee, RequestType $type, string $requestDate, ?string $overtimePeriod = null, ?int $ignoreId = null): ?string
+    {
+        $source = $type->source_key ?: $type->code;
+        if (in_array($source, ['permission', 'mission'], true)) return null;
+
+        $existing = HrRequest::where('employee_id', $employee->id)
+            ->effective()
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+            // Requests of different types may coexist in the same month (for
+            // example, an advance and overtime); only the same type counts.
+            ->where(function ($query) use ($type) {
+                $query->where('request_type_id', $type->id)
+                    ->orWhere('request_type', $type->code);
+            })->get(['payload', 'created_at'])
+            ->filter(function (HrRequest $candidate) use ($source, $requestDate, $overtimePeriod): bool {
+                $candidateDate = data_get($candidate->payload, 'request_date') ?: $candidate->created_at?->toDateString();
+                if (!$candidateDate) return false;
+                if ($source === 'overtime') {
+                    return Carbon::parse($candidateDate)->isSameDay(Carbon::parse($requestDate))
+                        && data_get($candidate->payload, 'overtime_period') === $overtimePeriod;
+                }
+                return Carbon::parse($candidateDate)->isSameMonth(Carbon::parse($requestDate));
+            })->first();
+        if (!$existing) return null;
+
+        $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
+        if (in_array($source, ['advance', 'bonus'], true)) {
+            $errorKey = $source === 'advance' ? 'advance_request_date' : 'financial_request_date';
+            throw ValidationException::withMessages([
+                $errorKey => 'يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن حفظ طلب آخر من النوع نفسه.',
+            ]);
+        }
+        if ($source === 'overtime') {
+            $periodLabel = $overtimePeriod === 'night' ? 'ليلي' : 'نهاري';
+            return "يوجد إضافي {$periodLabel} قائم لهذا الموظف في نفس اليوم ({$existingDate}). سُجّل الطلب دون منع.";
+        }
+        $label = $type->display_name ?: $source;
+        return "يوجد طلب «{$label}» قائم لهذا الموظف بتاريخ {$existingDate}. سُجّل الطلب دون منع.";
     }
 
     private function outstandingAdvanceFor(int $employeeId): array
