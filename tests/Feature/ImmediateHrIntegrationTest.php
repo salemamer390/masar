@@ -360,7 +360,7 @@ class ImmediateHrIntegrationTest extends TestCase
 
     public function test_fingerprint_upsert_calculates_metrics_before_summary_reads_it(): void
     {
-        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'upsertAttendance');
+        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'processPunch');
         $service=app(\App\Services\FingerprintAttendanceSyncService::class);
         $method->invoke($service,$this->employee,new \App\Data\FingerprintRawPunch('INTEGRATION',\Carbon\CarbonImmutable::parse('2026-11-01 10:00'),\App\Enums\RawAttendanceType::CheckIn));
         $method->invoke($service,$this->employee,new \App\Data\FingerprintRawPunch('INTEGRATION',\Carbon\CarbonImmutable::parse('2026-11-01 16:00'),\App\Enums\RawAttendanceType::CheckOut));
@@ -374,7 +374,7 @@ class ImmediateHrIntegrationTest extends TestCase
     public function test_fingerprint_overnight_punches_share_the_shift_attendance_date(): void
     {
         $this->employee->update(['shift_start'=>'22:00','shift_end'=>'06:00']);
-        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'upsertAttendance');
+        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'processPunch');
         $service=app(\App\Services\FingerprintAttendanceSyncService::class);
         $method->invoke($service,$this->employee,new \App\Data\FingerprintRawPunch('INTEGRATION',\Carbon\CarbonImmutable::parse('2026-11-01 22:00'),\App\Enums\RawAttendanceType::CheckIn));
         $method->invoke($service,$this->employee,new \App\Data\FingerprintRawPunch('INTEGRATION',\Carbon\CarbonImmutable::parse('2026-11-02 05:00'),\App\Enums\RawAttendanceType::CheckOut));
@@ -392,7 +392,7 @@ class ImmediateHrIntegrationTest extends TestCase
         $record=\App\Models\PayrollRecord::where('employee_id',$this->employee->id)->firstOrFail();
         $record->update(['status'=>'Approved','is_locked'=>false,'net_salary'=>8765.43,'calculation_snapshot'=>['frozen'=>'individual approval']]);
         $before=$record->fresh()->toArray();
-        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'upsertAttendance');
+        $method=new \ReflectionMethod(\App\Services\FingerprintAttendanceSyncService::class,'processPunch');
         $method->invoke(app(\App\Services\FingerprintAttendanceSyncService::class),$this->employee,new \App\Data\FingerprintRawPunch('INTEGRATION',\Carbon\CarbonImmutable::parse('2026-11-01 10:00'),\App\Enums\RawAttendanceType::CheckIn));
         $this->assertSame($before,$record->fresh()->toArray());
         $this->employee->update(['status_id'=>EmployeeStatus::firstOrCreate(['name'=>'Suspended'])->id]);
