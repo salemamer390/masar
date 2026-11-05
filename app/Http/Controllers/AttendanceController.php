@@ -248,14 +248,14 @@ class AttendanceController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
-            'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'], 'status' => ['required', 'string', 'max:50'],
+            'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'],
             'late_minutes' => ['nullable', 'integer', 'min:0'], 'source' => ['nullable', 'string', 'max:50'],
         ]);
         $periodGuard->ensureOpen($validated['attendance_date']); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($validated['attendance_date']);
         $employee = Employee::findOrFail($validated['employee_id']);
         $checkIn = $validated['check_in'] ?? null;
         $checkOut = $validated['check_out'] ?? null;
-        $metrics = $this->attendanceMetrics->metrics($employee, $checkIn, $checkOut, $validated['status']);
+        $metrics = $this->attendanceMetrics->metrics($employee, $checkIn, $checkOut);
         $attendance = Attendance::updateOrCreate(
             ['employee_id' => $validated['employee_id'], 'attendance_date' => $validated['attendance_date']],
             ['check_in' => $checkIn, 'check_out' => $checkOut, ...$metrics, 'source' => $validated['source'] ?? 'manual', 'approval_status' => 'Approved', 'approved_by' => null, 'approved_at' => null]
@@ -320,7 +320,7 @@ class AttendanceController extends Controller
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'], 'attendance_date' => ['required', 'date'],
             'check_in' => ['required', 'date_format:H:i'], 'check_out' => ['required', 'date_format:H:i'],
-            'status' => ['required', 'string', 'max:50'], 'source' => ['nullable', 'string', 'max:50'],
+            'source' => ['nullable', 'string', 'max:50'],
         ]);
 
         $periodGuard->ensureOpen($attendance->attendance_date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($attendance->attendance_date);

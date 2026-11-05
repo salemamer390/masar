@@ -113,6 +113,39 @@ class AttendancePageTest extends TestCase
         $this->assertStringNotContainsString('value="not_recorded"', $html);
     }
 
+    public function test_mobile_layout_uses_plain_table_rows_not_cards(): void
+    {
+        $html = $this->get('/attendance')->assertOk()->getContent();
+        // No card transformation on small screens: the table keeps its header
+        // and plain rows with horizontal scroll, exactly like desktop.
+        $this->assertStringNotContainsString('.table-panel .table thead{display:none}', $html);
+        $this->assertStringNotContainsString('.table-panel .table tbody tr{display:grid', $html);
+        $this->assertStringNotContainsString(".table-panel .table tbody td::before", $html);
+        $this->assertStringNotContainsString('.table-panel .table{display:block', $html);
+    }
+
+    public function test_record_forms_have_no_manual_status_field_and_status_is_derived_from_times(): void
+    {
+        $html = $this->get('/attendance')->assertOk()->getContent();
+        $this->assertStringNotContainsString('name="status"', $html);
+        $this->assertStringNotContainsString('editAttendanceStatus', $html);
+
+        // Store derives the status from the shift times: on time = حاضر.
+        $this->post('/attendance', [
+            'employee_id' => $this->employee->id, 'attendance_date' => '2026-11-24',
+            'check_in' => '09:00', 'check_out' => '17:00',
+        ])->assertRedirect();
+        $this->assertSame('Present', Attendance::where('employee_id', $this->employee->id)->whereDate('attendance_date', '2026-11-24')->value('status'));
+
+        // Update without any status field re-derives it: past grace = متأخر.
+        $record = Attendance::where('employee_id', $this->employee->id)->whereDate('attendance_date', '2026-11-24')->firstOrFail();
+        $this->put('/attendance/'.$record->id, [
+            'employee_id' => $this->employee->id, 'attendance_date' => '2026-11-24',
+            'check_in' => '10:30', 'check_out' => '17:00',
+        ])->assertRedirect();
+        $this->assertSame('Late', $record->fresh()->status);
+    }
+
     public function test_period_totals_count_actual_records_only(): void
     {
         $this->present('2026-11-24', '09:45', '17:00', 'Late', 45);
