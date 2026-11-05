@@ -340,9 +340,31 @@ class EmployeeImportService
         if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
         if ($has(['لوحة المؤشرات', 'حسابات لوحة المؤشرات', 'دليل الاستخدام', 'ملخص شئون العاملين', 'كشف الحضور الشهري'])) return 'auxiliary';
         if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'overtime', 'bonus', 'commission'])) return 'requests';
+        // Insurance-record sheets need markers beyond الرقم التأميني, which is a
+        // normal employee column too; a sheet that also carries strong employee
+        // identity columns stays an employees sheet, and ambiguous sheets stay
+        // 'unknown' for review rather than being guessed.
+        if ($has(['الأجر التأميني', 'مبلغ الاشتراك', 'اشتراك التأمينات', 'insurance wage', 'insurance subscription'])
+            && !$has(['الرقم القومي', 'تاريخ التعيين', 'تاريخ الميلاد', 'national id', 'hire date', 'birth date'])) return 'insurance';
         if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         return 'unknown';
+    }
+
+    /** Arabic labels for every workbook sheet kind shown in the preview. */
+    public static function kindLabels(): array
+    {
+        return [
+            'employees' => 'بيانات الموظفين',
+            'attendance' => 'حضور وانصراف',
+            'leaves' => 'إجازات',
+            'penalties' => 'جزاءات',
+            'advances' => 'سلف',
+            'requests' => 'طلبات (إضافي / مكافآت)',
+            'insurance' => 'تأمينات',
+            'auxiliary' => 'ورقة مساعدة',
+            'unknown' => 'غير معروفة - تحتاج مراجعة',
+        ];
     }
 
     /**
@@ -637,7 +659,7 @@ class EmployeeImportService
     {
         $employees = Employee::withoutGlobalScopes()
             ->where('company_id', $companyId)
-            ->get(['id', 'employee_code', 'national_id', 'full_name', 'status_id']);
+            ->get(['id', 'employee_code', 'national_id', 'full_name', 'status_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'manual_annual_balance', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'employment_type_id', 'termination_type', 'termination_date', 'department_id', 'job_id', 'branch_id', 'gross_salary']);
 
         $byNid = [];
         $byCode = [];
@@ -645,7 +667,10 @@ class EmployeeImportService
         $byId = [];
         foreach ($employees as $employee) {
             $id = (int) $employee->id;
-            $byId[$id] = ['status_id' => $employee->status_id !== null ? (int) $employee->status_id : null];
+            // Raw attributes keep database date/time formats so the update
+            // preview compares exactly what updateEmployee() would write.
+            $byId[$id] = $employee->getAttributes();
+            $byId[$id]['status_id'] = $employee->status_id !== null ? (int) $employee->status_id : null;
             if ($employee->national_id !== null && $employee->national_id !== '') {
                 $byNid[(string) $employee->national_id] = $id;
             }
@@ -689,7 +714,43 @@ class EmployeeImportService
             'departments' => $this->nameKeys(Department::class, 'name', $companyId),
             'jobs' => $this->nameKeys(Job::class, 'title', $companyId),
             'branches' => $this->nameKeys(Branch::class, 'name', $companyId),
+            'departmentNameById' => $this->nameById(Department::class, 'name', $companyId),
+            'jobNameById' => $this->nameById(Job::class, 'title', $companyId),
+            'branchNameById' => $this->nameById(Branch::class, 'name', $companyId),
+            'employmentTypeNameById' => $this->employmentTypeNameById($companyId),
         ];
+    }
+
+    /** @return array<int, string> */
+    private function nameById(string $modelClass, string $column, int $companyId): array
+    {
+        $map = [];
+        $models = $modelClass::withoutGlobalScopes()
+            ->where(function ($query) use ($companyId) {
+                $query->where('company_id', $companyId)->orWhereNull('company_id');
+            })
+            ->get(['id', $column]);
+        foreach ($models as $model) {
+            $map[(int) $model->id] = (string) $model->{$column};
+        }
+
+        return $map;
+    }
+
+    /** @return array<int, string> */
+    private function employmentTypeNameById(int $companyId): array
+    {
+        $map = [];
+        $types = EmploymentType::withoutGlobalScopes()
+            ->where(function ($query) use ($companyId) {
+                $query->where('company_id', $companyId)->orWhereNull('company_id');
+            })
+            ->get(['id', 'name']);
+        foreach ($types as $type) {
+            $map[(int) $type->id] = (string) $type->name;
+        }
+
+        return $map;
     }
 
     /**
@@ -1063,8 +1124,14 @@ class EmployeeImportService
             }
         }
 
+        $changes = [];
+        if ($action === 'update' && $existingId !== null) {
+            $changes = $this->computeChanges($data, $ctx['byId'][$existingId] ?? [], $ctx);
+        }
+
         return [
             'line' => $line,
+            'changes' => $changes,
             'name' => $name,
             'code' => $code !== '' ? $code : null,
             'national_id' => $nid !== '' ? $nid : null,
@@ -1078,6 +1145,82 @@ class EmployeeImportService
             'errors' => $errors,
             'warnings' => $warnings,
         ];
+    }
+
+    /**
+     * Field-level old => new preview for an update row: exactly the fields
+     * updateEmployee() would write, compared against the current record.
+     *
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $existing raw employee attributes
+     * @param array<string, mixed> $ctx
+     * @return array<int, array{field: string, label: string, old: string, new: string}>
+     */
+    private function computeChanges(array $data, array $existing, array $ctx): array
+    {
+        if ($existing === []) {
+            return [];
+        }
+
+        $labels = [];
+        foreach (self::COLUMNS as $key => [$label]) {
+            $labels[$key] = $label;
+        }
+
+        $changes = [];
+        $add = function (string $field, string $label, mixed $old, mixed $new) use (&$changes): void {
+            $oldText = trim((string) ($old ?? ''));
+            $newText = trim((string) ($new ?? ''));
+            if ($oldText !== $newText) {
+                $changes[] = ['field' => $field, 'label' => $label, 'old' => $oldText, 'new' => $newText];
+            }
+        };
+
+        foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'manual_annual_balance', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'termination_type', 'termination_date'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $add($field, $labels[$field] ?? $field, $existing[$field] ?? null, $data[$field]);
+            }
+        }
+
+        foreach (['department' => ['department_id', 'departmentNameById'], 'job' => ['job_id', 'jobNameById'], 'branch' => ['branch_id', 'branchNameById']] as $field => [$column, $mapKey]) {
+            if (array_key_exists($field, $data)) {
+                $oldName = $ctx[$mapKey][(int) ($existing[$column] ?? 0)] ?? '';
+                $add($field, $labels[$field], $oldName, $data[$field]);
+            }
+        }
+
+        if (array_key_exists('employment_type_id', $data)) {
+            $oldType = $ctx['employmentTypeNameById'][(int) ($existing['employment_type_id'] ?? 0)] ?? '';
+            $newType = $ctx['employmentTypeNameById'][(int) $data['employment_type_id']] ?? '';
+            $add('employment_type', $labels['employment_type'], $oldType, $newType);
+        }
+
+        if (array_key_exists('status_name', $data)) {
+            $oldStatus = $ctx['statusNameById'][(int) ($existing['status_id'] ?? 0)] ?? '';
+            $add('status', $labels['status'], $oldStatus, $data['status_name']);
+        }
+
+        $gross = $this->resolveGross($data);
+        if ($gross !== null && abs((float) ($existing['gross_salary'] ?? 0) - $gross) > 0.004) {
+            $add('gross_salary', $labels['gross_salary'], $existing['gross_salary'] ?? null, $gross);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Re-validate one corrected row from the review queue with the same rules
+     * as a fresh file import (never trust the stored payload).
+     *
+     * @param array<string, string> $raw
+     * @return array<string, mixed>
+     */
+    public function analyzeSingleRow(array $raw, int $companyId): array
+    {
+        $ctx = $this->loadContext($companyId);
+        $seen = ['nid' => [], 'code' => []];
+
+        return $this->analyzeRow($raw, 0, $ctx, 'update', $seen, null);
     }
 
     private function renewedContractEnd(string $start): string
@@ -1231,7 +1374,7 @@ class EmployeeImportService
             static fn (array $row): bool => in_array($row['action'], ['create', 'update'], true)
         ));
 
-        $report = ['created' => 0, 'updated' => 0, 'unchanged' => 0, 'skipped' => (int) ($analysis['summary']['skip'] ?? 0), 'failed' => [], 'warnings' => []];
+        $report = ['created' => 0, 'updated' => 0, 'unchanged' => 0, 'skipped' => (int) ($analysis['summary']['skip'] ?? 0), 'failed' => [], 'warnings' => [], 'created_ids' => [], 'updated_ids' => [], 'movement_ids' => []];
         if ($rows === []) {
             return $report;
         }
@@ -1259,6 +1402,15 @@ class EmployeeImportService
                 }
 
                 $report[$outcome['result']]++;
+                if ($outcome['result'] === 'created') {
+                    $report['created_ids'][] = $outcome['id'];
+                }
+                if ($outcome['result'] === 'updated') {
+                    $report['updated_ids'][] = $outcome['id'];
+                }
+                if (!empty($outcome['movement_id'])) {
+                    $report['movement_ids'][] = $outcome['movement_id'];
+                }
                 if (!empty($row['data']['manager_code']) || !empty($row['data']['manager_name'])) {
                     $managerLinks[] = [
                         'id' => $outcome['id'],
@@ -1461,7 +1613,7 @@ class EmployeeImportService
             'employees'
         );
 
-        return ['id' => (int) $employee->id, 'result' => 'created'];
+        return ['id' => (int) $employee->id, 'result' => 'created', 'movement_id' => null];
     }
 
     /**
@@ -1544,7 +1696,7 @@ class EmployeeImportService
                 ['name' => $statusChanged ? 'Status Change' : 'Profile Update'],
                 ['company_id' => $companyId]
             );
-            MovementRecord::create([
+            $movement = MovementRecord::create([
                 'employee_id' => $employee->id,
                 'movement_type_id' => $type->id,
                 'movement_date' => today(),
@@ -1556,7 +1708,7 @@ class EmployeeImportService
         }
 
         if (!$dirty && !$profileTouched && !$salaryChanged) {
-            return ['id' => (int) $employee->id, 'result' => 'unchanged'];
+            return ['id' => (int) $employee->id, 'result' => 'unchanged', 'movement_id' => null];
         }
 
         ActivityLog::record(
@@ -1568,7 +1720,7 @@ class EmployeeImportService
             'employees'
         );
 
-        return ['id' => (int) $employee->id, 'result' => 'updated'];
+        return ['id' => (int) $employee->id, 'result' => 'updated', 'movement_id' => isset($movement) ? (int) $movement->id : null];
     }
 
     /**
