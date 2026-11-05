@@ -203,6 +203,88 @@ class EmployeeWorkbookImportTest extends TestCase
         $this->assertSame('dismissed', $insuranceRow->refresh()->status);
     }
 
+
+    /** Workbook whose penalties sheet has one row with a missing penalty type. */
+    private function penaltyFixWorkbook(): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
+        (new XlsxWriter())->writeSheets($path, [
+            ['name' => 'الموظفين', 'rows' => [
+                ['الكود', 'الاسم الكامل', 'الرقم التأميني'],
+                ['301', 'سارة الجديدة', 'INS-301'],
+            ]],
+            ['name' => 'الجزاءات', 'rows' => [
+                ['كود الموظف', 'نوع الجزاء', 'تاريخ القرار', 'أيام الخصم'],
+                ['301', '', '2026-11-05', '1'],
+            ]],
+        ]);
+
+        return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
+    }
+
+    public function test_penalty_row_corrected_in_preview_is_imported_by_the_commit(): void
+    {
+        PenaltyType::firstOrCreate(['name' => 'خصم', 'company_id' => $this->company->id]);
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()]);
+        $failures = $preview->json('domains.penalties.failures');
+        $this->assertCount(1, $failures, 'the typeless row must surface in the pre-save review');
+        $fix = ['penalty_fixes' => json_encode([$failures[0]['sheet'] => [$failures[0]['line'] => 'خصم']])];
+
+        $token = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()] + $fix)->json('review_token');
+        $response = $this->post('/employees/import', ['file' => $this->penaltyFixWorkbook()] + $fix + ['review_token' => $token]);
+        $response->assertOk()->assertJson(['success' => true]);
+
+        $employee = Employee::where('company_id', $this->company->id)->where('employee_code', '301')->firstOrFail();
+        $this->assertSame(1, Penalty::where('employee_id', $employee->id)->count(), 'the corrected row is imported');
+        $this->assertSame(0, EmployeeImportRow::where('kind', 'penalties')->where('status', 'pending')->count());
+    }
+
+    public function test_tampered_penalty_fix_after_preview_is_rejected(): void
+    {
+        PenaltyType::firstOrCreate(['name' => 'خصم', 'company_id' => $this->company->id]);
+        PenaltyType::firstOrCreate(['name' => 'إنذار', 'company_id' => $this->company->id]);
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()]);
+        $failure = $preview->json('domains.penalties.failures.0');
+        $reviewed = ['penalty_fixes' => json_encode([$failure['sheet'] => [$failure['line'] => 'خصم']])];
+        $token = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()] + $reviewed)->json('review_token');
+
+        $tampered = ['penalty_fixes' => json_encode([$failure['sheet'] => [$failure['line'] => 'إنذار']])];
+        $this->post('/employees/import', ['file' => $this->penaltyFixWorkbook()] + $tampered + ['review_token' => $token])
+            ->assertStatus(422);
+        $this->assertSame(0, Penalty::count());
+        $this->assertSame(0, EmployeeImportBatch::count());
+    }
+
+    public function test_explicitly_excluded_penalty_row_is_audited_as_dismissed_not_pending(): void
+    {
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()]);
+        $failure = $preview->json('domains.penalties.failures.0');
+        $exclude = ['penalty_fixes' => json_encode([$failure['sheet'] => [$failure['line'] => '__exclude__']])];
+        $token = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()] + $exclude)->json('review_token');
+
+        $response = $this->post('/employees/import', ['file' => $this->penaltyFixWorkbook()] + $exclude + ['review_token' => $token]);
+        $response->assertOk()->assertJson(['success' => true]);
+
+        $this->assertSame(0, Penalty::count(), 'an excluded row is never imported');
+        $this->assertSame(0, EmployeeImportRow::where('kind', 'penalties')->where('status', 'pending')->count(), 'an explicit exclusion is not parked for a second review');
+        $this->assertSame(1, EmployeeImportRow::where('kind', 'penalties')->where('status', 'dismissed')->count(), 'the exclusion stays visible in the import log');
+    }
+
+    public function test_penalty_fix_with_a_type_from_another_company_is_not_applied(): void
+    {
+        $other = Company::create(['name' => 'OtherCo', 'slug' => 'other-co', 'status' => 'active']);
+        PenaltyType::firstOrCreate(['name' => 'غياب', 'company_id' => $other->id]);
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()]);
+        $failure = $preview->json('domains.penalties.failures.0');
+        $fix = ['penalty_fixes' => json_encode([$failure['sheet'] => [$failure['line'] => 'غياب']])];
+        $token = $this->postJson('/employees/import/preview', ['file' => $this->penaltyFixWorkbook()] + $fix)->json('review_token');
+
+        $this->post('/employees/import', ['file' => $this->penaltyFixWorkbook()] + $fix + ['review_token' => $token])
+            ->assertOk()->assertJson(['success' => true]);
+        $this->assertSame(0, Penalty::count(), 'a type outside the company never resolves');
+        $this->assertSame(1, EmployeeImportRow::where('kind', 'penalties')->where('status', 'pending')->count(), 'the still-rejected row stays parked');
+    }
+
     public function test_resubmitting_the_same_workbook_creates_no_duplicates(): void
     {
         $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk();
