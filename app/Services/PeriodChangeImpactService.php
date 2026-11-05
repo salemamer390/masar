@@ -111,6 +111,8 @@ class PeriodChangeImpactService
         for ($guard = 0; $guard < 800; $guard++) {
             $p = $this->settings->payrollPeriodForDays($this->monthFor($cursor, $s, $e), $s, $e);
             $start = $p['start']->copy()->startOfDay(); $end = $p['end']->copy()->startOfDay();
+            // The archive chain clips the straddling period to the first uncovered day.
+            if ($start->lt($cursor)) $start = $cursor->copy();
             if ($end->lt($cursor)) { $cursor = $cursor->copy()->addDay(); continue; }
             foreach ($saved as $a) {
                 $from = max($start->toDateString(), $a->period_start->toDateString());
