@@ -10,6 +10,7 @@ use App\Models\MovementRecord;
 use App\Services\Imports\EmployeeImportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * In-app review queue for rejected personnel-import rows: inspect the reason,
@@ -20,6 +21,7 @@ class EmployeeImportReviewController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless(Schema::hasTable('employee_import_rows'), 503, 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل مراجعة الاستيراد.');
         $rows = EmployeeImportRow::with(['batch', 'employee'])
             ->where('status', 'pending')
             ->orderBy('id')
@@ -34,6 +36,7 @@ class EmployeeImportReviewController extends Controller
 
     public function show(EmployeeImportRow $row)
     {
+        abort_unless(Schema::hasTable('employee_import_rows'), 503, 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل مراجعة الاستيراد.');
         $row->load(['batch', 'employee', 'revisions.user']);
 
         return view('employees.import-review.show', [
@@ -45,6 +48,7 @@ class EmployeeImportReviewController extends Controller
 
     public function update(Request $request, EmployeeImportRow $row, EmployeeImportService $service)
     {
+        abort_unless(Schema::hasTable('employee_import_rows'), 503, 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل مراجعة الاستيراد.');
         $data = $request->validate([
             'version' => ['required', 'integer', 'min:0'],
             'reason' => ['required', 'string', 'max:1000'],
@@ -112,6 +116,7 @@ class EmployeeImportReviewController extends Controller
 
     public function destroy(Request $request, EmployeeImportRow $row)
     {
+        abort_unless(Schema::hasTable('employee_import_rows'), 503, 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل مراجعة الاستيراد.');
         $data = $request->validate([
             'version' => ['required', 'integer', 'min:0'],
             'reason' => ['required', 'string', 'max:1000'],
