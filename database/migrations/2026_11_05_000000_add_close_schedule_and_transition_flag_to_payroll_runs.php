@@ -9,12 +9,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('payroll_runs', function (Blueprint $table) {
-            // The date this run finally closes (period end + the correction grace in force when set).
-            $table->date('closes_at')->nullable()->after('locked_at');
-            // Runs auto-created to bridge a payroll-cycle change.
-            $table->boolean('is_transition')->default(false)->after('closes_at');
-        });
+        // Partial-install safe: MySQL DDL is not transactional, so an interrupted run
+        // may have added one column but not the other. Add only what is missing.
+        if (!Schema::hasColumn('payroll_runs', 'closes_at')) {
+            Schema::table('payroll_runs', function (Blueprint $table) {
+                // The date this run finally closes (period end + the correction grace in force when set).
+                $table->date('closes_at')->nullable()->after('locked_at');
+            });
+        }
+        if (!Schema::hasColumn('payroll_runs', 'is_transition')) {
+            Schema::table('payroll_runs', function (Blueprint $table) {
+                // Runs auto-created to bridge a payroll-cycle change.
+                $table->boolean('is_transition')->default(false)->after('closes_at');
+            });
+        }
 
         // Backfill the close date of still-open runs from their stored period and the
         // company correction grace (default 3 days), so existing runs close on the
@@ -32,8 +40,17 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('payroll_runs', function (Blueprint $table) {
-            $table->dropColumn(['closes_at', 'is_transition']);
-        });
+        $drop = [];
+        if (Schema::hasColumn('payroll_runs', 'closes_at')) {
+            $drop[] = 'closes_at';
+        }
+        if (Schema::hasColumn('payroll_runs', 'is_transition')) {
+            $drop[] = 'is_transition';
+        }
+        if ($drop !== []) {
+            Schema::table('payroll_runs', function (Blueprint $table) use ($drop) {
+                $table->dropColumn($drop);
+            });
+        }
     }
 };
