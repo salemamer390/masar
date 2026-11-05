@@ -22,20 +22,20 @@ class WorkbookLeavePenaltyImporter
 
     public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true): array
     {
-        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => []]];
+        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []]];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
             [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
             $map = $this->mapHeaders($headers);
             if ($allowLeaves && isset($map['leave_type'], $map['start'], $map['end'])) {
-                $this->importLeaves($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['leaves']);
+                $this->importLeaves($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['leaves'], $headers);
             } elseif ($allowPenalties && isset($map['penalty_type'], $map['date'], $map['deduction'])) {
-                $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties']);
+                $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers);
             }
         }
         return $result;
     }
 
-    private function importLeaves(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result): void
+    private function importLeaves(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result, array $headers = []): void
     {
         foreach ($rows as $line => $row) {
             try {
@@ -61,11 +61,11 @@ class WorkbookLeavePenaltyImporter
                 app(\App\Services\LeaveBalanceService::class)->sync($employee, Carbon::parse($start));
                 app(\App\Services\EmployeeLeaveStatusService::class)->sync();
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
-            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; }
+            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
         }
     }
 
-    private function importPenalties(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result): void
+    private function importPenalties(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result, array $headers = []): void
     {
         foreach ($rows as $line => $row) {
             try {
@@ -82,7 +82,7 @@ class WorkbookLeavePenaltyImporter
                 $status = $this->status($row[$map['status'] ?? -1] ?? '');
                 Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $row[$map['reason'] ?? -1] ?? $type->name, 'action' => $row[$map['reason'] ?? -1] ?? $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
-            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; }
+            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
         }
     }
 
@@ -101,7 +101,7 @@ class WorkbookLeavePenaltyImporter
         $map = []; foreach ($headers as $index => $header) { $key = $this->normalise($header); foreach ($aliases as $field => $values) if (in_array($key, array_map(fn ($value) => $this->normalise($value), $values), true)) { $map[$field] = $index; break; } } return $map;
     }
 
-    private function employee(mixed $code, mixed $name): ?Employee { if (filled($code)) { $employee = Employee::where('employee_code', trim((string) $code))->first(); if ($employee) { if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) throw new \RuntimeException('كود الموظف لا يطابق الاسم.'); return $employee; } } return filled($name) ? Employee::where('full_name', trim((string) $name))->first() : null; }
+    private function employee(mixed $code, mixed $name): ?Employee { if (filled($code)) { $code = trim((string) $code); $employee = Employee::where('employee_code', $code)->first(); if (!$employee) { throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.'); } if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) { throw new \RuntimeException('كود الموظف لا يطابق الاسم.'); } return $employee; } if (!filled($name)) { return null; } $matches = Employee::where('full_name', trim((string) $name))->get(); if ($matches->count() > 1) { throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.'); } return $matches->first(); }
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
     private function person(mixed $value): string { return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim((string) $value))); }
     private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
