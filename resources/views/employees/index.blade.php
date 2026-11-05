@@ -13,6 +13,9 @@
     <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
       <i class="bi bi-file-earmark-excel text-success"></i> استيراد من Excel
     </button>
+    <a class="btn btn-light" href="{{ route('employees.import-batches.index') }}" title="صفوف الاستيراد المرفوضة وملفات الاستيراد السابقة">
+      <i class="bi bi-inbox text-warning"></i> مراجعة الاستيراد
+    </a>
     @if(auth()->user()?->hasPermission('employees.create'))
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
       <i class="bi bi-plus-lg"></i> إضافة موظف
