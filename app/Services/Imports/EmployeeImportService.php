@@ -554,7 +554,7 @@ class EmployeeImportService
             'advances' => 'سلف',
             'requests' => 'طلبات (إضافي / مكافآت)',
             'insurance' => 'تأمينات',
-            'auxiliary' => 'ورقة مساعدة',
+            'auxiliary' => 'تجاهل',
             'unknown' => 'غير معروفة - تحتاج مراجعة',
         ];
     }
