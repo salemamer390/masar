@@ -136,13 +136,29 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 .reference-kpi-grid--six .reference-kpi b { font-size: 10px !important; line-height: 1.35 !important; }
 .reference-kpi-grid--six .reference-kpi strong { font-size: 22px !important; margin: 2px 0 !important; }
 
-/* Keep dashboard KPI cards on one row at every viewport; narrow screens can
-   scroll the row horizontally without compressing its content. */
-.reference-kpi-grid--six {
-  grid-template-columns: repeat(6, minmax(130px, 1fr)) !important;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  padding-bottom: 4px;
+/* Keep dashboard KPI cards on one row on wide desktop; below that the
+   responsive grids above (3/2 columns) take over so no card is clipped. */
+@media(min-width:1351px){
+  .reference-kpi-grid--six {
+    grid-template-columns: repeat(6, minmax(130px, 1fr)) !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+  }
+  .reference-kpi-grid--six > * { min-width: 130px; }
 }
-.reference-kpi-grid--six > * { min-width: 130px; }
+
+/* Dashboard review readability fixes. */
+/* Mobile KPI labels must stay readable: wrap instead of truncating. */
+@media(max-width:520px){
+  .reference-kpi-grid--six .reference-kpi>span:last-child b{font-size:10px!important;line-height:1.35!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+}
+/* Quick actions: fill the row evenly instead of leaving one item alone. */
+@media(max-width:520px){
+  .dashboard-command-bar--reference{grid-template-columns:repeat(auto-fit,minmax(64px,1fr))!important}
+}
+/* Tables keep every cell readable: scroll sideways inside the panel instead
+   of crushing employee names into three lines. */
+.dashboard-reference-layout .recent-leaves .table{min-width:460px}
+.dashboard-reference-layout .new-employees .table{min-width:400px}
