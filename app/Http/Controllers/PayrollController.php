@@ -64,9 +64,16 @@ class PayrollController extends Controller
                 $runReports[$run->id] = $service->reconciliationReport($run);
             }
         }
+        $hrSettings = app(\App\Services\HrOperationalSettingsService::class);
+        $grace = $hrSettings->attendanceCorrectionDays();
         $runMeta = $runs->mapWithKeys(fn ($run) => [$run->id => [
             'month_ended' => $service->monthHasEnded($run->payroll_month),
-            'closes_on' => $run->payroll_month->copy()->endOfMonth()->format('d/m/Y'),
+            // Cross-month periods end on their own last day, not at month end.
+            'period_ended' => $service->periodForRun($run)['end']->lt(\Carbon\Carbon::today()),
+            // The snapshotted close date wins; older rows derive it from the period end + grace.
+            'closes_on' => ($run->closes_at
+                ? $run->closes_at->copy()
+                : $service->closesAtFor($service->periodForRun($run)['end'], $grace))->format('d/m/Y'),
         ]])->all();
         $cardDetails = [
             'employees' => Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderBy('full_name')->get(['id','full_name','employee_code']),
@@ -563,6 +570,30 @@ class PayrollController extends Controller
             return back()->withErrors(['payroll' => $e->getMessage()]);
         }
         return back()->with('toast', 'تم قفل مسير الرواتب نهائيًا.');
+    }
+
+    /**
+     * Manual final close of an ended period during its correction grace: freezes the
+     * period's attendance, the saved summary, the run and its records together through
+     * the same unified path the automatic daily close uses. Requires an explicit
+     * confirmation; a period that has not ended is rejected; repeating is a no-op.
+     */
+    public function closePeriod(Request $request, PayrollRunService $service)
+    {
+        $data = $request->validate([
+            'payroll_run_id' => ['required', 'integer', 'exists:payroll_runs,id'],
+            'confirm' => ['required', 'accepted'],
+        ], [
+            'confirm.accepted' => 'لازم تأكد إن أرقام الفترة هتتثبت نهائيًا ومش هتقبل تعديل.',
+        ]);
+        $run = \App\Models\PayrollRun::withoutGlobalScopes()->findOrFail((int) $data['payroll_run_id']);
+        $this->assertSameCompany($run);
+        try {
+            $service->closeRun($run);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            return back()->withErrors(['payroll' => $e->getMessage()]);
+        }
+        return back()->with('toast', 'تم قفل الفترة نهائيًا: الحضور والملخص المحفوظ والمسير وسجلاته اتثبتوا ومش هيقبلوا تعديل.');
     }
 
     public function approve(PayrollRecord $payrollRecord)
