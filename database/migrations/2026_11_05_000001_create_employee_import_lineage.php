@@ -9,7 +9,10 @@ return new class extends Migration {
         // Metadata-only lineage: which file, who, when, sheet classification and
         // outcome counts. The raw workbook is never retained by default (PII,
         // salaries) - only rows that need human review are kept, encrypted.
-        Schema::create('employee_import_batches', function (Blueprint $t) {
+        // Partial-install safe: MySQL DDL is not transactional, so a previous
+        // interrupted run may have created some of these. Create only what is
+        // missing and never touch existing tables or their data.
+        if (!Schema::hasTable('employee_import_batches')) Schema::create('employee_import_batches', function (Blueprint $t) {
             $t->id();
             $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
@@ -24,7 +27,7 @@ return new class extends Migration {
             $t->longText('distributed')->nullable(); // json: attendance/leaves/penalties/requests counts
             $t->timestamps();
         });
-        Schema::create('employee_import_rows', function (Blueprint $t) {
+        if (!Schema::hasTable('employee_import_rows')) Schema::create('employee_import_rows', function (Blueprint $t) {
             $t->id();
             $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('batch_id')->constrained('employee_import_batches')->restrictOnDelete();
@@ -40,7 +43,7 @@ return new class extends Migration {
             $t->timestamps();
             $t->index(['company_id', 'status']);
         });
-        Schema::create('employee_import_row_revisions', function (Blueprint $t) {
+        if (!Schema::hasTable('employee_import_row_revisions')) Schema::create('employee_import_row_revisions', function (Blueprint $t) {
             $t->id();
             $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('import_row_id')->constrained('employee_import_rows')->restrictOnDelete();
@@ -51,10 +54,10 @@ return new class extends Migration {
             $t->longText('after_data');   // encrypted json
             $t->timestamp('created_at');
         });
-        Schema::table('employees', function (Blueprint $t) {
+        if (!Schema::hasColumn('employees', 'import_batch_id')) Schema::table('employees', function (Blueprint $t) {
             $t->foreignId('import_batch_id')->nullable()->after('id')->constrained('employee_import_batches')->nullOnDelete();
         });
-        Schema::table('movement_records', function (Blueprint $t) {
+        if (!Schema::hasColumn('movement_records', 'import_batch_id')) Schema::table('movement_records', function (Blueprint $t) {
             $t->foreignId('import_batch_id')->nullable()->after('id')->constrained('employee_import_batches')->nullOnDelete();
         });
     }
