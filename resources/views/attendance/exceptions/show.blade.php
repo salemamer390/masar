@@ -37,7 +37,7 @@ if (is_array($punch) && ($punch['slot'] ?? null)==='out' && isset($day->current_
 @endif
 <h5 class="mt-4">سجل التعديل</h5>
 @forelse($day->revisions as $revision)
-<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? 'حساب سابق' }} · {{ $revision->created_at->format('d/m/Y H:i') }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
+<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? ($revision->user_id ? 'حساب سابق' : 'مزامنة جهاز البصمة') }} · {{ $revision->created_at->format('d/m/Y H:i') }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
 @empty
 <p class="text-muted">لا توجد تعديلات.</p>
 @endforelse
