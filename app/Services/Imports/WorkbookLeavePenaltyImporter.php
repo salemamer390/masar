@@ -20,10 +20,42 @@ class WorkbookLeavePenaltyImporter
         private readonly HrOperationalSettingsService $settings,
     ) {}
 
-    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true): array
+    public const LEAVE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'leave_type' => 'نوع الإجازة', 'start' => 'من تاريخ', 'end' => 'إلى تاريخ', 'days' => 'عدد الأيام', 'status' => 'حالة القرار', 'reason' => 'ملاحظات'];
+    public const PENALTY_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'penalty_type' => 'نوع الجزاء', 'date' => 'تاريخ القرار', 'deduction' => 'أيام الخصم', 'status' => 'حالة القرار', 'reason' => 'ملاحظات'];
+
+    /** Detected header row + field map for one sheet, exposed for the review UI. */
+    public function detectConfig(array $rows): ?array
+    {
+        foreach ($rows as $number => $row) {
+            $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
+            if (str_contains($key, 'كودالموظف') && (str_contains($key, 'نوعالإجازة') || str_contains($key, 'نوعالجزاء'))) {
+                return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
+            }
+        }
+
+        return null;
+    }
+
+    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true, ?array $onlySheets = null, ?array $configs = null): array
     {
         $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []]];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
+            if ($onlySheets !== null && !in_array((string) ($sheet['name'] ?? ''), $onlySheets, true)) continue;
+            $config = $configs[$sheet['name']] ?? null;
+            if ($config !== null) {
+                $headerRow = (int) ($config['header_row'] ?? -1);
+                $headers = $sheet['rows'][$headerRow] ?? [];
+                $rows = array_filter($sheet['rows'] ?? [], fn ($unused, $line) => $line > $headerRow, ARRAY_FILTER_USE_BOTH);
+                $map = array_map('intval', $config['map'] ?? []);
+                // The review's confirmed type decides the branch, not the aliases.
+                $forced = (string) ($config['domain'] ?? '');
+                if ($forced === 'leaves' && $allowLeaves) {
+                    $this->importLeaves($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['leaves'], $headers);
+                } elseif ($forced === 'penalties' && $allowPenalties) {
+                    $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers);
+                }
+                continue;
+            }
             [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
             $map = $this->mapHeaders($headers);
             if ($allowLeaves && isset($map['leave_type'], $map['start'], $map['end'])) {
