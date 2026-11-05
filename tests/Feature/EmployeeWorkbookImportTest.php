@@ -97,6 +97,19 @@ class EmployeeWorkbookImportTest extends TestCase
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
 
+    /**
+     * Commit through the reviewed plan: the store endpoint only executes the
+     * exact configuration the preview signed, so tests must fetch the review
+     * token first - with the same file and parameters.
+     */
+    private function commitImport(array $params): \Illuminate\Testing\TestResponse
+    {
+        $token = $this->postJson('/employees/import/preview', $params)->json('review_token');
+        $this->assertNotEmpty($token, 'preview must issue a review token');
+
+        return $this->post('/employees/import', $params + ['review_token' => $token]);
+    }
+
     public function test_preview_classifies_every_sheet_and_simulates_domains_without_saving(): void
     {
         $response = $this->postJson('/employees/import/preview', ['file' => $this->workbook()]);
@@ -135,7 +148,7 @@ class EmployeeWorkbookImportTest extends TestCase
 
     public function test_commit_imports_every_domain_and_parks_failures(): void
     {
-        $response = $this->post('/employees/import', ['file' => $this->workbook(), 'ack_updates' => '1']);
+        $response = $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1']);
         $response->assertOk()->assertJson(['success' => true]);
         $data = $response->json();
 
@@ -192,8 +205,8 @@ class EmployeeWorkbookImportTest extends TestCase
 
     public function test_resubmitting_the_same_workbook_creates_no_duplicates(): void
     {
-        $this->post('/employees/import', ['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk();
-        $second = $this->post('/employees/import', ['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk()->json();
+        $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk();
+        $second = $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk()->json();
 
         $this->assertSame(0, $second['result']['created']);
         $this->assertSame(2, Employee::where('company_id', $this->company->id)->whereIn('employee_code', ['301', '302'])->count());
@@ -227,7 +240,7 @@ class EmployeeWorkbookImportTest extends TestCase
         ]);
         $file = UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
 
-        $response = $this->post('/employees/import', ['file' => $file, 'ack_updates' => '1']);
+        $response = $this->commitImport(['file' => $file, 'ack_updates' => '1']);
         $response->assertOk()->assertJson(['success' => true]);
 
         $this->assertSame(0, InsuranceRecord::count());
@@ -241,7 +254,7 @@ class EmployeeWorkbookImportTest extends TestCase
 
     public function test_review_queue_is_company_scoped_and_permission_gated(): void
     {
-        $this->post('/employees/import', ['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk();
+        $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1'])->assertOk();
         $row = EmployeeImportRow::firstOrFail();
 
         // Another company's manager cannot see or touch these rows at all.
@@ -276,7 +289,7 @@ class EmployeeWorkbookImportTest extends TestCase
             }
         });
 
-        $response = $this->post('/employees/import', ['file' => $this->workbook(), 'ack_updates' => '1']);
+        $response = $this->commitImport(['file' => $this->workbook(), 'ack_updates' => '1']);
         $response->assertOk()->assertJson(['success' => true]);
         $data = $response->json();
 
@@ -335,7 +348,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['555', 'فريد الاسم', '2026-11-05', '09:00', '17:00'],      // unknown code: no name fallback
         ]]);
 
-        $this->post('/employees/import', ['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
+        $this->commitImport(['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
 
         $unique = Employee::where('company_id', $this->company->id)->where('employee_code', '404')->firstOrFail();
         $this->assertSame(1, Attendance::count());
@@ -354,7 +367,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['555', 'فريد الاسم', 'سنوية', '2026-11-12', '2026-11-12', '1'], // unknown code: no name fallback
         ]]);
 
-        $this->post('/employees/import', ['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
+        $this->commitImport(['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
 
         $unique = Employee::where('company_id', $this->company->id)->where('employee_code', '404')->firstOrFail();
         $this->assertSame(1, Leave::count());
@@ -373,7 +386,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['555', 'فريد الاسم', 'خصم', '2026-11-06', '1'],       // unknown code: no name fallback
         ]]);
 
-        $this->post('/employees/import', ['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
+        $this->commitImport(['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
 
         $unique = Employee::where('company_id', $this->company->id)->where('employee_code', '404')->firstOrFail();
         $this->assertSame(1, Penalty::count());
@@ -392,7 +405,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['555', 'فريد الاسم', '2026-11-04', '500'],           // unknown code: no name fallback
         ]]);
 
-        $this->post('/employees/import', ['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
+        $this->commitImport(['file' => $file, 'ack_updates' => '1'])->assertOk()->assertJson(['success' => true]);
 
         $unique = Employee::where('company_id', $this->company->id)->where('employee_code', '404')->firstOrFail();
         $this->assertSame(1, HrRequest::count());
