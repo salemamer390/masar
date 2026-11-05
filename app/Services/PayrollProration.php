@@ -18,11 +18,25 @@ final class PayrollProration
     public static function paidDays(Carbon $start, Carbon $end, int $basis = self::DEFAULT_BASIS): int
     {
         $basis = max(1, $basis);
-        $daysInMonth = (int) $end->copy()->endOfMonth()->day;
-        $paid = (int) $end->day - (int) $start->day + 1;
+        $start = $start->copy()->startOfDay();
+        $end = $end->copy()->startOfDay();
+        if ($end->lt($start)) return 0;
 
-        if ((int) $end->day === $daysInMonth && $daysInMonth < $basis) {
-            $paid += $basis - $daysInMonth;
+        // Count inclusively, month by month, so cross-month periods (26th to
+        // 25th) accrue every day; the short-month top-up applies only at the
+        // period's true end, exactly as it did for same-month periods.
+        $paid = 0;
+        $cursor = $start->copy();
+        while ($cursor->lte($end)) {
+            $monthEnd = $cursor->copy()->endOfMonth();
+            $segmentEnd = $monthEnd->lt($end) ? $monthEnd : $end;
+            $segment = (int) $segmentEnd->day - (int) $cursor->day + 1;
+            $daysInMonth = (int) $monthEnd->day;
+            if ($segmentEnd->equalTo($end) && $segmentEnd->isSameDay($monthEnd) && $daysInMonth < $basis) {
+                $segment += $basis - $daysInMonth;
+            }
+            $paid += $segment;
+            $cursor = $monthEnd->copy()->addDay();
         }
 
         return max(0, min($basis, $paid));
