@@ -133,6 +133,18 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware('permission:employees.import')
             ->name('import.store');
+        Route::get('/import-batches', [\App\Http\Controllers\EmployeeImportReviewController::class, 'index'])
+            ->middleware('permission:employees.import')
+            ->name('import-batches.index');
+        Route::get('/import-rows/{row}', [\App\Http\Controllers\EmployeeImportReviewController::class, 'show'])
+            ->middleware('permission:employees.import')
+            ->name('import-rows.show');
+        Route::put('/import-rows/{row}', [\App\Http\Controllers\EmployeeImportReviewController::class, 'update'])
+            ->middleware('permission:employees.import')
+            ->name('import-rows.update');
+        Route::delete('/import-rows/{row}', [\App\Http\Controllers\EmployeeImportReviewController::class, 'destroy'])
+            ->middleware('permission:employees.import')
+            ->name('import-rows.destroy');
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware('permission:employees.view')
             ->name('index');

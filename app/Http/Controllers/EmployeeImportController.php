@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Employee;
+use App\Models\EmployeeImportBatch;
+use App\Models\EmployeeImportRow;
+use App\Models\MovementRecord;
 use App\Services\Imports\EmployeeImportService;
 use App\Services\Imports\WorkbookAttendanceImporter;
+use App\Services\Imports\WorkbookInsuranceImporter;
 use App\Services\Imports\WorkbookLeavePenaltyImporter;
 use App\Services\Imports\WorkbookRequestImporter;
 use App\Services\PayrollPeriodGuard;
@@ -11,6 +16,7 @@ use App\Services\PayrollRunService;
 use App\Services\Imports\XlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeImportController extends Controller
 {
@@ -20,6 +26,7 @@ class EmployeeImportController extends Controller
         private readonly WorkbookAttendanceImporter $attendanceImporter,
         private readonly WorkbookLeavePenaltyImporter $leavePenaltyImporter,
         private readonly WorkbookRequestImporter $requestImporter,
+        private readonly WorkbookInsuranceImporter $insuranceImporter,
     ) {
     }
 
@@ -39,9 +46,60 @@ class EmployeeImportController extends Controller
         if ($prepared instanceof JsonResponse) {
             return $prepared;
         }
-        [$analysis] = $prepared;
+        [$analysis, $companyId] = $prepared;
 
-        return response()->json(['success' => true] + $this->payload($analysis));
+        return response()->json(['success' => true] + $this->payload($analysis) + [
+            'domains' => $this->simulateDomains($request, $analysis, $companyId),
+        ]);
+    }
+
+    /**
+     * Full dry-run of the commit inside a transaction that is always rolled
+     * back: the preview shows exactly what each workbook domain (attendance,
+     * leaves, penalties, requests, insurance) would import or reject - nothing
+     * is saved, and cross-sheet employee matching sees the employees this same
+     * file would create.
+     *
+     * @param array<string, mixed> $analysis
+     * @return array<string, array{imported: int, skipped: int, errors: array<int, string>}>
+     */
+    private function simulateDomains(Request $request, array $analysis, int $companyId): array
+    {
+        $file = $request->file('file');
+        $extension = strtolower((string) $file?->getClientOriginalExtension());
+        if ($extension !== 'xlsx') {
+            return [];
+        }
+
+        try {
+            DB::beginTransaction();
+            try {
+                $this->service->commit($analysis, $companyId);
+                $distributed = $this->distribute($request, (string) $file->getRealPath(), $extension);
+            } finally {
+                DB::rollBack();
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        $domains = [];
+        foreach (['attendance', 'leaves', 'penalties', 'requests', 'insurance'] as $domain) {
+            $data = $distributed[$domain] ?? [];
+            $imported = (int) ($data['imported'] ?? 0);
+            $skipped = (int) ($data['skipped'] ?? 0);
+            if ($imported + $skipped > 0) {
+                $domains[$domain] = [
+                    'imported' => $imported,
+                    'skipped' => $skipped,
+                    'errors' => array_slice((array) ($data['errors'] ?? []), 0, 5),
+                ];
+            }
+        }
+
+        return $domains;
     }
 
     /** Step 2: import the valid rows. */
@@ -72,49 +130,18 @@ class EmployeeImportController extends Controller
         }
 
         $result = $this->service->commit($analysis, $companyId);
-        $distributed = [];
         $extension = strtolower((string) $request->file('file')?->getClientOriginalExtension());
-        if ($extension === 'xlsx' && $request->user()?->hasPermission('attendance.create')) {
-            try {
-                $distributed['attendance'] = $this->attendanceImporter->import(
-                    $request->file('file')->getRealPath(),
-                    $extension,
-                    app(PayrollPeriodGuard::class),
-                    app(PayrollRunService::class),
-                );
-            } catch (\Throwable $exception) {
-                $distributed['attendance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة الحضور: '.$exception->getMessage()]];
-            }
-        }
-        if ($extension === 'xlsx') {
-            try {
-                if ($request->user()?->hasPermission('leaves.create') || $request->user()?->hasPermission('penalties.create')) {
-                    $distributed['leave_penalty'] = $this->leavePenaltyImporter->import(
-                        $request->file('file')->getRealPath(), $extension,
-                        app(PayrollPeriodGuard::class), app(PayrollRunService::class),
-                        (bool) $request->user()?->hasPermission('leaves.create'),
-                        (bool) $request->user()?->hasPermission('penalties.create'),
-                    );
-                }
-            } catch (\Throwable $exception) {
-                $distributed['leave_penalty'] = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()]], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => []]];
-            }
-        }
-        if ($extension === 'xlsx' && $request->user()?->hasPermission('requests.create')) {
-            try {
-                $distributed['requests'] = $this->requestImporter->import(
-                    $request->file('file')->getRealPath(), $extension,
-                    app(PayrollPeriodGuard::class), app(PayrollRunService::class),
-                );
-            } catch (\Throwable $exception) {
-                $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()]];
-            }
-        }
+        $distributed = $extension === 'xlsx'
+            ? $this->distribute($request, (string) $request->file('file')->getRealPath(), $extension)
+            : [];
+
+        $batch = $this->recordLineage($request, $analysis, $result, $distributed, $companyId);
 
         $attendanceCount = (int) data_get($distributed, 'attendance.imported', 0);
-        $leaveCount = (int) data_get($distributed, 'leave_penalty.leaves.imported', 0);
-        $penaltyCount = (int) data_get($distributed, 'leave_penalty.penalties.imported', 0);
+        $leaveCount = (int) data_get($distributed, 'leaves.imported', 0);
+        $penaltyCount = (int) data_get($distributed, 'penalties.imported', 0);
         $requestCount = (int) data_get($distributed, 'requests.imported', 0);
+        $insuranceCount = (int) data_get($distributed, 'insurance.imported', 0);
 
         return response()->json([
             'success' => true,
@@ -125,6 +152,9 @@ class EmployeeImportController extends Controller
             'distributed_leave_count' => $leaveCount,
             'distributed_penalty_count' => $penaltyCount,
             'distributed_request_count' => $requestCount,
+            'distributed_insurance_count' => $insuranceCount,
+            'batch_id' => $batch->id,
+            'batches_url' => route('employees.import-batches.index'),
         ] + $payload);
     }
 
@@ -146,6 +176,162 @@ class EmployeeImportController extends Controller
         $this->writer->write($path, $headers, $rows);
 
         return response()->download($path, 'rejected-employees.xlsx', ['Cache-Control' => 'no-store'])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Run every workbook domain importer (attendance, leaves/penalties,
+     * requests, insurance) against the uploaded file. Each importer is
+     * permission-gated and isolated: a failure in one domain never blocks the
+     * others, and per-row failures come back structured for the review queue.
+     *
+     * @return array<string, mixed>
+     */
+    private function distribute(Request $request, string $path, string $extension): array
+    {
+        $distributed = [];
+        if ($request->user()?->hasPermission('attendance.create')) {
+            try {
+                $distributed['attendance'] = $this->attendanceImporter->import(
+                    $path, $extension,
+                    app(PayrollPeriodGuard::class),
+                    app(PayrollRunService::class),
+                );
+            } catch (\Throwable $exception) {
+                $distributed['attendance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة الحضور: '.$exception->getMessage()], 'failures' => []];
+            }
+        }
+        if ($request->user()?->hasPermission('leaves.create') || $request->user()?->hasPermission('penalties.create')) {
+            try {
+                $leavePenalty = $this->leavePenaltyImporter->import(
+                    $path, $extension,
+                    app(PayrollPeriodGuard::class), app(PayrollRunService::class),
+                    (bool) $request->user()?->hasPermission('leaves.create'),
+                    (bool) $request->user()?->hasPermission('penalties.create'),
+                );
+                $distributed['leaves'] = $leavePenalty['leaves'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
+                $distributed['penalties'] = $leavePenalty['penalties'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
+            } catch (\Throwable $exception) {
+                $distributed['leaves'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()], 'failures' => []];
+                $distributed['penalties'] = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
+            }
+        }
+        if ($request->user()?->hasPermission('requests.create')) {
+            try {
+                $distributed['requests'] = $this->requestImporter->import(
+                    $path, $extension,
+                    app(PayrollPeriodGuard::class), app(PayrollRunService::class),
+                );
+            } catch (\Throwable $exception) {
+                $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()], 'failures' => []];
+            }
+        }
+        if ($request->user()?->hasPermission('insurance.create')) {
+            try {
+                $distributed['insurance'] = $this->insuranceImporter->import($path, $extension);
+            } catch (\Throwable $exception) {
+                $distributed['insurance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة التأمينات: '.$exception->getMessage()], 'failures' => []];
+            }
+        }
+
+        return $distributed;
+    }
+
+    /**
+     * Persist metadata-only import lineage and park the rejected rows for
+     * in-app review. The raw workbook is never stored; only rejected rows
+     * (encrypted) survive so a reviewer can fix them.
+     *
+     * @param array<string, mixed> $analysis
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $distributed
+     */
+    private function recordLineage(Request $request, array $analysis, array $result, array $distributed, int $companyId): EmployeeImportBatch
+    {
+        $sheets = [];
+        foreach ($analysis['sheets'] ?? [] as $sheet) {
+            $sheets[(string) ($sheet['name'] ?? '')] = (string) ($sheet['kind'] ?? 'unknown');
+        }
+
+        $distSummary = [];
+        foreach (['attendance', 'leaves', 'penalties', 'requests', 'insurance'] as $domain) {
+            $distSummary[$domain] = [
+                'imported' => (int) data_get($distributed, $domain . '.imported', 0),
+                'skipped' => (int) data_get($distributed, $domain . '.skipped', 0),
+            ];
+        }
+
+        return DB::transaction(function () use ($request, $analysis, $result, $companyId, $sheets, $distSummary, $distributed): EmployeeImportBatch {
+            $batch = EmployeeImportBatch::create([
+                'company_id' => $companyId,
+                'user_id' => $request->user()?->id,
+                'file_name' => (string) ($request->file('file')?->getClientOriginalName() ?: 'workbook'),
+                'sheets' => $sheets,
+                'created' => (int) ($result['created'] ?? 0),
+                'updated' => (int) ($result['updated'] ?? 0),
+                'unchanged' => (int) ($result['unchanged'] ?? 0),
+                'skipped' => (int) ($result['skipped'] ?? 0),
+                'failed' => count($result['failed'] ?? []),
+                'rejected' => (int) ($analysis['summary']['error'] ?? 0) + count($result['failed'] ?? [])
+                    + array_sum(array_map(static fn ($domain) => count((array) data_get($distributed, $domain . '.failures', [])), ['attendance', 'leaves', 'penalties', 'requests', 'insurance'])),
+                'distributed' => $distSummary,
+            ]);
+
+            if (!empty($result['created_ids'])) {
+                Employee::withoutGlobalScopes()->where('company_id', $companyId)
+                    ->whereIn('id', $result['created_ids'])->update(['import_batch_id' => $batch->id]);
+            }
+            if (!empty($result['movement_ids'])) {
+                MovementRecord::withoutGlobalScopes()->whereIn('id', $result['movement_ids'])
+                    ->update(['import_batch_id' => $batch->id]);
+            }
+
+            $failedLines = [];
+            foreach ($result['failed'] ?? [] as $failed) {
+                $failedLines[(int) $failed['line']] = (array) ($failed['messages'] ?? []);
+            }
+            foreach ($analysis['rows'] ?? [] as $row) {
+                $isError = ($row['action'] ?? null) === 'error';
+                $line = (int) ($row['line'] ?? 0);
+                if (!$isError && !isset($failedLines[$line])) {
+                    continue;
+                }
+                EmployeeImportRow::create([
+                    'company_id' => $companyId,
+                    'batch_id' => $batch->id,
+                    'sheet' => $row['sheet'] ?? null,
+                    'line' => $line,
+                    'kind' => 'employees',
+                    'employee_id' => $row['existing_id'] ?? null,
+                    'status' => 'pending',
+                    'payload' => $row['raw'] ?? [],
+                    'errors' => $isError ? (array) ($row['errors'] ?? []) : $failedLines[$line],
+                ]);
+            }
+
+            // Failed rows from the other workbook domains (attendance, leaves,
+            // penalties, requests, insurance) are parked too - as review-only
+            // entries: they are corrected in their own screens, never guessed here.
+            foreach (['attendance', 'leaves', 'penalties', 'requests', 'insurance'] as $domain) {
+                foreach ((array) data_get($distributed, $domain . '.failures', []) as $failure) {
+                    EmployeeImportRow::create([
+                        'company_id' => $companyId,
+                        'batch_id' => $batch->id,
+                        'sheet' => (string) ($failure['sheet'] ?? ''),
+                        'line' => (int) ($failure['line'] ?? 0),
+                        'kind' => $domain,
+                        'employee_id' => null,
+                        'status' => 'pending',
+                        'payload' => [
+                            'headers' => (array) ($failure['headers'] ?? []),
+                            'values' => (array) ($failure['values'] ?? []),
+                        ],
+                        'errors' => (array) ($failure['errors'] ?? []),
+                    ]);
+                }
+            }
+
+            return $batch;
+        });
     }
 
     /**
@@ -228,12 +414,18 @@ class EmployeeImportController extends Controller
             'field_usage' => (object) $analysis['field_usage'],
             'fields' => $fields,
             'today' => date('d/m/Y'),
+            'kind_labels' => EmployeeImportService::kindLabels(),
+            'review_sheets' => array_values(array_map(
+                static fn (array $sheet): array => ['name' => $sheet['name'], 'rows' => $sheet['rows']],
+                array_filter($analysis['sheets'] ?? [], static fn (array $sheet): bool => ($sheet['kind'] ?? 'unknown') === 'unknown' && (int) ($sheet['rows'] ?? 0) > 0)
+            )),
             'rows' => array_map(static fn (array $row): array => [
                 'line' => $row['line'],
                 'sheet' => $row['sheet'],
                 'name' => $row['name'],
                 'code' => $row['code'],
                 'action' => $row['action'],
+                'changes' => $row['changes'] ?? [],
                 'errors' => $row['errors'],
                 'warnings' => $row['warnings'],
             ], array_slice($analysis['rows'], 0, 150)),

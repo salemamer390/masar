@@ -391,10 +391,31 @@
             html += detail('<i class="bi bi-layers"></i> تم اختيار ورقة تلقائيًا',
                 sheets.map((sheet) => '<div>' + (sheet.eligible ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + 'ورقة «' + esc(sheet.name) + '» — ' + (sheet.eligible ? 'مؤهلة للاستيراد (' + num(sheet.rows) + ' صف)' : 'ليست ورقة بيانات موظفين وتم تجاهلها') + '</div>').join(''), false);
         }
-        const kinds = {employees: 'بيانات الموظفين', attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', advances: 'السلف', requests: 'الطلبات/الإضافي', auxiliary: 'ورقة محسوبة/مساعدة', unknown: 'غير معروف'};
+        const kinds = data.kind_labels || {employees: 'بيانات الموظفين', attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', advances: 'السلف', requests: 'الطلبات/الإضافي', auxiliary: 'ورقة محسوبة/مساعدة', unknown: 'غير معروفة'};
         const classified = sheets.filter((sheet) => sheet.kind && sheet.kind !== 'unknown');
         if (classified.length) {
             html += detail('<i class="bi bi-diagram-3"></i> خريطة أوراق الملف', classified.map((sheet) => '<div><i class="bi bi-check-circle text-success"></i> ورقة «' + esc(sheet.name) + '» ← <strong>' + esc(kinds[sheet.kind] || kinds.unknown) + '</strong></div>').join(''), true);
+        }
+        const domainLabels = {attendance: 'الحضور والانصراف', leaves: 'الإجازات', penalties: 'الجزاءات', requests: 'الطلبات', insurance: 'التأمينات'};
+        const domains = data.domains || {};
+        const domainLines = Object.keys(domainLabels).filter((key) => domains[key]).map((key) => {
+            const d = domains[key];
+            let line = '<div><i class="bi bi-check-circle text-success"></i> ' + domainLabels[key] + ': سيُستورد <strong>' + num(d.imported) + '</strong> سجل';
+            if (d.skipped > 0) { line += ' · <span class="text-danger">' + num(d.skipped) + ' صف مرفوض</span>'; }
+            line += '</div>';
+            if (d.errors && d.errors.length) {
+                line += d.errors.map((message) => '<div class="small text-danger ms-3">' + esc(message) + '</div>').join('');
+            }
+            return line;
+        });
+        if (domainLines.length) {
+            html += detail('<i class="bi bi-diagram-2"></i> ما سيحدث في باقي أوراق الملف (تجربة كاملة بدون حفظ)', domainLines.join(''), true);
+        }
+        const review = data.review_sheets || [];
+        if (review.length) {
+            html += '<div class="alert alert-warning small mb-2"><i class="bi bi-exclamation-triangle-fill"></i> <strong>أوراق لم نفهمها ولن يُستورد منها شيء:</strong> ' +
+                review.map((sheet) => '«' + esc(sheet.name) + '» (' + num(sheet.rows) + ' صف)').join('، ') +
+                '. راجع عناوين أعمدتها أو أخبرنا بمحتواها بدل التخمين.</div>';
         }
         if (!mappingInDecisions) { html += mappingCard(data, false); }
         return html;
@@ -428,10 +449,18 @@
         box.tabs.innerHTML = tabs.map((tab) => '<button type="button" class="btn btn-outline-secondary' + (table.tab === tab[0] ? ' active' : '') + '" data-tab="' + tab[0] + '">' + tab[1] + ' (' + num(tab[2]) + ')</button>').join('');
     }
 
+    function changesHtml(row) {
+        const changes = row.changes || [];
+        if (!changes.length) { return ''; }
+        const line = (c) => '<div class="small">' + esc(c.label) + ': <span class="text-muted text-decoration-line-through">' + esc(c.old || '—') + '</span> ← <span class="text-success-emphasis">' + esc(c.new || '—') + '</span></div>';
+        if (changes.length <= 3) { return changes.map(line).join(''); }
+        return changes.slice(0, 2).map(line).join('') + '<details class="small"><summary class="text-primary" style="cursor:pointer">+' + (changes.length - 2) + ' تغييرات أخرى</summary>' + changes.slice(2).map(line).join('') + '</details>';
+    }
+
     function renderTable() {
         const rows = filteredRows();
         box.rows.innerHTML = rows.slice(0, table.limit).map((row) =>
-            '<tr><td>' + esc(row.line) + '</td><td>' + esc(row.name || '—') + (row.sheet ? '<div class="text-muted small">ورقة: ' + esc(row.sheet) + '</div>' : '') + '</td><td>' + (actionBadge[row.action] || '') + '</td><td>' + messagesHtml(row) + '</td></tr>'
+            '<tr><td>' + esc(row.line) + '</td><td>' + esc(row.name || '—') + (row.sheet ? '<div class="text-muted small">ورقة: ' + esc(row.sheet) + '</div>' : '') + '</td><td>' + (actionBadge[row.action] || '') + changesHtml(row) + '</td><td>' + messagesHtml(row) + '</td></tr>'
         ).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">لا توجد صفوف مطابقة.</td></tr>';
         box.count.textContent = 'يعرض ' + num(Math.min(table.limit, rows.length)) + ' من ' + num(rows.length) + ' صف';
         box.more.hidden = rows.length <= table.limit;
@@ -483,9 +512,12 @@
         if (Number(data.distributed_attendance_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-calendar-check"></i> تم توزيع ' + num(data.distributed_attendance_count) + ' سجل حضور وانصراف تلقائيًا.</div>';
         if (Number(data.distributed_leave_count || 0) > 0 || Number(data.distributed_penalty_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-diagram-3"></i> تم توزيع ' + num(data.distributed_leave_count || 0) + ' إجازة و' + num(data.distributed_penalty_count || 0) + ' جزاء تلقائيًا.</div>';
         if (Number(data.distributed_request_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-cash-coin"></i> تم توزيع ' + num(data.distributed_request_count) + ' طلب مالي أو إضافي تلقائيًا.</div>';
+        if (Number(data.distributed_insurance_count || 0) > 0) html += '<div class="alert alert-success small"><i class="bi bi-shield-check"></i> تم توزيع ' + num(data.distributed_insurance_count) + ' سجل تأمينات تلقائيًا.</div>';
         if (data.summary && data.summary.error > 0) {
             html += '<div class="alert alert-warning small">لم يتم استيراد ' + num(data.summary.error) + ' صف بسبب أخطاء في بياناتها.' +
-                ' <button type="button" class="btn btn-sm btn-outline-dark ms-2" data-import-rejected><i class="bi bi-file-earmark-excel"></i> تحميل الصفوف المرفوضة لتصحيحها</button></div>';
+                ' <button type="button" class="btn btn-sm btn-outline-dark ms-2" data-import-rejected><i class="bi bi-file-earmark-excel"></i> تحميل الصفوف المرفوضة لتصحيحها</button>' +
+                (data.batches_url ? ' <a class="btn btn-sm btn-outline-primary ms-2" href="' + esc(data.batches_url) + '"><i class="bi bi-inbox"></i> راجع الأسباب في صفحة المراجعة</a>' : '') +
+                '<div class="mt-1 text-muted">صفحة المراجعة توضح سبب رفض كل صف: صفوف الموظفين تُصحَّح منها مباشرة، وصفوف الحضور والإجازات والجزاءات والطلبات والتأمينات تُصحَّح من شاشاتها أو بإعادة رفع الملف بعد التصحيح.</div>' + '</div>';
         }
         if (failed.length) {
             html += '<div class="alert alert-danger small">تعذّر حفظ ' + num(failed.length) + ' صف:<ul class="mb-0">' + failed.slice(0, 10).map((f) => '<li>الصف ' + esc(f.line) + ' (' + esc(f.name) + '): ' + esc((f.messages || []).join(' ')) + '</li>').join('') + '</ul></div>';

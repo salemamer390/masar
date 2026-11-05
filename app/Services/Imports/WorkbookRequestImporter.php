@@ -14,7 +14,7 @@ class WorkbookRequestImporter
 {
     public function import(string $path, string $extension, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns): array
     {
-        $result = ['imported' => 0, 'skipped' => 0, 'errors' => []];
+        $result = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
         foreach (app(SpreadsheetReader::class)->readAll($path, $extension) as $sheet) {
             [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
             $map = $this->mapHeaders($headers);
@@ -50,7 +50,7 @@ class WorkbookRequestImporter
                     if ($duplicate) throw new \RuntimeException('الطلب موجود بالفعل لنفس الموظف والتاريخ.');
                     HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);
                     $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
-                } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet['name']} / الصف {$line}: {$exception->getMessage()}"; }
+                } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet['name']} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet['name'], 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
             }
         }
         return $result;
@@ -71,7 +71,7 @@ class WorkbookRequestImporter
         return null;
     }
     private function period(mixed $value): ?string { $key=$this->normalise($value); return str_contains($key,'ليل') || str_contains($key,'night') ? 'night' : (str_contains($key,'نهار') || str_contains($key,'day') ? 'day' : null); }
-    private function employee(mixed $code,mixed $name): ?Employee { if(filled($code)){ $employee=Employee::where('employee_code',trim((string)$code))->first(); if($employee){if(filled($name)&&$this->person($employee->full_name)!==$this->person($name))throw new \RuntimeException('كود الموظف لا يطابق الاسم.');return $employee;}} return filled($name)?Employee::where('full_name',trim((string)$name))->first():null; }
+    private function employee(mixed $code,mixed $name): ?Employee { if(filled($code)){ $code=trim((string)$code); $employee=Employee::where('employee_code',$code)->first(); if(!$employee){throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.');} if(filled($name)&&$this->person($employee->full_name)!==$this->person($name)){throw new \RuntimeException('كود الموظف لا يطابق الاسم.');} return $employee;} if(!filled($name)){return null;} $matches=Employee::where('full_name',trim((string)$name))->get(); if($matches->count()>1){throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.');} return $matches->first(); }
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u','',mb_strtolower(trim((string)$value))); }
     private function person(mixed $value): string { return mb_strtolower((string)preg_replace('/\s+/u',' ',trim((string)$value))); }
     private function date(mixed $value): ?string { try{return filled($value)?Carbon::parse($value)->toDateString():null;}catch(\Throwable){return null;} }
