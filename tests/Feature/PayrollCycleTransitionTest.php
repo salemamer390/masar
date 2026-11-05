@@ -251,4 +251,35 @@ class PayrollCycleTransitionTest extends TestCase
         $this->assertSame('Locked', $ended->fresh()->status, 'a repeated close changes nothing');
         Carbon::setTestNow();
     }
+
+    public function test_close_schedule_migration_is_partial_install_safe(): void
+    {
+        // Amer's interrupted-migrate incident class: one column added, the other missing.
+        if (\Illuminate\Support\Facades\Schema::hasColumn('payroll_runs', 'is_transition')) {
+            \Illuminate\Support\Facades\Schema::table('payroll_runs', function ($t) { $t->dropColumn('is_transition'); });
+        }
+        try {
+            $migration = require database_path('migrations/2026_11_05_000000_add_close_schedule_and_transition_flag_to_payroll_runs.php');
+            $migration->up(); // completes only the missing column
+            $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('payroll_runs', 'closes_at'));
+            $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('payroll_runs', 'is_transition'));
+            $migration->up(); // a re-run over the complete schema is a no-op, never an error
+            $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('payroll_runs', 'is_transition'));
+        } finally {
+            $migration = require database_path('migrations/2026_11_05_000000_add_close_schedule_and_transition_flag_to_payroll_runs.php');
+            $migration->up();
+            // DDL commits the wrapping DatabaseTransactions transaction, so this test
+            // removes its own fixture explicitly to keep repeated suite runs green.
+            $companyIds = \Illuminate\Support\Facades\DB::table('companies')->where('slug', 'company-t')->pluck('id');
+            foreach ($companyIds as $companyId) {
+                \Illuminate\Support\Facades\DB::table('salaries')->whereIn('employee_id', \Illuminate\Support\Facades\DB::table('employees')->where('company_id', $companyId)->pluck('id'))->delete();
+                \Illuminate\Support\Facades\DB::table('employees')->where('company_id', $companyId)->delete();
+                \Illuminate\Support\Facades\DB::table('users')->where('company_id', $companyId)->delete();
+                \Illuminate\Support\Facades\DB::table('hr_operational_settings')->where('company_id', $companyId)->delete();
+                \Illuminate\Support\Facades\DB::table('company_subscriptions')->where('company_id', $companyId)->delete();
+                \Illuminate\Support\Facades\DB::table('roles')->where('company_id', $companyId)->delete();
+                \Illuminate\Support\Facades\DB::table('companies')->where('id', $companyId)->delete();
+            }
+        }
+    }
 }
