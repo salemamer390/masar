@@ -210,7 +210,9 @@ class JobDataController extends Controller
                 'late_minutes' => $daily['late_minutes'],
                 'absence_days' => $daily['absence_days'],
                 'annual_leave_days' => $leaveByPolicy('annual'), 'casual_leave_days' => $leaveByPolicy('casual'), 'sick_leave_days' => $leaveByPolicy('sick'), 'maternity_leave_days' => $leaveByPolicy('maternity'),
-                'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity')),
+                // «بدون أجر» has its own column, so other leaves never include unpaid days
+                // (Amer, 2026-11-06: keep unpaid separate from «أنواع أخرى»).
+                'other_leave_days' => max(0, (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0) - $leaveByPolicy('annual') - $leaveByPolicy('casual') - $leaveByPolicy('sick') - $leaveByPolicy('maternity') - $unpaidLeaveDays),
                 'total_leave_days' => (float) $employeeLeaves->sum(fn (Leave $leave) => $leaveDays[$leave->id] ?? 0), 'unpaid_leave_days' => $unpaidLeaveDays,
                 'early_leave_minutes' => $daily['early_leave_minutes'],
                 'day_overtime_minutes' => (int) $attendanceRows->sum(fn (Attendance $item) => $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'day')),
@@ -407,5 +409,4 @@ class JobDataController extends Controller
         return (float) $days;
     }
 }
-
 
