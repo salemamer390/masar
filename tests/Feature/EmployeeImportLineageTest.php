@@ -52,10 +52,23 @@ class EmployeeImportLineageTest extends TestCase
 
     private function commit(): array
     {
-        $response = $this->post('/employees/import', ['file' => $this->csvUpload(), 'ack_updates' => '1']);
+        $response = $this->commitImport(['file' => $this->csvUpload(), 'ack_updates' => '1']);
         $response->assertOk()->assertJson(['success' => true]);
 
         return $response->json();
+    }
+
+    /**
+     * Commit through the reviewed plan: the store endpoint only executes the
+     * exact configuration the preview signed, so tests must fetch the review
+     * token first - with the same file and parameters.
+     */
+    private function commitImport(array $params): \Illuminate\Testing\TestResponse
+    {
+        $token = $this->postJson('/employees/import/preview', $params)->json('review_token');
+        $this->assertNotEmpty($token, 'preview must issue a review token');
+
+        return $this->post('/employees/import', $params + ['review_token' => $token]);
     }
 
     public function test_preview_shows_field_level_changes_and_kind_labels(): void
