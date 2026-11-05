@@ -136,6 +136,8 @@ class EmployeeImportService
         $duplicates = $duplicates === 'skip' ? 'skip' : 'update';
         $manual = $this->sanitizeMappings($options['mappings'] ?? []);
         $choice = (string) ($options['sheet'] ?? 'auto');
+        $confirmedKinds = $this->sanitizeSheetKinds($options['sheet_kinds'] ?? []);
+        $domainMappings = $this->sanitizeDomainMappings($options['domain_mappings'] ?? []);
 
         $result = [
             'file_errors' => [],
@@ -178,16 +180,47 @@ class EmployeeImportService
 
         $multipleSheets = count($sheets) > 1;
         foreach ($infos as $index => $info) {
-            $eligible = $info['matched'] && (!$multipleSheets || $this->isEmployeeDataSheet($info['used']));
+            $detected = $this->detectWorkbookSheetKind($sheets[$index]['rows'], $info['used'], (string) $sheets[$index]['name']);
+            $kind = $confirmedKinds[(string) $index] ?? $confirmedKinds[(string) $sheets[$index]['name']] ?? $detected;
+            // The user's confirmed type is authoritative: a sheet confirmed as
+            // employee data is eligible even when the auto-markers missed it,
+            // and every non-employee type is out of the employee import.
+            $eligible = $info['matched'] && ($kind === 'employees')
+                && (!$multipleSheets || $this->isEmployeeDataSheet($info['used']) || ($confirmedKinds[(string) $index] ?? $confirmedKinds[(string) $sheets[$index]['name']] ?? null) === 'employees');
             $infos[$index]['eligible'] = $eligible;
-            $result['sheets'][] = [
+            $entry = [
                 'index' => $index,
                 'name' => $sheets[$index]['name'],
                 'rows' => $info['matched'] ? $info['rows'] : count($sheets[$index]['rows']),
                 'matched' => $info['matched'],
                 'eligible' => $eligible,
-                'kind' => $this->detectWorkbookSheetKind($sheets[$index]['rows'], $info['used']),
+                'kind' => $kind,
+                'detected_kind' => $detected,
+                'sample' => $this->sheetSample($sheets[$index]['rows'], $info['header_row']),
             ];
+            // The column mapping the domain parser will use: auto-detected, with
+            // the user's reviewed choices on top. Shown and editable in the review.
+            if (in_array($kind, ['attendance', 'leaves', 'penalties', 'requests', 'advances', 'insurance'], true)) {
+                $config = $this->detectDomainConfig($kind, $sheets[$index]['rows']);
+                if ($config === null) {
+                    // Header-row detection failed: fall back to the first
+                    // non-empty row so the user can still map every column
+                    // manually instead of being locked out of the sheet.
+                    foreach ($sheets[$index]['rows'] as $number => $row) {
+                        $cells = array_map(static fn ($v) => (string) $v, $row);
+                        if (implode('', $cells) === '') {
+                            continue;
+                        }
+                        $config = ['header_row' => (int) $number, 'headers' => $cells, 'map' => []];
+                        break;
+                    }
+                }
+                if ($config !== null) {
+                    $config['map'] = array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []);
+                    $entry['domain_config'] = $config;
+                }
+            }
+            $result['sheets'][] = $entry;
         }
 
         $candidates = array_values(array_keys(array_filter($infos, static fn (array $info): bool => !empty($info['eligible']))));
@@ -314,9 +347,25 @@ class EmployeeImportService
         return false;
     }
 
-    /** Classify every workbook sheet before any import is committed. */
-    private function detectWorkbookSheetKind(array $rows, array $used): string
+    /**
+     * Classify every workbook sheet before any import is committed. The sheet
+     * NAME counts as evidence, dashboard/summary sheets are recognised before
+     * data sheets so their aggregate columns never pull them into a data
+     * domain, and an attendance sheet needs a real date column - anything
+     * uncertain stays 'unknown' for the user to decide.
+     */
+    private function detectWorkbookSheetKind(array $rows, array $used, string $name = ''): string
     {
+        // Dashboard/summary/account sheets are auxiliary, and the file's own
+        // sheet name is the strongest signal for them.
+        $auxiliaryNeedles = ['لوحة المؤشرات', 'لوحة التحكم', 'داشبورد', 'dashboard', 'حسابات اللوحة', 'حسابات لوحة المؤشرات', 'دليل الاستخدام', 'ملخص شئون العاملين', 'ملخص شؤون العاملين', 'كشف الحضور الشهري'];
+        $nameKey = $this->key($name);
+        if ($nameKey !== '') {
+            foreach ($auxiliaryNeedles as $needle) {
+                if (str_contains($nameKey, $this->key($needle))) return 'auxiliary';
+            }
+        }
+
         $headers = [];
         foreach (array_slice($rows, 0, 8, true) as $row) {
             foreach ($row as $value) {
@@ -333,12 +382,20 @@ class EmployeeImportService
             }
             return false;
         };
+        $hasExact = function (array $needles) use ($headers): bool {
+            foreach ($needles as $needle) {
+                if (isset($headers[$this->key((string) $needle)])) return true;
+            }
+            return false;
+        };
 
-        if ($has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout'])) return 'attendance';
+        if ($has($auxiliaryNeedles)) return 'auxiliary';
+        $hasTime = $has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout']);
+        $hasDate = $has(['التاريخ', 'تاريخ الحضور', 'attendance date', 'attendance_date']) || $hasExact(['date', 'day', 'اليوم']);
+        if ($hasTime && $hasDate) return 'attendance';
         if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type', 'start date'])) return 'leaves';
         if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])) return 'penalties';
         if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
-        if ($has(['لوحة المؤشرات', 'حسابات لوحة المؤشرات', 'دليل الاستخدام', 'ملخص شئون العاملين', 'كشف الحضور الشهري'])) return 'auxiliary';
         if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'overtime', 'bonus', 'commission'])) return 'requests';
         // Insurance-record sheets need markers beyond الرقم التأميني, which is a
         // normal employee column too; a sheet that also carries strong employee
@@ -349,6 +406,141 @@ class EmployeeImportService
         if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         return 'unknown';
+    }
+
+    /** Confirmed per-sheet kinds from the user, keyed by sheet index or name; values limited to known kinds + ignore. */
+    private function sanitizeSheetKinds(mixed $kinds): array
+    {
+        if (!is_array($kinds)) return [];
+        $allowed = array_merge(array_keys(self::kindLabels()), ['ignore']);
+        $clean = [];
+        foreach ($kinds as $key => $kind) {
+            $kind = (string) $kind;
+            if (in_array($kind, $allowed, true)) $clean[(string) $key] = $kind;
+        }
+
+        return $clean;
+    }
+
+    /** First data rows of a sheet (strings, capped) so the user can eyeball what a sheet really is. */
+    private function sheetSample(array $rows, ?int $headerRow, int $maxRows = 3, int $maxCols = 8): array
+    {
+        $sample = [];
+        $count = 0;
+        foreach ($rows as $number => $cells) {
+            if ($count >= $maxRows) break;
+            if ($headerRow !== null && $number < $headerRow) continue;
+            $values = array_map(static fn ($v) => (string) $v, array_slice($cells, 0, $maxCols));
+            if (implode('', $values) === '') continue;
+            $sample[] = $values;
+            $count++;
+        }
+
+        return $sample;
+    }
+
+    /** The importer that parses a sheet kind, and its mappable fields. */
+    public static function domainFields(string $kind): array
+    {
+        return match ($kind) {
+            'attendance' => WorkbookAttendanceImporter::MAPPABLE_FIELDS,
+            'leaves' => WorkbookLeavePenaltyImporter::LEAVE_FIELDS,
+            'penalties' => WorkbookLeavePenaltyImporter::PENALTY_FIELDS,
+            'requests', 'advances' => WorkbookRequestImporter::MAPPABLE_FIELDS,
+            'insurance' => WorkbookInsuranceImporter::MAPPABLE_FIELDS,
+            default => [],
+        };
+    }
+
+    /** Auto-detected header row + field map of a sheet for its (confirmed) kind. */
+    private function detectDomainConfig(string $kind, array $rows): ?array
+    {
+        return match ($kind) {
+            'attendance' => app(WorkbookAttendanceImporter::class)->detectConfig($rows),
+            'leaves', 'penalties' => app(WorkbookLeavePenaltyImporter::class)->detectConfig($rows),
+            'requests', 'advances' => app(WorkbookRequestImporter::class)->detectConfig($rows),
+            'insurance' => app(WorkbookInsuranceImporter::class)->detectConfig($rows),
+            default => null,
+        };
+    }
+
+    /**
+     * Fields a confirmed sheet of this kind must map before the parser can run
+     * (mirrors the sheets-step editor; enforced server-side at commit).
+     *
+     * @return array<int, string>
+     */
+    public static function requiredDomainFields(string $kind): array
+    {
+        return match ($kind) {
+            'attendance' => ['date'],
+            'leaves' => ['leave_type', 'start', 'end'],
+            'penalties' => ['penalty_type', 'date', 'deduction'],
+            'requests', 'advances' => ['date'],
+            'insurance' => ['insurance_number'],
+            default => [],
+        };
+    }
+
+    /**
+     * First blocking problem with the confirmed per-sheet domain configs, or
+     * null when every data sheet is importable exactly as reviewed. A sheet
+     * the parser cannot read as its confirmed kind fails closed: it is never
+     * silently re-detected or skipped at commit.
+     *
+     * @param array<int, array<string, mixed>> $sheets
+     */
+    public function domainConfigError(array $sheets): ?string
+    {
+        $labels = self::kindLabels();
+        foreach ($sheets as $sheet) {
+            $kind = (string) ($sheet['kind'] ?? 'unknown');
+            $fields = self::domainFields($kind);
+            if ($fields === []) {
+                continue;
+            }
+            $name = (string) ($sheet['name'] ?? '');
+            $config = $sheet['domain_config'] ?? null;
+            if (!is_array($config) || (int) ($config['header_row'] ?? -1) < 0) {
+                return 'ورقة «' . $name . '»: لم يتعرف التطبيق على صف العناوين لنوع «' . ($labels[$kind] ?? $kind) . '». اختر نوعًا آخر أو راجع الملف.';
+            }
+            $map = (array) ($config['map'] ?? []);
+            $missing = [];
+            foreach (self::requiredDomainFields($kind) as $field) {
+                if (!isset($map[$field])) {
+                    $missing[] = (string) ($fields[$field] ?? $field);
+                }
+            }
+            if (in_array($kind, ['attendance', 'leaves', 'penalties', 'requests', 'advances'], true) && !isset($map['code']) && !isset($map['name'])) {
+                $missing[] = 'كود أو اسم الموظف';
+            }
+            // Mirrors the insurance importer's own sheet gate.
+            if ($kind === 'insurance' && isset($map['insurance_number'])
+                && !array_intersect(['insured_salary', 'office', 'category', 'status', 'job_code'], array_keys($map))) {
+                $missing[] = 'حقل تأميني واحد على الأقل (الأجر التأميني، المكتب، الفئة، الحالة، أو كود الوظيفة)';
+            }
+            if ($missing !== []) {
+                return 'ورقة «' . $name . '»: أكمل ربط الحقول المطلوبة (' . implode('، ', $missing) . ').';
+            }
+        }
+
+        return null;
+    }
+
+    /** Reviewed per-sheet column choices: only real fields of the sheet's domain, only non-negative column indexes. */
+    private function sanitizeDomainMappings(mixed $mappings): array
+    {
+        if (!is_array($mappings)) return [];
+        $clean = [];
+        foreach ($mappings as $sheet => $fields) {
+            if (!is_array($fields)) continue;
+            foreach ($fields as $field => $column) {
+                if (!is_numeric($column) || (int) $column < 0) continue;
+                $clean[(string) $sheet][(string) $field] = (int) $column;
+            }
+        }
+
+        return $clean;
     }
 
     /** Arabic labels for every workbook sheet kind shown in the preview. */

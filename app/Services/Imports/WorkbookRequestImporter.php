@@ -12,12 +12,36 @@ use Carbon\Carbon;
 /** Imports advances, overtime and financial requests from workbook sheets. */
 class WorkbookRequestImporter
 {
-    public function import(string $path, string $extension, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns): array
+    public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'تاريخ الطلب', 'amount' => 'المبلغ', 'hours' => 'عدد الساعات', 'period' => 'نوع الساعات', 'from' => 'من الساعة', 'to' => 'إلى الساعة', 'type' => 'نوع الطلب', 'details' => 'التفاصيل'];
+
+    /** Detected header row + field map for one sheet, exposed for the review UI. */
+    public function detectConfig(array $rows): ?array
+    {
+        foreach ($rows as $number => $row) {
+            $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
+            if (str_contains($key, 'كودالموظف') && (str_contains($key, 'تاريخ') || str_contains($key, 'date'))) {
+                return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
+            }
+        }
+
+        return null;
+    }
+
+    public function import(string $path, string $extension, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, ?array $onlySheets = null, ?array $configs = null): array
     {
         $result = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
         foreach (app(SpreadsheetReader::class)->readAll($path, $extension) as $sheet) {
-            [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
-            $map = $this->mapHeaders($headers);
+            if ($onlySheets !== null && !in_array((string) ($sheet['name'] ?? ''), $onlySheets, true)) continue;
+            $config = $configs[$sheet['name']] ?? null;
+            if ($config !== null) {
+                $headerRow = (int) ($config['header_row'] ?? -1);
+                $headers = $sheet['rows'][$headerRow] ?? [];
+                $rows = array_filter($sheet['rows'] ?? [], fn ($unused, $line) => $line > $headerRow, ARRAY_FILTER_USE_BOTH);
+                $map = array_map('intval', $config['map'] ?? []);
+            } else {
+                [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
+                $map = $this->mapHeaders($headers);
+            }
             if (!isset($map['date'], $map['code']) || !isset($map['amount']) && !isset($map['hours'])) continue;
             foreach ($rows as $line => $row) {
                 try {

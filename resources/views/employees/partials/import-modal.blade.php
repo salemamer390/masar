@@ -6,8 +6,9 @@
                     <h5 class="modal-title mb-1" id="employeesImportTitle"><i class="bi bi-file-earmark-excel text-success"></i> استيراد الموظفين من Excel</h5>
                     <div class="d-flex flex-wrap gap-3 small" data-import-steps>
                         <span data-step-id="upload">1. رفع الملف</span>
-                        <span data-step-id="preview">2. المراجعة (بدون حفظ)</span>
-                        <span data-step-id="result">3. النتيجة</span>
+                        <span data-step-id="sheets">2. الأوراق وأنواعها</span>
+                        <span data-step-id="preview">3. المراجعة (بدون حفظ)</span>
+                        <span data-step-id="result">4. النتيجة</span>
                     </div>
                 </div>
                 <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="إغلاق" data-import-close></button>
@@ -38,7 +39,13 @@
                     </div>
                 </div>
 
-                {{-- Step 2: review --}}
+                {{-- Step 2: sheets and their types --}}
+                <div data-import-step="sheets" hidden>
+                    <p class="text-muted small mb-3">التطبيق يقترح نوع كل ورقة، والاختيار النهائي ليك: غيّر النوع لو القراءة غلط أو اختر «تجاهل». الاختيار هنا هو اللي بيحدد أين تُحفظ بيانات كل ورقة فعلًا — الأوراق المساعدة والمتجاهَلة لا تُستورد نهائيًا.</p>
+                    <div data-import-sheets-list></div>
+                </div>
+
+                {{-- Step 3: review --}}
                 <div data-import-step="preview" hidden>
                     <div data-import-verdict class="mb-3"></div>
                     <div data-import-decisions></div>
@@ -103,7 +110,8 @@
     };
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const q = (selector) => modalEl.querySelector(selector);
-    const steps = { upload: q('[data-import-step="upload"]'), preview: q('[data-import-step="preview"]'), result: q('[data-import-step="result"]') };
+    const steps = { upload: q('[data-import-step="upload"]'), sheets: q('[data-import-step="sheets"]'), preview: q('[data-import-step="preview"]'), result: q('[data-import-step="result"]') };
+    const sheetsList = q('[data-import-sheets-list]');
     const fileInput = q('#employeesImportFile');
     const alertBox = q('[data-import-alert]');
     const box = {
@@ -120,7 +128,8 @@
     let busy = false;
     let needsReload = false;
     let lastData = null;
-    let state = { sheet: 'auto', mappings: {} };
+    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' };
+    let sheetsStepUsed = false;
     let table = { tab: 'all', query: '', limit: PAGE };
 
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -136,11 +145,14 @@
     function showStep(name) {
         Object.keys(steps).forEach((key) => { steps[key].hidden = key !== name; });
         btn.cancel.hidden = name === 'result';
-        btn.back.hidden = name !== 'preview';
-        btn.preview.hidden = name !== 'upload';
+        btn.back.hidden = name !== 'preview' && name !== 'sheets';
+        btn.preview.hidden = name !== 'upload' && name !== 'sheets';
+        const previewLabel = name === 'sheets' ? 'متابعة للمراجعة' : 'فحص الملف';
+        btn.preview.querySelector('span').textContent = previewLabel;
+        if (btn.preview.dataset.label) { btn.preview.dataset.label = previewLabel; }
         btn.commit.hidden = name !== 'preview';
         btn.finish.hidden = name !== 'result';
-        const order = ['upload', 'preview', 'result'];
+        const order = ['upload', 'sheets', 'preview', 'result'];
         modalEl.querySelectorAll('[data-step-id]').forEach((el) => {
             const idx = order.indexOf(el.getAttribute('data-step-id'));
             const cur = order.indexOf(name);
@@ -176,6 +188,9 @@
         body.append('duplicates', q('input[name="import_duplicates"]:checked')?.value || 'update');
         body.append('sheet', String(state.sheet));
         body.append('mappings', JSON.stringify(state.mappings));
+        body.append('sheet_kinds', JSON.stringify(state.sheetKinds));
+        body.append('domain_mappings', JSON.stringify(state.domainMappings));
+        body.append('review_token', state.reviewToken || '');
         body.append('ack_dates', withAck && ackBox() && ackBox().checked ? '1' : '0');
         body.append('ack_updates', withAck && updateAckBox() && updateAckBox().checked ? '1' : '0');
         return body;
@@ -467,6 +482,90 @@
     }
 
     // ---- preview / result ---------------------------------------------------
+    function sheetKindOptions(selected) {
+        const labels = (lastData && lastData.kind_labels) || {};
+        const order = ['employees', 'attendance', 'leaves', 'penalties', 'advances', 'requests', 'insurance', 'auxiliary', 'unknown'];
+        let html = '';
+        order.forEach((kind) => {
+            if (!labels[kind]) { return; }
+            html += '<option value="' + kind + '"' + (selected === kind ? ' selected' : '') + '>' + esc(labels[kind]) + '</option>';
+        });
+        html += '<option value="ignore"' + (selected === 'ignore' ? ' selected' : '') + '>تجاهل الورقة</option>';
+        return html;
+    }
+
+    function domainMappingEditor(data, sheet, chosen) {
+        const fields = (data.domain_fields || {})[chosen];
+        if (!fields) { return ''; }
+        const config = sheet.domain_config || null;
+        const headers = config ? (config.headers || []) : [];
+        const detectedMap = config ? (config.map || {}) : {};
+        const chosenMap = state.domainMappings[sheet.name] || {};
+        if (!headers.length) {
+            return '<div class="alert alert-warning small py-1 px-2 mt-2 mb-0">لم يتعرف التطبيق على صف العناوين في هذه الورقة؛ اختر نوعًا آخر أو راجع الملف.</div>';
+        }
+        const required = { attendance: ['date'], leaves: ['leave_type', 'start', 'end'], penalties: ['penalty_type', 'date', 'deduction'], requests: ['date'], insurance: ['insurance_number'] }[chosen] || [];
+        let html = '<div class="mt-2 border-top pt-2"><div class="small fw-semibold mb-1"><i class="bi bi-layout-three-columns"></i> ربط الأعمدة بحقول النظام <span class="text-muted fw-normal">(راجعه وعدّله لو التطبيق قراه غلط)</span></div>';
+        html += '<div class="row g-1">';
+        Object.keys(fields).forEach((field) => {
+            const selected = chosenMap[field] !== undefined ? chosenMap[field] : (detectedMap[field] !== undefined ? detectedMap[field] : '');
+            html += '<div class="col-6 col-md-4"><label class="form-label small mb-0">' + esc(fields[field]) + (required.includes(field) ? ' <span class="text-danger">*</span>' : '') + '</label>'
+                + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
+                + '<option value="">— بدون —</option>'
+                + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || ('عمود ' + (index + 1))) + '</option>').join('')
+                + '</select></div>';
+        });
+        html += '</div></div>';
+        return html;
+    }
+
+    function validateDomainMappings(data) {
+        const required = { attendance: ['date'], leaves: ['leave_type', 'start', 'end'], penalties: ['penalty_type', 'date', 'deduction'], requests: ['date'], insurance: ['insurance_number'] };
+        const needEmployee = ['attendance', 'leaves', 'penalties', 'requests'];
+        for (const sheet of (data.sheets || [])) {
+            const kind = state.sheetKinds[sheet.name] || sheet.kind;
+            const fields = (data.domain_fields || {})[kind];
+            if (!fields || !sheet.domain_config) { continue; }
+            const map = Object.assign({}, sheet.domain_config.map || {}, state.domainMappings[sheet.name] || {});
+            const missing = (required[kind] || []).filter((field) => map[field] === undefined || map[field] === '' || map[field] === null);
+            if (needEmployee.includes(kind) && map.code === undefined && map.name === undefined) { missing.push('كود أو اسم الموظف'); }
+            if (missing.length) {
+                return 'ورقة «' + sheet.name + '»: أكمل ربط الحقول المطلوبة (' + missing.map((field) => (fields[field] || field)).join('، ') + ').';
+            }
+        }
+        return '';
+    }
+
+    function renderSheetsStep(data) {
+        const sheets = data.sheets || [];
+        let html = '';
+        sheets.forEach((sheet) => {
+            const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
+            const corrected = state.sheetKinds[sheet.name] && state.sheetKinds[sheet.name] !== sheet.detected_kind;
+            html += '<div class="border rounded p-2 mb-2">'
+                + '<div class="d-flex flex-wrap align-items-center gap-2">'
+                + '<div class="fw-semibold"><i class="bi bi-file-earmark-spreadsheet text-success"></i> ' + esc(sheet.name) + ' <span class="text-muted small">(' + num(sheet.rows) + ' صف)</span></div>'
+                + '<select class="form-select form-select-sm ms-auto" style="max-width:230px" data-sheet-kind="' + esc(sheet.name) + '">' + sheetKindOptions(chosen) + '</select>'
+                + '</div>'
+                + '<div class="small mt-1 ' + (corrected ? 'text-warning-emphasis' : 'text-muted') + '">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + (corrected ? ' — اخترت نوعًا مختلفًا وسيُحترم اختيارك' : '') + '</div>'
+                + domainMappingEditor(data, sheet, chosen)
+                + ((sheet.sample || []).length
+                    ? '<div class="table-responsive mt-1"><table class="table table-sm table-bordered mb-0 small text-muted"><tbody>'
+                      + sheet.sample.map((row) => '<tr>' + row.map((cell) => '<td class="text-truncate" style="max-width:140px">' + esc(cell) + '</td>').join('') + '</tr>').join('')
+                      + '</tbody></table></div>'
+                    : '')
+                + '</div>';
+        });
+        html += '<div class="form-text"><i class="bi bi-info-circle"></i> الأوراق من نوع «ورقة مساعدة» أو «تجاهل» أو «غير معروفة» لا تدخل أي استيراد فعلي.</div>';
+        sheetsList.innerHTML = html;
+    }
+
+    function needsSheetsStep(data) {
+        const sheets = data.sheets || [];
+        if (sheets.length <= 1 && (sheets[0]?.kind || 'employees') === 'employees') { return false; }
+        return sheets.length > 0;
+    }
+
     function renderPreview(data) {
         lastData = data;
         table = { tab: data.summary.error > 0 ? 'errors' : 'all', query: '', limit: PAGE };
@@ -532,7 +631,9 @@
         fileInput.value = '';
         lastData = null;
         lastResult = null;
-        state = { sheet: 'auto', mappings: {} };
+        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' };
+        sheetsStepUsed = false;
+        sheetsList.innerHTML = '';
         box.verdict.innerHTML = '';
         box.decisions.innerHTML = '';
         box.info.innerHTML = '';
@@ -540,18 +641,36 @@
         showStep('upload');
     }
 
-    async function runPreview(button, label, stayOnPreview) {
+    async function runPreview(button, label, stayOnPreview, mode = null) {
         if (busy) { return; }
         showAlert('');
         const file = fileInput.files[0];
         if (!file) { showAlert('اختر ملف Excel أو CSV أولًا.'); return; }
+        if (mode === 'preview' && lastData) {
+            const invalid = validateDomainMappings(lastData);
+            if (invalid) { showAlert(invalid); return; }
+        }
         if (!/\.(xlsx|csv)$/i.test(file.name)) { showAlert('يجب أن يكون الملف بصيغة xlsx أو csv.'); return; }
         if (file.size > 5 * 1024 * 1024) { showAlert('حجم الملف يجب ألا يتجاوز 5 ميجابايت.'); return; }
         setBusy(true, button, label);
         try {
             const data = await send(urls.preview, false);
-            renderPreview(data);
-            showStep('preview');
+            lastData = data;
+            // Bind the commit to what this preview showed: keep the
+            // server-issued review token and seed the confirmed sheet kinds
+            // so the commit echoes the reviewed plan even when the sheets
+            // step was skipped. User changes made afterwards overwrite the
+            // seeded values, and each refetch refreshes the token.
+            state.reviewToken = data.review_token || '';
+            (data.sheets || []).forEach((s) => { if (!(s.name in state.sheetKinds)) { state.sheetKinds[s.name] = s.kind; } });
+            if (mode === 'preview' || !needsSheetsStep(data)) {
+                renderPreview(data);
+                showStep('preview');
+            } else {
+                sheetsStepUsed = true;
+                renderSheetsStep(data);
+                showStep('sheets');
+            }
         } catch (error) {
             showAlert(error.message);
             if (stayOnPreview) { showStep('preview'); }
@@ -561,9 +680,40 @@
     }
 
     // ---- events ---------------------------------------------------------------
-    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {} }; lastData = null; });
-    btn.preview.addEventListener('click', () => runPreview(btn.preview, 'جارٍ فحص الملف...', false));
-    btn.back.addEventListener('click', () => { if (!busy) { showAlert(''); showStep('upload'); } });
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
+    btn.preview.addEventListener('click', () => {
+        const fromSheets = !steps.sheets.hidden;
+        runPreview(btn.preview, fromSheets ? 'جارٍ تحديث المراجعة...' : 'جارٍ فحص الملف...', false, fromSheets ? 'preview' : null);
+    });
+    btn.back.addEventListener('click', () => {
+        if (busy) { return; }
+        showAlert('');
+        const onPreview = !steps.preview.hidden;
+        showStep(onPreview && sheetsStepUsed ? 'sheets' : 'upload');
+    });
+    sheetsList.addEventListener('change', (event) => {
+        const fieldSelect = event.target.closest('select[data-domain-field]');
+        if (fieldSelect) {
+            const sheetName = fieldSelect.getAttribute('data-domain-sheet');
+            state.domainMappings[sheetName] = state.domainMappings[sheetName] || {};
+            if (fieldSelect.value === '') { delete state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')]; }
+            else { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = parseInt(fieldSelect.value, 10); }
+            return;
+        }
+        const select = event.target.closest('select[data-sheet-kind]');
+        if (!select) { return; }
+        const name = select.getAttribute('data-sheet-kind');
+        state.sheetKinds[name] = select.value;
+        // Reload the detected column mapping for the newly chosen type, staying here.
+        runPreview(null, '', false, 'reload-sheets');
+        const corrected = lastData && (lastData.sheets || []).find((sheet) => sheet.name === name);
+        const note = select.closest('.border').querySelector('.small');
+        if (note && corrected) {
+            const changed = select.value !== corrected.detected_kind;
+            note.className = 'small mt-1 ' + (changed ? 'text-warning-emphasis' : 'text-muted');
+            note.textContent = 'اقتراح التطبيق: ' + ((lastData.kind_labels || {})[corrected.detected_kind] || 'غير معروفة') + (changed ? ' — اخترت نوعًا مختلفًا وسيُحترم اختيارك' : '');
+        }
+    });
 
     function onChange(event) {
         const target = event.target;

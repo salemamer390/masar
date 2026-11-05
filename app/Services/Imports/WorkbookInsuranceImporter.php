@@ -19,14 +19,38 @@ class WorkbookInsuranceImporter
         private readonly SpreadsheetReader $reader,
     ) {}
 
-    public function import(string $path, string $extension): array
+    public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'insurance_number' => 'الرقم التأميني', 'insured_salary' => 'الأجر التأميني', 'office' => 'مكتب التأمينات', 'category' => 'الفئة التأمينية', 'job_code' => 'كود الوظيفة', 'start' => 'تاريخ التسجيل', 'end' => 'تاريخ انتهاء الاشتراك', 'status' => 'الحالة التأمينية', 'notes' => 'ملاحظات'];
+
+    /** Detected header row + field map for one sheet, exposed for the review UI. */
+    public function detectConfig(array $rows): ?array
+    {
+        foreach ($rows as $number => $row) {
+            $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
+            if (str_contains($key, 'تأمين') || str_contains($key, 'insurance')) {
+                return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
+            }
+        }
+
+        return null;
+    }
+
+    public function import(string $path, string $extension, ?array $onlySheets = null, ?array $configs = null): array
     {
         $result = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
-            [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
-            $map = $this->mapHeaders($headers);
-            if (!$this->isInsuranceSheet($map)) {
-                continue;
+            if ($onlySheets !== null && !in_array((string) ($sheet['name'] ?? ''), $onlySheets, true)) continue;
+            $config = $configs[$sheet['name']] ?? null;
+            if ($config !== null) {
+                $headerRow = (int) ($config['header_row'] ?? -1);
+                $headers = $sheet['rows'][$headerRow] ?? [];
+                $rows = array_filter($sheet['rows'] ?? [], fn ($unused, $line) => $line > $headerRow, ARRAY_FILTER_USE_BOTH);
+                $map = array_map('intval', $config['map'] ?? []);
+            } else {
+                [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
+                $map = $this->mapHeaders($headers);
+                if (!$this->isInsuranceSheet($map)) {
+                    continue;
+                }
             }
             foreach ($rows as $line => $row) {
                 try {
