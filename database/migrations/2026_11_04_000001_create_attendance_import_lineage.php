@@ -4,12 +4,13 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void {
-        Schema::create('attendance_import_batches', function (Blueprint $t) {
+        // Partial-install safe: an interrupted earlier run may have created some of these.
+        if (!Schema::hasTable('attendance_import_batches')) Schema::create('attendance_import_batches', function (Blueprint $t) {
             $t->id(); $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $t->string('file_name'); $t->string('layout', 30); $t->longText('original_data'); $t->timestamps();
         });
-        Schema::create('attendance_import_days', function (Blueprint $t) {
+        if (!Schema::hasTable('attendance_import_days')) Schema::create('attendance_import_days', function (Blueprint $t) {
             $t->id(); $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('batch_id')->constrained('attendance_import_batches')->restrictOnDelete();
             $t->foreignId('employee_id')->constrained()->restrictOnDelete(); $t->date('work_date');
@@ -18,7 +19,7 @@ return new class extends Migration {
             $t->string('issue', 60)->nullable(); $t->string('resolution', 30)->default('pending');
             $t->timestamps(); $t->index(['company_id','resolution','work_date']);
         });
-        Schema::create('attendance_punch_revisions', function (Blueprint $t) {
+        if (!Schema::hasTable('attendance_punch_revisions')) Schema::create('attendance_punch_revisions', function (Blueprint $t) {
             $t->id(); $t->foreignId('company_id')->constrained()->restrictOnDelete();
             $t->foreignId('import_day_id')->constrained('attendance_import_days')->restrictOnDelete();
             $t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
