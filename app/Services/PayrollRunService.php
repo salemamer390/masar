@@ -11,6 +11,7 @@ use App\Models\PayrollRecord;
 use App\Models\PayrollRun;
 use App\Models\Penalty;
 use App\Models\Salary;
+use App\Http\Controllers\JobDataController;
 use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -43,36 +44,86 @@ class PayrollRunService
      * $employeeIds is supplied. A company is always required: payroll is never
      * generated for "all companies".
      */
-    public function generate(Carbon $month, ?array $employeeIds = null, ?int $companyId = null): PayrollRun
+    public function generate(Carbon $month, ?array $employeeIds = null, ?int $companyId = null, ?PayrollRun $forRun = null): PayrollRun
     {
         $companyId = $companyId ?? CompanyContext::id();
         abort_if(!$companyId, 422, 'يجب تحديد الشركة لإنشاء مسير الرواتب.');
-        $month = $month->copy()->startOfMonth();
+        // A transition run keeps its exact anchor date; monthly runs anchor on the month start.
+        $month = $forRun ? $month->copy() : $month->copy()->startOfMonth();
 
-        return CompanyContext::run($companyId, function () use ($month, $employeeIds, $companyId) {
-            return DB::transaction(function () use ($month, $employeeIds, $companyId) {
-                $run = PayrollRun::withoutGlobalScopes()->lockForUpdate()->firstOrCreate(
-                    ['company_id' => $companyId, 'payroll_month' => $month->toDateString()],
-                    ['status' => 'Draft', 'created_by' => auth()->id(), 'settings_snapshot' => $this->settings->snapshot()]
-                );
-                if (in_array($run->status, ['Approved', 'Locked'], true)) {
-                    abort(422, 'Approved or locked payroll runs cannot be regenerated.');
+        return CompanyContext::run($companyId, function () use ($month, $employeeIds, $companyId, $forRun) {
+            return DB::transaction(function () use ($month, $employeeIds, $companyId, $forRun) {
+                $periodOverride = null;
+                if ($forRun) {
+                    $run = PayrollRun::withoutGlobalScopes()->lockForUpdate()->findOrFail($forRun->id);
+                    abort_if($run->status !== 'Draft', 422, 'Only draft payroll runs can be regenerated.');
+                    abort_if(!$run->period_start || !$run->period_end, 422, 'Transition run is missing its period.');
+                    $periodOverride = ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
+                } else {
+                    $creationPeriod = $this->hrSettings->payrollPeriod($month);
+                    $run = PayrollRun::withoutGlobalScopes()->lockForUpdate()->firstOrCreate(
+                        ['company_id' => $companyId, 'payroll_month' => $month->toDateString()],
+                        [
+                            'status' => 'Draft',
+                            'created_by' => auth()->id(),
+                            'settings_snapshot' => $this->settings->snapshot() + [
+                                // The cycle this run was created under: close scheduling
+                                // must never re-read the live settings for a historical run.
+                                'period' => [
+                                    'start_day' => $this->hrSettings->payrollPeriodStartDay(),
+                                    'end_day' => $this->hrSettings->payrollPeriodEndDay(),
+                                ],
+                            ],
+                            // Snapshotted at creation: a later grace-settings change never moves an existing run.
+                            'closes_at' => $this->closesAtFor($creationPeriod['end'], $this->hrSettings->attendanceCorrectionDays())->toDateString(),
+                        ]
+                    );
+                    if (in_array($run->status, ['Approved', 'Locked'], true)) {
+                        abort(422, 'Approved or locked payroll runs cannot be regenerated.');
+                    }
+                    abort_if($run->status === 'Canceled', 422, 'مسير هذه الفترة اتلغى عند تغيير دورة الرواتب ولا يمكن إعادة توليده.');
+                    if (!$run->wasRecentlyCreated && $run->period_start && $run->period_end) {
+                        // A draft pinned by a cycle change keeps covering its original days.
+                        $periodOverride = ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
+                    }
+                    if ($run->wasRecentlyCreated) {
+                        // No overlap, ever: a month whose new-cycle period straddles days an
+                        // existing run already covers (e.g. replaced by a transition run)
+                        // must not start a second run over the same days.
+                        $overlap = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)
+                            ->where('id', '!=', $run->id)->where('status', '!=', 'Canceled')
+                            ->whereNotNull('period_start')->whereNotNull('period_end')
+                            ->whereDate('period_start', '<=', $creationPeriod['end']->toDateString())
+                            ->whereDate('period_end', '>=', $creationPeriod['start']->toDateString())
+                            ->exists();
+                        abort_if($overlap, 422, 'فترة المسير بتتداخل مع مسير موجود. راجع المسير الانتقالي اللي بيغطي نفس الأيام.');
+                    }
                 }
-                $run->update(['settings_snapshot' => $this->settings->snapshot()]);
+                $refreshedSnapshot = $this->settings->snapshot();
+                $existingSnapshot = (array) ($run->settings_snapshot ?? []);
+                // The creation-time cycle survives regeneration; only rows from before
+                // period snapshotting pick up the current days here.
+                $refreshedSnapshot['period'] = (array) ($existingSnapshot['period'] ?? [
+                    'start_day' => $this->hrSettings->payrollPeriodStartDay(),
+                    'end_day' => $this->hrSettings->payrollPeriodEndDay(),
+                ]);
+                $run->update(['settings_snapshot' => $refreshedSnapshot]);
 
                 $eligibleIds = [];
-                foreach ($this->payableEmployees($month, $companyId, $employeeIds) as $item) {
+                foreach ($this->payableEmployees($month, $companyId, $employeeIds, $periodOverride) as $item) {
                     $employee = $item['employee'];
                     $window = $item['window'];
-                    $salary = $this->salaryFor((int) $employee->id, $month);
+                    $salary = $this->salaryFor((int) $employee->id, $month, $periodOverride);
                     if (!$salary) continue;
                     $eligibleIds[] = (int) $employee->id;
 
                     $structure = $this->calculator->structureForSalary($salary);
-                    $inputs = $this->approvedInputs($employee, $month, $structure, $window);
-                    $insuranceDue = $this->insuranceIsDueForMonth($employee, $month);
-                    $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor']);
-                    $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window);
+                    $inputs = $this->approvedInputs($employee, $month, $structure, $window, $run->is_transition ? $run : null);
+                    $chargeMonths = $this->chargeMonthsFor($run, $month);
+                    $insuranceMonths = count(array_filter($chargeMonths, fn ($chargeMonth) => $this->insuranceIsDueForMonth($employee, $chargeMonth)));
+                    $insuranceDue = $insuranceMonths > 0;
+                    $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor'], max(1, $insuranceMonths), $run->is_transition);
+                    $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window, max(1, $insuranceMonths));
                     $this->storeRecord($run, $employee, $month, $payload, $companyId);
                 }
 
@@ -111,7 +162,7 @@ class PayrollRunService
             ->get();
 
         foreach ($runs as $run) {
-            $this->generate($run->payroll_month->copy(), [$employeeId], (int) $companyId);
+            $this->generate($run->payroll_month->copy(), [$employeeId], (int) $companyId, $run->is_transition ? $run : null);
         }
     }
 
@@ -121,7 +172,7 @@ class PayrollRunService
         $runs = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)
             ->where('status', 'Draft')->orderBy('payroll_month')->get();
         foreach ($runs as $run) {
-            $this->generate($run->payroll_month->copy(), null, $companyId);
+            $this->generate($run->payroll_month->copy(), null, $companyId, $run->is_transition ? $run : null);
         }
         return $runs->count();
     }
@@ -160,7 +211,7 @@ class PayrollRunService
     }
 
     /** Run the full calculation for one salary: monthly inputs, statutory values, then proration. */
-    public function calculate(Salary $salary, array $structure, array $inputs, bool $insuranceDue, float $factor): array
+    public function calculate(Salary $salary, array $structure, array $inputs, bool $insuranceDue, float $factor, int $insuranceMonths = 1, bool $allowOverFullMonth = false): array
     {
         $calculation = $this->calculator->monthly(
             (float) $structure['gross'],
@@ -168,18 +219,21 @@ class PayrollRunService
             $salary->insurance_wage ? (float) $salary->insurance_wage : null,
             (bool) $salary->no_insurance || !$insuranceDue,
         );
-        $calculation = $this->applyStructureStatutoryValues($calculation, $salary, $insuranceDue);
+        $calculation = $this->applyStructureStatutoryValues($calculation, $salary, $insuranceDue, $insuranceMonths);
 
-        return $this->applyProration($calculation, $factor);
+        return $this->applyProration($calculation, $factor, $allowOverFullMonth);
     }
 
     /** Map a finished calculation to the payroll_records columns and its audit snapshot. */
-    public function buildPayload(PayrollRun $run, Salary $salary, array $structure, array $calculation, array $inputs, bool $insuranceDue, array $window): array
+    public function buildPayload(PayrollRun $run, Salary $salary, array $structure, array $calculation, array $inputs, bool $insuranceDue, array $window, int $insuranceMonths = 1): array
     {
         return [
             'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
             'agreed_net_salary' => (float) $salary->net_salary,
-            'basic_salary' => $structure['basic_salary'], 'allowances' => $structure['allowances'],
+            // Persist the contractual amounts actually earned in the period: the
+            // engine's internal basic/allowance split drives statutory math only.
+            'basic_salary' => round((float) ($salary->basic_salary ?? $calculation['basic_salary']) * $window['factor'], 2),
+            'allowances' => round((float) ($salary->allowances ?? $calculation['allowances']) * $window['factor'], 2),
             'housing_allowance' => $calculation['housing_allowance'], 'transportation_allowance' => $calculation['transportation_allowance'],
             'meal_allowance' => $calculation['meal_allowance'], 'clothing_allowance' => $calculation['clothing_allowance'],
             'overtime_amount' => $calculation['overtime_amount'], 'total_overtime' => $calculation['overtime_amount'],
@@ -204,6 +258,7 @@ class PayrollRunService
             'calculation_snapshot' => array_merge($structure, $calculation, [
                 'inputs' => $inputs, 'advance_details' => $inputs['advance_details'] ?? [], 'settings' => $run->settings_snapshot,
                 'insurance_due' => $insuranceDue,
+                'insurance_months' => $insuranceDue ? $insuranceMonths : 0,
                 'service_start' => $window['start']->toDateString(),
                 'service_end' => $window['end']->toDateString(),
                 'paid_days' => $window['days'],
@@ -230,8 +285,9 @@ class PayrollRunService
 
         return CompanyContext::run((int) $record->company_id, function () use ($record, $salary, $run, $inputs, $insuranceDue, $window) {
             $structure = $this->calculator->structureForSalary($salary);
-            $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor']);
-            $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window);
+            $insuranceMonths = (int) ($snapshot['insurance_months'] ?? ($insuranceDue ? 1 : 0));
+            $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor'], max(1, $insuranceMonths), $run->is_transition);
+            $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window, max(1, $insuranceMonths));
             unset($payload['payroll_run_id'], $payload['salary_id'], $payload['status'], $payload['is_locked']);
             $record->update($payload);
 
@@ -247,23 +303,25 @@ class PayrollRunService
      * The period of a month: the exact dates stored when its run was approved, otherwise the configured period.
      * Runs approved before the dates were stored have none and keep using the configured period (never guessed).
      */
-    public function periodFor(Carbon $month): array
+    public function periodFor(Carbon $month, ?array $override = null): array
     {
+        if ($override !== null) return $override;
         $companyId = CompanyContext::id();
         if ($companyId) {
             $run = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)
                 ->whereDate('payroll_month', $month->copy()->startOfMonth()->toDateString())
-                ->whereIn('status', ['Approved', 'Locked'])->whereNotNull('period_start')->whereNotNull('period_end')->first();
+                ->whereIn('status', ['Draft', 'Approved', 'Locked'])->whereNotNull('period_start')->whereNotNull('period_end')
+                ->orderByRaw("CASE WHEN status = 'Draft' THEN 1 ELSE 0 END")->first();
             if ($run) return ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
         }
 
         return $this->hrSettings->payrollPeriod($month);
     }
 
-    private function salaryFor(int $employeeId, Carbon $month): ?Salary
+    private function salaryFor(int $employeeId, Carbon $month, ?array $periodOverride = null): ?Salary
     {
         // A historical salary can be the valid one for a past payroll month.
-        $periodEnd = $this->periodFor($month)['end'];
+        $periodEnd = $this->periodFor($month, $periodOverride)['end'];
 
         return Salary::withoutGlobalScopes()
             ->where('employee_id', $employeeId)
@@ -272,9 +330,9 @@ class PayrollRunService
     }
 
     /** Employees whose status allows payroll in this month (before the service-window check). */
-    public function eligibleEmployees(Carbon $month, int $companyId, ?array $employeeIds = null): Collection
+    public function eligibleEmployees(Carbon $month, int $companyId, ?array $employeeIds = null, ?array $periodOverride = null): Collection
     {
-        $period = $this->periodFor($month);
+        $period = $this->periodFor($month, $periodOverride);
         $periodStart = $period['start']->toDateString();
         $periodEnd = $period['end']->toDateString();
 
@@ -292,11 +350,11 @@ class PayrollRunService
     }
 
     /** @return array<int, array{employee: Employee, window: array}> employees that must be paid this month */
-    public function payableEmployees(Carbon $month, int $companyId, ?array $employeeIds = null): array
+    public function payableEmployees(Carbon $month, int $companyId, ?array $employeeIds = null, ?array $periodOverride = null): array
     {
         $payable = [];
-        foreach ($this->eligibleEmployees($month, $companyId, $employeeIds) as $employee) {
-            $window = $this->serviceWindow($employee, $month);
+        foreach ($this->eligibleEmployees($month, $companyId, $employeeIds, $periodOverride) as $employee) {
+            $window = $this->serviceWindow($employee, $month, $periodOverride);
             if ($window === null) continue;
             $payable[] = ['employee' => $employee, 'window' => $window];
         }
@@ -347,7 +405,7 @@ class PayrollRunService
      * ------------------------------------------------------------------ */
 
     /** Build payroll inputs from attendance, leaves, penalties and HR requests inside the service window. */
-    private function approvedInputs(Employee $employee, Carbon $month, array $structure, array $window): array
+    private function approvedInputs(Employee $employee, Carbon $month, array $structure, array $window, ?PayrollRun $forRun = null): array
     {
         $windowFrom = $window['start']->copy()->startOfDay();
         $windowTo = $window['end']->copy()->startOfDay();
@@ -388,7 +446,7 @@ class PayrollRunService
         $penalties = Penalty::withoutGlobalScopes()->with('penaltyType')->where('employee_id', $employee->id)->whereBetween('penalty_date', [$from, $to])
             ->effective()->get();
         $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
-        $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross']);
+        $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross'], $forRun);
 
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
@@ -459,7 +517,7 @@ class PayrollRunService
      * advance and the monthly installment are capped at a share of gross salary
      * (a company setting, 10% by default).
      */
-    private function advanceDeduction(Employee $employee, Carbon $month, float $gross): array
+    private function advanceDeduction(Employee $employee, Carbon $month, float $gross, ?PayrollRun $forRun = null): array
     {
         $requests = HrRequest::withoutGlobalScopes()->with('requestType')
             ->where('employee_id', $employee->id)
@@ -468,8 +526,13 @@ class PayrollRunService
                 $query->where('request_type', 'advance')
                     ->orWhereHas('requestType', fn ($type) => $type->where('source_key', 'advance'));
             })->get();
+        // Canceled runs never paid anything: their records must not count as history.
         $priorRecords = PayrollRecord::withoutGlobalScopes()->where('employee_id', $employee->id)
             ->where('payroll_month', '<', $month->toDateString())
+            ->where(function ($query) {
+                $query->whereNull('payroll_run_id')
+                    ->orWhereNotIn('payroll_run_id', DB::table('payroll_runs')->select('id')->where('status', 'Canceled'));
+            })
             ->get(['payroll_month', 'loans', 'calculation_snapshot']);
         $monthlyCap = round(max(0, $gross) * $this->settings->advanceMaxFraction(), 2);
         $remainingCapacity = $monthlyCap;
@@ -525,6 +588,54 @@ class PayrollRunService
                 $remainingLegacy = round($remainingLegacy - $allocated, 2);
                 if ($remainingLegacy <= 0) break;
             }
+        }
+
+        if ($forRun) {
+            // Transition run: an advance is granted by the run whose exact period contains
+            // the hand-over date, and one installment is collected per owned charge month
+            // (the monthly cap applies per charged month). Months owned by another run
+            // are never double-charged.
+            $periodStart = $forRun->period_start->copy()->startOfDay();
+            $periodEnd = $forRun->period_end->copy()->startOfDay();
+            $chargeMonths = $this->chargeMonthsFor($forRun, $month);
+            foreach ($orderedRequests as $request) {
+                $payload = is_array($request->payload) ? $request->payload : [];
+                $amount = (float) ($payload['amount'] ?? 0);
+                $requestDate = $payload['request_date'] ?? $request->created_at?->toDateString();
+                if ($amount <= 0 || !$requestDate) continue;
+                if (Carbon::parse($requestDate)->betweenIncluded($periodStart, $periodEnd)) {
+                    $grantAmount += $amount;
+                }
+            }
+            foreach ($chargeMonths as $chargeMonth) {
+                $remainingCapacity = $monthlyCap;
+                foreach ($orderedRequests as $request) {
+                    $payload = is_array($request->payload) ? $request->payload : [];
+                    $amount = (float) ($payload['amount'] ?? 0);
+                    $requestDate = $payload['request_date'] ?? $request->created_at?->toDateString();
+                    if ($amount <= 0 || !$requestDate) continue;
+                    $startMonth = Carbon::parse($requestDate)->startOfMonth()->addMonth();
+                    if ($chargeMonth->lt($startMonth)) continue;
+                    $paid = (float) ($paidByRequest[$request->id] ?? 0);
+                    $remaining = round(max(0, $amount - $paid), 2);
+                    if ($remaining <= 0 || $remainingCapacity <= 0) continue;
+                    $installment = round(min($remaining, $remainingCapacity), 2);
+                    $total += $installment;
+                    $remainingCapacity = round($remainingCapacity - $installment, 2);
+                    $paidByRequest[$request->id] = round(($paidByRequest[$request->id] ?? 0) + $installment, 2);
+                    $details[] = [
+                        'request_id' => $request->id,
+                        'amount' => $amount,
+                        'paid_before' => round($paid, 2),
+                        'installment' => $installment,
+                        'remaining_after' => round($remaining - $installment, 2),
+                        'start_month' => $startMonth->toDateString(),
+                        'charge_month' => $chargeMonth->toDateString(),
+                    ];
+                }
+            }
+
+            return ['amount' => round($total, 2), 'grant_amount' => round($grantAmount, 2), 'details' => $details];
         }
 
         foreach ($requests as $request) {
@@ -754,8 +865,14 @@ class PayrollRunService
             }
 
             $actor = auth()->id();
-            $period = CompanyContext::run((int) $run->company_id, fn () => $this->hrSettings->payrollPeriod($run->payroll_month->copy()->startOfMonth()));
-            $run->update(['period_start' => $period['start']->toDateString(), 'period_end' => $period['end']->toDateString(), 'status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now(), 'skipped_report' => $report]);
+            $period = CompanyContext::run((int) $run->company_id, function () use ($run) {
+                // A run already carrying exact period dates (transition or cycle-pinned draft) keeps them.
+                if ($run->period_start && $run->period_end) {
+                    return ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
+                }
+                return $this->hrSettings->payrollPeriod($run->payroll_month->copy()->startOfMonth());
+            });
+            $run->update(['period_start' => $period['start']->toDateString(), 'period_end' => $period['end']->toDateString(), 'status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now(), 'skipped_report' => $report, 'closes_at' => $run->closes_at ?? $this->closesAtFor($period['end'], $this->hrSettings->attendanceCorrectionDays())->toDateString()]);
             PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $run->id)->whereNotIn('status', self::PAID_STATUSES)
                 ->update(['status' => 'Approved', 'approved_by' => $actor, 'approved_at' => now()]);
             ActivityLog::record(
@@ -798,7 +915,7 @@ class PayrollRunService
 
         return CompanyContext::run($companyId, function () use ($companyId, $month) {
             $run = PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->first();
-            if ($run && $run->status === 'Locked') return $run;
+            if ($run && in_array($run->status, ['Locked', 'Paid'], true)) return $run;
 
             if (!$run || $run->status !== 'Approved') {
                 $run = $this->generate($month, null, $companyId);
@@ -807,14 +924,98 @@ class PayrollRunService
                     $run->delete();
                     return null;
                 }
-                if ($run->status !== 'Draft') {
-                    $run->update(['status' => 'Draft']);
-                    $run = $run->fresh();
-                }
-                $run = $this->approve($run, false, true);
             }
 
-            return $this->lock($run, true);
+            return $this->closeRun($run, true);
+        });
+    }
+
+    /** The date a period finally closes: its last day plus the full correction grace. */
+    public function closesAtFor(Carbon $periodEnd, int $graceDays): Carbon
+    {
+        // Same schedule as the attendance archive: the full grace days stay correctable,
+        // the run closes on the first day after them (period end + grace + 1).
+        return $periodEnd->copy()->startOfDay()->addDays(max(0, $graceDays) + 1);
+    }
+
+    /**
+     * The single lock path for every period, monthly or transition, automatic or manual:
+     * freeze the period's attendance first, recalculate a draft from the frozen data,
+     * approve, then lock the run and its records, and refresh the saved monthly summary
+     * with the final numbers. Idempotent: an already-final run is returned untouched.
+     * A period that has not ended is never closed.
+     */
+    /**
+     * The period a run actually covers: its stored dates when present, otherwise the
+     * cycle snapshotted at creation, and only for pre-snapshot rows the live settings.
+     *
+     * @return array{start: Carbon,end: Carbon}
+     */
+    public function periodForRun(PayrollRun $run): array
+    {
+        if ($run->period_start && $run->period_end) {
+            return ['start' => $run->period_start->copy()->startOfDay(), 'end' => $run->period_end->copy()->startOfDay()];
+        }
+        $month = $run->payroll_month->copy()->startOfMonth();
+        $snapshot = (array) ($run->settings_snapshot ?? []);
+        $startDay = (int) data_get($snapshot, 'period.start_day', 0);
+        $endDay = (int) data_get($snapshot, 'period.end_day', 0);
+        if ($startDay >= 1 && $endDay >= 1) {
+            return $this->hrSettings->payrollPeriodForDays($month, $startDay, $endDay);
+        }
+
+        return $this->hrSettings->payrollPeriod($month);
+    }
+
+    public function closeRun(PayrollRun $run, bool $automatic = false): PayrollRun
+    {
+        $companyId = (int) $run->company_id;
+
+        return CompanyContext::run($companyId, function () use ($run, $companyId, $automatic) {
+            return DB::transaction(function () use ($run, $companyId, $automatic) {
+                // One writer per company: settings saves and attendance writers queue here.
+                app(AttendancePeriodArchiveService::class)->lockCompanyForWrite($companyId);
+                $run = PayrollRun::withoutGlobalScopes()->lockForUpdate()->findOrFail($run->id);
+                if (in_array($run->status, ['Locked', 'Paid'], true)) {
+                    return $run; // idempotent: already final
+                }
+                abort_if($run->status === 'Canceled', 422, 'لا يمكن قفل مسير ملغي.');
+
+                $period = $this->periodForRun($run);
+                abort_if($period['end']->gte(Carbon::today()), 422, 'لا يمكن قفل فترة لم تنتهِ بعد.');
+
+                // 1) Freeze the period's attendance before any recalculation.
+                $archives = app(AttendancePeriodArchiveService::class);
+                if ($archive = $archives->archivePeriod($companyId, $period['start'], $period['end'])) {
+                    $archives->close($archive);
+                }
+
+                // 2) Recalculate a draft from the frozen attendance, then approve.
+                if ($run->status === 'Draft') {
+                    $run = $this->generate($run->payroll_month->copy(), null, $companyId, $run->is_transition ? $run : null);
+                    if (PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $run->id)->exists()) {
+                        $run = $this->approve($run, false, true);
+                    } else {
+                        // Nothing to pay: lock the empty run as-is so the period is final.
+                        $run->update(['status' => 'Locked', 'locked_by' => auth()->id(), 'locked_at' => now()]);
+                        ActivityLog::record('payroll_run_auto_lock', 'Empty payroll run locked automatically at period close.', $run, ['status' => 'Draft'], ['status' => 'Locked'], 'payroll');
+                    }
+                }
+
+                // 3) Lock the run and its records.
+                if ($run->status === 'Approved') {
+                    $run = $this->lock($run, true);
+                }
+
+                // 4) Refresh the saved monthly summary with the final numbers.
+                try {
+                    app(JobDataController::class)->captureSnapshot($month, auth()->id());
+                } catch (\Throwable $e) {
+                    report($e); // the lock itself already succeeded; the summary can be recaptured
+                }
+
+                return $run->fresh();
+            });
         });
     }
 
@@ -852,15 +1053,17 @@ class PayrollRunService
      * extra tax on taxable variable earnings (computed by the calculator) is
      * added on top of the structure tax.
      */
-    public function applyStructureStatutoryValues(array $calculation, Salary $salary, bool $insuranceDue = true): array
+    public function applyStructureStatutoryValues(array $calculation, Salary $salary, bool $insuranceDue = true, int $insuranceMonths = 1): array
     {
+        $insuranceMonths = $insuranceDue ? max(1, $insuranceMonths) : 0;
         $insuranceWage = $insuranceDue ? (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0) : 0.0;
-        $employeeInsurance = $insuranceDue ? (float) ($salary->employee_insurance ?? 0) : 0.0;
+        // A run charges one full monthly insurance per calendar month it owns (never prorated).
+        $employeeInsurance = $insuranceDue ? (float) ($salary->employee_insurance ?? 0) * $insuranceMonths : 0.0;
         $structureTax = (float) ($salary->income_tax ?? 0);
         $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
         $incomeTax = round($structureTax + $variableTax, 2);
         $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
-        $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) : 0.0;
+        $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) * $insuranceMonths : 0.0;
         $deductions = $employeeInsurance + $incomeTax + $martyrsFund
             + (float) $calculation['absence_deduction'] + (float) $calculation['penalty_deduction']
             + (float) $calculation['loans'] + (float) $calculation['other_deductions'];
@@ -872,9 +1075,11 @@ class PayrollRunService
             'income_tax' => $incomeTax,
             'martyrs_fund' => $martyrsFund,
             'employer_insurance' => $employerInsurance,
-            'employee_cost' => $insuranceDue
-                ? (float) ($salary->employee_cost ?? ((float) $calculation['gross'] + $employerInsurance))
-                : (float) $calculation['gross'],
+            'employee_cost' => !$insuranceDue
+                ? (float) $calculation['gross']
+                : ($insuranceMonths === 1 && $salary->employee_cost !== null
+                    ? (float) $salary->employee_cost
+                    : (float) $calculation['gross'] + $employerInsurance),
             'monthly_deductions' => round($deductions, 2),
             'net_monthly' => round((float) $calculation['entitlements'] - $deductions, 2),
         ]);
@@ -886,10 +1091,11 @@ class PayrollRunService
      *  - Never prorated: social insurance (paid in full), absence and penalty deductions,
      *    advances, other deductions and every variable earning (overtime, bonuses...).
      */
-    public function applyProration(array $calculation, float $factor): array
+    public function applyProration(array $calculation, float $factor, bool $allowOverFullMonth = false): array
     {
-        $factor = min(1, max(0, $factor));
-        if ($factor >= 1) {
+        // Transition runs pay by actual days even beyond a full month; monthly runs stay capped.
+        $factor = $allowOverFullMonth ? max(0, $factor) : min(1, max(0, $factor));
+        if ($factor >= 1 && (!$allowOverFullMonth || abs($factor - 1) < 0.000001)) {
             return $calculation + [
                 'proration_factor' => 1.0,
                 'monthly_total' => round((float) ($calculation['monthly_total'] ?? $calculation['gross']), 2),
@@ -944,9 +1150,9 @@ class PayrollRunService
      * period ends today so users can follow the amount accrued so far; past
      * months always run to month end. Days are counted with integer logic only.
      */
-    public function serviceWindow(Employee $employee, Carbon $month): ?array
+    public function serviceWindow(Employee $employee, Carbon $month, ?array $periodOverride = null): ?array
     {
-        $period = $this->periodFor($month);
+        $period = $this->periodFor($month, $periodOverride);
         $periodStart = $period['start']->copy()->startOfDay();
         $periodEnd = $period['end']->copy()->startOfDay();
         $today = Carbon::today()->startOfDay();
@@ -988,7 +1194,7 @@ class PayrollRunService
         $basis = $this->settings->prorationDays();
         $days = PayrollProration::paidDays($start, $end, $basis);
 
-        return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => min(1, $days / $basis)];
+        return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => $periodOverride ? max(0, $days / $basis) : min(1, $days / $basis)];
     }
 
     /** Return the end of the current annual renewal cycle. */
@@ -1000,6 +1206,32 @@ class PayrollRunService
             $end->addYear();
         }
         return $end;
+    }
+
+    /**
+     * Calendar months whose statutory monthly charges (insurance, advance installments)
+     * belong to this run: every month whose first day falls inside the run's period.
+     * A monthly run always owns exactly its payroll month; a transition run owns the
+     * months bridged by its exact gap period (zero when the gap fits inside one month).
+     * The period chain is contiguous and non-overlapping, so each month is charged once.
+     *
+     * @return array<int, Carbon> month-start dates
+     */
+    private function chargeMonthsFor(PayrollRun $run, Carbon $month): array
+    {
+        if (!$run->is_transition) {
+            return [$month->copy()->startOfMonth()];
+        }
+        $start = $run->period_start->copy()->startOfDay();
+        $end = $run->period_end->copy()->startOfDay();
+        $first = $start->copy()->startOfMonth();
+        if ($first->lt($start)) $first->addMonthNoOverflow();
+        $months = [];
+        for ($cursor = $first; $cursor->lte($end); $cursor = $cursor->copy()->addMonthNoOverflow()) {
+            $months[] = $cursor->copy();
+        }
+
+        return $months;
     }
 
     /** Employees hired after the 1st of a month pay no social insurance for that month. */

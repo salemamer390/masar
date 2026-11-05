@@ -17,5 +17,7 @@ Schedule::command('attendance:archive-periods')->dailyAt('00:10')->timezone('Afr
 Schedule::command('fingerprint:sync-devices')->everyFifteenMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('operations:detect-stale-sync')->everyThirtyMinutes()->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::call(fn () => \App\Http\Controllers\AttendanceImportController::purgeStaleImportFiles())->hourly()->name('attendance-import-prune')->withoutOverlapping();
-// Payroll closing is manual. Late fingerprint imports from the new month may
-// still affect the previous month, so no automatic close is scheduled.
+// Every ended period closes automatically once its correction grace (the
+// attendance_correction_days company setting, default 3 days) has fully passed:
+// attendance, the saved summary, the run and its records freeze together.
+Schedule::command('payroll:close-periods')->dailyAt('00:20')->timezone('Africa/Cairo')->withoutOverlapping();

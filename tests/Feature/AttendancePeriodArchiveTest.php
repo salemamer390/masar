@@ -262,7 +262,7 @@ class AttendancePeriodArchiveTest extends TestCase
         return DB::table('hr_operational_settings')->where('company_id', $this->company->id)->where('setting_key', $key)->value('setting_value');
     }
 
-    public function test_save_that_reuses_already_saved_attendance_days_is_rejected_and_changes_nothing(): void
+    public function test_save_with_a_period_still_in_its_correction_window_needs_confirmation_and_changes_nothing(): void
     {
         $this->attend('2026-11-10');
         Carbon::setTestNow('2026-11-26 09:00:00'); // 26/10..25/11 just ended and is saved (pending) when settings are saved
@@ -271,10 +271,7 @@ class AttendancePeriodArchiveTest extends TestCase
         $draft = DB::table('payroll_runs')->insertGetId(['company_id' => $this->company->id, 'payroll_month' => '2026-11-01', 'status' => 'Draft', 'created_at' => now(), 'updated_at' => '2026-01-01 00:00:00']);
 
         $response = $this->saveDays('1', '30', ['grace_minutes' => '40']);
-        $response->assertRedirect()->assertSessionHasErrors('payroll_period');
-        $errors = implode(' | ', session('errors')->get('payroll_period'));
-        $this->assertStringContainsString('01/11/2026', $errors);
-        $this->assertStringContainsString('25/11/2026', $errors);
+        $response->assertRedirect()->assertSessionHas('period_confirm');
         $this->assertSame('26', $this->settingValue('payroll_period_start_day'), 'period days untouched');
         $this->assertNull($this->settingValue('grace_minutes'), 'other fields of the same form are not saved either');
         $this->assertSame(26, app(HrOperationalSettingsService::class)->payrollPeriodStartDay(), 'no stale or poisoned cache');
@@ -283,15 +280,19 @@ class AttendancePeriodArchiveTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_json_request_gets_422_with_the_overlapping_dates(): void
+    public function test_json_request_saves_and_creates_a_marked_transition_run_for_the_gap(): void
     {
         Carbon::setTestNow('2026-11-30 09:00:00');
         $this->service()->archivePeriod($this->company->id, Carbon::parse('2026-10-26'), Carbon::parse('2026-11-25'));
         $this->putJson(route('payroll.settings.operational.update'), [
             'default_shift_start' => '09:00', 'default_shift_end' => '17:00', 'absence_cutoff_time' => '17:00', 'grace_minutes' => '15',
             'weekly_rest_pattern' => '0000100', 'payroll_period_start_day' => '1', 'payroll_period_end_day' => '30',
-        ])->assertStatus(422)->assertJsonPath('success', false)->assertJsonPath('overlaps.0.from', '2026-11-01')->assertJsonPath('overlaps.0.to', '2026-11-25');
-        $this->assertSame('closed', $this->archives()[0]->status);
+        ])->assertStatus(200)->assertJsonPath('success', true);
+        $this->assertSame('closed', $this->archives()[0]->status, 'saved attendance never re-covered or moved');
+        $transition = DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', true)->first();
+        $this->assertNotNull($transition, 'a marked transition run bridges the gap');
+        $this->assertSame(['2026-11-26', '2026-11-30'], [substr($transition->period_start, 0, 10), substr($transition->period_end, 0, 10)], 'exactly the uncovered days: no gap, no overlap');
+        $this->assertSame('Draft', $transition->status);
         Carbon::setTestNow();
     }
 
@@ -333,14 +334,19 @@ class AttendancePeriodArchiveTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_confirmation_never_overrides_overlap_rejection_and_rolls_the_early_close_back(): void
+    public function test_confirmed_save_closes_the_pending_period_and_bridges_the_gap(): void
     {
         $this->attend('2026-11-10');
         Carbon::setTestNow('2026-11-26 09:00:00');
         $this->service()->sync($this->company->id);
-        $this->saveDays('1', '30', ['confirm_close_pending' => '1'])->assertSessionHasErrors('payroll_period');
-        $this->assertSame('26', $this->settingValue('payroll_period_start_day'));
-        $this->assertSame('pending', $this->archives()[0]->status, 'early close rolled back with the rejected save');
+        $this->saveDays('1', '30', ['confirm_close_pending' => '1'])->assertSessionHasNoErrors();
+        $this->assertSame('1', $this->settingValue('payroll_period_start_day'));
+        $archive = $this->archives()[0];
+        $this->assertSame('closed', $archive->status, 'confirmed pending period closed with the save');
+        $this->assertSame(['2026-10-26', '2026-11-25'], [$archive->period_start->toDateString(), $archive->period_end->toDateString()], 'closed with its original boundaries');
+        $transition = DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', true)->first();
+        $this->assertNotNull($transition);
+        $this->assertSame(['2026-11-26', '2026-11-30'], [substr($transition->period_start, 0, 10), substr($transition->period_end, 0, 10)]);
         Carbon::setTestNow();
     }
 
@@ -396,35 +402,52 @@ class AttendancePeriodArchiveTest extends TestCase
         Carbon::setTestNow();
     }
 
-    public function test_overlap_guard_uses_the_stored_run_period_not_only_record_windows(): void
+    public function test_generation_never_reuses_days_of_a_stored_run_period(): void
     {
         Carbon::setTestNow('2026-11-10 09:00:00');
         $run = $this->frozenRun($this->company->id, '2026-10-01', '2026-10-01', '2026-10-10', 'Approved'); // narrow record window
         DB::table('payroll_runs')->where('id', $run)->update(['period_start' => '2026-09-26', 'period_end' => '2026-10-25']);
-        $this->saveDays('20', '19')->assertSessionHasErrors('payroll_period'); // new Nov = 20/10.. reuses 20/10-25/10 of the stored period
-        $this->assertSame('26', $this->settingValue('payroll_period_start_day'));
+        // The cycle change itself is allowed: the gap becomes a marked transition run.
+        $this->saveDays('20', '19')->assertSessionHasNoErrors();
+        $this->assertSame('20', $this->settingValue('payroll_period_start_day'));
+        $transition = DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', true)->first();
+        $this->assertNotNull($transition);
+        $this->assertSame(['2026-10-26', '2026-11-19'], [substr($transition->period_start, 0, 10), substr($transition->period_end, 0, 10)]);
+        // But a monthly run must never be generated over days the stored period already covers.
+        $svc = app(\App\Services\PayrollRunService::class);
+        try {
+            $svc->generate(Carbon::parse('2026-11-01'), null, $this->company->id); // new-cycle Nov = 20/10..19/11
+            $this->fail('generating over the stored period of another run must be rejected');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            $this->assertSame(422, $e->getStatusCode());
+        }
+        $this->assertSame(1, DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', false)->where('status', '!=', 'Canceled')->count(), 'no second monthly run appeared');
         Carbon::setTestNow();
     }
 
-    public function test_approved_payroll_blocks_only_a_change_that_reuses_its_days(): void
+    public function test_cycle_changes_bridge_every_gap_with_marked_transition_runs(): void
     {
         Carbon::setTestNow('2026-11-10 09:00:00');
         $this->frozenRun($this->company->id, '2026-10-01', '2026-09-26', '2026-10-25', 'Locked');
         $this->frozenRun($this->company->id, '2026-11-01', '2026-10-26', '2026-11-25', 'Approved');
-        // 26/25 -> 1/30: the next unfinished month (Dec 1..30) reuses nothing, so an existing approved run does not forbid it.
         $this->saveDays('1', '30')->assertSessionHasNoErrors();
         $this->assertSame('1', $this->settingValue('payroll_period_start_day'));
-        $this->assertStringContainsString('26/11/2026', implode(' ', (array) session('period_notes')), 'uncovered days are reported, not invented');
-        // back to 26/25: Dec would be 26/11..25/12 and reuses 26/11? No - Nov is final (..25/11), so it is fine too.
+        $this->assertStringContainsString('مسير انتقالي', implode(' ', (array) session('period_notes')), 'the transition run is announced');
+        $transitions = DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', true)->orderBy('period_start')->get();
+        $this->assertCount(1, $transitions);
+        $this->assertSame(['2026-11-26', '2026-11-30'], [substr($transitions[0]->period_start, 0, 10), substr($transitions[0]->period_end, 0, 10)], 'contiguous with the finalized runs and the new cycle');
+        // Back to 26/25: the first transition is finalized history input; the new gap (1/12..25/12) is bridged too.
         $this->saveDays('26', '25')->assertSessionHasNoErrors();
-        // Oct is final with 1/10..30/10 in this variant: switching to 26/25 would make Nov start on 26/10 and reuse 26..30/10.
+        $transitions = DB::table('payroll_runs')->where('company_id', $this->company->id)->where('is_transition', true)->orderBy('period_start')->get();
+        $this->assertCount(2, $transitions);
+        $this->assertSame(['2026-12-01', '2026-12-25'], [substr($transitions[1]->period_start, 0, 10), substr($transitions[1]->period_end, 0, 10)], 'no gap, no overlap across repeated changes');
+        // A shorter recorded window does not move the anchor: the stored run period is the boundary.
         DB::table('payroll_records')->where('payroll_month', '2026-11-01')->delete();
         DB::table('payroll_runs')->where('payroll_month', '2026-11-01')->delete();
         DB::table('payroll_records')->where('payroll_month', '2026-10-01')->update(['calculation_snapshot' => json_encode(['service_start' => '2026-10-01', 'service_end' => '2026-10-30'])]);
         $this->setting('payroll_period_start_day', '1'); $this->setting('payroll_period_end_day', '30');
-        $this->saveDays('26', '25')->assertSessionHasErrors('payroll_period');
-        $this->assertStringContainsString('26/10/2026', implode(' ', session('errors')->get('payroll_period')));
-        $this->assertSame('1', $this->settingValue('payroll_period_start_day'));
+        $this->saveDays('26', '25')->assertSessionHasNoErrors();
+        $this->assertSame('26', $this->settingValue('payroll_period_start_day'), 'changes keep being allowed; coverage is bridged, never guessed');
         Carbon::setTestNow();
     }
 
@@ -478,7 +501,7 @@ class AttendancePeriodArchiveTest extends TestCase
         $this->setting('payroll_period_end_day', '30');
         $this->service()->sync($this->company->id, Carbon::parse('2026-12-05'));
         $ranges = $this->ranges();
-        $this->assertSame(['2026-09-26..2026-10-25', '2026-10-01..2026-10-30', '2026-11-01..2026-11-30'], $ranges, 'exactly the configured period, no short transition and nothing skipped silently');
+        $this->assertSame(['2026-09-26..2026-10-25', '2026-10-26..2026-10-30', '2026-11-01..2026-11-30'], $ranges, 'the chain continues from the first unsaved day, clipped, never re-covering saved days');
     }
 
     public function test_duplicate_save_attempt_keeps_the_first_saved_period(): void

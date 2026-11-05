@@ -387,6 +387,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::post('/runs/{payrollRun}/lock', [PayrollController::class, 'lockRun'])
             ->middleware('permission:payroll.lock')
             ->name('runs.lock');
+        Route::post('/close-period', [PayrollController::class, 'closePeriod'])
+            ->middleware('permission:payroll.lock')
+            ->name('close-period');
         Route::delete('/runs/{payrollRun}', [PayrollController::class, 'destroyRun'])
             ->middleware('permission:payroll.delete')
             ->name('runs.destroy');

@@ -8,19 +8,23 @@
 @if($errors->has('payroll'))<div class="alert alert-danger m-3">{{ $errors->first('payroll') }}</div>@endif
 <table class="table align-middle"><thead><tr><th>الشهر</th><th>الحالة</th><th>السجلات</th><th>الإقفال التلقائي</th><th>الإجراء</th></tr></thead><tbody>
 @forelse($runs as $run)
-@php($meta = $runMeta[$run->id] ?? ['month_ended' => false, 'closes_on' => ''])
+@php($meta = $runMeta[$run->id] ?? ['month_ended' => false, 'period_ended' => false, 'closes_on' => ''])
 @php($report = $runReports[$run->id] ?? null)
 @php($statusLabel = ['Draft' => 'مسودة (حتى اليوم)', 'Generating' => 'جارٍ الإنشاء', 'Approved' => 'معتمد', 'Locked' => 'مقفول'][$run->status] ?? $run->status)
-<tr><td>{{ $run->payroll_month?->format('m/Y') }}</td><td><span class="badge {{ $run->status === 'Locked' ? 'text-bg-dark' : ($run->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $statusLabel }}</span></td><td>{{ $run->records_count }}</td><td>@if($run->status === 'Locked')تم {{ $run->locked_at?->format('d/m/Y H:i') }}@else{{ $meta['closes_on'] }}@endif</td>
+<tr><td>{{ $run->payroll_month?->format('m/Y') }}@if($run->is_transition) <span class="badge text-bg-info">انتقالي</span>@endif @if($run->period_start && $run->period_end)<small class="d-block text-muted">{{ $run->period_start->format('d/m/Y') }} - {{ $run->period_end->format('d/m/Y') }}</small>@endif</td><td><span class="badge {{ $run->status === 'Locked' ? 'text-bg-dark' : ($run->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $statusLabel }}</span></td><td>{{ $run->records_count }}</td><td>@if($run->status === 'Locked')تم {{ $run->locked_at?->format('d/m/Y H:i') }}@else{{ $meta['closes_on'] }}@endif</td>
 <td>
 @if($run->status === 'Draft' && auth()->user()?->hasPermission('payroll.approve'))
-@if($meta['month_ended'])
+@if($meta['period_ended'])
 <form class="d-inline" method="POST" action="{{ route('payroll.runs.approve',$run) }}">@csrf
 @if($report && count($report['skipped']))<label class="d-block small mb-1"><input type="checkbox" name="confirm_skipped" value="1" required> أؤكد الاعتماد رغم استبعاد {{ count($report['skipped']) }} موظف</label>@endif
 <button class="btn btn-sm btn-outline-success">اعتماد</button></form>
 @else<small class="text-muted">يُعتمد ويُقفل تلقائيًا يوم {{ $meta['closes_on'] }}</small>@endif
-@elseif($run->status === 'Approved' && auth()->user()?->hasPermission('payroll.lock'))
-@if($meta['month_ended'])<form class="d-inline" method="POST" action="{{ route('payroll.runs.lock',$run) }}">@csrf<button class="btn btn-sm btn-outline-dark">قفل نهائي</button></form>@else<small class="text-muted">يُقفل تلقائيًا يوم {{ $meta['closes_on'] }}</small>@endif
+@elseif($run->status === 'Approved' && !$meta['period_ended'])
+<small class="text-muted">يُقفل تلقائيًا يوم {{ $meta['closes_on'] }}</small>
+@endif
+@if(in_array($run->status, ['Draft', 'Approved'], true) && $meta['period_ended'] && auth()->user()?->hasPermission('payroll.lock'))
+<button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#closePeriod{{ $run->id }}">قفل نهائي</button>
+<div class="modal fade" id="closePeriod{{ $run->id }}" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" action="{{ route('payroll.close-period') }}">@csrf<input type="hidden" name="payroll_run_id" value="{{ $run->id }}"><div class="modal-header"><h5>قفل نهائي لمسير {{ $run->payroll_month?->format('m/Y') }}@if($run->is_transition) (انتقالي)@endif</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="alert alert-light border small">القفل النهائي يثبّت حضور الفترة والملخص المحفوظ والمسير وسجلاته معًا، ومش هيقبلوا تعديل بعدها. لو المسير لسه مسودة هيُعتمد تلقائيًا قبل القفل.</div><label class="d-flex gap-2 align-items-start"><input type="checkbox" name="confirm" value="1" required class="form-check-input mt-1"><span>أؤكد إن أرقام الفترة هتتثبت نهائيًا ومش هتقبل تعديل.</span></label></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-dark">قفل نهائي</button></div></form></div></div></div>
 @endif
 @if(auth()->user()?->hasPermission('payroll.delete'))<form class="d-inline ms-1" method="POST" action="{{ route('payroll.runs.destroy',$run) }}" onsubmit="return confirm('سيتم حذف المسير وسجلاته نهائيًا ولا يمكن التراجع. هل تريد المتابعة؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger">حذف</button></form>@endif
 </td></tr>

@@ -127,7 +127,8 @@ class PayrollSettingsController extends Controller
         $blocked = null;
         $needsConfirm = null;
         $notes = [];
-        try { DB::transaction(function () use ($companyId, $data, $labels, $hrSettings, $confirmClose, &$blocked, &$needsConfirm, &$notes) {
+        $transitionNote = null;
+        try { DB::transaction(function () use ($companyId, $data, $labels, $hrSettings, $confirmClose, &$blocked, &$needsConfirm, &$notes, &$transitionNote) {
             // One writer per company: settings saves, the archive job and attendance writers queue here.
             DB::table('companies')->where('id', $companyId)->lockForUpdate()->first();
             $hrSettings->flush();
@@ -138,8 +139,9 @@ class PayrollSettingsController extends Controller
             if ($daysChanged) {
                 $impact = app(\App\Services\PeriodChangeImpactService::class)->detect($companyId, (int) $data['payroll_period_start_day'], (int) $data['payroll_period_end_day']);
                 $notes = $impact['notes'];
-                if ($impact['blocking']) {
-                    $blocked = $impact['blocking'];
+                $attendanceBlocking = array_values(array_filter($impact['blocking'], fn ($item) => ($item['source'] ?? null) === 'attendance_archive'));
+                if ($attendanceBlocking) {
+                    $blocked = $attendanceBlocking;
                     throw new \DomainException('period-change-rejected'); // rolls the whole transaction back
                 }
             }
@@ -161,6 +163,20 @@ class PayrollSettingsController extends Controller
                     ['company_id' => $companyId, 'setting_key' => $key],
                     ['setting_value' => (string) $value, 'label' => $labels[$key], 'updated_at' => now(), 'created_at' => now()]
                 );
+            }
+            if ($daysChanged) {
+                // Read the just-saved days (and grace) inside the same transaction.
+                $hrSettings->flush();
+                $this->recordChange($companyId, now()->toDateString(),
+                    ['payroll_period_start_day' => $oldStart, 'payroll_period_end_day' => $oldEnd],
+                    ['payroll_period_start_day' => (int) $data['payroll_period_start_day'], 'payroll_period_end_day' => (int) $data['payroll_period_end_day']]);
+                $transition = app(\App\Services\PayrollTransitionService::class)->createForCycleChange(
+                    $companyId, (int) $data['payroll_period_start_day'], (int) $data['payroll_period_end_day'], $oldStart, $oldEnd);
+                if ($transition) {
+                    // The transition run covers the bridged days, so the "uncovered days" notes no longer apply.
+                    $notes = [];
+                    $transitionNote = 'اتعمل مسير انتقالي من ' . $transition->period_start->format('d/m/Y') . ' إلى ' . $transition->period_end->format('d/m/Y') . ' بالأيام الفعلية، عشان ميبقاش في فجوة ولا تداخل بين الدورتين.';
+                }
             }
         }); } catch (\DomainException $rejected) {
             if (!$blocked && !$needsConfirm) throw $rejected;
@@ -186,7 +202,7 @@ class PayrollSettingsController extends Controller
         $draftCount = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Operational settings updated and calculations refreshed.', 'settings' => $data, 'attendance_updated' => $attendanceCount, 'drafts_refreshed' => $draftCount])
-            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.')->with('period_notes', array_column($notes, 'text'));
+            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.')->with('period_notes', array_values(array_filter(array_merge($transitionNote ? [$transitionNote] : [], array_column($notes, 'text')))));
     }
 
     public function storeHoliday(Request $request)

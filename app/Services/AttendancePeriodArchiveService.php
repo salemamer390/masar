@@ -46,6 +46,9 @@ class AttendancePeriodArchiveService
                     $period = $this->settings->periodContaining($cursor->copy());
                     $start = $period['start']->copy()->startOfDay();
                     $end = $period['end']->copy()->startOfDay();
+                    // After a cycle-days change the chain continues from the first uncovered
+                    // day: the straddling period is clipped instead of re-covering saved days.
+                    if ($start->lt($cursor)) $start = $cursor->copy();
                     if ($end->lt($cursor)) { $cursor = $cursor->copy()->addDay(); continue; } // a day the settings leave uncovered (e.g. 31st with end day 30)
                     if ($end->gte($today)) break; // still the current period
                     if ($this->openPeriod($companyId, $start, $end)) $result['opened']++;
