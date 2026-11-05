@@ -14,9 +14,11 @@ use App\Services\Imports\WorkbookRequestImporter;
 use App\Services\PayrollPeriodGuard;
 use App\Services\PayrollRunService;
 use App\Services\Imports\XlsxWriter;
+use App\Models\PenaltyType;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class EmployeeImportController extends Controller
 {
@@ -50,6 +52,7 @@ class EmployeeImportController extends Controller
 
         return response()->json(['success' => true] + $this->payload($analysis) + [
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
+            'penalty_types' => PenaltyType::withoutGlobalScopes()->orderBy('name')->pluck('name'),
             'review_token' => $this->reviewToken($request, $analysis, $companyId),
         ]);
     }
@@ -96,7 +99,7 @@ class EmployeeImportController extends Controller
                     'imported' => $imported,
                     'skipped' => $skipped,
                     'errors' => array_slice((array) ($data['errors'] ?? []), 0, 5),
-                ];
+                ] + ($domain === 'penalties' ? ['failures' => array_slice((array) ($data['failures'] ?? []), 0, 25), 'excluded' => (int) ($data['excluded'] ?? 0)] : []);
             }
         }
 
@@ -113,6 +116,13 @@ class EmployeeImportController extends Controller
         [$analysis, $companyId] = $prepared;
         $payload = $this->payload($analysis);
         $extension = strtolower((string) $request->file('file')?->getClientOriginalExtension());
+
+        // Import lineage tables come from migrations; never expose a raw SQL error.
+        foreach (['employee_import_batches', 'employee_import_rows', 'employee_import_row_revisions', 'attendance_import_batches', 'attendance_import_days', 'attendance_punch_revisions'] as $table) {
+            if (!Schema::hasTable($table)) {
+                return response()->json(['success' => false, 'message' => 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل الاستيراد. لم يُحفظ أي شيء.'], 500);
+            }
+        }
 
         // The commit executes exactly the plan the user reviewed: the review
         // token binds the file contents, company, user, duplicates mode,
@@ -158,12 +168,17 @@ class EmployeeImportController extends Controller
             return response()->json(['success' => false, 'message' => 'يجب تأكيد تحديث بيانات الموظفين الموجودين مسبقًا.'] + $payload, 422);
         }
 
-        $result = $this->service->commit($analysis, $companyId);
-        $distributed = $extension === 'xlsx'
-            ? $this->distribute($request, (string) $request->file('file')->getRealPath(), $extension, $analysis['sheets'] ?? [])
-            : [];
+        // One atomic unit: employees, workbook domains and the lineage batch all
+        // commit together or roll back together, so a failure never leaves data
+        // without its review records (or half an import behind a raw error).
+        [$result, $distributed, $batch] = DB::transaction(function () use ($request, $analysis, $companyId, $extension) {
+            $result = $this->service->commit($analysis, $companyId);
+            $distributed = $extension === 'xlsx'
+                ? $this->distribute($request, (string) $request->file('file')->getRealPath(), $extension, $analysis['sheets'] ?? [])
+                : [];
 
-        $batch = $this->recordLineage($request, $analysis, $result, $distributed, $companyId);
+            return [$result, $distributed, $this->recordLineage($request, $analysis, $result, $distributed, $companyId)];
+        });
 
         $attendanceCount = (int) data_get($distributed, 'attendance.imported', 0);
         $leaveCount = (int) data_get($distributed, 'leaves.imported', 0);
@@ -214,6 +229,24 @@ class EmployeeImportController extends Controller
      *
      * @return array<string, mixed>
      */
+    /** Reviewed per-row penalty-type corrections: {sheet: {line: type name}}. */
+    private function penaltyFixes(Request $request): array
+    {
+        $fixes = json_decode((string) $request->input('penalty_fixes', '{}'), true);
+        if (!is_array($fixes)) return [];
+        $clean = [];
+        foreach ($fixes as $sheet => $lines) {
+            if (!is_array($lines)) continue;
+            foreach ($lines as $line => $type) {
+                $type = trim((string) $type);
+                if ($type === '__exclude__' || $type !== '') $clean[(string) $sheet][(int) $line] = $type;
+            }
+            if (count($clean) > 200) break;
+        }
+
+        return $clean;
+    }
+
     private function distribute(Request $request, string $path, string $extension, array $sheets = []): array
     {
         // One classification, confirmed by the user in the preview, decides which
@@ -273,6 +306,7 @@ class EmployeeImportController extends Controller
                     (bool) $request->user()?->hasPermission('penalties.create'),
                     $leavePenaltySheets,
                     $sheetConfigs(['leaves', 'penalties']),
+                    $this->penaltyFixes($request),
                 );
                 $distributed['leaves'] = $leavePenalty['leaves'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
                 $distributed['penalties'] = $leavePenalty['penalties'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
@@ -379,6 +413,24 @@ class EmployeeImportController extends Controller
             // Failed rows from the other workbook domains (attendance, leaves,
             // penalties, requests, insurance) are parked too - as review-only
             // entries: they are corrected in their own screens, never guessed here.
+            // Rows the user explicitly excluded in the review are audit-dismissed,
+            // never parked as pending again.
+            foreach ((array) data_get($distributed, 'penalties.excluded_rows', []) as $excluded) {
+                EmployeeImportRow::create([
+                    'company_id' => $companyId,
+                    'batch_id' => $batch->id,
+                    'sheet' => (string) ($excluded['sheet'] ?? ''),
+                    'line' => (int) ($excluded['line'] ?? 0),
+                    'kind' => 'penalties',
+                    'employee_id' => null,
+                    'status' => 'dismissed',
+                    'payload' => [
+                        'headers' => (array) ($excluded['headers'] ?? []),
+                        'values' => (array) ($excluded['values'] ?? []),
+                    ],
+                    'errors' => (array) ($excluded['errors'] ?? []),
+                ]);
+            }
             foreach (['attendance', 'leaves', 'penalties', 'requests', 'insurance'] as $domain) {
                 foreach ((array) data_get($distributed, $domain . '.failures', []) as $failure) {
                     EmployeeImportRow::create([
@@ -444,6 +496,7 @@ class EmployeeImportController extends Controller
             'sheet' => (string) $request->input('sheet', 'auto'),
             'mappings' => $mappings,
             'sheets' => $sheets,
+            'penalty_fixes' => $this->penaltyFixes($request),
         ];
 
         return hash_hmac('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE), (string) config('app.key'));
