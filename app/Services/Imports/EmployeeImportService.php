@@ -396,7 +396,7 @@ class EmployeeImportService
         if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type', 'start date'])) return 'leaves';
         if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])) return 'penalties';
         if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
-        if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'overtime', 'bonus', 'commission'])) return 'requests';
+        if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'نوع الطلب', 'overtime', 'bonus', 'commission', 'incentive', 'profit', 'permission', 'mission', 'request type', 'إذن', 'مأمورية'])) return 'requests';
         // Insurance-record sheets need markers beyond الرقم التأميني, which is a
         // normal employee column too; a sheet that also carries strong employee
         // identity columns stays an employees sheet, and ambiguous sheets stay
@@ -552,7 +552,7 @@ class EmployeeImportService
             'leaves' => 'إجازات',
             'penalties' => 'جزاءات',
             'advances' => 'سلف',
-            'requests' => 'طلبات (إضافي / مكافآت)',
+            'requests' => 'طلبات (إضافي / مكافآت / إذن / مأمورية)',
             'insurance' => 'تأمينات',
             'auxiliary' => 'تجاهل',
             'unknown' => 'غير معروفة - تحتاج مراجعة',
