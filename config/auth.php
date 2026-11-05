@@ -40,6 +40,13 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        // Dedicated session guard for the private owner dashboard. It shares
+        // the session cookie with the web guard but keeps its own login, so
+        // the owner can stay signed in here and in a company account at once.
+        'owner' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
     ],
 
     /*
