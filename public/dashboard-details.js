@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.setAttribute('role', 'button');
     panel.addEventListener('click', event => {
       if (event.target.closest('a,button,input,select,form')) return;
-      const [type, icon] = match;
+      const [type, icon] = match[1];
       const heading = panel.querySelector('.panel-head h3')?.textContent?.trim() || 'تفاصيل المؤشر';
       title?.querySelector('span:last-child').replaceChildren(document.createTextNode(heading));
       const iconElement = title?.querySelector('i');
