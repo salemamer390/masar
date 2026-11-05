@@ -36,7 +36,7 @@ class WorkbookLeavePenaltyImporter
         return null;
     }
 
-    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true, ?array $onlySheets = null, ?array $configs = null): array
+    public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true, ?array $onlySheets = null, ?array $configs = null, array $penaltyFixes = []): array
     {
         $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []]];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
@@ -52,7 +52,7 @@ class WorkbookLeavePenaltyImporter
                 if ($forced === 'leaves' && $allowLeaves) {
                     $this->importLeaves($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['leaves'], $headers);
                 } elseif ($forced === 'penalties' && $allowPenalties) {
-                    $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers);
+                    $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers, $penaltyFixes);
                 }
                 continue;
             }
@@ -61,7 +61,7 @@ class WorkbookLeavePenaltyImporter
             if ($allowLeaves && isset($map['leave_type'], $map['start'], $map['end'])) {
                 $this->importLeaves($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['leaves'], $headers);
             } elseif ($allowPenalties && isset($map['penalty_type'], $map['date'], $map['deduction'])) {
-                $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers);
+                $this->importPenalties($sheet['name'], $rows, $map, $periodGuard, $payrollRuns, $result['penalties'], $headers, $penaltyFixes);
             }
         }
         return $result;
@@ -97,15 +97,26 @@ class WorkbookLeavePenaltyImporter
         }
     }
 
-    private function importPenalties(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result, array $headers = []): void
+    private function importPenalties(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result, array $headers = [], array $penaltyFixes = []): void
     {
         foreach ($rows as $line => $row) {
             try {
+                // A row the user explicitly excluded in the review is not imported
+                // and not a failure: it is recorded as a deliberate dismissal.
+                if (($penaltyFixes[$sheet][$line] ?? null) === '__exclude__') {
+                    $result['excluded'] = ($result['excluded'] ?? 0) + 1;
+                    $result['excluded_rows'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => ['استبعده المستخدم أثناء المراجعة قبل الحفظ.']];
+                    continue;
+                }
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
                 if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                 $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح.');
                 $guard->ensureOpen($date);
                 $typeName = trim((string) ($row[$map['penalty_type']] ?? ''));
+                $fixedType = $penaltyFixes[$sheet][$line] ?? null;
+                if (is_string($fixedType) && trim($fixedType) !== '') $typeName = trim($fixedType);
+                // A missing type must be rejected for review, never matched by wildcard.
+                if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
                 $type = PenaltyType::where('name', $typeName)->first() ?: PenaltyType::where('name', 'like', '%'.$typeName.'%')->first();
                 if (!$type) throw new \RuntimeException('نوع الجزاء غير موجود.');
                 $days = (float) ($row[$map['deduction']] ?? 0);
