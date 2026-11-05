@@ -99,6 +99,7 @@ class EmployeeImportController extends Controller
                     'imported' => $imported,
                     'skipped' => $skipped,
                     'errors' => array_slice((array) ($data['errors'] ?? []), 0, 5),
+                    'warnings' => array_slice((array) ($data['warnings'] ?? []), 0, 10),
                 ] + ($domain === 'penalties' ? ['failures' => array_slice((array) ($data['failures'] ?? []), 0, 25), 'excluded' => (int) ($data['excluded'] ?? 0)] : []);
             }
         }
@@ -279,7 +280,7 @@ class EmployeeImportController extends Controller
         $leavePenaltySheets = $sheetNames(['leaves', 'penalties']);
         $requestSheets = $sheetNames(['requests', 'advances']);
         $insuranceSheets = $sheetNames(['insurance']);
-        $empty = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
+        $empty = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'warnings' => [], 'failures' => []];
 
         $distributed = [];
         if ($request->user()?->hasPermission('attendance.create')) {
@@ -324,7 +325,7 @@ class EmployeeImportController extends Controller
                     $sheetConfigs(['requests', 'advances']),
                 );
             } catch (\Throwable $exception) {
-                $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()], 'failures' => []];
+                $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()], 'warnings' => [], 'failures' => []];
             }
         }
         if ($request->user()?->hasPermission('insurance.create')) {
