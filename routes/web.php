@@ -555,9 +555,14 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
 });
 
 
-// Private owner dashboard: not listed in the sidebar, and the `owner`
-// middleware answers 404 to every account except the platform owner's.
-Route::middleware(['auth', 'no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->group(function () {
+// Private owner dashboard: not listed in the sidebar. It authenticates
+// through the dedicated `owner` guard (its own login below); the `owner`
+// middleware answers 404 to anyone logged into the regular app who is not
+// the owner, and sends only true guests to the owner login.
+Route::get('/owner/login', [\App\Http\Controllers\OwnerAuthController::class, 'showLogin'])->name('owner.login');
+Route::post('/owner/login', [\App\Http\Controllers\OwnerAuthController::class, 'login'])->middleware('throttle:5,1')->name('owner.login.attempt');
+Route::post('/owner/logout', [\App\Http\Controllers\OwnerAuthController::class, 'logout'])->name('owner.logout');
+Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->group(function () {
     Route::get('/', [\App\Http\Controllers\OwnerDashboardController::class, 'index'])->name('index');
     Route::post('/plans', [\App\Http\Controllers\OwnerDashboardController::class, 'storePlan'])->name('plans.store');
     Route::put('/plans/{plan}', [\App\Http\Controllers\OwnerDashboardController::class, 'updatePlan'])->name('plans.update');
