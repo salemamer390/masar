@@ -50,6 +50,7 @@ class EmployeeImportController extends Controller
 
         return response()->json(['success' => true] + $this->payload($analysis) + [
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
+            'review_token' => $this->reviewToken($request, $analysis, $companyId),
         ]);
     }
 
@@ -75,7 +76,7 @@ class EmployeeImportController extends Controller
             DB::beginTransaction();
             try {
                 $this->service->commit($analysis, $companyId);
-                $distributed = $this->distribute($request, (string) $file->getRealPath(), $extension);
+                $distributed = $this->distribute($request, (string) $file->getRealPath(), $extension, $analysis['sheets'] ?? []);
             } finally {
                 DB::rollBack();
             }
@@ -111,6 +112,34 @@ class EmployeeImportController extends Controller
         }
         [$analysis, $companyId] = $prepared;
         $payload = $this->payload($analysis);
+        $extension = strtolower((string) $request->file('file')?->getClientOriginalExtension());
+
+        // The commit executes exactly the plan the user reviewed: the review
+        // token binds the file contents, company, user, duplicates mode,
+        // employee sheet choice and mappings, and every sheet's confirmed kind
+        // and column mapping. Changing anything after the preview - the file,
+        // a kind, or a mapping - fails closed and forces a fresh preview.
+        $token = (string) $request->input('review_token', '');
+        if ($token === '' || !hash_equals($this->reviewToken($request, $analysis, $companyId), $token)) {
+            return response()->json(['success' => false, 'message' => 'التأكيد يتطلب مراجعة حديثة: أعد فحص الملف ثم أكّد الاستيراد.'] + $payload, 422);
+        }
+
+        // Reject unknown sheet-kind values outright instead of silently
+        // falling back to detection and importing a different plan.
+        $rawKinds = json_decode((string) $request->input('sheet_kinds', '{}'), true);
+        $allowedKinds = array_merge(array_keys(EmployeeImportService::kindLabels()), ['ignore']);
+        foreach ((is_array($rawKinds) ? $rawKinds : []) as $rawKind) {
+            if (!in_array((string) $rawKind, $allowedKinds, true)) {
+                return response()->json(['success' => false, 'message' => 'قيمة نوع ورقة غير معروفة. أعد فحص الملف وراجع أنواع الأوراق.'] + $payload, 422);
+            }
+        }
+
+        // The reviewed column mapping must be complete enough to parse each
+        // data sheet as its confirmed kind - enforced server-side, not only
+        // in the modal.
+        if ($extension === 'xlsx' && ($configError = $this->service->domainConfigError($analysis['sheets'] ?? [])) !== null) {
+            return response()->json(['success' => false, 'message' => $configError] + $payload, 422);
+        }
 
         if ($analysis['needs_mapping']) {
             return response()->json(['success' => false, 'message' => 'اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.'] + $payload, 422);
@@ -130,9 +159,8 @@ class EmployeeImportController extends Controller
         }
 
         $result = $this->service->commit($analysis, $companyId);
-        $extension = strtolower((string) $request->file('file')?->getClientOriginalExtension());
         $distributed = $extension === 'xlsx'
-            ? $this->distribute($request, (string) $request->file('file')->getRealPath(), $extension)
+            ? $this->distribute($request, (string) $request->file('file')->getRealPath(), $extension, $analysis['sheets'] ?? [])
             : [];
 
         $batch = $this->recordLineage($request, $analysis, $result, $distributed, $companyId);
@@ -186,15 +214,51 @@ class EmployeeImportController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function distribute(Request $request, string $path, string $extension): array
+    private function distribute(Request $request, string $path, string $extension, array $sheets = []): array
     {
+        // One classification, confirmed by the user in the preview, decides which
+        // domain receives which sheet: dashboard/summary/ignored/unknown sheets
+        // never reach a data importer, so a misclassified sheet cannot write
+        // attendance (or any other domain) silently.
+        $sheetNames = function (array $kinds) use ($sheets): array {
+            // Fail safe: a sheet without a positively confirmed kind reaches no
+            // importer - there is no legacy all-sheets fan-out from this path.
+            $names = [];
+            foreach ($sheets as $sheet) {
+                if (in_array($sheet['kind'] ?? 'unknown', $kinds, true)) $names[] = (string) $sheet['name'];
+            }
+            return $names;
+        };
+        $sheetConfigs = function (array $kinds) use ($sheets): array {
+            $configs = [];
+            foreach ($sheets as $sheet) {
+                $kind = (string) ($sheet['kind'] ?? 'unknown');
+                if (!in_array($kind, $kinds, true) || empty($sheet['domain_config'])) continue;
+                $configs[(string) $sheet['name']] = [
+                    'header_row' => (int) ($sheet['domain_config']['header_row'] ?? -1),
+                    'map' => (array) ($sheet['domain_config']['map'] ?? []),
+                    'domain' => $kind,
+                ];
+            }
+            return $configs;
+        };
+        $attendanceSheets = $sheetNames(['attendance']);
+        $leavePenaltySheets = $sheetNames(['leaves', 'penalties']);
+        $requestSheets = $sheetNames(['requests', 'advances']);
+        $insuranceSheets = $sheetNames(['insurance']);
+        $empty = ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
+
         $distributed = [];
         if ($request->user()?->hasPermission('attendance.create')) {
-            try {
+            if ($attendanceSheets === []) {
+                $distributed['attendance'] = $empty;
+            } else try {
                 $distributed['attendance'] = $this->attendanceImporter->import(
                     $path, $extension,
                     app(PayrollPeriodGuard::class),
                     app(PayrollRunService::class),
+                    $attendanceSheets,
+                    $sheetConfigs(['attendance']),
                 );
             } catch (\Throwable $exception) {
                 $distributed['attendance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة الحضور: '.$exception->getMessage()], 'failures' => []];
@@ -202,11 +266,13 @@ class EmployeeImportController extends Controller
         }
         if ($request->user()?->hasPermission('leaves.create') || $request->user()?->hasPermission('penalties.create')) {
             try {
-                $leavePenalty = $this->leavePenaltyImporter->import(
+                $leavePenalty = $leavePenaltySheets === [] ? ['leaves' => $empty, 'penalties' => $empty] : $this->leavePenaltyImporter->import(
                     $path, $extension,
                     app(PayrollPeriodGuard::class), app(PayrollRunService::class),
                     (bool) $request->user()?->hasPermission('leaves.create'),
                     (bool) $request->user()?->hasPermission('penalties.create'),
+                    $leavePenaltySheets,
+                    $sheetConfigs(['leaves', 'penalties']),
                 );
                 $distributed['leaves'] = $leavePenalty['leaves'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
                 $distributed['penalties'] = $leavePenalty['penalties'] ?? ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []];
@@ -217,9 +283,11 @@ class EmployeeImportController extends Controller
         }
         if ($request->user()?->hasPermission('requests.create')) {
             try {
-                $distributed['requests'] = $this->requestImporter->import(
+                $distributed['requests'] = $requestSheets === [] ? $empty : $this->requestImporter->import(
                     $path, $extension,
                     app(PayrollPeriodGuard::class), app(PayrollRunService::class),
+                    $requestSheets,
+                    $sheetConfigs(['requests', 'advances']),
                 );
             } catch (\Throwable $exception) {
                 $distributed['requests'] = ['imported' => 0, 'skipped' => 0, 'errors' => [$exception->getMessage()], 'failures' => []];
@@ -227,7 +295,7 @@ class EmployeeImportController extends Controller
         }
         if ($request->user()?->hasPermission('insurance.create')) {
             try {
-                $distributed['insurance'] = $this->insuranceImporter->import($path, $extension);
+                $distributed['insurance'] = $insuranceSheets === [] ? $empty : $this->insuranceImporter->import($path, $extension, $insuranceSheets, $sheetConfigs(['insurance']));
             } catch (\Throwable $exception) {
                 $distributed['insurance'] = ['imported' => 0, 'skipped' => 0, 'errors' => ['تعذر توزيع ورقة التأمينات: '.$exception->getMessage()], 'failures' => []];
             }
@@ -339,6 +407,48 @@ class EmployeeImportController extends Controller
      *
      * @return array{0: array<string, mixed>, 1: int}|JsonResponse
      */
+    /**
+     * HMAC over the canonical reviewed plan: the uploaded file's hash, the
+     * company and user, the duplicates mode, the employee sheet choice and
+     * column mappings, and every sheet's effective kind plus its final domain
+     * config (detected header row + map merged with the user's reviewed
+     * overrides). Preview signs it; store recomputes and compares, so a commit
+     * can only run the exact configuration the preview showed.
+     *
+     * @param array<string, mixed> $analysis
+     */
+    private function reviewToken(Request $request, array $analysis, int $companyId): string
+    {
+        $file = $request->file('file');
+        $sheets = [];
+        foreach ($analysis['sheets'] ?? [] as $sheet) {
+            $config = $sheet['domain_config'] ?? null;
+            $map = is_array($config) ? (array) ($config['map'] ?? []) : [];
+            ksort($map);
+            $sheets[] = [
+                'name' => (string) ($sheet['name'] ?? ''),
+                'kind' => (string) ($sheet['kind'] ?? 'unknown'),
+                'header_row' => is_array($config) ? (int) ($config['header_row'] ?? -1) : null,
+                'map' => $map,
+            ];
+        }
+        $mappings = json_decode((string) $request->input('mappings', '{}'), true);
+        $mappings = is_array($mappings) ? $mappings : [];
+        ksort($mappings);
+        $canonical = [
+            'v' => 1,
+            'file' => hash_file('sha256', (string) $file->getRealPath()),
+            'company' => $companyId,
+            'user' => (int) $request->user()->id,
+            'duplicates' => (string) $request->input('duplicates', 'update'),
+            'sheet' => (string) $request->input('sheet', 'auto'),
+            'mappings' => $mappings,
+            'sheets' => $sheets,
+        ];
+
+        return hash_hmac('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE), (string) config('app.key'));
+    }
+
     private function prepare(Request $request): array|JsonResponse
     {
         $request->validate([
@@ -346,6 +456,8 @@ class EmployeeImportController extends Controller
             'duplicates' => ['nullable', 'in:update,skip'],
             'sheet' => ['nullable', 'string', 'max:10'],
             'mappings' => ['nullable', 'string', 'max:20000'],
+            'sheet_kinds' => ['nullable', 'string', 'max:20000'],
+            'domain_mappings' => ['nullable', 'string', 'max:20000'],
             'ack_dates' => ['nullable', 'boolean'],
             'ack_updates' => ['nullable', 'boolean'],
         ], [
@@ -372,6 +484,8 @@ class EmployeeImportController extends Controller
         }
 
         $mappings = json_decode((string) $request->input('mappings', '{}'), true);
+        $sheetKinds = json_decode((string) $request->input('sheet_kinds', '{}'), true);
+        $domainMappings = json_decode((string) $request->input('domain_mappings', '{}'), true);
         $analysis = $this->service->analyze(
             $file->getRealPath(),
             $extension,
@@ -380,6 +494,8 @@ class EmployeeImportController extends Controller
             [
                 'sheet' => (string) $request->input('sheet', 'auto'),
                 'mappings' => is_array($mappings) ? $mappings : [],
+                'sheet_kinds' => is_array($sheetKinds) ? $sheetKinds : [],
+                'domain_mappings' => is_array($domainMappings) ? $domainMappings : [],
             ]
         );
 
@@ -415,6 +531,13 @@ class EmployeeImportController extends Controller
             'fields' => $fields,
             'today' => date('d/m/Y'),
             'kind_labels' => EmployeeImportService::kindLabels(),
+            'domain_fields' => [
+                'attendance' => EmployeeImportService::domainFields('attendance'),
+                'leaves' => EmployeeImportService::domainFields('leaves'),
+                'penalties' => EmployeeImportService::domainFields('penalties'),
+                'requests' => EmployeeImportService::domainFields('requests'),
+                'insurance' => EmployeeImportService::domainFields('insurance'),
+            ],
             'review_sheets' => array_values(array_map(
                 static fn (array $sheet): array => ['name' => $sheet['name'], 'rows' => $sheet['rows']],
                 array_filter($analysis['sheets'] ?? [], static fn (array $sheet): bool => ($sheet['kind'] ?? 'unknown') === 'unknown' && (int) ($sheet['rows'] ?? 0) > 0)
