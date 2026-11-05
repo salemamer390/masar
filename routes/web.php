@@ -553,3 +553,17 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
             ->name('destroy');
     });
 });
+
+
+// Private owner dashboard: not listed in the sidebar, and the `owner`
+// middleware answers 404 to every account except the platform owner's.
+Route::middleware(['auth', 'no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\OwnerDashboardController::class, 'index'])->name('index');
+    Route::post('/plans', [\App\Http\Controllers\OwnerDashboardController::class, 'storePlan'])->name('plans.store');
+    Route::put('/plans/{plan}', [\App\Http\Controllers\OwnerDashboardController::class, 'updatePlan'])->name('plans.update');
+    Route::post('/companies', [\App\Http\Controllers\OwnerDashboardController::class, 'storeCompany'])->name('companies.store');
+    Route::put('/companies/{company}/subscription', [\App\Http\Controllers\OwnerDashboardController::class, 'updateCompanySubscription'])->name('companies.subscription.update');
+    Route::put('/companies/{company}/status', [\App\Http\Controllers\OwnerDashboardController::class, 'updateCompanyStatus'])->name('companies.status.update');
+    Route::put('/renewals/{renewal}', [\App\Http\Controllers\OwnerDashboardController::class, 'updateRenewal'])->name('renewals.update');
+    Route::post('/announcements', [\App\Http\Controllers\OwnerDashboardController::class, 'sendAnnouncement'])->name('announcements.send');
+});

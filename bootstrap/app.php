@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'superadmin' => \App\Http\Middleware\SuperAdminOnly::class,
             'global_superadmin' => \App\Http\Middleware\GlobalSuperAdminOnly::class,
+            'owner' => \App\Http\Middleware\OwnerOnly::class,
             'companymanager' => \App\Http\Middleware\CompanyManagerOnly::class,
             'subscription' => \App\Http\Middleware\EnsureActiveCompanySubscription::class,
             'no_auth_cache' => \App\Http\Middleware\PreventAuthenticatedPageCache::class,
