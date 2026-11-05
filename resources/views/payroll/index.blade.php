@@ -533,3 +533,4 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   });
 </script>
 @endpush
+
