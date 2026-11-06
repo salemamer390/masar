@@ -218,10 +218,35 @@ class PayrollRunService
             $inputs,
             $salary->insurance_wage ? (float) $salary->insurance_wage : null,
             (bool) $salary->no_insurance || !$insuranceDue,
+            $this->absenceBaseOverride($salary),
         );
         $calculation = $this->applyStructureStatutoryValues($calculation, $salary, $insuranceDue, $insuranceMonths);
 
         return $this->applyProration($calculation, $factor, $allowOverFullMonth);
+    }
+
+    /**
+     * Absence-day deduction base under the BasicPlusAllowances basis: the
+     * contractual basic plus the daily value of only the allowances configured
+     * as absence-deducted, read from the stored salary row. Returns null for
+     * the Basic/Gross bases so the calculator keeps its existing behavior.
+     */
+    private function absenceBaseOverride(Salary $salary): ?float
+    {
+        if ($this->settings->absenceBasis() !== 'BasicPlusAllowances') return null;
+        // Legacy rows without a contractual basic breakdown keep the calculator's own base.
+        if ($salary->basic_salary === null) return null;
+
+        $columns = [
+            'housing' => 'housing_allowance', 'transportation' => 'transportation_allowance',
+            'meal' => 'meal_allowance', 'clothing' => 'clothing_allowance', 'other' => 'other_allowances',
+        ];
+        $base = (float) ($salary->basic_salary ?? 0);
+        foreach ($this->settings->absenceDeductedAllowances() as $key) {
+            $base += (float) ($salary->{$columns[$key]} ?? 0);
+        }
+
+        return $base;
     }
 
     /** Map a finished calculation to the payroll_records columns and its audit snapshot. */
