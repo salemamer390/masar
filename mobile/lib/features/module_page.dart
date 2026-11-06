@@ -6,6 +6,7 @@ import '../core/api.dart';
 import '../core/theme.dart';
 import '../shared/widgets.dart';
 import 'record_form.dart';
+import 'employee_profile.dart';
 
 class Module {
   final String path, title, shortTitle;
@@ -402,160 +403,179 @@ class _ModulePageState extends State<ModulePage> {
     }
   }
 
-  void detail(Map<String, dynamic> row) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (c) => SafeArea(
-      child: DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .65,
-        minChildSize: .35,
-        maxChildSize: .94,
-        builder: (_, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              row['title']?.toString() ?? '',
-              style: Theme.of(c).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 7),
-            Text(
-              row['subtitle']?.toString() ?? '',
-              style: const TextStyle(color: MasarColors.muted),
-            ),
-            const SizedBox(height: 10),
-            StatusChip(row['status']?.toString() ?? ''),
-            const SizedBox(height: 14),
-            ...Map<String, dynamic>.from(
-              row['fields'] as Map? ?? {},
-            ).entries.map(
-              (e) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        e.key,
-                        style: const TextStyle(color: MasarColors.muted),
+  void detail(Map<String, dynamic> row) {
+    if (path == 'employees') {
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmployeeProfilePage(
+            api: widget.api,
+            employeeId: row['id'] as int,
+            canEdit: can('edit'),
+          ),
+        ),
+      ).then((_) {
+        if (mounted) load();
+      });
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => SafeArea(
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: .65,
+          minChildSize: .35,
+          maxChildSize: .94,
+          builder: (_, controller) => ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                row['title']?.toString() ?? '',
+                style: Theme.of(c).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 7),
+              Text(
+                row['subtitle']?.toString() ?? '',
+                style: const TextStyle(color: MasarColors.muted),
+              ),
+              const SizedBox(height: 10),
+              StatusChip(row['status']?.toString() ?? ''),
+              const SizedBox(height: 14),
+              ...Map<String, dynamic>.from(
+                row['fields'] as Map? ?? {},
+              ).entries.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          e.key,
+                          style: const TextStyle(color: MasarColors.muted),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: SelectableText(
-                        e.value?.toString() ?? 'غير مسجل',
-                        textAlign: TextAlign.end,
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: SelectableText(
+                          e.value?.toString() ?? 'غير مسجل',
+                          textAlign: TextAlign.end,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (can('edit') &&
-                    row['edit'] != null &&
-                    [
-                      'employees',
-                      'leaves',
-                      'penalties',
-                      'attendance',
-                      'payroll',
-                    ].contains(path) &&
-                    (path != 'payroll' ||
-                        (row['status'] == 'Draft' && row['is_locked'] != true)))
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      form(row);
-                    },
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('تعديل'),
-                  ),
-                if (path == 'leaves' &&
-                    can('approve') &&
-                    row['status'] != 'Rejected')
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      action(row, 'reject');
-                    },
-                    child: const Text('رفض مع السبب'),
-                  ),
-                if (path == 'documents' && row['has_file'] == true)
-                  OutlinedButton.icon(
-                    onPressed: () => shareFile(
-                      'documents/${row['id']}/file',
-                      row['file_name']?.toString() ?? 'document',
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (can('edit') &&
+                      row['edit'] != null &&
+                      [
+                        'employees',
+                        'leaves',
+                        'penalties',
+                        'attendance',
+                        'payroll',
+                      ].contains(path) &&
+                      (path != 'payroll' ||
+                          (row['status'] == 'Draft' &&
+                              row['is_locked'] != true)))
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        form(row);
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('تعديل'),
                     ),
-                    icon: const Icon(Icons.file_open),
-                    label: const Text('فتح / مشاركة الملف'),
-                  ),
-                if (path == 'payroll' && can('view'))
-                  OutlinedButton.icon(
-                    onPressed: () => shareFile(
-                      'payroll/records/${row['id']}/payslip',
-                      'payslip-${row['id']}.pdf',
+                  if (path == 'leaves' &&
+                      can('approve') &&
+                      row['status'] != 'Rejected')
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        action(row, 'reject');
+                      },
+                      child: const Text('رفض مع السبب'),
                     ),
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('مفردات الراتب PDF'),
-                  ),
-                if (path == 'payroll' &&
-                    can('approve') &&
-                    row['status'] == 'Draft')
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      mutate(
-                        'payroll/records/${row['id']}/approve',
-                        'اعتماد راتب ${row['title']}',
-                      );
-                    },
-                    child: const Text('اعتماد الراتب'),
-                  ),
-                if (path == 'payroll' &&
-                    can('edit') &&
-                    row['paid_at'] == null &&
-                    ['Approved', 'Locked'].contains(row['status']))
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      mutate(
-                        'payroll/records/${row['id']}/pay',
-                        'تسجيل صرف ${row['title']} (سجل محاسبي، ليس تحويلًا بنكيًا)',
-                      );
-                    },
-                    child: const Text('تسجيل الصرف'),
-                  ),
-                if (can('delete') &&
-                    ![
-                      'employees',
-                      'payroll',
-                      'reports',
-                      'summary',
-                      'notifications',
-                    ].contains(path))
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(c);
-                      action(row, 'delete');
-                    },
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('حذف'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
+                  if (path == 'documents' && row['has_file'] == true)
+                    OutlinedButton.icon(
+                      onPressed: () => shareFile(
+                        'documents/${row['id']}/file',
+                        row['file_name']?.toString() ?? 'document',
+                      ),
+                      icon: const Icon(Icons.file_open),
+                      label: const Text('فتح / مشاركة الملف'),
+                    ),
+                  if (path == 'payroll' && can('view'))
+                    OutlinedButton.icon(
+                      onPressed: () => shareFile(
+                        'payroll/records/${row['id']}/payslip',
+                        'payslip-${row['id']}.pdf',
+                      ),
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text('مفردات الراتب PDF'),
+                    ),
+                  if (path == 'payroll' &&
+                      can('approve') &&
+                      row['status'] == 'Draft')
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        mutate(
+                          'payroll/records/${row['id']}/approve',
+                          'اعتماد راتب ${row['title']}',
+                        );
+                      },
+                      child: const Text('اعتماد الراتب'),
+                    ),
+                  if (path == 'payroll' &&
+                      can('edit') &&
+                      row['paid_at'] == null &&
+                      ['Approved', 'Locked'].contains(row['status']))
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        mutate(
+                          'payroll/records/${row['id']}/pay',
+                          'تسجيل صرف ${row['title']} (سجل محاسبي، ليس تحويلًا بنكيًا)',
+                        );
+                      },
+                      child: const Text('تسجيل الصرف'),
+                    ),
+                  if (can('delete') &&
+                      ![
+                        'employees',
+                        'payroll',
+                        'reports',
+                        'summary',
+                        'notifications',
+                      ].contains(path))
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        action(row, 'delete');
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('حذف'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+
   Future<void> period() async {
     final now = DateTime.now();
     if (path == 'payroll' ||
