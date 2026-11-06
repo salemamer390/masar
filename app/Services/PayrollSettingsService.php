@@ -84,11 +84,11 @@ class PayrollSettingsService
     }
 
     /** Basis rules accept only Gross or Basic; anything else falls back to the default. */
-    private function basis(string $group, string $key, string $default): string
+    private function basis(string $group, string $key, string $default, array $allowed = ['Gross', 'Basic']): string
     {
         $value = ucfirst(strtolower(trim($this->rule($group, $key, $default))));
 
-        return in_array($value, ['Gross', 'Basic'], true) ? $value : $default;
+        return in_array($value, $allowed, true) ? $value : $default;
     }
 
     private function rulesAreCompanyScoped(): bool
@@ -196,7 +196,15 @@ class PayrollSettingsService
 
     public function absenceBasis(): string
     {
-        return $this->basis('absence', 'calculation_basis', 'Gross');
+        return $this->basis('absence', 'calculation_basis', 'BasicPlusAllowances', ['Gross', 'Basic', 'BasicPlusAllowances']);
+    }
+
+    /** Allowance keys whose daily value is deducted on an absence day under the BasicPlusAllowances basis. */
+    public function absenceDeductedAllowances(): array
+    {
+        $keys = array_filter(array_map('trim', explode(',', strtolower($this->rule('absence', 'deducted_allowances', 'meal,transportation')))));
+
+        return array_values(array_intersect($keys, ['housing', 'transportation', 'meal', 'clothing', 'other']));
     }
 
     public function penaltyBasis(): string
