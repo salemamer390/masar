@@ -9,10 +9,10 @@
 <button class="btn btn-primary"><i class="bi bi-calendar-check"></i> {{ $baseline ? 'حفظ التاريخ' : 'تفعيل تاريخ البدء' }}</button></form></div></div>
 
 <div class="panel table-panel"><div class="panel-head"><div><h3>موظفون بتاريخ سابق لبدء التتبع</h3><span>أدخل الرصيد المرحّل المؤكد لكل سنة دورة، أو أكّد عدم وجود رصيد. الإدخال يُحفظ باسمك وتاريخه وسببه.</span></div></div>
-<div class="table-responsive"><table class="table align-middle"><thead><tr><th>الموظف</th><th>تاريخ التعيين</th><th>سنة الدورة</th><th>الرصيد الافتتاحي (يوم)</th><th>تأكيد صفر</th><th>السبب / المصدر</th><th>الإدخالات المحفوظة</th><th></th></tr></thead><tbody>
+<div class="table-responsive"><table class="table align-middle"><thead><tr><th>الموظف</th><th>تاريخ بداية العقد</th><th>سنة الدورة</th><th>الرصيد الافتتاحي (يوم)</th><th>تأكيد صفر</th><th>السبب / المصدر</th><th>الإدخالات المحفوظة</th><th></th></tr></thead><tbody>
 @forelse($employees as $employee)
-@php($firstCycleYear = \Carbon\Carbon::parse($employee->hire_date)->year)
-<tr><td>{{ $employee->full_name }}<br><small class="text-muted">{{ $employee->employee_code }}</small></td><td>{{ \Carbon\Carbon::parse($employee->hire_date)->format('d/m/Y') }}</td><td colspan="6">
+@php($firstCycleYear = \Carbon\Carbon::parse($employee->contract_start_date)->year)
+<tr><td>{{ $employee->full_name }}<br><small class="text-muted">{{ $employee->employee_code }}</small></td><td>{{ \Carbon\Carbon::parse($employee->contract_start_date)->format('d/m/Y') }}</td><td colspan="6">
 @foreach($entries->get($employee->id, collect()) as $entry)
 <div class="small mb-1">دورة {{ $entry->cycle_year }}: {{ $entry->is_confirmed_zero ? 'مؤكد صفر' : format_number((float) $entry->amount) }} يوم — {{ $entry->reason }} <span class="text-muted">({{ $entry->creator?->name ?? '—' }}، {{ $entry->updated_at?->format('d/m/Y') }})</span></div>
 @endforeach
