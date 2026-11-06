@@ -71,7 +71,7 @@
         <th>الوظيفة</th>
         <th>القسم</th>
         <th>الحالة</th>
-        <th>تاريخ التعيين</th>
+        <th>تاريخ بداية العقد</th>
         <th></th>
       </tr>
     </thead>
@@ -116,7 +116,7 @@
             </span>
             @endif
           </td>
-          <td>{{ $employee->hire_date?->format('d/m/Y') ?? '—' }}</td>
+          <td>{{ $employee->contract_start_date?->format('d/m/Y') ?? '—' }}</td>
           <td>
             <div class="dropdown">
               <button class="table-action" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
@@ -251,8 +251,8 @@
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">تاريخ التعيين / بداية العقد</label>
-              <input id="new_employee_hire_date" type="date" name="hire_date" class="form-control" value="{{ old('hire_date', date('Y-m-d')) }}">
+              <label class="form-label">تاريخ بداية العقد</label>
+              <input id="new_employee_contract_start_date" type="date" name="contract_start_date" class="form-control" value="{{ old('contract_start_date', date('Y-m-d')) }}">
             </div>
             <div class="col-6">
               <label class="form-label">تاريخ نهاية العقد</label>
@@ -284,7 +284,7 @@
     const employeeRow = (employee) => {
         const status = employee.status?.name || employee.status_name || 'Active';
         const id = Number(employee.id);
-        return `<tr data-employee-id="${id}"><td>#${escapeEmployeeHtml(employee.employee_code)}</td><td><div class="employee-cell"><span class="employee-avatar">${escapeEmployeeHtml(String(employee.full_name || '—').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join(''))}</span><a href="${employeeBaseUrl}/${id}" class="employee-link text-decoration-none fw-bold">${escapeEmployeeHtml(employee.full_name)}</a></div></td><td>${escapeEmployeeHtml(employee.job?.title)}</td><td>${escapeEmployeeHtml(employee.department?.name)}</td><td><span class="badge-soft ${statusTone(status)}">${escapeEmployeeHtml(statusLabel(status))}</span></td><td>${employee.hire_date ? escapeEmployeeHtml(employee.hire_date) : '—'}</td><td>${canEditEmployees ? `<a class="table-action" href="${employeeBaseUrl}/${id}"><i class="bi bi-three-dots"></i></a>` : '—'}</td></tr>`;
+        return `<tr data-employee-id="${id}"><td>#${escapeEmployeeHtml(employee.employee_code)}</td><td><div class="employee-cell"><span class="employee-avatar">${escapeEmployeeHtml(String(employee.full_name || '—').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join(''))}</span><a href="${employeeBaseUrl}/${id}" class="employee-link text-decoration-none fw-bold">${escapeEmployeeHtml(employee.full_name)}</a></div></td><td>${escapeEmployeeHtml(employee.job?.title)}</td><td>${escapeEmployeeHtml(employee.department?.name)}</td><td><span class="badge-soft ${statusTone(status)}">${escapeEmployeeHtml(statusLabel(status))}</span></td><td>${employee.contract_start_date ? escapeEmployeeHtml(employee.contract_start_date) : '—'}</td><td>${canEditEmployees ? `<a class="table-action" href="${employeeBaseUrl}/${id}"><i class="bi bi-three-dots"></i></a>` : '—'}</td></tr>`;
     };
     const wireEmployeeAjaxForms = (root = document) => {
         root.querySelectorAll('#addEmployeeForm').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
@@ -318,7 +318,7 @@
 })();
 
 (function () {
-    const hireDateInput = document.getElementById('new_employee_hire_date');
+    const hireDateInput = document.getElementById('new_employee_contract_start_date');
     const contractEndInput = document.getElementById('new_employee_contract_end_date');
     let contractEndEdited = false;
     function oneYearAfter(value) {
