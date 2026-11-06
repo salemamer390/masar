@@ -25,7 +25,7 @@ class WorkPermitDeadlineNotification extends Notification
             'employee_name' => $this->employee->full_name,
             'deadline' => $deadline->toDateString(),
             'days_allowed' => 30,
-            'message' => "يرجى استكمال استخراج كعب العمل للموظف {$this->employee->full_name} خلال 30 يومًا من تاريخ التعيين، بحد أقصى {$deadline->format('d/m/Y')}.",
+            'message' => "يرجى استكمال استخراج كعب العمل للموظف {$this->employee->full_name} خلال 30 يومًا من تاريخ بداية العقد، بحد أقصى {$deadline->format('d/m/Y')}.",
             'url' => route('employees.show', $this->employee),
         ];
     }
