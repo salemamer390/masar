@@ -48,6 +48,56 @@ class MobileApiTest extends TestCase {
     }
 
 
+ public function test_employee_profile_and_paginated_stored_history_are_isolated(): void {
+  $this->actingAs($this->userA);
+  $this->employeeA->update(['contract_start_date'=>'2025-01-02','address'=>'Test address']);
+  $this->getJson('/mobile/v1/employees/'.$this->employeeA->id.'/profile')->assertOk()->assertJsonPath('data.edit.contract_start_date','2025-01-02')->assertJsonPath('data.fields.العنوان','Test address');
+  $this->getJson('/mobile/v1/employees/'.$this->employeeB->id.'/profile')->assertNotFound();
+  foreach(['movements','salaries','payroll','leaves','attendance','penalties','requests','documents','contacts','banks'] as $section) {
+   $this->getJson('/mobile/v1/employees/'.$this->employeeA->id.'/history?section='.$section)->assertOk()->assertJsonPath('total',0)->assertJsonStructure(['data','last_page']);
+   $this->getJson('/mobile/v1/employees/'.$this->employeeB->id.'/history?section='.$section)->assertNotFound();
+  }
+  $this->getJson('/mobile/v1/employees/'.$this->employeeA->id.'/history?section=invalid')->assertUnprocessable();
+
+ }
+
+ public function test_employee_history_contains_stored_rows_and_requires_profile_permission(): void {
+  $this->actingAs($this->userA);
+  $type=\App\Models\MovementType::firstOrCreate(['name'=>'Mobile Test Movement'],['company_id'=>$this->companyA->id]);
+  $this->employeeA->movements()->create(['movement_type_id'=>$type->id,'movement_date'=>'2026-10-01','reason'=>'Stored movement','created_by'=>$this->userA->id,'old_values'=>['gross_salary'=>1000],'new_values'=>['gross_salary'=>2000]]);
+  $this->employeeA->emergencyContacts()->create(['name'=>'Example contact','phone'=>'01000000000','relationship'=>'Sibling']);
+  $this->employeeA->bankAccounts()->create(['account_holder_name'=>'Test holder','account_number'=>'TEST-001','effective_from'=>'2026-01-01','status'=>'Active']);
+  $this->employeeA->salaries()->create(['effective_from'=>'2026-01-01','salary_type'=>'gross','salary_input'=>2000,'basic_salary'=>1500,'gross_salary'=>2000,'net_salary'=>1750,'status'=>'Active']);
+  $base='/mobile/v1/employees/'.$this->employeeA->id.'/history?section=';
+  $this->getJson($base.'movements')->assertOk()->assertJsonPath('data.0.fields.السبب','Stored movement')->assertJsonPath('data.0.fields.سجله','User A');
+  $this->getJson($base.'contacts')->assertOk()->assertJsonPath('data.0.fields.الاسم','Example contact');
+  $this->getJson($base.'banks')->assertOk()->assertJsonPath('data.0.fields.رقم الحساب','TEST-001');
+  $before=\App\Models\Salary::findOrFail($this->employeeA->salaries()->first()->id)->getRawOriginal();
+  $this->getJson($base.'salaries')->assertOk()->assertJsonPath('data.0.fields.الإجمالي','2000.00');
+  $this->assertSame($before,\App\Models\Salary::findOrFail($this->employeeA->salaries()->first()->id)->getRawOriginal());
+  $role=Role::create(['name'=>'no-profile','display_name'=>'No profile','company_id'=>$this->companyA->id]);
+  $this->userA->update(['role_id'=>$role->id]);$this->userA->unsetRelation('role');
+  $this->getJson('/mobile/v1/employees/'.$this->employeeA->id.'/profile')->assertForbidden();
+  $this->getJson($base.'banks')->assertForbidden();
+ }
+
+ public function test_profile_contacts_and_bank_writes_reuse_audited_controllers(): void {
+  $this->actingAs($this->userA);
+  $base='/mobile/v1/employees/'.$this->employeeA->id;
+  $this->postJson($base.'/emergency-contacts',['name'=>'Emergency example','phone'=>'01000000000','relationship'=>'Sibling','is_primary'=>true])->assertOk();
+  $this->postJson($base.'/bank-accounts',['account_holder_name'=>'Example holder','account_number'=>'TEST-ONLY','effective_from'=>'2026-01-01','is_primary'=>true])->assertOk();
+  $this->assertDatabaseHas('employee_emergency_contacts',['employee_id'=>$this->employeeA->id,'name'=>'Emergency example','is_primary'=>true]);
+  $this->assertDatabaseHas('employee_bank_accounts',['employee_id'=>$this->employeeA->id,'account_number'=>'TEST-ONLY','is_primary'=>true]);
+  $this->assertDatabaseHas('activity_logs',['action'=>'emergency_contact_create','user_id'=>$this->userA->id]);
+  $this->assertDatabaseHas('activity_logs',['action'=>'bank_account_create','user_id'=>$this->userA->id]);
+  $this->postJson('/mobile/v1/employees/'.$this->employeeB->id.'/bank-accounts',['effective_from'=>'2026-01-01'])->assertNotFound();
+  $role=Role::create(['name'=>'profile-viewer','display_name'=>'Viewer','company_id'=>$this->companyA->id]);
+  $role->permissions()->sync(Permission::where('name','employees.view')->pluck('id'));
+  $this->userA->update(['role_id'=>$role->id]);$this->userA->unsetRelation('role');
+  $this->postJson($base.'/emergency-contacts',['name'=>'Blocked'])->assertForbidden();
+  $this->postJson($base.'/bank-accounts',['effective_from'=>'2026-01-01'])->assertForbidden();
+ }
+
  public function test_no_mobile_signup_route_is_exposed(): void {
   $this->postJson('/mobile/v1/register',[])->assertNotFound();
   $this->postJson('/mobile/v1/signup',[])->assertNotFound();
