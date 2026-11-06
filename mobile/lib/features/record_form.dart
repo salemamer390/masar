@@ -20,6 +20,7 @@ class FieldSpec {
 
 class RecordForm extends StatefulWidget {
   final String module, title;
+  final String? endpoint, lookupModule, formKind;
   final ApiClient api;
   final Map<String, dynamic>? row;
   const RecordForm({
@@ -28,6 +29,9 @@ class RecordForm extends StatefulWidget {
     required this.title,
     required this.api,
     this.row,
+    this.endpoint,
+    this.lookupModule,
+    this.formKind,
   });
   @override
   State<RecordForm> createState() => _RecordFormState();
@@ -48,15 +52,51 @@ class _RecordFormState extends State<RecordForm> {
                   .firstOrNull?['source'] ??
               '')
           .toString();
-  List<FieldSpec> get specs => switch (widget.module) {
+  List<FieldSpec> get specs => switch (widget.formKind ?? widget.module) {
+    'contacts' => [
+      const FieldSpec('name', 'الاسم', required: true),
+      const FieldSpec('phone', 'الهاتف', required: true),
+      const FieldSpec('relationship', 'صلة القرابة', required: true),
+      const FieldSpec('is_primary', 'جهة الاتصال الرئيسية', type: 'checkbox'),
+    ],
+    'banks' => [
+      const FieldSpec('bank_id', 'البنك', lookup: 'banks'),
+      const FieldSpec('account_holder_name', 'اسم صاحب الحساب'),
+      const FieldSpec('account_number', 'رقم الحساب'),
+      const FieldSpec('iban', 'IBAN'),
+      const FieldSpec(
+        'payment_method_id',
+        'وسيلة الدفع',
+        lookup: 'payment_methods',
+      ),
+      const FieldSpec(
+        'effective_from',
+        'ساري من',
+        type: 'date',
+        required: true,
+      ),
+      const FieldSpec('effective_to', 'ساري إلى', type: 'date'),
+      const FieldSpec('is_primary', 'الحساب الرئيسي', type: 'checkbox'),
+    ],
     'employees' => [
       const FieldSpec('full_name', 'الاسم الكامل', required: true),
       const FieldSpec('employee_code', 'كود الموظف (اتركه فارغًا للتوليد)'),
+      const FieldSpec('national_id', 'الرقم القومي'),
       const FieldSpec('phone', 'الهاتف'),
       const FieldSpec('email', 'البريد الإلكتروني'),
       const FieldSpec('department_id', 'القسم', lookup: 'departments'),
       const FieldSpec('job_id', 'الوظيفة', lookup: 'jobs'),
       const FieldSpec('branch_id', 'الفرع', lookup: 'branches'),
+      const FieldSpec(
+        'employment_type_id',
+        'نوع التوظيف',
+        lookup: 'employment_types',
+      ),
+      const FieldSpec('gender', 'النوع'),
+      const FieldSpec('birth_date', 'تاريخ الميلاد', type: 'date'),
+      const FieldSpec('address', 'العنوان', type: 'multiline'),
+      const FieldSpec('marital_status', 'الحالة الاجتماعية'),
+      const FieldSpec('qualification', 'المؤهل'),
       if (widget.row == null) ...[
         const FieldSpec(
           'salary_source',
@@ -73,6 +113,8 @@ class _RecordFormState extends State<RecordForm> {
       ],
       const FieldSpec('contract_start_date', 'تاريخ بداية العقد', type: 'date'),
       const FieldSpec('contract_end_date', 'نهاية العقد', type: 'date'),
+      const FieldSpec('contract_duration', 'مدة العقد'),
+      const FieldSpec('notes', 'ملاحظات', type: 'multiline'),
     ],
     'attendance' => [
       const FieldSpec('employee_id', 'الموظف', type: 'person', required: true),
@@ -298,7 +340,7 @@ class _RecordFormState extends State<RecordForm> {
           : await widget.api.request(
               'GET',
               'lookups',
-              query: {'module': widget.module},
+              query: {'module': widget.lookupModule ?? widget.module},
             );
       data['overtime_periods'] = [
         {'id': 'day', 'name': 'نهاري'},
@@ -436,9 +478,11 @@ class _RecordFormState extends State<RecordForm> {
       error = null;
     });
     try {
-      var endpoint = widget.module;
+      var endpoint = widget.endpoint ?? widget.module;
       var method = widget.row == null ? 'POST' : 'PUT';
-      if (widget.row != null) endpoint += '/${widget.row!['id']}';
+      if (widget.row != null && widget.endpoint == null) {
+        endpoint += '/${widget.row!['id']}';
+      }
       if (widget.module == 'payroll') {
         endpoint = 'payroll/records/${widget.row!['id']}/inputs';
       }
