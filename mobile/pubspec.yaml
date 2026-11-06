@@ -1,0 +1,30 @@
+name: masar_mobile
+description: Masar HR Arabic mobile client for the existing Laravel application.
+publish_to: 'none'
+version: 1.0.0+1
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.35.7'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.6.0
+  flutter_secure_storage: ^10.3.4
+  file_picker: ^11.0.3
+  share_plus: ^12.0.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/masar-logo.png
+  fonts:
+    - family: Cairo
+      fonts:
+        - asset: assets/fonts/cairo-regular.ttf
+        - asset: assets/fonts/cairo-bold.ttf
+          weight: 700
