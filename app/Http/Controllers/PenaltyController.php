@@ -40,7 +40,7 @@ class PenaltyController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
-            'penalty_type_id' => ['nullable', 'exists:penalty_types,id'],
+            'penalty_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\PenaltyType::class)],
             'penalty_type_name' => ['nullable', 'string'],
             'penalty_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:500'],
@@ -115,7 +115,7 @@ class PenaltyController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
-            'penalty_type_id' => ['required', 'exists:penalty_types,id'],
+            'penalty_type_id' => ['required', new \App\Rules\VisibleModel(\App\Models\PenaltyType::class)],
             'penalty_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:500'],
             'details' => ['nullable', 'string'],
