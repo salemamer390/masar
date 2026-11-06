@@ -301,4 +301,23 @@ class CompanyIsolationTest extends TestCase
         for($i=0;$i<5;$i++) $this->post('/login',['email'=>'missing@example.test','password'=>'wrong'])->assertRedirect();
         $this->post('/login',['email'=>'missing@example.test','password'=>'wrong'])->assertStatus(429);
     }
+
+    public function test_company_manager_cannot_modify_a_globally_shared_lookup(): void
+    {
+        $global=\App\Models\Department::create(['name'=>'Shared department','company_id'=>null]);
+        $this->actingAs($this->userA)->putJson('/master/departments/'.$global->id,['name'=>'Changed by A','code'=>''])->assertForbidden();
+        $this->assertSame('Shared department',$global->fresh()->name);
+        $this->deleteJson('/master/departments/'.$global->id)->assertForbidden();
+    }
+    public function test_employee_documents_are_stored_privately_and_preview_is_company_scoped(): void
+    {
+        Storage::fake('public');Storage::fake('local');
+        $file=UploadedFile::fake()->createWithContent('private.pdf','%PDF-1.4 local test');
+        $this->actingAs($this->userA)->postJson('/employees/'.$this->employeeA->id.'/documents',['document_name'=>'Private document','document_file'=>$file])->assertOk();
+        $doc=\App\Models\Document::where('employee_id',$this->employeeA->id)->latest('id')->firstOrFail();
+        Storage::disk('public')->assertMissing($doc->file_path);
+        Storage::disk('local')->assertExists($doc->file_path);
+        $this->get('/documents/'.$doc->id.'/preview')->assertOk();
+        $this->actingAs($this->userB)->get('/documents/'.$doc->id.'/preview')->assertNotFound();
+    }
 }
