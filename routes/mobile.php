@@ -29,6 +29,10 @@ Route::prefix('mobile/v1')->name('mobile.')->middleware(\App\Http\Middleware\Mob
         Route::get('/payroll/records/{payrollRecord}/payslip', [PayrollController::class,'payslipPdf'])->middleware('permission:payroll.view');
         Route::get('/reports/export/{type}', [ReportController::class,'export'])->middleware('permission:reports.export_excel');
         Route::get('/documents/{document}/file', [DocumentController::class,'preview'])->middleware('permission:documents.view');
+        Route::post('/employees/{employee}/emergency-contacts', [\App\Http\Controllers\EmployeeContactController::class,'storeEmergencyContact'])->middleware('permission:employees.edit');
+        Route::post('/employees/{employee}/bank-accounts', [\App\Http\Controllers\EmployeeContactController::class,'storeBankAccount'])->middleware('permission:employees.edit');
+        Route::get('/employees/{employee}/profile', [\App\Http\Controllers\Mobile\EmployeeProfileController::class,'show'])->middleware('permission:employees.view');
+        Route::get('/employees/{employee}/history', [\App\Http\Controllers\Mobile\EmployeeProfileController::class,'history'])->middleware('permission:employees.view');
         Route::get('/employees/{employee}', [ReadController::class,'employeeShow'])->middleware('permission:employees.view');
         Route::get('/notifications', [ReadController::class,'notifications']);
         Route::post('/notifications/read-all', [NotificationController::class,'markAllRead']);
