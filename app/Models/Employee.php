@@ -213,6 +213,12 @@ class Employee extends Model
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
-        return $this->profile_photo_path ? Storage::disk('public')->url($this->profile_photo_path) : null;
+        return $this->profile_photo_path ? route('employees.photo.show', $this) : null;
+    }
+
+    /** Legacy public photos remain readable through the guarded route until migrated. */
+    public function profilePhotoDisk(): string
+    {
+        return $this->profile_photo_path && Storage::disk('local')->exists($this->profile_photo_path) ? 'local' : 'public';
     }
 }
