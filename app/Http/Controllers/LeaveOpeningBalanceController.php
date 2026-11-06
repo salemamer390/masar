@@ -19,13 +19,14 @@ class LeaveOpeningBalanceController extends Controller
     public function index(LeaveBalanceService $balances)
     {
         $companyId = auth()->user()->company_id;
-        $baseline = $balances->carryoverBaseline($companyId);
+        $baseline = $balances->carryoverBaseline($companyId); // null until explicitly confirmed below
+        $proposedBaseline = $baseline ?? today(); // proposal only — nothing persists on this read
         $employees = Employee::where('company_id', $companyId)
-            ->whereNotNull('hire_date')->whereDate('hire_date', '<', $baseline)
+            ->whereNotNull('hire_date')->whereDate('hire_date', '<', $proposedBaseline)
             ->orderBy('full_name')->get();
         $entries = LeaveOpeningEntry::with('creator')->where('company_id', $companyId)->get()
             ->groupBy('employee_id');
-        return view('leaves.opening', compact('baseline', 'employees', 'entries'));
+        return view('leaves.opening', compact('baseline', 'proposedBaseline', 'employees', 'entries'));
     }
 
     public function store(Request $request)
