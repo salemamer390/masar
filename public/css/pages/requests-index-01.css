@@ -1,0 +1,4 @@
+  .request-row-adding{animation:requestRowIn .35s ease both}
+  .request-row-removing{animation:requestRowOut .28s ease forwards;pointer-events:none}
+  @keyframes requestRowIn{from{opacity:0;transform:translateY(-10px);background:#eaf4ff}to{opacity:1;transform:none;background:transparent}}
+  @keyframes requestRowOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(28px);height:0}}
