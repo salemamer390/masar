@@ -16,6 +16,8 @@ void main() {
     'documents',
     'requests',
     'payroll',
+    'contacts',
+    'banks',
   ]) {
     testWidgets(
       '$module form fits 320px with larger text and does not mutate on open',
@@ -53,7 +55,10 @@ void main() {
               ),
             ),
             home: RecordForm(
-              module: module,
+              module: ['contacts', 'banks'].contains(module)
+                  ? 'employees'
+                  : module,
+              formKind: ['contacts', 'banks'].contains(module) ? module : null,
               title: 'بيانات اختبار',
               api: api,
               row: module == 'payroll'
