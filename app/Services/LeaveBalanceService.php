@@ -252,7 +252,7 @@ class LeaveBalanceService
      */
     public function allocate(Employee $employee, Collection $deductingLeaves, array $currentCycle, float $currentUsage, ?Collection $openingEntries = null, ?int $companyId = null): array
     {
-        $baseline = $this->carryoverBaseline($companyId);
+        $baseline = $this->effectiveBaseline($companyId);
         $buckets = [];
         $cursor = $this->firstCycleStart($employee, $currentCycle['start']);
         while ($cursor->lt($currentCycle['start'])) {
@@ -324,7 +324,7 @@ class LeaveBalanceService
      */
     public function hasUninitializedHistory(Employee $employee, array $currentCycle, ?Collection $openingEntries = null, ?int $companyId = null): bool
     {
-        $baseline = $this->carryoverBaseline($companyId);
+        $baseline = $this->effectiveBaseline($companyId);
         if (!$this->firstCycleStart($employee, $currentCycle['start'])->lt($baseline)) return false;
         $cursor = $this->firstCycleStart($employee, $currentCycle['start']);
         while ($cursor->lt($baseline) && $cursor->lt($currentCycle['start'])) {
@@ -346,21 +346,30 @@ class LeaveBalanceService
      * The explicit dated baseline from which cycles are system-tracked for
      * carry accrual. Self-activates once (persisted) when no company set it.
      */
-    public function carryoverBaseline(?int $companyId = null): Carbon
+    /**
+     * The persisted carryover baseline, or null when the company has not
+     * confirmed one yet. Reading never writes: activation is an explicit,
+     * authorized save on the opening-balances page, so no balance page view
+     * silently initializes company policy.
+     */
+    public function carryoverBaseline(?int $companyId = null): ?Carbon
     {
         $companyId = $companyId ?? (auth()->check() && !auth()->user()->isSuperAdmin() ? auth()->user()->company_id : null);
         $query = DB::table('leave_policy_settings')->where('setting_key', 'leave_carryover_baseline');
         if ($companyId) $query->where('company_id', $companyId); else $query->whereNull('company_id');
         $value = $query->value('setting_value');
-        if (!$value) {
-            $value = today()->toDateString();
-            DB::table('leave_policy_settings')->insertOrIgnore([
-                'company_id' => $companyId, 'setting_key' => 'leave_carryover_baseline',
-                'setting_value' => $value, 'label' => 'Leave carryover baseline date',
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        }
-        return Carbon::parse($value)->startOfDay();
+        return $value ? Carbon::parse($value)->startOfDay() : null;
+    }
+
+    /**
+     * The cutoff actually applied while no baseline is confirmed: today.
+     * Pre-cutoff cycles then count only via explicit opening entries, and the
+     * setup alert points authorized users at the page where they confirm the
+     * real date. Nothing is persisted until they do.
+     */
+    public function effectiveBaseline(?int $companyId = null): Carbon
+    {
+        return $this->carryoverBaseline($companyId) ?? today();
     }
 
     /** Leave days inside [from, to], prorated like daysWithinCycle for partial overlaps. */
