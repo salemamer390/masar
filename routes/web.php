@@ -163,6 +163,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware('permission:employees.edit')
             ->name('update');
+        Route::get('/{employee}/photo', [EmployeeController::class, 'showPhoto'])
+            ->middleware('permission:employees.view')
+            ->name('photo.show');
         Route::patch('/{employee}/photo', [EmployeeController::class, 'updatePhoto'])
             ->middleware('permission:employees.edit')
             ->name('photo');
