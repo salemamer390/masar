@@ -76,7 +76,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
     Route::post('/register/company', [AuthController::class, 'registerCompany'])
         ->middleware('throttle:5,1')
         ->name('register.company');
