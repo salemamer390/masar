@@ -53,8 +53,27 @@ class LeaveOpeningBalanceUiTest extends TestCase
         $response = $this->get(route('leaves.opening.index'));
         $response->assertOk();
         $response->assertSee('Employee 7101');
-        // Baseline date is visible, not hidden.
-        $response->assertSee(today()->format('d/m/Y'));
+        // Baseline date is visible (prefilled proposal in the date input),
+        // not hidden in the DB.
+        $response->assertSee('value="'.today()->toDateString().'"', false);
+        // ...but the page read itself persists nothing: activation is an
+        // explicit authorized save, never a silent display-time write.
+        $response->assertSee('غير مفعّل بعد');
+        $this->assertSame(0, DB::table('leave_policy_settings')->where('setting_key', 'leave_carryover_baseline')->count());
+    }
+
+    public function test_baseline_activates_only_via_explicit_save(): void
+    {
+        $this->get(route('leaves.opening.index'))->assertOk();
+        $this->assertSame(0, DB::table('leave_policy_settings')->where('setting_key', 'leave_carryover_baseline')->count());
+
+        $this->put(route('leaves.opening.baseline'), ['baseline' => '2026-01-01'])->assertRedirect();
+        $this->assertSame('2026-01-01', DB::table('leave_policy_settings')->where('setting_key', 'leave_carryover_baseline')->value('setting_value'));
+
+        $this->get(route('leaves.opening.index'))
+            ->assertOk()
+            ->assertSee('01/01/2026')
+            ->assertDontSee('غير مفعّل بعد');
     }
 
     public function test_store_saves_audited_entry_and_initializes_history(): void
