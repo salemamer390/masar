@@ -57,9 +57,9 @@ class PayrollCalculatorRulesTest extends TestCase
 
     public function test_absence_base_override_drives_the_deduction_and_is_recorded(): void
     {
-        // BasicPlusAllowances supplies the contractual base from the salary row
+        // A base override supplies the contractual base from the salary row
         // (basic + selected allowances); the calculator only applies days/30.
-        $r = $this->calculator([], ['absence.calculation_basis' => 'BasicPlusAllowances'])
+        $r = $this->calculator([], ['absence.calculation_basis' => 'Basic'])
             ->monthly(8600.0, ['absence_days' => 2], null, true, 7000.0);
         $this->assertEqualsWithDelta(466.67, $r['absence_deduction'], 0.01);
         $this->assertEqualsWithDelta(7000.0, $r['absence_base'], 0.01);
