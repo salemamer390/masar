@@ -226,14 +226,18 @@ class PayrollRunService
     }
 
     /**
-     * Absence-day deduction base under the BasicPlusAllowances basis: the
-     * contractual basic plus the daily value of only the allowances configured
-     * as absence-deducted, read from the stored salary row. Returns null for
-     * the Basic/Gross bases so the calculator keeps its existing behavior.
+     * Absence-day deduction base under the Basic basis with absence-deducted
+     * allowances configured: the contractual basic plus only the allowances
+     * configured as absence-deducted, read from the stored salary row. Returns
+     * null otherwise (and under Gross, where every allowance is already inside
+     * the gross - adding them again would double-deduct) so the calculator
+     * keeps its existing behavior.
      */
     private function absenceBaseOverride(Salary $salary): ?float
     {
-        if ($this->settings->absenceBasis() !== 'BasicPlusAllowances') return null;
+        if ($this->settings->absenceBasis() !== 'Basic') return null;
+        $allowances = $this->settings->absenceDeductedAllowances();
+        if ($allowances === []) return null;
         // Legacy rows without a contractual basic breakdown keep the calculator's own base.
         if ($salary->basic_salary === null) return null;
 
@@ -241,8 +245,8 @@ class PayrollRunService
             'housing' => 'housing_allowance', 'transportation' => 'transportation_allowance',
             'meal' => 'meal_allowance', 'clothing' => 'clothing_allowance', 'other' => 'other_allowances',
         ];
-        $base = (float) ($salary->basic_salary ?? 0);
-        foreach ($this->settings->absenceDeductedAllowances() as $key) {
+        $base = (float) $salary->basic_salary;
+        foreach ($allowances as $key) {
             $base += (float) ($salary->{$columns[$key]} ?? 0);
         }
 
