@@ -76,7 +76,7 @@ class ReportController extends Controller
                 return [
                     'title' => 'تقرير الموظفين',
                     'subtitle' => 'بيانات الموظفين والحالات والأقسام',
-                    'columns' => ['الكود', 'الاسم', 'الوظيفة', 'القسم', 'تاريخ التعيين', 'الحالة'],
+                    'columns' => ['الكود', 'الاسم', 'الوظيفة', 'القسم', 'تاريخ بداية العقد', 'الحالة'],
                     'rows' => $items->map(fn($e) => [
                         $e->employee_code,
                         $e->full_name,
