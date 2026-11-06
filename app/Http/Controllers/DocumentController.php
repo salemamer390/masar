@@ -37,7 +37,7 @@ class DocumentController extends Controller
     {
         $request->validate([
             'document_name' => ['required', 'string', 'max:200'],
-            'document_type_id' => ['nullable', 'exists:document_types,id'],
+            'document_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\DocumentType::class)],
             'expiry_date' => ['nullable', 'date'],
             'document_file' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ], [
