@@ -581,3 +581,6 @@ Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->
     Route::put('/renewals/{renewal}', [\App\Http\Controllers\OwnerDashboardController::class, 'updateRenewal'])->name('renewals.update');
     Route::post('/announcements', [\App\Http\Controllers\OwnerDashboardController::class, 'sendAnnouncement'])->name('announcements.send');
 });
+
+// Mobile JSON adapter, sharing the existing web session and business rules.
+require __DIR__.'/mobile.php';
