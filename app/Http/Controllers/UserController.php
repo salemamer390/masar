@@ -74,7 +74,7 @@ class UserController extends Controller
         $this->rolesForActor()->whereKey($validated['role_id'])->firstOrFail();
         $this->authorizePermissionAssignment($validated);
 
-        $companyId = auth()->user()->isSuperAdmin() ? ($validated['company_id'] ?? null) : auth()->user()->company_id;
+        $companyId = auth()->user()->company_id ?: ($validated['company_id'] ?? null);
         if (!$companyId) return back()->withErrors(['company_id' => 'يجب ربط المستخدم بشركة قبل إنشاء الحساب.'])->withInput();
         $this->ensureRoleBelongsToCompany((int) $validated['role_id'], (int) $companyId);
         if (!auth()->user()->isSuperAdmin()) $this->ensureHrCapacity($companyId);
@@ -172,7 +172,7 @@ class UserController extends Controller
     {
         $actor = auth()->user();
         $user->loadMissing('role');
-        if (!$actor->isSuperAdmin() && (int) $user->company_id !== (int) $actor->company_id) {
+        if ($actor->company_id && (int) $user->company_id !== (int) $actor->company_id) {
             abort(403);
         }
         if ((int) $user->id === (int) $actor->id) {
@@ -216,7 +216,7 @@ class UserController extends Controller
     private function rolesForActor()
     {
         $actor = auth()->user();
-        return Role::query()->when(!$actor->isSuperAdmin(), function ($query) use ($actor): void {
+        return Role::query()->when($actor->company_id, function ($query) use ($actor): void {
             $query->where('company_id', $actor->company_id);
         });
     }
