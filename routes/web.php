@@ -270,6 +270,15 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
           Route::put('/{leave}', [LeaveController::class, 'update'])
              ->middleware('permission:leaves.edit')
              ->name('update');
+        Route::get('/opening-balances', [\App\Http\Controllers\LeaveOpeningBalanceController::class, 'index'])
+            ->middleware('permission:leaves.view')
+            ->name('opening.index');
+        Route::post('/opening-balances', [\App\Http\Controllers\LeaveOpeningBalanceController::class, 'store'])
+            ->middleware('permission:leaves.edit')
+            ->name('opening.store');
+        Route::put('/opening-balances/baseline', [\App\Http\Controllers\LeaveOpeningBalanceController::class, 'updateBaseline'])
+            ->middleware('permission:leaves.edit')
+            ->name('opening.baseline');
         Route::patch('/{leave}/approve', [LeaveController::class, 'approve'])
             ->middleware('permission:leaves.approve')
             ->name('approve');

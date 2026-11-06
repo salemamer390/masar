@@ -10,3 +10,6 @@
 /bootstrap/cache/*.php
 *.log
 *.tmp
+database/database.sqlite
+database/database.sqlite
+.phpunit.result.cache

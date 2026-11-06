@@ -188,7 +188,10 @@ class JobDataController extends Controller
             ->groupBy('employee_id');
         $leaves = Leave::effective()->with('leaveType')->whereIn('employee_id', $employeeIds)->whereDate('start_date', '<=', $monthEnd)->whereDate('end_date', '>=', $monthStart)->get()->groupBy('employee_id');
         $leaveBalanceService = app(LeaveBalanceService::class);
-        $balances = $leaveBalanceService->balancesFor($employees, $month);
+        // The balance column is a point-in-time figure at the period END:
+        // the cycle in force then, with usage counted only up to that date
+        // and the carried balance from earlier cycles included.
+        $balances = $leaveBalanceService->balancesFor($employees, $period['end']);
 
         return $employees->map(function (Employee $employee) use ($attendance, $penalties, $leaves, $requests, $month, $period, $balances, $settings): array {
             $attendanceRows = $attendance->get($employee->id, collect());
@@ -409,4 +412,3 @@ class JobDataController extends Controller
         return (float) $days;
     }
 }
-
