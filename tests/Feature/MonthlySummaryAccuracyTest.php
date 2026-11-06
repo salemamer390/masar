@@ -246,4 +246,33 @@ class MonthlySummaryAccuracyTest extends TestCase
             ->assertSee('Employee Alpha A')
             ->assertSee('Employee Bravo B');
     }
+
+    public function test_unpaid_leave_is_separate_from_other_leave_days(): void
+    {
+        // «بدون أجر» has its own column; unpaid days must not also count in
+        // «أنواع أخرى», so the leave-type columns add up to «إجمالي الإجازات».
+        $this->setSetting('weekly_rest_pattern', '0000100');
+        $unpaidType = LeaveType::create([
+            'name' => 'إجازة بدون أجر', 'policy_code' => 'unpaid', 'is_paid' => false,
+            'is_active' => true, 'deducts_annual_balance' => false, 'company_id' => $this->company->id,
+        ]);
+        $otherType = LeaveType::create([
+            'name' => 'إجازة حج', 'policy_code' => 'pilgrimage', 'is_paid' => true,
+            'is_active' => true, 'deducts_annual_balance' => false, 'company_id' => $this->company->id,
+        ]);
+        // Monday+Tuesday 2026-09-07/08 unpaid; Wednesday+Thursday 09/10 pilgrimage;
+        // Sunday+Monday 13/14 annual - all fully inside the September period.
+        Leave::create(['employee_id' => $this->employee->id, 'leave_type_id' => $unpaidType->id,
+            'start_date' => '2026-09-07', 'end_date' => '2026-09-08', 'days' => 2, 'status' => 'Approved']);
+        Leave::create(['employee_id' => $this->employee->id, 'leave_type_id' => $otherType->id,
+            'start_date' => '2026-09-09', 'end_date' => '2026-09-10', 'days' => 2, 'status' => 'Approved']);
+        $this->makeLeave('2026-09-13', '2026-09-14', 2);
+
+        $row = $this->summaryRow(Carbon::create(2026, 9, 1));
+
+        $this->assertSame(2.0, (float) $row['unpaid_leave_days']);
+        $this->assertSame(2.0, (float) $row['annual_leave_days']);
+        $this->assertSame(2.0, (float) $row['other_leave_days']);
+        $this->assertSame(6.0, (float) $row['total_leave_days']);
+    }
 }
