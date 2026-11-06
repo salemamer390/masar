@@ -229,4 +229,76 @@ class CompanyIsolationTest extends TestCase
         $response->assertSee('Employee Alpha A');
         $response->assertDontSee('Employee Bravo B');
     }
+
+    public function test_company_linked_super_admin_cannot_disable_foreign_user(): void
+    {
+        $adminRole = Role::create(['name'=>'super_admin','display_name'=>'Company A admin','company_id'=>$this->companyA->id]);
+        $this->userA->update(['role_id'=>$adminRole->id]); $this->userA->unsetRelation('role');
+        $staffRole = Role::create(['name'=>'staff','display_name'=>'Company B staff','company_id'=>$this->companyB->id]);
+        $this->userB->update(['role_id'=>$staffRole->id]);
+        $this->actingAs($this->userA)->patchJson('/users/'.$this->userB->id.'/status',['is_active'=>false])->assertForbidden();
+        $this->assertTrue($this->userB->fresh()->is_active);
+    }
+
+    public function test_employee_bank_rejects_foreign_company_reference(): void
+    {
+        $bank=\App\Models\Bank::create(['name'=>'Private company B bank','company_id'=>$this->companyB->id]);
+        $this->actingAs($this->userA)->postJson('/employees/'.$this->employeeA->id.'/bank-accounts',['bank_id'=>$bank->id,'effective_from'=>'2026-11-01'])->assertUnprocessable()->assertJsonValidationErrors('bank_id');
+        $this->assertDatabaseMissing('employee_bank_accounts',['employee_id'=>$this->employeeA->id,'bank_id'=>$bank->id]);
+    }
+
+    public function test_company_linked_admin_cannot_edit_delete_or_create_foreign_users(): void
+    {
+        $adminRole = Role::create(['name'=>'super_admin','display_name'=>'Admin','company_id'=>$this->companyA->id]);
+        $this->userA->update(['role_id'=>$adminRole->id]); $this->userA->unsetRelation('role');
+        $staffRole = Role::create(['name'=>'staff','display_name'=>'Staff','company_id'=>$this->companyB->id]);
+        $this->userB->update(['role_id'=>$staffRole->id]);
+        $this->actingAs($this->userA)->putJson('/users/'.$this->userB->id, ['name'=>'Changed','email'=>'changed@example.test','role_id'=>$staffRole->id])->assertForbidden();
+        $this->deleteJson('/users/'.$this->userB->id)->assertForbidden();
+        $this->postJson('/users',['name'=>'Foreign','email'=>'foreign@example.test','password'=>'secret123','password_confirmation'=>'secret123','role_id'=>$staffRole->id,'company_id'=>$this->companyB->id])->assertNotFound();
+        $this->assertSame('User B',$this->userB->fresh()->name);
+        $this->assertDatabaseMissing('users',['email'=>'foreign@example.test']);
+    }
+
+    public function test_private_lookup_ids_are_rejected_before_cross_company_links_are_written(): void
+    {
+        $models = ['bank_id'=>\App\Models\Bank::class,'payment_method_id'=>\App\Models\PaymentMethod::class,'department_id'=>\App\Models\Department::class,'job_id'=>\App\Models\Job::class,'branch_id'=>\App\Models\Branch::class,'document_type_id'=>\App\Models\DocumentType::class,'penalty_type_id'=>\App\Models\PenaltyType::class,'leave_type_id'=>\App\Models\LeaveType::class,'movement_type_id'=>\App\Models\MovementType::class];
+        $ids=[];
+        foreach($models as $field=>$model) {
+            $row = new $model; $row->forceFill(['company_id'=>$this->companyB->id, $field==='job_id'?'title':'name'=>'Private foreign lookup']); $row->save(); $ids[$field]=$row->id;
+        }
+        $this->actingAs($this->userA);
+        $cases=[['/employees',['department_id','job_id','branch_id']],['/employees/'.$this->employeeA->id.'/bank-accounts',['bank_id','payment_method_id']],['/salaries',['payment_method_id']],['/movements',['movement_type_id']],['/discipline/penalties',['penalty_type_id']],['/leaves',['leave_type_id']],['/employees/'.$this->employeeA->id.'/documents',['document_type_id']]];
+        foreach($cases as [$url,$fields]) {
+            $payload=['employee_id'=>$this->employeeA->id,'full_name'=>'Safe employee','effective_from'=>'2026-11-01','movement_date'=>'2026-11-01','start_date'=>'2026-11-01','end_date'=>'2026-11-01','penalty_date'=>'2026-11-01'];
+            foreach($fields as $f) $payload[$f]=$ids[$f];
+            $this->postJson($url,$payload)->assertUnprocessable()->assertJsonValidationErrors($fields);
+        }
+        $this->assertDatabaseMissing('salaries',['employee_id'=>$this->employeeA->id,'payment_method_id'=>$ids['payment_method_id']]);
+        $this->assertDatabaseMissing('movement_records',['employee_id'=>$this->employeeA->id,'movement_type_id'=>$ids['movement_type_id']]);
+    }
+
+    public function test_scoped_lookup_validation_keeps_global_and_own_records_available(): void
+    {
+        $global=\App\Models\Bank::create(['name'=>'Global bank']);
+        $own=\App\Models\Bank::create(['name'=>'Own bank','company_id'=>$this->companyA->id]);
+        $this->actingAs($this->userA);
+        foreach([$global,$own] as $bank) {
+            $this->postJson('/employees/'.$this->employeeA->id.'/bank-accounts',['bank_id'=>$bank->id,'effective_from'=>'2026-11-01'])->assertOk();
+        }
+    }
+
+    public function test_disabled_account_loses_an_existing_web_session(): void
+    {
+        $this->userA->update(['is_active'=>false]);
+        $this->actingAs($this->userA)->get('/dashboard')->assertForbidden();
+        $this->assertGuest();
+    }
+
+    public function test_web_login_is_rate_limited(): void
+    {
+        \Illuminate\Support\Facades\RateLimiter::clear('prelaunch');
+        for($i=0;$i<5;$i++) $this->post('/login',['email'=>'missing@example.test','password'=>'wrong'])->assertRedirect();
+        $this->post('/login',['email'=>'missing@example.test','password'=>'wrong'])->assertStatus(429);
+    }
 }
