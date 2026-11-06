@@ -17,7 +17,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- Application stylesheet (styles + ux + design-system merged; originals in _archive/public) -->
+  <!-- Application CSS: ordered sources in resources/styles; build with php scripts/build-styles.php. -->
   <link href="{{ asset('app.css') }}?v={{ @filemtime(public_path('app.css')) }}" rel="stylesheet">
   
   @stack('styles')
