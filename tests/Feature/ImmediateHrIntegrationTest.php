@@ -141,7 +141,9 @@ class ImmediateHrIntegrationTest extends TestCase
         };
         $calculate = fn () => app(PayrollRunService::class)->calculate($salary, ['gross' => 8600], ['absence_days' => 1], false, 1.0);
 
-        $rule('calculation_basis', 'BasicPlusAllowances');
+        // Confirmed rule: basis Basic + meal,transportation marked absence-deducted
+        // deducts (contractual basic + meal + transport)/30 per absent day.
+        $rule('calculation_basis', 'Basic');
         $rule('deducted_allowances', 'meal,transportation');
         $this->assertEqualsWithDelta(233.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500)/30
 
@@ -149,13 +151,16 @@ class ImmediateHrIntegrationTest extends TestCase
         $rule('deducted_allowances', 'meal,transportation,housing');
         $this->assertEqualsWithDelta(253.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500+600)/30
 
-        // Existing bases are unchanged: Gross deducts from the full gross, Basic from basic only.
+        // Gross is unchanged and never double-deducts: every allowance is already
+        // inside the gross, so the allowance selection adds nothing there.
         $rule('calculation_basis', 'Gross');
         $this->assertEqualsWithDelta(286.67, $calculate()['absence_deduction'], 0.01); // 8600/30
+
+        // Plain Basic with no allowance selected keeps its existing behavior: the
+        // engine's internal basic split (gross / 1.25), not the contractual row.
         $rule('calculation_basis', 'Basic');
-        // Existing Basic behavior is unchanged: it uses the engine's internal
-        // basic split (gross / 1.25), not the contractual row - 6880/30.
-        $this->assertEqualsWithDelta(229.33, $calculate()['absence_deduction'], 0.01);
+        $rule('deducted_allowances', '');
+        $this->assertEqualsWithDelta(229.33, $calculate()['absence_deduction'], 0.01); // 6880/30
     }
 
     public function test_rules_settings_save_accepts_the_allowance_basis_and_its_allowance_selection(): void
@@ -167,7 +172,7 @@ class ImmediateHrIntegrationTest extends TestCase
             ->whereIn('rule_key', ['calculation_basis', 'deducted_allowances'])
             ->update(['rule_value' => 'Gross']);
         $rules = [
-            'absence_basis' => 'BasicPlusAllowances', 'penalty_basis' => 'Gross',
+            'absence_basis' => 'Basic', 'penalty_basis' => 'Gross',
             'overtime_basis' => 'Gross', 'insurance_basis' => 'Gross',
         ];
 
@@ -178,20 +183,19 @@ class ImmediateHrIntegrationTest extends TestCase
 
         $read = fn (string $key) => DB::table('payroll_calculation_rules')
             ->where('company_id', $this->company->id)->where('rule_group', 'absence')->where('rule_key', $key)->value('rule_value');
-        $this->assertSame('BasicPlusAllowances', $read('calculation_basis'));
+        $this->assertSame('Basic', $read('calculation_basis'));
         $this->assertSame('meal,transportation', $read('deducted_allowances'));
         // The change is audited with before/after snapshots.
         $change = DB::table('payroll_setting_changes')->where('company_id', $this->company->id)->latest('id')->first();
         $this->assertNotNull($change);
-        $this->assertStringContainsString('BasicPlusAllowances', (string) $change->after_snapshot);
+        $this->assertStringContainsString('meal,transportation', (string) $change->after_snapshot);
 
-        // The allowance basis is not accepted for the other rule fields.
+        // Only Gross and Basic are accepted as rule values, on every field.
         $this->put(route('payroll.settings.rules'), [
             'effective_from' => '2026-11-01',
-            'rules' => array_merge($rules, ['overtime_basis' => 'BasicPlusAllowances']),
-        ])->assertSessionHasErrors('rules.overtime_basis');
-        $this->assertSame('Gross', DB::table('payroll_calculation_rules')
-            ->where('company_id', $this->company->id)->where('rule_group', 'overtime')->where('rule_key', 'calculation_basis')->value('rule_value'));
+            'rules' => array_merge($rules, ['absence_basis' => 'BasicPlusAllowances']),
+        ])->assertSessionHasErrors('rules.absence_basis');
+        $this->assertSame('Basic', $read('calculation_basis'));
     }
 
     public function test_leave_status_is_not_a_present_day_and_leave_excuses_explicit_absence(): void
