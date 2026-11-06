@@ -1497,43 +1497,6 @@ select {
     font-size: 12px;
   }
 }
-.preview-dark {
-  background: #121a29 !important;
-  color: #e8eef8;
-}
-.preview-dark .topbar,
-.preview-dark .panel,
-.preview-dark .stat-card,
-.preview-dark .profile-head,
-.preview-dark .profile-tabs,
-.preview-dark .filter-bar select,
-.preview-dark .search-table,
-.preview-dark .master-sidebar,
-.preview-dark .master-data-panel,
-.preview-dark .salary-card,
-.preview-dark .report-card {
-  background: #182337 !important;
-  color: #e8eef8;
-  border-color: #2b3a55;
-}
-.preview-dark .table {
-  color: #dce5f4;
-}
-.preview-dark .table th {
-  background: #202e45;
-  color: #aebbd0;
-}
-.preview-dark .table td {
-  color: #d5deeb;
-  border-color: #2b3a55;
-}
-.preview-dark .page-head p,
-.preview-dark .panel-head span,
-.preview-dark .stat-card span,
-.preview-dark .stat-card small,
-.preview-dark .details-grid label {
-  color: #9eabc0;
-}
 .documents-page-head {
   display: flex;
   align-items: center;
@@ -3390,29 +3353,7 @@ nav[role="navigation"] span[aria-current="page"] > span {
 .dropdown-item {
   white-space: normal;
 }
-.preview-dark .notification-menu,
-.preview-dark .dropdown-menu {
-  background: #182337;
-  color: #e8eef8;
-}
-.preview-dark .notification-item:hover {
-  background: #202e45;
-}
-.preview-dark .quick-grid a {
-  background: #182337;
-  border-color: #2b3a55;
-  color: #dce5f4;
-}
-.preview-dark .form-control,
-.preview-dark .form-select {
-  background: #182337;
-  color: #e8eef8;
-  border-color: #2b3a55;
-}
-.preview-dark .modal-content {
-  background: #182337;
-  color: #e8eef8;
-}
+
 @keyframes page-enter{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .dashboard-heading {
   margin-bottom: 22px;
