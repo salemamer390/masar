@@ -219,6 +219,12 @@ class PayrollController extends Controller
                 + $displayAllowance('transportation_allowance')
                 + $displayAllowance('meal_allowance')
                 + $displayAllowance('clothing_allowance');
+            // Mirror the «البدلات» fallback line above: when no itemized allowance
+            // columns are stored, the lump allowances amount is part of the total
+            // too - otherwise the drawer total is less than the sum of its lines.
+            if ($displayAllowances <= 0 && (float) $record->allowances > 0) {
+                $displayAllowances = (float) $record->allowances;
+            }
             $displayEntitlements = round(
                 $toDateEntitlement
                 + $displayAllowances
