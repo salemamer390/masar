@@ -227,15 +227,25 @@ class PayrollRunService
     /** Map a finished calculation to the payroll_records columns and its audit snapshot. */
     public function buildPayload(PayrollRun $run, Salary $salary, array $structure, array $calculation, array $inputs, bool $insuranceDue, array $window, int $insuranceMonths = 1): array
     {
+        // Persist the contractual amounts actually earned in the period: the
+        // engine's internal basic/allowance split drives statutory math only.
+        $contractualBasicEarned = round((float) ($salary->basic_salary ?? $calculation['basic_salary']) * $window['factor'], 2);
+        // Itemized allowances are the contractual split when the structure has
+        // one; a lump-only structure stores zeros so the drawer shows the
+        // contractual lump instead of the engine's invented split.
+        $hasContractualSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
+            + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
+        $itemized = static fn (string $column): float => $hasContractualSplit
+            ? round((float) ($salary->{$column} ?? 0) * $window['factor'], 2)
+            : 0.0;
+
         return [
             'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
             'agreed_net_salary' => (float) $salary->net_salary,
-            // Persist the contractual amounts actually earned in the period: the
-            // engine's internal basic/allowance split drives statutory math only.
-            'basic_salary' => round((float) ($salary->basic_salary ?? $calculation['basic_salary']) * $window['factor'], 2),
+            'basic_salary' => $contractualBasicEarned,
             'allowances' => round((float) ($salary->allowances ?? $calculation['allowances']) * $window['factor'], 2),
-            'housing_allowance' => $calculation['housing_allowance'], 'transportation_allowance' => $calculation['transportation_allowance'],
-            'meal_allowance' => $calculation['meal_allowance'], 'clothing_allowance' => $calculation['clothing_allowance'],
+            'housing_allowance' => $itemized('housing_allowance'), 'transportation_allowance' => $itemized('transportation_allowance'),
+            'meal_allowance' => $itemized('meal_allowance'), 'clothing_allowance' => $itemized('clothing_allowance'),
             'overtime_amount' => $calculation['overtime_amount'], 'total_overtime' => $calculation['overtime_amount'],
             'day_overtime_hours' => $calculation['ot_day_hours'], 'day_overtime_amount' => $calculation['ot_day_amount'],
             'night_overtime_hours' => $calculation['ot_night_hours'], 'night_overtime_amount' => $calculation['ot_night_amount'],
@@ -264,6 +274,11 @@ class PayrollRunService
                 'paid_days' => $window['days'],
                 'proration_factor' => $window['factor'],
                 'proration_basis' => $this->settings->prorationDays(),
+                // «المستحق حتى اليوم» in the drawer and payslip is the same
+                // contractual prorated basic stored on the record - not the
+                // engine's internal split, which differs whenever the contractual
+                // basic is not gross / 1.25.
+                'to_date_entitlement' => $contractualBasicEarned,
             ]),
         ];
     }
