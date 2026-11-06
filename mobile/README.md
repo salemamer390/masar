@@ -63,3 +63,11 @@ GPS employee check-in/out is a later requirement, not implemented here. No locat
 The payroll report screen uses the existing approved/locked report data. Its Excel export follows the existing web export, including drafts; the app states this difference. An explicit payroll.delete grant can delete a locked run, matching the existing server policy, not a new mobile exception.
 
 Tests and coverage will be expanded on this same branch. Do not merge/deploy as a finished mobile product yet.
+
+## Isolated offline preview
+
+`flutter run --target lib/main_preview.dart` opens an explicitly labelled, offline UI preview without login. It uses the same screens with in-memory illustrative data. It never forwards requests to a server. Employee edits reset when the process restarts. Payroll calculation, real uploads and exports are intentionally unavailable. This is not a production authentication bypass; `lib/main.dart` retains real login and backend permissions. Build and sign the preview only as a private test artifact.
+
+## Employee profile candidate
+
+Employee cards open a detailed profile with paginated stored movement, salary, payroll, leave, attendance, penalty, request, document, emergency-contact and bank history. Reads never recalculate salary. Personal and contract edits reuse EmployeeController. Emergency-contact and bank creation reuse the audited web controller and employees.edit permission. Full salary-structure/status/termination/transfer administration and other web workflows remain under development; this is not a parity-complete release.
