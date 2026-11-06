@@ -24,7 +24,9 @@
     "scripts": {
         "post-autoload-dump": [
             "@php artisan package:discover --ansi"
-        ]
+        ],
+        "styles:build": "@php scripts/build-styles.php",
+        "styles:check": "@php scripts/build-styles.php --check"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.95",
