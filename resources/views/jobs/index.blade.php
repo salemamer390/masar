@@ -23,19 +23,7 @@
 @endif
 <div id="summaryHistory" hidden><div class="panel table-panel"><div class="panel-head"><div><h3>سجل الملخصات المحفوظة</h3><span>كل سجل لقطة ثابتة للبيانات وقت الحفظ.</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>رقم الشهر</th><th>عدد الموظفين</th><th>تاريخ الحفظ</th><th>الإجراء</th></tr></thead><tbody>@forelse($summaryHistory as $snapshot)<tr><td>{{ $snapshot->summary_month->format('m/Y') }}</td><td>{{ $snapshot->employee_count }}</td><td>{{ $snapshot->created_at->format('d/m/Y H:i') }}</td><td><button type="button" class="btn btn-sm btn-outline-primary summary-history-open" data-url="{{ route('jobs.summary-history.show',$snapshot) }}"><i class="bi bi-eye"></i> فتح</button> <a class="btn btn-sm btn-outline-success" href="{{ route('jobs.summary-history.export',$snapshot) }}"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a></td></tr>@empty<tr><td colspan="4" class="text-center py-4">لا توجد سجلات محفوظة بعد.</td></tr>@endforelse</tbody></table></div></div></div>
 <div class="modal fade" id="summaryHistoryModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">سجل ملخص الشهر</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="summaryHistoryBody"></div><div class="modal-footer"><a id="summaryHistoryExport" class="btn btn-success" href="#"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a><button type="button" class="btn btn-light" data-bs-dismiss="modal">إغلاق</button></div></div></div></div>
-<style>
-.filter-bar + .d-flex form[action*="summary-history"] { display: none !important; }
-.monthly-summary-table { --summary-blue:#eaf3ff; --summary-orange:#fff4df; --summary-green:#eafaf1; --summary-red:#fff0f1; --summary-purple:#f3edff; --summary-cyan:#e8f7ff; }
-.monthly-summary-table thead tr:first-child th { font-weight:800; border-bottom:0; }
-.monthly-summary-table thead tr:first-child th:nth-child(1), .monthly-summary-table thead tr:nth-child(2) th:nth-child(-n+3), .monthly-summary-table tbody td:nth-child(-n+3) { background:var(--summary-blue); }
-.monthly-summary-table thead tr:first-child th:nth-child(2), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+4):nth-child(-n+10), .monthly-summary-table tbody td:nth-child(n+4):nth-child(-n+10) { background:var(--summary-orange); }
-.monthly-summary-table thead tr:first-child th:nth-child(3), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+11):nth-child(-n+18), .monthly-summary-table tbody td:nth-child(n+11):nth-child(-n+18) { background:var(--summary-green); }
-.monthly-summary-table thead tr:first-child th:nth-child(4), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+19):nth-child(-n+20), .monthly-summary-table tbody td:nth-child(n+19):nth-child(-n+20) { background:var(--summary-red); }
-.monthly-summary-table thead tr:first-child th:nth-child(5), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+21):nth-child(-n+23), .monthly-summary-table tbody td:nth-child(n+21):nth-child(-n+23) { background:var(--summary-cyan); }
-.monthly-summary-table tbody td { border-color:rgba(30,50,80,.08); }
-.monthly-summary-table thead th, .monthly-summary-table tbody td { text-align:center; vertical-align:middle; white-space:nowrap; }
-.monthly-summary-table { min-width:1900px; }
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/jobs-index-01.css') }}?v={{ filemtime(public_path('css/pages/jobs-index-01.css')) }}">
 <script>
 document.querySelectorAll('[data-summary-tab]').forEach(button => button.addEventListener('click', () => {
     const history = button.dataset.summaryTab === 'history';
