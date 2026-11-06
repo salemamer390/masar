@@ -36,11 +36,11 @@ class EmployeeContactController extends Controller
     public function storeBankAccount(Request $request, Employee $employee)
     {
         $data = $request->validate([
-            'bank_id' => ['nullable', 'exists:banks,id'],
+            'bank_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Bank::class)],
             'account_holder_name' => ['nullable', 'string', 'max:255'],
             'account_number' => ['nullable', 'string', 'max:100'],
             'iban' => ['nullable', 'string', 'max:64'],
-            'payment_method_id' => ['nullable', 'exists:payment_methods,id'],
+            'payment_method_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\PaymentMethod::class)],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
             'is_primary' => ['nullable', 'boolean'],
