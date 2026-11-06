@@ -893,3 +893,14 @@ body.preview-dark .completion-list span { background: var(--dm-surface-2); borde
 body.preview-dark .attendance-ring:before { background: var(--dm-surface); }
 body.preview-dark .attendance-ring span { color: var(--dm-text); }
 body.preview-dark .attendance-ring small { color: var(--dm-muted); }
+
+/* ---------- Round 8: Bootstrap helper/muted text variables ---------- */
+body.preview-dark {
+  --bs-secondary-color: rgba(233, 238, 247, .65);
+  --bs-tertiary-color: rgba(233, 238, 247, .5);
+  --bs-secondary-bg: #1f2c46;
+  --bs-tertiary-bg: #182337;
+  --bs-emphasis-color: #f3f6fc;
+  --bs-body-color: #e9eef7;
+}
+body.preview-dark .form-text { color: var(--dm-muted); }
