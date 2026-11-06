@@ -888,3 +888,8 @@ body.preview-dark .profile-summary>div { background: var(--dm-surface-2); border
 body.preview-dark .profile-summary span { color: var(--dm-muted); }
 body.preview-dark .profile-summary b { color: var(--dm-text); }
 body.preview-dark .completion-list span { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text-2); }
+
+/* ---------- Round 7: attendance donut center ---------- */
+body.preview-dark .attendance-ring:before { background: var(--dm-surface); }
+body.preview-dark .attendance-ring span { color: var(--dm-text); }
+body.preview-dark .attendance-ring small { color: var(--dm-muted); }
