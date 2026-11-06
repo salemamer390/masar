@@ -225,7 +225,7 @@ class SalaryController extends Controller
             'excluded_allowance_pct' => ['nullable', 'numeric'],
             'personal_exemption' => ['nullable', 'numeric'],
             'tax_treatment' => ['nullable', 'in:egyptian,other'],
-            'payment_method_id' => ['nullable', 'exists:payment_methods,id'],
+            'payment_method_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\PaymentMethod::class)],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
     }
