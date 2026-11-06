@@ -1,0 +1,20 @@
+  .attendance-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 6px}
+  .attendance-toolbar .attendance-tabs{margin:0}
+  .attendance-toolbar-actions{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex-wrap:nowrap}
+  .attendance-toolbar-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}
+  .attendance-today-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#52617c;margin:10px 0 6px}
+  .attendance-filters.filter-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin-bottom:12px}
+  .attendance-filters .form-select,.attendance-filters .form-control{min-width:0;flex:0 1 auto;height:36px;min-height:36px;font-size:12.5px;padding:6px 10px}
+  .attendance-filters .search-table{height:36px;flex:1 1 240px;min-width:180px}
+  .attendance-filters .search-table input{font-size:12.5px}
+  .attendance-filter-main{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;justify-content:space-between;width:100%;align-self:stretch}.attendance-filter-controls{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;flex-wrap:nowrap}.attendance-filter-controls .search-table{flex:1 1 200px;min-width:160px;max-width:420px}.attendance-filter-controls select[name="state"]{flex:0 0 auto}
+  .attendance-filter-main select[name="state"]{width:auto;min-width:130px;flex:0 0 auto}
+  .attendance-filter-main .btn{height:36px;min-height:36px;padding:6px 12px;font-size:12.5px;border-radius:9px;display:inline-flex;align-items:center;gap:6px}
+  .attendance-more-filters{background:none;border:0;color:#2563eb;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:6px 4px;white-space:nowrap;flex:0 0 auto}
+  .attendance-more-filters:hover{text-decoration:underline}
+  .attendance-filter-extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px dashed #dbe4f0;padding-top:8px}
+  .attendance-filter-extra input[type="date"]{width:auto;flex:0 0 auto}
+  .attendance-filter-extra select{max-width:260px}
+  @media(max-width:700px){.attendance-toolbar-actions{width:100%;margin-inline-start:0;justify-content:flex-start;overflow-x:auto}.attendance-filter-main .attendance-filter-search{min-width:100%;flex-basis:100%}}
+
+  @media(max-width:640px){.attendance-filter-main{flex-wrap:wrap}.attendance-filter-controls{flex-wrap:wrap;width:100%}.attendance-filter-actions{border-inline-start:0;padding-inline-start:0;width:100%;margin-inline-start:0}}
