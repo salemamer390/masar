@@ -12,7 +12,7 @@ Edit `resources/styles/`, not the generated `public/app.css`:
 
 The names describe ownership, not permission to reorder rules. These legacy layers still overlap; broad selector deduplication needs a separate behavioral and visual review. `app-header.txt` preserves the original bundle header.
 
-Run `php scripts/build-styles.php` to rebuild. Run `php scripts/build-styles.php --check` to fail if source and output diverge. Composer aliases: `composer styles:build` / `composer styles:check`. No Node, npm, Vite, minifier, or production build step is required. Commit sources and output together. The first extraction reproduces the existing app.css byte for byte.
+Run `php scripts/build-styles.php` to rebuild. Run `php scripts/build-styles.php --check` to fail if source and output diverge. Composer aliases: `composer styles:build` / `composer styles:check`. No Node, npm, Vite, minifier, or production build step is required. Commit sources and output together. The first extraction reproduced the existing app.css byte for byte. A later verified pass removed superseded declarations without changing final values; see [style-cascade-review.md](style-cascade-review.md).
 
 `public/dark-mode.css` remains a separate final head layer. `public/dashboard-reference.css` and `public/payroll/employee-salaries.css` retain their current page ownership. Platform/admin and print/PDF styles are not part of this cleanup.
 
