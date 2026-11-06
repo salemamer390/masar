@@ -980,3 +980,17 @@ body.preview-dark .report-card:hover { background: var(--dm-surface-2); }
 body.preview-dark .btn.btn-outline-secondary { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text-2); }
 body.preview-dark .profile-tab.active { background: var(--dm-primary-soft); color: #86b7ff; border-color: var(--dm-primary); }
 body.preview-dark .payroll-record-filter { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text-2); }
+
+/* Master-list labels and counters must not inherit light pills with light text. */
+body.preview-dark .master-menu span { background: transparent; color: inherit; }
+body.preview-dark .master-menu span:last-child { background: var(--dm-surface-3); color: var(--dm-text-2); }
+body.preview-dark .master-menu.active span { background: var(--dm-primary-soft); color: #a8caff; }
+/* Preserve access to action columns on narrow screens without unclipping cards. */
+body.preview-dark .table-panel:has(> .table) { overflow-x: auto; }
+/* Filled action links must not inherit the generic blue link color. */
+body.preview-dark .btn.btn-primary,
+body.preview-dark .btn.btn-primary:hover { color: #fff; }
+body.preview-dark .btn.btn-success,
+body.preview-dark .btn.btn-success:hover { color: #062f24; }
+body.preview-dark .attendance-row-btn.attendance-row-edit { background: var(--dm-primary-soft); border-color: var(--dm-border); color: #a8caff; }
+body.preview-dark .attendance-row-btn.attendance-row-delete { background: var(--dm-red-soft); border-color: var(--dm-border); color: #fca5a5; }
