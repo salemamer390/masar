@@ -149,8 +149,7 @@ class PayrollController extends Controller
         // Data shape consumed by the approved payroll drawer prototype.
         // Keeping this adapter here lets us preserve the prototype UI while
         // replacing its sample JavaScript data with the real payroll records.
-        $statusLabels = ['Draft' => 'مسودة', 'Approved' => 'معتمد', 'Locked' => 'مغلق'];
-        $prototypePeople = $recordCollection->values()->map(function ($record) use ($statusLabels) {
+        $prototypePeople = $recordCollection->values()->map(function ($record) {
             $snapshot = (array) ($record->calculation_snapshot ?? []);
             $inputs = (array) ($snapshot['inputs'] ?? []);
             $employee = $record->employee;
@@ -219,6 +218,12 @@ class PayrollController extends Controller
                 + $displayAllowance('transportation_allowance')
                 + $displayAllowance('meal_allowance')
                 + $displayAllowance('clothing_allowance');
+            // Mirror the «البدلات» fallback line above: when no itemized allowance
+            // columns are stored, the lump allowances amount is part of the total
+            // too - otherwise the drawer total is less than the sum of its lines.
+            if ($displayAllowances <= 0 && (float) $record->allowances > 0) {
+                $displayAllowances = (float) $record->allowances;
+            }
             $displayEntitlements = round(
                 $toDateEntitlement
                 + $displayAllowances
@@ -270,8 +275,6 @@ class PayrollController extends Controller
                 'net' => (float) $record->net_salary,
                 'companyCost' => (float) $record->employee_cost,
                 'state' => $record->status,
-                'stateLabel' => $statusLabels[$record->status] ?? $record->status,
-                'insurance' => (float) $record->employee_insurance,
                 'initials' => $initials,
                 'structureLabel' => $record->salary_id ? 'هيكل #' . $record->salary_id : 'بدون هيكل',
                 'effectiveFrom' => $record->salary?->effective_from?->format('d/m/Y'),
@@ -300,6 +303,7 @@ class PayrollController extends Controller
             ->get(['payroll_month', 'status'])
             ->mapWithKeys(fn ($run) => [Carbon::parse($run->payroll_month)->format('Y-m') => $run->status])
             ->all();
+        $statusLabels = ['Draft' => 'مسودة', 'Approved' => 'معتمد', 'Locked' => 'مغلق'];
         $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
         $payrollHistory = PayrollRecord::query()
             ->when($companyId, fn ($query) => $query->where('company_id', $companyId))
