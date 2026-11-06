@@ -84,11 +84,11 @@ class PayrollSettingsService
     }
 
     /** Basis rules accept only Gross or Basic; anything else falls back to the default. */
-    private function basis(string $group, string $key, string $default, array $allowed = ['Gross', 'Basic']): string
+    private function basis(string $group, string $key, string $default): string
     {
         $value = ucfirst(strtolower(trim($this->rule($group, $key, $default))));
 
-        return in_array($value, $allowed, true) ? $value : $default;
+        return in_array($value, ['Gross', 'Basic'], true) ? $value : $default;
     }
 
     private function rulesAreCompanyScoped(): bool
@@ -196,13 +196,15 @@ class PayrollSettingsService
 
     public function absenceBasis(): string
     {
-        return $this->basis('absence', 'calculation_basis', 'BasicPlusAllowances', ['Gross', 'Basic', 'BasicPlusAllowances']);
+        return $this->basis('absence', 'calculation_basis', 'Gross');
     }
 
-    /** Allowance keys whose daily value is deducted on an absence day under the BasicPlusAllowances basis. */
+    /** Allowance keys whose daily value joins the absence-day deduction under the Basic basis. */
     public function absenceDeductedAllowances(): array
     {
-        $keys = array_filter(array_map('trim', explode(',', strtolower($this->rule('absence', 'deducted_allowances', 'meal,transportation')))));
+        // The seeded row carries the meal,transportation default; an explicitly saved
+        // empty selection must stay empty (rule() would otherwise resurrect the default).
+        $keys = array_filter(array_map('trim', explode(',', strtolower($this->rule('absence', 'deducted_allowances', '')))));
 
         return array_values(array_intersect($keys, ['housing', 'transportation', 'meal', 'clothing', 'other']));
     }
