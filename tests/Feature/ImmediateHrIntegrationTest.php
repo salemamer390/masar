@@ -169,6 +169,25 @@ class ImmediateHrIntegrationTest extends TestCase
         $this->assertEqualsWithDelta(66.67, (float) $record2->clothing_allowance, 0.01);
     }
 
+    public function test_configured_friday_saturday_rest_is_paid_and_never_inferred_absent(): void
+    {
+        // Fri+Sat weekly rest (pattern positions are Monday..Sunday).
+        $this->setting('weekly_rest_pattern', '0000110');
+
+        // No attendance records at all: Friday 2026-10-30 and Saturday
+        // 2026-10-31 are configured rest days, so neither infers absence.
+        $this->assertSame(0.0, $this->daily('2026-10-30', '2026-10-31')['absence_days']);
+        // Sunday 2026-11-01 is a working day in this pattern and still infers absence.
+        $this->assertSame(1.0, $this->daily('2026-11-01')['absence_days']);
+        // Rest days stay paid: a fully elapsed month accrues all 30 calendar
+        // days; configured rest days are not subtracted from paid days.
+        $window = app(PayrollRunService::class)->serviceWindow($this->employee->fresh(), Carbon::parse('2026-10-01'));
+        $this->assertSame(30, $window['days']);
+        // Under the default Friday-only pattern the Saturday is a working day.
+        DB::table('hr_operational_settings')->where('company_id', $this->company->id)->where('setting_key', 'weekly_rest_pattern')->delete();
+        $this->assertSame(1.0, $this->daily('2026-10-31')['absence_days']);
+    }
+
     public function test_leave_status_is_not_a_present_day_and_leave_excuses_explicit_absence(): void
     {
         $this->record('2026-11-01', null, null, 'On Leave');
