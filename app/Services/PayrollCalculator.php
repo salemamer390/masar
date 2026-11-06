@@ -88,12 +88,12 @@ class PayrollCalculator
      * the variable amount on top of the fixed taxable base. Advances are a loan
      * payout and are never taxed.
      */
-    public function monthly(float $gross, array $monthly = [], ?float $manualInsuranceWage = null, bool $noInsurance = false): array
+    public function monthly(float $gross, array $monthly = [], ?float $manualInsuranceWage = null, bool $noInsurance = false, ?float $absenceBaseOverride = null): array
     {
         $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
         $basic = (float) $structure['basic_salary'];
         $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
-        $absenceBase = $this->settings->absenceBasis() === 'Basic' ? $basic : $gross;
+        $absenceBase = $absenceBaseOverride ?? ($this->settings->absenceBasis() === 'Basic' ? $basic : $gross);
         $penaltyBase = $this->settings->penaltyBasis() === 'Gross' ? $gross : $basic;
 
         $dayHours = max(0, (float)($monthly['ot_day_hours'] ?? 0));
@@ -141,7 +141,7 @@ class PayrollCalculator
             'overtime_amount'=>$overtime, 'bonus'=>$bonus, 'incentives'=>$incentives, 'commission'=>$commission, 'profit_share'=>$profitShare, 'advance_earnings'=>$advanceEarnings, 'other_earnings'=>$otherEarnings,
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'penalty_days_requested'=>$penaltyDaysRequested, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
-            'income_tax'=>$tax, 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
+            'income_tax'=>$tax, 'absence_base'=>$this->round2($absenceBase), 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
     }

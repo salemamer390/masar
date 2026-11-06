@@ -199,6 +199,16 @@ class PayrollSettingsService
         return $this->basis('absence', 'calculation_basis', 'Gross');
     }
 
+    /** Allowance keys whose daily value joins the absence-day deduction under the Basic basis. */
+    public function absenceDeductedAllowances(): array
+    {
+        // The seeded row carries the meal,transportation default; an explicitly saved
+        // empty selection must stay empty (rule() would otherwise resurrect the default).
+        $keys = array_filter(array_map('trim', explode(',', strtolower($this->rule('absence', 'deducted_allowances', '')))));
+
+        return array_values(array_intersect($keys, ['housing', 'transportation', 'meal', 'clothing', 'other']));
+    }
+
     public function penaltyBasis(): string
     {
         return $this->basis('penalty', 'calculation_basis', 'Basic');

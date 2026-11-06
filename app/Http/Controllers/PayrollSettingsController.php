@@ -369,6 +369,8 @@ class PayrollSettingsController extends Controller
             'effective_from' => ['required', 'date'],
             'rules' => ['required', 'array'],
             'rules.*' => ['required', 'in:Gross,Basic'],
+            'absence_deducted_allowances' => ['nullable', 'array'],
+            'absence_deducted_allowances.*' => ['in:housing,transportation,meal,clothing,other'],
         ]);
         abort_if(array_diff(array_keys($data['rules']), array_keys(self::RULE_FIELDS)) !== [], 422, 'Invalid payroll rule.');
 
@@ -381,6 +383,10 @@ class PayrollSettingsController extends Controller
                 DB::table('payroll_calculation_rules')->where('company_id', $companyId)->where('rule_group', $group)->where('rule_key', $key)
                     ->update(['rule_value' => $value, 'is_active' => 1, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
             }
+            // The allowances whose daily value joins the absence-day deduction under the Basic basis.
+            $deductedAllowances = implode(',', $data['absence_deducted_allowances'] ?? []);
+            DB::table('payroll_calculation_rules')->where('company_id', $companyId)->where('rule_group', 'absence')->where('rule_key', 'deducted_allowances')
+                ->update(['rule_value' => $deductedAllowances, 'is_active' => 1, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
             $this->recordChange($companyId, $data['effective_from'], $before, $snapshot());
         });
 

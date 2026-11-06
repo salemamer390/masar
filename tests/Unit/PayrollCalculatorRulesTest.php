@@ -55,6 +55,22 @@ class PayrollCalculatorRulesTest extends TestCase
         $this->assertEqualsWithDelta(20075.86, $r['net_monthly'], 0.01);
     }
 
+    public function test_absence_base_override_drives_the_deduction_and_is_recorded(): void
+    {
+        // A base override supplies the contractual base from the salary row
+        // (basic + selected allowances); the calculator only applies days/30.
+        $r = $this->calculator([], ['absence.calculation_basis' => 'Basic'])
+            ->monthly(8600.0, ['absence_days' => 2], null, true, 7000.0);
+        $this->assertEqualsWithDelta(466.67, $r['absence_deduction'], 0.01);
+        $this->assertEqualsWithDelta(7000.0, $r['absence_base'], 0.01);
+
+        // Without an override the existing bases behave as before.
+        $gross = $this->calculator([], ['absence.calculation_basis' => 'Gross'])->monthly(8600.0, ['absence_days' => 1], null, true);
+        $this->assertEqualsWithDelta(286.67, $gross['absence_deduction'], 0.01);
+        $basic = $this->calculator([], ['absence.calculation_basis' => 'Basic'])->monthly(8600.0, ['absence_days' => 1], null, true);
+        $this->assertEqualsWithDelta(229.33, $basic['absence_deduction'], 0.01); // 8600/1.25/30
+    }
+
     public function test_profit_share_is_exempt_but_other_earnings_and_incentives_are_taxed(): void
     {
         $profit = $this->calculator()->monthly(25536.0, ['profit_share' => 5000]);
