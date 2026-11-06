@@ -23,8 +23,11 @@ use Illuminate\Support\Facades\DB;
  *    days this cycle (the 15-days-actual rule).
  *  - leave_six_consecutive: same window, and no single annual leave of 6+
  *    days was taken this cycle (the 6-consecutive-day rule).
- *  - leave_settlement_due: a known carried bucket's cycle end approaches 3
- *    years without settlement (90- and 30-day thresholds; settlement itself
+ *  - leave_settlement_due: a known carried bucket's cycle START reaches the
+ *    configurable planning cadence (default 3 years, the Art. 125 settlement
+ *    interval, which fixes no anchor) without a recorded settlement — an
+ *    internal planning date, never a claimed statutory deadline (90- and
+ *    30-day thresholds; settlement itself
  *    is manual — the alert never pays out or expires anything).
  *  - leave_history_uninitialized: pre-baseline history exists with no
  *    confirmed opening entry; authorized users get an actionable setup nudge
@@ -120,14 +123,20 @@ class SendLeaveSmartAlerts extends Command
             $allocation = $service->allocate($employee, $leaves->values(), $cycle, 0.0, $service->openingEntriesFor($employee), $employee->company_id);
             foreach ($allocation['buckets'] as $bucket) {
                 if ($bucket['source'] === 'current' || $bucket['remaining'] <= 0) continue;
-                $deadline = $bucket['end']->copy()->addYears(3);
+                // Internal planning date, NOT a statutory due date: Art. 125
+                // obliges settling the balance (or its cash equivalent) every
+                // three years at most without fixing an anchor, so we anchor
+                // conservatively on the bucket's cycle START (never later than
+                // its end) and keep the cadence configurable per company.
+                $years = max(1, (int) $this->policy('leave_settlement_planning_years', '3'));
+                $deadline = $bucket['start']->copy()->addYears($years);
                 $daysLeft = today()->diffInDays($deadline, false);
                 if ($daysLeft < 0 || $daysLeft > 90) continue;
                 $threshold = $daysLeft <= 30 ? 30 : 90;
                 $sent += $this->send(
                     $employee,
                     'leave_settlement_due',
-                    "رصيد مرحّل قديم لـ{$employee->full_name} (دورة {$bucket['year']}، متبقٍ {$this->number($bucket['remaining'])} يوم) يجب تسويته بالاستخدام أو تسوية مسجلة قبل {$deadline->format('d/m/Y')} (حد الثلاث سنوات).",
+                    "تنبيه تخطيطي داخلي: الرصيد المرحّل لـ{$employee->full_name} (دورة {$bucket['year']}، متبقٍ {$this->number($bucket['remaining'])} يوم) بدأت دورته منذ نحو {$years} سنوات دون تسوية مسجلة بالاستخدام أو الصرف. المادة 125 تلزم بتسوية الرصيد كل ثلاث سنوات على الأكثر دون تحديد مرجع قاطع لبداية المدة، فهذا موعد مراجعة داخلي (يُضبط من إعدادات الشركة) وليس تاريخ سقوط قانوني — راجعه قبل {$deadline->format('d/m/Y')}.",
                     $deadline,
                     "leave_settlement_due:{$employee->id}:{$bucket['year']}:{$threshold}",
                     $threshold === 30 ? 'high' : 'normal',
