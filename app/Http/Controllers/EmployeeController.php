@@ -267,7 +267,7 @@ class EmployeeController extends Controller
             return $employee;
         });
         if ($request->hasFile('profile_photo')) {
-            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
         }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
 
@@ -365,9 +365,9 @@ class EmployeeController extends Controller
         unset($validated['profile_photo']);
         if ($request->hasFile('profile_photo')) {
             if ($employee->profile_photo_path) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($employee->profile_photo_path);
+                \Illuminate\Support\Facades\Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
             }
-            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public');
+            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local');
         }
         if ($request->filled('contract_start_date')) {
             $hireDate = \Carbon\Carbon::parse($validated['contract_start_date'])->toDateString();
@@ -563,20 +563,30 @@ class EmployeeController extends Controller
         }
     }
 
+    public function showPhoto(Employee $employee)
+    {
+        $disk = $employee->profilePhotoDisk();
+        if (!$employee->profile_photo_path || !Storage::disk($disk)->exists($employee->profile_photo_path)) {
+            abort(404, 'الصورة غير موجودة.');
+        }
+
+        return Storage::disk($disk)->response($employee->profile_photo_path);
+    }
+
     public function updatePhoto(Request $request, Employee $employee)
     {
         $request->validate(['profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
         if (!$request->hasFile('profile_photo')) {
             return back()->with('toast', 'لم يتم اختيار صورة جديدة.');
         }
-        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
-        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+        if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
+        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
         return back()->with('toast', 'تم تحديث صورة الموظف.');
     }
 
     public function deletePhoto(Employee $employee)
     {
-        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
+        if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
         $employee->update(['profile_photo_path' => null]);
         return back()->with('toast', 'تم حذف صورة الموظف.');
     }
