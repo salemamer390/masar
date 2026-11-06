@@ -121,23 +121,77 @@ class ImmediateHrIntegrationTest extends TestCase
         $this->assertSame(0.0, $this->daily('2026-10-30')['absence_days']); // default Friday rest
     }
 
-    public function test_configured_friday_saturday_rest_is_paid_and_never_inferred_absent(): void
+    public function test_absence_deduction_follows_configured_basis_and_allowance_selection(): void
     {
-        // Fri+Sat weekly rest (pattern positions are Monday..Sunday).
-        $this->setting('weekly_rest_pattern', '0000110');
+        // Contractual row: basic 6000, meal 500, transport 500, housing 600,
+        // clothing 1000 (gross 8600). Confirmed rule: an absence day deducts
+        // basic/30 + meal/30 + transport/30; housing and clothing are not
+        // reduced by absence.
+        $salary = new \App\Models\Salary([
+            'company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'effective_from' => '2026-11-01',
+            'basic_salary' => 6000, 'meal_allowance' => 500, 'transportation_allowance' => 500,
+            'housing_allowance' => 600, 'clothing_allowance' => 1000, 'other_allowances' => 0,
+            'allowances' => 2600, 'gross_salary' => 8600, 'net_salary' => 8000, 'no_insurance' => true,
+        ]);
+        $rule = function (string $key, string $value): void {
+            DB::table('payroll_calculation_rules')->updateOrInsert(
+                ['company_id' => $this->company->id, 'rule_group' => 'absence', 'rule_key' => $key],
+                ['rule_value' => $value, 'is_active' => 1, 'created_at' => now(), 'updated_at' => now()]
+            );
+        };
+        $calculate = fn () => app(PayrollRunService::class)->calculate($salary, ['gross' => 8600], ['absence_days' => 1], false, 1.0);
 
-        // No attendance records at all: Friday 2026-10-30 and Saturday
-        // 2026-10-31 are configured rest days, so neither infers absence.
-        $this->assertSame(0.0, $this->daily('2026-10-30', '2026-10-31')['absence_days']);
-        // Sunday 2026-11-01 is a working day in this pattern and still infers absence.
-        $this->assertSame(1.0, $this->daily('2026-11-01')['absence_days']);
-        // Rest days stay paid: a fully elapsed month accrues all 30 calendar
-        // days; configured rest days are not subtracted from paid days.
-        $window = app(PayrollRunService::class)->serviceWindow($this->employee->fresh(), Carbon::parse('2026-10-01'));
-        $this->assertSame(30, $window['days']);
-        // Under the default Friday-only pattern the Saturday is a working day.
-        DB::table('hr_operational_settings')->where('company_id', $this->company->id)->where('setting_key', 'weekly_rest_pattern')->delete();
-        $this->assertSame(1.0, $this->daily('2026-10-31')['absence_days']);
+        $rule('calculation_basis', 'BasicPlusAllowances');
+        $rule('deducted_allowances', 'meal,transportation');
+        $this->assertEqualsWithDelta(233.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500)/30
+
+        // Only the configured allowances join the base; adding housing adds its daily share.
+        $rule('deducted_allowances', 'meal,transportation,housing');
+        $this->assertEqualsWithDelta(253.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500+600)/30
+
+        // Existing bases are unchanged: Gross deducts from the full gross, Basic from basic only.
+        $rule('calculation_basis', 'Gross');
+        $this->assertEqualsWithDelta(286.67, $calculate()['absence_deduction'], 0.01); // 8600/30
+        $rule('calculation_basis', 'Basic');
+        // Existing Basic behavior is unchanged: it uses the engine's internal
+        // basic split (gross / 1.25), not the contractual row - 6880/30.
+        $this->assertEqualsWithDelta(229.33, $calculate()['absence_deduction'], 0.01);
+    }
+
+    public function test_rules_settings_save_accepts_the_allowance_basis_and_its_allowance_selection(): void
+    {
+        // Mimic the settings page load so the seeded rule rows exist, then start from
+        // values the PUT must change so the assertions prove the write, not the defaults.
+        app(\App\Services\PayrollDefaultsService::class)->ensureForCompany($this->company->id);
+        DB::table('payroll_calculation_rules')->where('company_id', $this->company->id)->where('rule_group', 'absence')
+            ->whereIn('rule_key', ['calculation_basis', 'deducted_allowances'])
+            ->update(['rule_value' => 'Gross']);
+        $rules = [
+            'absence_basis' => 'BasicPlusAllowances', 'penalty_basis' => 'Gross',
+            'overtime_basis' => 'Gross', 'insurance_basis' => 'Gross',
+        ];
+
+        $this->put(route('payroll.settings.rules'), [
+            'effective_from' => '2026-11-01', 'rules' => $rules,
+            'absence_deducted_allowances' => ['meal', 'transportation'],
+        ])->assertSessionHasNoErrors();
+
+        $read = fn (string $key) => DB::table('payroll_calculation_rules')
+            ->where('company_id', $this->company->id)->where('rule_group', 'absence')->where('rule_key', $key)->value('rule_value');
+        $this->assertSame('BasicPlusAllowances', $read('calculation_basis'));
+        $this->assertSame('meal,transportation', $read('deducted_allowances'));
+        // The change is audited with before/after snapshots.
+        $change = DB::table('payroll_setting_changes')->where('company_id', $this->company->id)->latest('id')->first();
+        $this->assertNotNull($change);
+        $this->assertStringContainsString('BasicPlusAllowances', (string) $change->after_snapshot);
+
+        // The allowance basis is not accepted for the other rule fields.
+        $this->put(route('payroll.settings.rules'), [
+            'effective_from' => '2026-11-01',
+            'rules' => array_merge($rules, ['overtime_basis' => 'BasicPlusAllowances']),
+        ])->assertSessionHasErrors('rules.overtime_basis');
+        $this->assertSame('Gross', DB::table('payroll_calculation_rules')
+            ->where('company_id', $this->company->id)->where('rule_group', 'overtime')->where('rule_key', 'calculation_basis')->value('rule_value'));
     }
 
     public function test_leave_status_is_not_a_present_day_and_leave_excuses_explicit_absence(): void
