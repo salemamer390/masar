@@ -11,7 +11,14 @@ class EnsureActiveCompanySubscription
     public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
-        if (!$user || $user->isSuperAdmin()) return $next($request);
+        if (!$user) return $next($request);
+        if (!$user->is_active) {
+            \Illuminate\Support\Facades\Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            abort(403, 'هذا الحساب معطل حاليًا.');
+        }
+        if ($user->isSuperAdmin()) return $next($request);
 
         // السماح بالخروج وفتح الحساب وتجديد الاشتراك حتى بعد انتهائه.
         if ($request->routeIs('logout', 'company.account', 'company.renewals.store')) return $next($request);
