@@ -57,6 +57,21 @@
     document.getElementById('earnSum').textContent = money(es); document.getElementById('deductSum').textContent = money(ds);
     document.getElementById('netAmount').innerHTML = money(selected.net ?? (es - ds)) + ' <small style="font-size:12px">ج.م</small>';
     document.getElementById('formula').textContent = `${money(es)} − ${money(ds)}`;
+    const stateLabel = selected.stateLabel || selected.state || '—';
+    const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
+    setText('pState', stateLabel);
+    setText('exPaidDays', `${selected.paidDays ?? 0} يوم`);
+    setText('exAbsenceDays', `${selected.absenceDays ?? 0} يوم`);
+    setText('exOvertimeHours', `${selected.overtimeHours ?? 0} ساعة`);
+    setText('exState', stateLabel);
+    setText('netState', selected.state === 'Draft' ? '● مسودة' : (selected.state === 'Approved' ? '● معتمد' : (selected.state === 'Locked' ? '● نهائي' : '')));
+    const note = document.getElementById('netNote');
+    if (note) {
+      const midPeriod = Number(selected.paidDays ?? 30) < 30;
+      const negativeDraft = Number(selected.net ?? 0) < 0 && selected.state === 'Draft' && midPeriod && Number(selected.insurance ?? 0) > 0;
+      note.style.display = negativeDraft ? '' : 'none';
+      if (negativeDraft) note.textContent = 'التأمينات محمَّلة بقيمة الشهر كاملة من أول الفترة، بينما المستحقات تتراكم يومًا بيوم حتى نهاية الفترة.';
+    }
   }
   function toast(message) { const t = document.getElementById('toast'); if (!t) return; t.textContent = message; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); }
   ['search', 'dept', 'state'].forEach(id => document.getElementById(id)?.addEventListener('input', table));
