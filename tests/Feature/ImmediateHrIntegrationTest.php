@@ -156,11 +156,11 @@ class ImmediateHrIntegrationTest extends TestCase
         $rule('calculation_basis', 'Gross');
         $this->assertEqualsWithDelta(286.67, $calculate()['absence_deduction'], 0.01); // 8600/30
 
-        // Plain Basic with no allowance selected keeps its existing behavior: the
-        // engine's internal basic split (gross / 1.25), not the contractual row.
+        // Basic with no allowance selected is the contractual basic alone - never
+        // the engine's internal split (gross / 1.25 = 6880 here).
         $rule('calculation_basis', 'Basic');
         $rule('deducted_allowances', '');
-        $this->assertEqualsWithDelta(229.33, $calculate()['absence_deduction'], 0.01); // 6880/30
+        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01); // 6000/30
     }
 
     public function test_rules_settings_save_accepts_the_allowance_basis_and_its_allowance_selection(): void
