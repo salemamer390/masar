@@ -21,6 +21,7 @@
   <link href="{{ asset('app.css') }}?v={{ @filemtime(public_path('app.css')) }}" rel="stylesheet">
   
   @stack('styles')
+  <link href="{{ asset('dark-mode.css') }}?v={{ @filemtime(public_path('dark-mode.css')) }}" rel="stylesheet">
 </head>
 <body>
 <div class="app-shell">
