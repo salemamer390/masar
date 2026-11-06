@@ -236,7 +236,7 @@ body.preview-dark .filter-bar input {
 }
 
 /* ---------- Buttons ---------- */
-body.preview-dark .btn-light,
+body.preview-dark .btn.btn-light,
 body.preview-dark .back-btn,
 body.preview-dark .module-row button,
 body.preview-dark .quick-grid a {
@@ -244,7 +244,7 @@ body.preview-dark .quick-grid a {
   border-color: var(--dm-border);
   color: var(--dm-text-2);
 }
-body.preview-dark .btn-light:hover,
+body.preview-dark .btn.btn-light:hover,
 body.preview-dark .back-btn:hover,
 body.preview-dark .module-row button:hover,
 body.preview-dark .quick-grid a:hover {
@@ -899,3 +899,84 @@ body.preview-dark {
   --bs-body-color: #e9eef7;
 }
 body.preview-dark .form-text { color: var(--dm-muted); }
+
+/* Page tokens must follow the selected theme, not retain their light defaults. */
+body.preview-dark {
+  --color-page-bg: var(--dm-bg);
+  --color-card-bg: var(--dm-surface);
+  --color-border: var(--dm-border);
+  --color-text-primary: var(--dm-text);
+  --color-text-secondary: var(--dm-muted);
+  --color-primary-dark: var(--dm-text);
+}
+
+/* Roles and permissions use a dedicated component set. */
+body.preview-dark .roles-panel,
+body.preview-dark .roles-module-body,
+body.preview-dark .roles-list-item { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text); }
+body.preview-dark .roles-module,
+body.preview-dark .roles-tabs,
+body.preview-dark .roles-footer,
+body.preview-dark .roles-permission-item,
+body.preview-dark .roles-search { border-color: var(--dm-border); }
+body.preview-dark .roles-page .roles-tab,
+body.preview-dark .roles-module-head { background: var(--dm-surface-2); color: var(--dm-text-2); }
+body.preview-dark .roles-page .roles-tab.active,
+body.preview-dark .roles-module-head:hover,
+body.preview-dark .roles-list-item:hover,
+body.preview-dark .roles-page .roles-list-item.selected { background: var(--dm-primary-soft); border-color: var(--dm-primary); color: #86b7ff; }
+body.preview-dark .roles-fields input,
+body.preview-dark .roles-fields textarea,
+body.preview-dark .roles-check { background: var(--dm-bg); border-color: #61728f; color: var(--dm-text); }
+body.preview-dark .roles-fields input:focus,
+body.preview-dark .roles-fields textarea:focus { box-shadow: 0 0 0 3px var(--dm-primary-soft); border-color: var(--dm-primary); }
+body.preview-dark .roles-check:checked { background: var(--dm-primary); border-color: var(--dm-primary); }
+body.preview-dark .roles-search input { color: var(--dm-text); }
+body.preview-dark .roles-permission-item,
+body.preview-dark .roles-select-module { color: var(--dm-text-2); }
+body.preview-dark .roles-status { background: var(--dm-green-soft); color: #6ee7a0; }
+body.preview-dark .roles-hint { background: var(--dm-primary-soft); border-color: var(--dm-border); color: var(--dm-text-2); }
+body.preview-dark .roles-emblem,
+body.preview-dark .roles-title-icon,
+body.preview-dark .roles-module-count,
+body.preview-dark .roles-list-icon,
+body.preview-dark .roles-users,
+body.preview-dark .btn-soft { background: var(--dm-primary-soft); border-color: var(--dm-border); color: #86b7ff; }
+body.preview-dark .roles-users small { color: #a8caff; }
+
+/* Company account cards and their usage/subscription details. */
+body.preview-dark .account-mini-stat,
+body.preview-dark .account-detail { background: var(--dm-surface-2); }
+body.preview-dark .account-progress { background: var(--dm-surface-3); }
+body.preview-dark .company-account-panel tbody tr:hover { background: var(--dm-surface-2); }
+body.preview-dark .account-status--active { background: var(--dm-green-soft); color: #6ee7a0; }
+body.preview-dark .account-status--pending { background: var(--dm-orange-soft); color: #fcd34d; }
+body.preview-dark .account-status--rejected { background: var(--dm-red-soft); color: #fca5a5; }
+body.preview-dark .company-account-card__heading i { background: var(--dm-primary-soft); color: #86b7ff; }
+body.preview-dark .company-account-card:nth-child(2) .company-account-card__heading i { background: var(--dm-green-soft); color: #6ee7a0; }
+body.preview-dark .company-account-card:nth-child(3) .company-account-card__heading i { background: var(--dm-purple-soft); color: #c4b5fd; }
+
+/* Keep summary column grouping without light pastel cells under light text. */
+body.preview-dark .monthly-summary-table {
+  --summary-blue: #1b304f;
+  --summary-orange: #3a3021;
+  --summary-green: #19372f;
+  --summary-red: #3c2733;
+  --summary-purple: #302b49;
+  --summary-cyan: #193444;
+}
+body.preview-dark .monthly-summary-table tbody td { border-color: var(--dm-border); }
+body.preview-dark .monthly-summary-table thead th { color: var(--dm-text-2); }
+
+body.preview-dark .btn.btn-light,
+body.preview-dark .dashboard-existing-action,
+body.preview-dark .dashboard-import-action,
+body.preview-dark .empty-page { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text-2); }
+body.preview-dark .btn.btn-light:hover,
+body.preview-dark .dashboard-existing-action:hover,
+body.preview-dark .dashboard-import-action:hover { background: var(--dm-surface-3); color: var(--dm-text); }
+body.preview-dark .report-card { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text); }
+body.preview-dark .report-card:hover { background: var(--dm-surface-2); }
+body.preview-dark .btn.btn-outline-secondary { background: var(--dm-surface); border-color: var(--dm-border); color: var(--dm-text-2); }
+body.preview-dark .profile-tab.active { background: var(--dm-primary-soft); color: #86b7ff; border-color: var(--dm-primary); }
+body.preview-dark .payroll-record-filter { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text-2); }
