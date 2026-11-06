@@ -320,4 +320,52 @@ class CompanyIsolationTest extends TestCase
         $this->get('/documents/'.$doc->id.'/preview')->assertOk();
         $this->actingAs($this->userB)->get('/documents/'.$doc->id.'/preview')->assertNotFound();
     }
+
+    public function test_platform_management_requires_separate_owner_account(): void
+    {
+        $superAdminRole = Role::firstOrCreate(['name' => 'super_admin', 'company_id' => null], ['display_name' => 'Super Admin']);
+        $companyLinkedAdmin = User::create([
+            'name' => 'Company Admin', 'email' => 'admin-a@example.test', 'password' => bcrypt('secret'),
+            'role_id' => $superAdminRole->id, 'company_id' => $this->companyA->id, 'is_active' => true,
+        ]);
+
+        $this->actingAs($companyLinkedAdmin)
+            ->get(route('subscriptions.index'))
+            ->assertRedirect(route('dashboard'));
+
+        config(['owner.emails' => ['owner@example.test']]);
+        $owner = User::create([
+            'name' => 'Owner', 'email' => 'owner@example.test', 'password' => bcrypt('secret'),
+            'role_id' => $superAdminRole->id, 'company_id' => null, 'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)->get(route('subscriptions.index'))->assertOk();
+    }
+
+    public function test_employee_photo_upload_is_private_and_company_scoped(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->userA)
+            ->patch(route('employees.photo', $this->employeeA), ['profile_photo' => UploadedFile::fake()->image('avatar.jpg')])
+            ->assertRedirect();
+
+        $path = $this->employeeA->fresh()->profile_photo_path;
+        $this->assertNotNull($path);
+        Storage::disk('local')->assertExists($path);
+        Storage::disk('public')->assertMissing($path);
+
+        $this->actingAs($this->userA)->get(route('employees.photo.show', $this->employeeA))->assertOk();
+        $this->actingAs($this->userB)->get(route('employees.photo.show', $this->employeeA))->assertNotFound();
+    }
+
+    public function test_legacy_public_photo_is_served_only_through_guarded_route(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('employees/1/profile/legacy.jpg', 'old-bytes');
+        $this->employeeA->update(['profile_photo_path' => 'employees/1/profile/legacy.jpg']);
+
+        $this->actingAs($this->userA)->get(route('employees.photo.show', $this->employeeA))->assertOk();
+        $this->actingAs($this->userB)->get(route('employees.photo.show', $this->employeeA))->assertNotFound();
+    }
 }
