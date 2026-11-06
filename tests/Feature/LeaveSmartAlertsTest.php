@@ -118,11 +118,14 @@ class LeaveSmartAlertsTest extends TestCase
     public function test_settlement_alert_keys_off_known_bucket_age_with_thresholds(): void
     {
         DB::table('leave_policy_settings')->insert(['company_id' => $this->company->id, 'setting_key' => 'leave_carryover_baseline', 'setting_value' => '2020-01-01', 'label' => 'baseline', 'created_at' => now(), 'updated_at' => now()]);
-        // Hired 2022: the 2023 bucket (ends 2023-12-31) hits its 3-year
-        // settlement deadline 2026-12-31 — inside the 90-day threshold.
+        // Anchor is the bucket's cycle START + the planning cadence (3 years):
+        // an internal review date, since Art. 125 fixes the interval but no
+        // anchor. Hired Jan 2022: the 2024 bucket (starts 2024-01-01) reaches
+        // its planning date 01/01/2027 — inside the 90-day threshold; the
+        // 2022/2023 buckets already passed theirs and stop nagging.
         $this->employee('7204', '2022-01-01');
-        // Hired Dec 2022: the 2022-12-01..2023-11-30 bucket's deadline is
-        // 2026-11-30 — inside the tighter 30-day threshold.
+        // Hired Dec 2022: the bucket starting 2023-12-01 reaches its planning
+        // date 01/12/2026 — inside the tighter 30-day threshold.
         $this->employee('7205', '2022-12-01');
 
         Artisan::call('leaves:notify-smart');
@@ -132,11 +135,14 @@ class LeaveSmartAlertsTest extends TestCase
         $this->assertCount(2, $alerts);
         $wide = $alerts->firstWhere('dedupe_key', fn ($k) => str_contains((string) $k, '7204')) ?? $alerts->first(fn ($a) => str_contains($a['message'], 'Employee 7204'));
         $this->assertNotNull($wide);
-        $this->assertStringContainsString('31/12/2026', $wide['message']);
+        $this->assertStringContainsString('01/01/2027', $wide['message']);
         $this->assertSame('normal', $wide['priority']);
+        // Planning framing only — never a statutory due-date claim.
+        $this->assertStringContainsString('تخطيطي', $wide['message']);
+        $this->assertStringNotContainsString('حد الثلاث سنوات', $wide['message']);
         $tight = $alerts->first(fn ($a) => str_contains($a['message'], 'Employee 7205'));
         $this->assertNotNull($tight);
-        $this->assertStringContainsString('30/11/2026', $tight['message']);
+        $this->assertStringContainsString('01/12/2026', $tight['message']);
         $this->assertSame('high', $tight['priority']);
     }
 
