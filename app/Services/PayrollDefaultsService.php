@@ -46,7 +46,8 @@ class PayrollDefaultsService
 
     /** [group, key, value, label, description] */
     public const RULES = [
-        ['absence', 'calculation_basis', 'Gross', 'أساس حساب الغياب', 'أساس حساب أجر يوم الغياب: Gross إجمالي الراتب أو Basic الأساسي'],
+        ['absence', 'calculation_basis', 'BasicPlusAllowances', 'أساس حساب الغياب', 'أساس حساب أجر يوم الغياب: Gross إجمالي الراتب، Basic الأساسي، أو BasicPlusAllowances الأساسي مع بدلات محددة'],
+        ['absence', 'deducted_allowances', 'meal,transportation', 'البدلات المخصومة مع الغياب', 'البدلات التي تدخل قيمتها اليومية في خصم يوم الغياب عند أساس «الأساسي + بدلات محددة»: housing المسكن، transportation الانتقال، meal الوجبة، clothing الملبس، other أخرى'],
         ['penalty', 'calculation_basis', 'Basic', 'أساس حساب الجزاءات', 'أساس حساب أجر يوم الجزاء: Gross إجمالي الراتب أو Basic الأساسي'],
         ['overtime', 'calculation_basis', 'Gross', 'أساس حساب الإضافي', 'أساس حساب أجر ساعة الإضافي وأجر يوم الراحة/العطلة: Gross أو Basic'],
         ['insurance', 'automatic_calculation_basis', 'Basic', 'أساس حساب الأجر التأميني', 'الحساب التلقائي للأجر التأميني: Basic الأساسي أو Gross الإجمالي'],
