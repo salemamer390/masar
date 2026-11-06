@@ -75,7 +75,7 @@ class EmployeeImportService
         'branch' => ['الفرع', ['مكان العمل', 'branch', 'work location']],
         'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'نوع الموظف', 'employment type', 'employment_type']],
         'status' => ['الحالة الوظيفية', ['حالة الموظف', 'حالة العمل', 'employee status', 'status']],
-        'hire_date' => ['تاريخ التعيين', ['تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date']],
+        'hire_date' => ['بداية العقد (عمود قديم)', ['تاريخ التعيين', 'تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date']],
         'contract_start_date' => ['بداية العقد', ['تاريخ بداية العقد', 'contract start', 'contract_start_date']],
         'contract_end_date' => ['نهاية العقد', ['تاريخ نهاية العقد', 'contract end', 'contract_end_date']],
         'contract_duration' => ['مدة العقد', ['contract duration', 'contract_duration']],
@@ -338,7 +338,7 @@ class EmployeeImportService
             return false;
         }
 
-        foreach (['national_id', 'hire_date', 'job', 'employment_type', 'phone', 'insurance_number'] as $marker) {
+        foreach (['national_id', 'hire_date', 'contract_start_date', 'job', 'employment_type', 'phone', 'insurance_number'] as $marker) {
             if (isset($used[$marker])) {
                 return true;
             }
@@ -402,7 +402,7 @@ class EmployeeImportService
         // identity columns stays an employees sheet, and ambiguous sheets stay
         // 'unknown' for review rather than being guessed.
         if ($has(['الأجر التأميني', 'مبلغ الاشتراك', 'اشتراك التأمينات', 'insurance wage', 'insurance subscription'])
-            && !$has(['الرقم القومي', 'تاريخ التعيين', 'تاريخ الميلاد', 'national id', 'hire date', 'birth date'])) return 'insurance';
+            && !$has(['الرقم القومي', 'تاريخ التعيين', 'بداية العقد', 'تاريخ الميلاد', 'national id', 'hire date', 'contract start', 'birth date'])) return 'insurance';
         if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         return 'unknown';
@@ -1216,7 +1216,7 @@ class EmployeeImportService
         // ---- dates ------------------------------------------------------
         $hire = null;
         if ($get('hire_date') !== '') {
-            $hire = $attempt('تاريخ التعيين', fn () => $this->parseDate($get('hire_date')));
+            $hire = $attempt('بداية العقد (عمود قديم)', fn () => $this->parseDate($get('hire_date')));
         }
         $contractStart = null;
         if ($get('contract_start_date') !== '') {
@@ -1225,6 +1225,13 @@ class EmployeeImportService
         $contractEnd = null;
         if ($get('contract_end_date') !== '') {
             $contractEnd = $attempt('نهاية العقد', fn () => $this->parseDate($get('contract_end_date')));
+        }
+
+        try {
+            $contractStart = \App\Support\EmploymentStartDate::resolve($contractStart, $hire);
+            $hire = $contractStart;
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $errors[] = $exception->errors()['contract_start_date'][0];
         }
 
         if ($isNew) {
@@ -1369,6 +1376,7 @@ class EmployeeImportService
         };
 
         foreach (['full_name', 'national_id', 'insurance_number', 'phone', 'email', 'gender', 'birth_date', 'marital_status', 'qualification', 'address', 'contract_duration', 'shift_start', 'shift_end', 'manual_annual_balance', 'notes', 'hire_date', 'contract_start_date', 'contract_end_date', 'termination_type', 'termination_date'] as $field) {
+            if ($field === 'hire_date') continue;
             if (array_key_exists($field, $data)) {
                 $add($field, $labels[$field] ?? $field, $existing[$field] ?? null, $data[$field]);
             }
@@ -1981,7 +1989,7 @@ class EmployeeImportService
             return;
         }
 
-        $effectiveFrom = $employee->hire_date?->format('Y-m-d') ?? today()->format('Y-m-d');
+        $effectiveFrom = $employee->contract_start_date?->format('Y-m-d') ?? today()->format('Y-m-d');
         $structure = $this->calculator->structure([
             'salary_type' => 'gross',
             'salary_input' => $gross,

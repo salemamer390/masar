@@ -29,7 +29,17 @@ class ImportCurrentStaff extends Command
         if (!$companyId || !Company::whereKey($companyId)->exists()) { $this->error('A valid --company ID is required.'); return self::FAILURE; }
         $staff = json_decode((string) @file_get_contents($file), true);
         if (!is_array($staff)) { $this->error('A valid JSON array is required.'); return self::FAILURE; }
-        $this->table(['Code', 'Name', 'Hire date', 'Net', 'Action'], array_map(function ($row) {
+        try {
+            foreach ($staff as &$row) {
+                $start = \App\Support\EmploymentStartDate::resolve($row['contract_start_date'] ?? null, $row['hire_date'] ?? null);
+                $row['contract_start_date'] = $row['hire_date'] = $start;
+            }
+            unset($row);
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->error($exception->errors()['contract_start_date'][0]);
+            return self::FAILURE;
+        }
+        $this->table(['Code', 'Name', 'Contract start', 'Net', 'Action'], array_map(function ($row) {
             $existing = Employee::where('company_id', $companyId)->where(function ($q) use ($row) { $q->where('national_id', $row['national_id'])->orWhere('email', $row['email'] ?: '__none__'); })->first();
             return [$existing?->employee_code ?? 'Auto', $row['full_name'], $row['hire_date'], $row['net_salary'], $existing ? 'update' : 'create'];
         }, $staff));

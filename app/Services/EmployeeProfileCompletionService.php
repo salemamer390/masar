@@ -45,7 +45,6 @@ class EmployeeProfileCompletionService
             'العنوان' => $employee->address,
             'القسم' => $employee->department_id,
             'الوظيفة' => $employee->job_id,
-            'تاريخ التعيين' => $employee->hire_date,
             'بداية العقد' => $employee->contract_start_date,
             'نهاية العقد' => $employee->contract_end_date,
             'الراتب الإجمالي' => (float) $employee->gross_salary > 0 ? $employee->gross_salary : null,

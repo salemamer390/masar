@@ -169,8 +169,26 @@ class EmployeeController extends Controller
         ));
     }
 
+    /** Legacy hire_date is an input alias only, never an independent date. */
+    private function normalizeEmploymentStart(Request $request): void
+    {
+        $dates = $request->validate([
+            'contract_start_date' => ['nullable', 'date'],
+            'hire_date' => ['nullable', 'date'],
+        ]);
+        $start = \App\Support\EmploymentStartDate::resolve($dates['contract_start_date'] ?? null, $dates['hire_date'] ?? null);
+        // An omitted/empty date on edit must not erase an existing start date.
+        if ($start) {
+            $request->merge(['contract_start_date' => $start, 'hire_date' => $start]);
+        } else {
+            $request->request->remove('contract_start_date');
+            $request->request->remove('hire_date');
+        }
+    }
+
     public function store(Request $request)
     {
+        $this->normalizeEmploymentStart($request);
         $employeeCode = trim((string) $request->input('employee_code', ''));
         $request->merge(['employee_code' => $employeeCode !== '' ? $employeeCode : null]);
         $companyId = auth()->user()->company_id ?: DB::table('companies')->value('id');
@@ -194,7 +212,8 @@ class EmployeeController extends Controller
             'job_id' => ['nullable', 'exists:hr_jobs,id'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'hire_date' => ['nullable', 'date'],
-            'contract_end_date' => ['nullable', 'date', 'after_or_equal:hire_date'],
+            'contract_start_date' => ['nullable', 'date'],
+            'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous'],
         ], [
             'full_name.required' => 'اسم الموظف الكامل مطلوب.',
@@ -215,7 +234,7 @@ class EmployeeController extends Controller
         $validated['first_name'] = $names[0] ?? '';
         $validated['last_name'] = end($names) ?: '';
         $validated['status_id'] = $request->input('status_id', 1);
-        $hireDate = \Carbon\Carbon::parse($validated['hire_date'] ?? today())->toDateString();
+        $hireDate = \Carbon\Carbon::parse($validated['contract_start_date'] ?? today())->toDateString();
         $validated['hire_date'] = $hireDate;
         $validated['contract_start_date'] = $hireDate;
         $validated['contract_end_date'] = $request->filled('contract_end_date')
@@ -272,6 +291,7 @@ class EmployeeController extends Controller
     public function update(Request $request, Employee $employee)
     {
         if (!auth()->user()->isSuperAdmin() && (int) $employee->company_id !== (int) auth()->user()->company_id) abort(403);
+        $this->normalizeEmploymentStart($request);
         $validated = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
             'first_name' => ['nullable', 'string', 'max:100'],
@@ -349,8 +369,8 @@ class EmployeeController extends Controller
             }
             $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public');
         }
-        if ($request->filled('hire_date')) {
-            $hireDate = \Carbon\Carbon::parse($validated['hire_date'])->toDateString();
+        if ($request->filled('contract_start_date')) {
+            $hireDate = \Carbon\Carbon::parse($validated['contract_start_date'])->toDateString();
             $validated['hire_date'] = $hireDate;
             $validated['contract_start_date'] = $hireDate;
             if (! $request->filled('contract_end_date')) {
@@ -653,7 +673,7 @@ class EmployeeController extends Controller
         $gross = (float) $employee->gross_salary;
         if ($gross <= 0) return;
 
-        $effectiveFrom = $employee->hire_date?->format('Y-m-d') ?? today()->format('Y-m-d');
+        $effectiveFrom = $employee->contract_start_date?->format('Y-m-d') ?? today()->format('Y-m-d');
         $structure = $this->payrollCalculator->structure([
             'salary_type' => 'gross',
             'salary_input' => $gross,

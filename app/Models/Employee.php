@@ -65,6 +65,41 @@ class Employee extends Model
         'gross_salary' => 'decimal:2',
     ];
 
+    /**
+     * contract_start_date is the business date; hire_date is retained only as
+     * a synchronized compatibility column for older clients and exports.
+     * Query-builder writes must set both (the migration checks legacy rows).
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Employee $employee): void {
+            $startChanged = $employee->isDirty('contract_start_date');
+            $legacyChanged = $employee->isDirty('hire_date');
+            if (!$startChanged && !$legacyChanged) return;
+
+            $start = $employee->contract_start_date?->format('Y-m-d');
+            $legacy = $employee->hire_date?->format('Y-m-d');
+            if ($startChanged && $legacyChanged) {
+                \App\Support\EmploymentStartDate::resolve($start, $legacy);
+            }
+            $date = $startChanged ? $start : $legacy;
+            $date ??= $start ?? $legacy;
+            $employee->contract_start_date = $date;
+            $employee->hire_date = $date;
+        });
+    }
+
+    public function fill(array $attributes)
+    {
+        if (array_key_exists('contract_start_date', $attributes) || array_key_exists('hire_date', $attributes)) {
+            $date = \App\Support\EmploymentStartDate::resolve($attributes['contract_start_date'] ?? null, $attributes['hire_date'] ?? null);
+            $attributes['contract_start_date'] = $date;
+            $attributes['hire_date'] = $date;
+        }
+
+        return parent::fill($attributes);
+    }
+
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
