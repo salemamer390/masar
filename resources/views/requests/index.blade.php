@@ -40,12 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<style>
-  .request-row-adding{animation:requestRowIn .35s ease both}
-  .request-row-removing{animation:requestRowOut .28s ease forwards;pointer-events:none}
-  @keyframes requestRowIn{from{opacity:0;transform:translateY(-10px);background:#eaf4ff}to{opacity:1;transform:none;background:transparent}}
-  @keyframes requestRowOut{from{opacity:1;transform:none}to{opacity:0;transform:translateX(28px);height:0}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/requests-index-01.css') }}?v={{ filemtime(public_path('css/pages/requests-index-01.css')) }}">
 @push('scripts')
 <script>
 (() => {
@@ -251,20 +246,7 @@ window.addEventListener('load', () => {
 @endpush
 
 @push('styles')
-<style>
-  #requestCreateModal .request-conditional-card{width:min(100%,520px);margin:14px auto 0;border:1px solid #dbe7f5;border-radius:16px;background:linear-gradient(135deg,#f8fbff,#fff);padding:16px;box-shadow:0 8px 22px rgba(31,73,125,.06)}
-  #requestCreateModal .request-conditional-card .form-label{font-weight:700;color:#16325c;margin-bottom:7px}
-  #requestCreateModal .request-conditional-card .form-control,#requestCreateModal .request-conditional-card .form-select{border-radius:11px;min-height:44px;border-color:#d8e4f2}
-  #requestCreateModal .request-conditional-card[hidden]{display:none!important}
-  #requestCreateModal .advance-field-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 190px;gap:12px;align-items:end}
-  #requestCreateModal .advance-limit-box{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border:1px solid #f1aeb5;border-radius:11px;background:#fff5f5;color:#842029;min-height:76px}
-  #requestCreateModal .advance-limit-box strong{font-size:16px}.advance-limit-box small{font-size:11px}.advance-warning{margin-top:12px;padding:10px 12px;border-radius:10px;background:#fff3cd;color:#856404;font-size:13px}.advance-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
-  #requestCreateModal .advance-existing-notice{margin-top:12px;padding:10px 12px;border:1px solid #b6d4fe;border-radius:10px;background:#eef6ff;color:#084298;font-size:13px;line-height:1.7}
-  #requestCreateModal .overtime-existing-notice{margin-top:12px;padding:10px 12px;border:1px solid #b6d4fe;border-radius:10px;background:#eef6ff;color:#084298;font-size:13px;line-height:1.7}
-  #requestCreateModal .overtime-existing-notice.is-danger{border-color:#f1aeb5;background:#fff5f5;color:#842029}
-  #requestCreateModal .advance-existing-confirm{margin-top:10px;color:#7a1f1f;font-size:13px}
-  @media(max-width:576px){#requestCreateModal .advance-field-grid{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/requests-index-02.css') }}?v={{ filemtime(public_path('css/pages/requests-index-02.css')) }}">
 @endpush
 @push('scripts')
 <script>

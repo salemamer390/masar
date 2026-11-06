@@ -63,20 +63,8 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 @endphp
 <div class="modal fade" id="attendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input class="form-control" type="date" name="attendance_date" value="{{ date('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">الحضور <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_in" required></div><div class="col-6"><label class="form-label">الانصراف <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_out" required></div><div class="col-6"><label class="form-label">دقائق التأخير</label><input class="form-control" type="number" min="0" name="late_minutes" value="0"></div><div class="col-6"><label class="form-label">المصدر</label><select class="form-select" name="source"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل API</option></select></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
 <div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>تعديل سجل الحضور</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">المصدر</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل نظامي</option></select></div></div><p class="small text-muted mt-3 mb-0">سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>
-@push('styles')<style>.attendance-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.attendance-tab{padding:8px 16px;border-radius:12px;border:1px solid #d9e2ef;background:#fff;color:#33415c;text-decoration:none;font-weight:600}.attendance-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
-.attendance-row-late td{background:#fff8e1}.attendance-row-absent td{background:#fdecef}
-.attendance-row-rejected td{background:#eef0f3;color:#6b7280}
-.attendance-period-totals{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#f7f9fc;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:12px;margin:10px 0 6px}
-.attendance-period-totals .totals-title{font-weight:700;color:#33415c}
-.attendance-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
-.legend-swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
-.legend-late{background:#fff8e1}.legend-absent{background:#fdecef}.legend-rejected{background:#eef0f3}
-.table-responsive .table td:first-child,.table-responsive .table th:first-child{width:96px;min-width:96px}
-.table-responsive .table td:nth-child(2),.table-responsive .table th:nth-child(2){position:sticky;inset-inline-start:96px;background:#fff;z-index:1}
-.table-responsive .attendance-row-late td:nth-child(2){background:#fff8e1}
-.table-responsive .attendance-row-absent td:nth-child(2){background:#fdecef}
-.table-responsive .attendance-row-rejected td:nth-child(2){background:#eef0f3}.attendance-filter-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;padding-inline-start:10px;border-inline-start:1px dashed #e2e8f0}.attendance-filter-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}.attendance-row-actions{display:flex;gap:6px;align-items:center}.attendance-row-actions form{display:inline-flex}.attendance-row-btn{width:32px;height:32px;border-radius:9px;border:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background .15s,color .15s}.attendance-row-edit{background:#eaf1fe;color:#2563eb}.attendance-row-edit:hover{background:#2563eb;color:#fff}.attendance-row-delete{background:#fdecec;color:#dc2626}.attendance-row-delete:hover{background:#dc2626;color:#fff}</style>@endpush
-@push('styles')<style>.attendance-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}.attendance-stat-grid .stat-card{min-height:96px;padding:13px 15px;gap:11px}.attendance-stat-grid .stat-icon{width:42px;height:42px;min-width:42px;border-radius:11px;font-size:18px}.attendance-stat-grid .stat-card b{font-size:21px}.attendance-stat-grid .stat-card small{font-size:10px}@media(max-width:900px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.attendance-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.attendance-stat-grid .stat-card{min-height:82px}}</style>@endpush
+@push('styles')<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-01.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-01.css')) }}">@endpush
+@push('styles')<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-02.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-02.css')) }}">@endpush
 @push('scripts')
 <script>
 (() => {
@@ -316,14 +304,10 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 </script>
 @endpush
 @push('styles')
-<style>
-  .attendance-filter-search{min-width:240px;flex:1 1 260px}
-  @media(max-width:600px){.attendance-filter-search{min-width:100%;flex-basis:100%}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-03.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-03.css')) }}">
 @endpush
 @push('styles')
-<style>
-</style>
+
 @endpush
 @push('scripts')
 <script>
@@ -347,28 +331,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 </script>
 @endpush
 @push('styles')
-<style>
-  .attendance-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 6px}
-  .attendance-toolbar .attendance-tabs{margin:0}
-  .attendance-toolbar-actions{display:flex;align-items:center;gap:8px;margin-inline-start:auto;flex-wrap:nowrap}
-  .attendance-toolbar-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}
-  .attendance-today-label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#52617c;margin:10px 0 6px}
-  .attendance-filters.filter-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;margin-bottom:12px}
-  .attendance-filters .form-select,.attendance-filters .form-control{min-width:0;flex:0 1 auto;height:36px;min-height:36px;font-size:12.5px;padding:6px 10px}
-  .attendance-filters .search-table{height:36px;flex:1 1 240px;min-width:180px}
-  .attendance-filters .search-table input{font-size:12.5px}
-  .attendance-filter-main{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;justify-content:space-between;width:100%;align-self:stretch}.attendance-filter-controls{display:flex;align-items:center;gap:8px;flex:1 1 auto;min-width:0;flex-wrap:nowrap}.attendance-filter-controls .search-table{flex:1 1 200px;min-width:160px;max-width:420px}.attendance-filter-controls select[name="state"]{flex:0 0 auto}
-  .attendance-filter-main select[name="state"]{width:auto;min-width:130px;flex:0 0 auto}
-  .attendance-filter-main .btn{height:36px;min-height:36px;padding:6px 12px;font-size:12.5px;border-radius:9px;display:inline-flex;align-items:center;gap:6px}
-  .attendance-more-filters{background:none;border:0;color:#2563eb;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:6px 4px;white-space:nowrap;flex:0 0 auto}
-  .attendance-more-filters:hover{text-decoration:underline}
-  .attendance-filter-extra{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px dashed #dbe4f0;padding-top:8px}
-  .attendance-filter-extra input[type="date"]{width:auto;flex:0 0 auto}
-  .attendance-filter-extra select{max-width:260px}
-  @media(max-width:700px){.attendance-toolbar-actions{width:100%;margin-inline-start:0;justify-content:flex-start;overflow-x:auto}.attendance-filter-main .attendance-filter-search{min-width:100%;flex-basis:100%}}
-
-  @media(max-width:640px){.attendance-filter-main{flex-wrap:wrap}.attendance-filter-controls{flex-wrap:wrap;width:100%}.attendance-filter-actions{border-inline-start:0;padding-inline-start:0;width:100%;margin-inline-start:0}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-04.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-04.css')) }}">
 @endpush
 @push('scripts')
 <script>
@@ -379,14 +342,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 @endpush
 @if(auth()->user()?->hasPermission('attendance.create'))
 @push('styles')
-<style>
-  .attendance-import-trigger{margin-inline-start:auto;white-space:nowrap}
-  .attendance-import-modal .modal-content{border:0;border-radius:18px;overflow:hidden}
-  .attendance-import-modal .modal-header{background:linear-gradient(135deg,#0d6efd,#0b5ed7);color:#fff}
-  .attendance-import-modal .modal-header .btn-close{filter:brightness(0) invert(1)}
-  .attendance-import-modal .import-help{background:#f5f8fc;border:1px solid #e1eaf5;border-radius:12px;padding:12px;line-height:1.8}
-  @media(max-width:600px){.attendance-import-trigger{width:100%;margin-top:8px}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-05.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-05.css')) }}">
 @endpush
 @push('scripts')
 <script>
@@ -413,26 +369,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 @endpush
 @endif
 @push('styles')
-<style>
-  .attendance-details-trigger{cursor:pointer;transition:background-color .18s ease,transform .18s ease}
-  .attendance-details-trigger:hover{background:#f1f6ff;transform:translateY(-1px)}
-  .attendance-details-trigger td:last-child{cursor:default}
-  .attendance-detail-list{display:flex;flex-direction:column;gap:8px}
-  .attendance-detail-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 13px;border:1px solid #e4ebf5;border-radius:10px;background:#f8fafd}
-  .attendance-detail-item small{color:#71809a;font-size:12px}
-  .attendance-detail-item strong{color:#15294d;font-size:14px;text-align:end}
-  .attendance-detail-item--check_out{background:#eef5ff;border-color:#9ec5fe}.attendance-detail-item--check_out strong{color:#1d4ed8}
-  .attendance-detail-item--worked{background:#ecfdf5;border-color:#86efac}.attendance-detail-item--worked strong{color:#047857}
-  .attendance-detail-item--late{background:#fff8e6;border-color:#f8c76a}.attendance-detail-item--late strong{color:#b45309}
-  .attendance-detail-item--early{background:#fff1f2;border-color:#fda4af}.attendance-detail-item--early strong{color:#be123c}
-  .attendance-detail-group{margin-bottom:18px}
-  .attendance-detail-group-title{display:flex;align-items:center;gap:8px;margin:0 0 9px;padding-bottom:7px;border-bottom:1px solid #e4ebf5;color:#173866;font-size:14px;font-weight:700}
-  .attendance-detail-group-title i{color:#2674e8}
-  .attendance-detail-group--late .attendance-detail-item strong{color:#b45309}
-  .attendance-detail-group--overtime .attendance-detail-item strong{color:#087f5b}
-  .attendance-detail-item.is-zero strong{color:#8290a6!important;font-weight:500}
-  @media(max-width:576px){.attendance-detail-item{align-items:flex-start;flex-direction:column;gap:3px}.attendance-detail-item strong{text-align:start}}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-06.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-06.css')) }}">
 @endpush
 @push('scripts')
 <script>
@@ -483,13 +420,6 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 </script>
 @endpush
 @push('styles')
-<style>
-  .attendance-employee-search-box{width:100%;margin-bottom:8px}
-  .attendance-employee-search-box input{width:100%;border:0;outline:0;background:transparent}
-  .attendance-employee-suggestions{position:relative;z-index:1060;display:flex;flex-direction:column;max-height:220px;overflow-y:auto;margin-top:-6px;margin-bottom:8px;border:1px solid #dbe5f2;border-radius:10px;background:#fff;box-shadow:0 8px 22px rgba(20,45,80,.12)}
-  .attendance-employee-suggestions[hidden]{display:none}
-  .attendance-employee-suggestion{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;border:0;border-bottom:1px solid #edf1f6;background:#fff;text-align:start;color:#18345d}
-  .attendance-employee-suggestion:last-child{border-bottom:0}.attendance-employee-suggestion:hover{background:#eef5ff}.attendance-employee-suggestion small{color:#6b82a3}
-</style>
+<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-07.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-07.css')) }}">
 @endpush
 @endsection

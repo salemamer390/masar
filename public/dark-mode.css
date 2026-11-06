@@ -450,8 +450,6 @@ body.preview-dark .attendance-breakdown div { border-bottom-color: var(--dm-bord
 body.preview-dark .attendance-breakdown b { color: var(--dm-text) !important; }
 body.preview-dark .attendance-breakdown div { color: var(--dm-text-2); }
 body.preview-dark .attendance-ring { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05) !important; }
-body.preview-dark .attendance-ring span { color: var(--dm-text); }
-body.preview-dark .attendance-ring small { color: var(--dm-muted); }
 body.preview-dark .document-stats a { border-color: var(--dm-border) !important; background: var(--dm-surface-2); }
 body.preview-dark .document-stats a:hover { border-color: #3b4c6d !important; }
 body.preview-dark .document-stats b { color: var(--dm-text) !important; }
@@ -462,7 +460,7 @@ body.preview-dark .payroll-dashboard-body > div {
 }
 body.preview-dark .payroll-dashboard-body span { color: var(--dm-muted) !important; }
 body.preview-dark .payroll-dashboard-body b { color: var(--dm-text) !important; }
-body.preview-dark .attention-card { background: var(--dm-surface) !important; border-color: var(--dm-border) !important; }
+body.preview-dark .attention-card {  border-color: var(--dm-border) !important; }
 body.preview-dark .attention-card:hover { border-color: #3b4c6d !important; box-shadow: 0 6px 16px rgba(2, 8, 20, .45) !important; }
 body.preview-dark .dashboard-request-row { border-color: var(--dm-border) !important; }
 body.preview-dark .dashboard-request-row strong, body.preview-dark .dashboard-request-row b { color: var(--dm-text); }
@@ -525,11 +523,8 @@ body.preview-dark .attendance-period-totals .totals-title { color: var(--dm-mute
 body.preview-dark .attendance-details-trigger:hover td { background: rgba(255, 255, 255, .03); }
 body.preview-dark .attendance-detail-group { border-color: var(--dm-border); }
 body.preview-dark .attendance-detail-group-title { color: var(--dm-muted); }
-body.preview-dark .attendance-detail-item { background: var(--dm-surface-2); border-color: var(--dm-border); }
 body.preview-dark .attendance-detail-item strong { color: var(--dm-text); }
 body.preview-dark .attendance-detail-item small { color: var(--dm-muted); }
-body.preview-dark .attendance-row-late td { background: rgba(245, 158, 11, .06); }
-body.preview-dark .attendance-row-rejected td { background: rgba(239, 68, 68, .07); }
 body.preview-dark .attendance-more-filters { color: #6ea8ff; }
 body.preview-dark .attendance-import-modal .modal-content { background: var(--dm-surface); }
 body.preview-dark .attendance-import-modal .modal-header { border-color: var(--dm-border); }
@@ -574,12 +569,12 @@ body.preview-dark .payroll-view-banner {
   border-color: rgba(245, 158, 11, .35);
   color: #fde68a;
 }
-body.preview-dark .payroll-month-picker { background: var(--dm-surface-2); border-color: var(--dm-border); color: var(--dm-text); }
+body.preview-dark .payroll-month-picker { background: var(--dm-surface-2); border-color: var(--dm-border);  }
 body.preview-dark .payroll-month-picker .mp-head { color: var(--dm-text); }
 body.preview-dark .payroll-month-picker .mp-head button { background: var(--dm-surface-3); color: var(--dm-text-2); border-color: var(--dm-border); }
-body.preview-dark .payroll-month-picker .mp-month { color: var(--dm-text-2); background: var(--dm-surface); border-color: var(--dm-border); }
-body.preview-dark .payroll-month-picker .mp-month:hover { background: var(--dm-surface-3); color: #fff; }
-body.preview-dark .payroll-month-picker .mp-month.active { background: var(--dm-primary); color: #fff; border-color: var(--dm-primary); }
+body.preview-dark .payroll-month-picker .mp-month {  background: var(--dm-surface); border-color: var(--dm-border); }
+body.preview-dark .payroll-month-picker .mp-month:hover { background: var(--dm-surface-3);  }
+body.preview-dark .payroll-month-picker .mp-month.active { background: var(--dm-primary);  border-color: var(--dm-primary); }
 body.preview-dark .payroll-month-picker .mp-note { color: var(--dm-muted); }
 
 /* Drawer */
@@ -810,7 +805,7 @@ body.preview-dark .payroll-month-picker .mp-month:hover { background: var(--dm-s
 body.preview-dark .payroll-month-picker .mp-month.active { background: var(--dm-primary) !important; border-color: var(--dm-primary) !important; color: #fff; }
 
 /* Round 3 — ring disc, attention cards, employee avatars */
-body.preview-dark .attendance-ring:before { background: var(--dm-surface); }
+
 body.preview-dark .attention-card { color: var(--dm-text-2); background: var(--dm-surface-2) !important; }
 body.preview-dark .attention-card:hover { color: #fff; box-shadow: 0 8px 20px rgba(2, 8, 20, .45); }
 body.preview-dark .attention-content b { color: var(--dm-text); }

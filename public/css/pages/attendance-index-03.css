@@ -1,0 +1,2 @@
+  .attendance-filter-search{min-width:240px;flex:1 1 260px}
+  @media(max-width:600px){.attendance-filter-search{min-width:100%;flex-basis:100%}}

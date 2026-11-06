@@ -1,0 +1,11 @@
+.filter-bar + .d-flex form[action*="summary-history"] { display: none !important; }
+.monthly-summary-table { --summary-blue:#eaf3ff; --summary-orange:#fff4df; --summary-green:#eafaf1; --summary-red:#fff0f1; --summary-purple:#f3edff; --summary-cyan:#e8f7ff; }
+.monthly-summary-table thead tr:first-child th { font-weight:800; border-bottom:0; }
+.monthly-summary-table thead tr:first-child th:nth-child(1), .monthly-summary-table thead tr:nth-child(2) th:nth-child(-n+3), .monthly-summary-table tbody td:nth-child(-n+3) { background:var(--summary-blue); }
+.monthly-summary-table thead tr:first-child th:nth-child(2), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+4):nth-child(-n+10), .monthly-summary-table tbody td:nth-child(n+4):nth-child(-n+10) { background:var(--summary-orange); }
+.monthly-summary-table thead tr:first-child th:nth-child(3), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+11):nth-child(-n+18), .monthly-summary-table tbody td:nth-child(n+11):nth-child(-n+18) { background:var(--summary-green); }
+.monthly-summary-table thead tr:first-child th:nth-child(4), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+19):nth-child(-n+20), .monthly-summary-table tbody td:nth-child(n+19):nth-child(-n+20) { background:var(--summary-red); }
+.monthly-summary-table thead tr:first-child th:nth-child(5), .monthly-summary-table thead tr:nth-child(2) th:nth-child(n+21):nth-child(-n+23), .monthly-summary-table tbody td:nth-child(n+21):nth-child(-n+23) { background:var(--summary-cyan); }
+.monthly-summary-table tbody td { border-color:rgba(30,50,80,.08); }
+.monthly-summary-table thead th, .monthly-summary-table tbody td { text-align:center; vertical-align:middle; white-space:nowrap; }
+.monthly-summary-table { min-width:1900px; }

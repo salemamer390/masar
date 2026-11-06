@@ -1,0 +1,13 @@
+.attendance-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 8px}.attendance-tab{padding:8px 16px;border-radius:12px;border:1px solid #d9e2ef;background:#fff;color:#33415c;text-decoration:none;font-weight:600}.attendance-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
+.attendance-row-late td{background:#fff8e1}.attendance-row-absent td{background:#fdecef}
+.attendance-row-rejected td{background:#eef0f3;color:#6b7280}
+.attendance-period-totals{display:flex;gap:18px;flex-wrap:wrap;align-items:center;background:#f7f9fc;border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:12px;margin:10px 0 6px}
+.attendance-period-totals .totals-title{font-weight:700;color:#33415c}
+.attendance-legend{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+.legend-swatch{display:inline-block;width:12px;height:12px;border-radius:3px;margin-inline-end:4px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
+.legend-late{background:#fff8e1}.legend-absent{background:#fdecef}.legend-rejected{background:#eef0f3}
+.table-responsive .table td:first-child,.table-responsive .table th:first-child{width:96px;min-width:96px}
+.table-responsive .table td:nth-child(2),.table-responsive .table th:nth-child(2){position:sticky;inset-inline-start:96px;background:#fff;z-index:1}
+.table-responsive .attendance-row-late td:nth-child(2){background:#fff8e1}
+.table-responsive .attendance-row-absent td:nth-child(2){background:#fdecef}
+.table-responsive .attendance-row-rejected td:nth-child(2){background:#eef0f3}.attendance-filter-actions{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;flex:0 0 auto;padding-inline-start:10px;border-inline-start:1px dashed #e2e8f0}.attendance-filter-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap;font-size:12.5px}.attendance-row-actions{display:flex;gap:6px;align-items:center}.attendance-row-actions form{display:inline-flex}.attendance-row-btn{width:32px;height:32px;border-radius:9px;border:0;display:inline-flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:background .15s,color .15s}.attendance-row-edit{background:#eaf1fe;color:#2563eb}.attendance-row-edit:hover{background:#2563eb;color:#fff}.attendance-row-delete{background:#fdecec;color:#dc2626}.attendance-row-delete:hover{background:#dc2626;color:#fff}

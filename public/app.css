@@ -372,14 +372,11 @@ select {
 }
 .employee-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 14px;
   margin: 0 0 22px;
 }
 .employee-kpi {
   display: flex;
   align-items: center;
-  min-height: 130px;
   padding: 20px;
   gap: 16px;
   border: 1px solid #e8ecf2;
@@ -398,32 +395,20 @@ select {
 .employee-kpi-icon {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
-  min-width: 56px;
-  flex: 0 0 56px;
   border-radius: 13px;
-  font-size: 25px;
 }
 .employee-kpi b {
   display: block;
   color: #64748b;
-  font-size: 13px;
   font-weight: 600;
-  line-height: 1.45;
 }
 .employee-kpi strong {
   display: block;
   color: #0f172a;
-  font-size: 32px;
   font-weight: 700;
-  line-height: 1.18;
-  margin: 4px 0;
 }
 .employee-kpi small {
   display: block;
-  font-size: 12px;
-  line-height: 1.4;
 }
 .employee-kpi.blue small {
   color: #2563eb;
@@ -1529,9 +1514,6 @@ select {
   margin: 3px 0 0;
 }
 .documents-toolbar {
-  display: flex;
-  gap: 9px;
-  align-items: center;
   margin-bottom: 16px;
 }
 .documents-toolbar .search-table {
@@ -1804,12 +1786,7 @@ button,
   border-radius: 0 0 16px 16px;
 }
 .filter-bar {
-  background: #fff;
-  border: 1px solid var(--border);
-  padding: 12px;
   display: flex;
-  gap: 9px;
-  align-items: center;
   margin-bottom: 16px;
 }
 .filter-bar select,
@@ -2763,7 +2740,6 @@ button,
   gap: 14px;
 }
 .payroll-employee-kpi-grid .stat-card {
-  min-height: 130px;
   padding: 20px;
   border-radius: 14px;
   border-width: 1px;
@@ -2795,10 +2771,7 @@ button,
   border-color: #fecaca;
 }
 .payroll-employee-kpi-grid .stat-icon {
-  width: 56px;
-  height: 56px;
   border-radius: 13px;
-  font-size: 25px;
 }
 @media(max-width:1100px) {
   .payroll-employee-kpi-grid {
@@ -4312,8 +4285,6 @@ body {
 }
 .filter-bar {
   border-color: var(--color-border);
-  border-radius: var(--ui-radius);
-  box-shadow: var(--ui-shadow);
 }
 .table>thead>tr>th {
   background: #F8FAFD;
@@ -4893,7 +4864,6 @@ body {
    large empty column. Six cards fit on one desktop row when space allows. */
 .stat-grid.compact,
 .payroll-employee-kpi-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
   gap: 10px !important;
 }
 .employee-kpi-grid {
