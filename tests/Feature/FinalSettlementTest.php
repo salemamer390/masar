@@ -396,6 +396,36 @@ class FinalSettlementTest extends TestCase
         $this->assertEqualsWithDelta(6000 * 16 / 30, (float) $record->basic_salary, 0.01);
     }
 
+    public function test_repeated_departures_keep_advance_and_leave_history_accurate(): void
+    {
+        $company = $this->makeCompany('settle-t');
+        $employee = $this->employee($company, 'ST1');
+        $this->salary($company, $employee);
+        $this->advance($employee, 3000, '2026-09-01');
+
+        // First departure: settlement recovers the full outstanding advance.
+        $first = $this->start($employee);
+        app(SettlementService::class)->updateDraft($first, [
+            'leave_payout_mode' => 'pay', 'leave_payout_amount' => 500, 'advance_recovery_mode' => 'full',
+        ]);
+        app(SettlementService::class)->approve($first->fresh());
+        app(SettlementService::class)->markPaid($first->fresh());
+
+        // Back to work in December, then a second departure in January.
+        $this->rehire($employee, '2026-12-15');
+        Carbon::setTestNow(Carbon::parse('2027-01-20 12:00:00', 'Africa/Cairo'));
+        $second = $this->start($employee, '2027-01-25');
+
+        // The advance recovered by the first settlement is NOT offered for recovery again.
+        $this->assertEqualsWithDelta(0.0, (float) $second->advance_outstanding, 0.01);
+        $this->assertSame('scheduled', $second->advance_recovery_mode, 'nothing outstanding: no recovery decision needed');
+        // Leave balance is recomputed live for the new departure, not copied from the old settlement.
+        $this->assertNotNull($second->leave_balance_days);
+        // Both settlements stay on record; the first one is untouched.
+        $this->assertSame('Paid', $first->fresh()->status);
+        $this->assertSame('Draft', $second->status);
+    }
+
     private function rehire(Employee $employee, string $returnDate): void
     {
         DB::table('employees')->where('id', $employee->id)->update([
