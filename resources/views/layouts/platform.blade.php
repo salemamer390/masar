@@ -7,7 +7,7 @@
   <link rel="shortcut icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
   <title>MASAR Platform Admin — @yield('title', 'إدارة الشركات')</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
   <link href="{{ asset('platform-admin.css') }}?v={{ @filemtime(public_path('platform-admin.css')) }}" rel="stylesheet">
   @stack('styles')
 </head>
