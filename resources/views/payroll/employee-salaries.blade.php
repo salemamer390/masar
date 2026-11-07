@@ -10,7 +10,7 @@
     $arabicMonthLabel = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][$monthIndex] . ' ' . $month->format('Y');
 @endphp
 
-<link rel="stylesheet" href="{{ asset('payroll/employee-salaries.css') }}">
+<link rel="stylesheet" href="{{ asset('payroll-assets/employee-salaries.css') }}">
 <style>
   .employee-payroll-actions .btn-success { background:#16a36f; border-color:#16a36f; color:#fff; }
   .employee-payroll-actions .btn-success:hover { background:#118b5e; border-color:#118b5e; color:#fff; }
@@ -130,5 +130,5 @@ window.masarEmployeeSalaries = {
   pdfUrlTemplate: @json(route('payroll.employee-salaries.payslip-pdf', ['payrollRecord' => '__RECORD__']))
 };
 </script>
-<script src="{{ asset('payroll/employee-salaries.js') }}?v={{ @filemtime(public_path('payroll/employee-salaries.js')) }}"></script>
+<script src="{{ asset('payroll-assets/employee-salaries.js') }}?v={{ @filemtime(public_path('payroll-assets/employee-salaries.js')) }}"></script>
 @endsection
