@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{Company, CompanySubscription, Employee, EmployeeStatus, HrRequest, PayrollRecord, PayrollRun, Role, Salary, Settlement, SubscriptionPlan, User};
+use App\Models\{Company, CompanySubscription, Employee, EmployeeStatus, HrRequest, MovementRecord, PayrollRecord, PayrollRun, Role, Salary, Settlement, SubscriptionPlan, User};
 use App\Services\PayrollRunService;
 use App\Services\SettlementService;
 use Carbon\Carbon;
@@ -529,5 +529,158 @@ class FinalSettlementTest extends TestCase
         $settlement = app(SettlementService::class)->approve($settlement);
         $this->assertSame('Approved', $settlement->status);
         $this->assertSame('draft_run', $settlement->reconciliation);
+    }
+
+    public function test_terminal_save_starts_one_draft_settlement_from_recorded_data(): void
+    {
+        $company = $this->makeCompany('settle-h');
+        $employee = $this->employee($company, 'SH1');
+        $this->salary($company, $employee);
+        $terminated = EmployeeStatus::where('name', 'منتهي الخدمة')->first();
+
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'resignation',
+            'termination_date' => '2026-11-10',
+        ])->assertSessionDoesntHaveErrors();
+
+        $settlement = Settlement::where('employee_id', $employee->id)->sole();
+        $this->assertSame('Draft', $settlement->status);
+        $this->assertSame('resignation', $settlement->reason);
+        $this->assertSame('2026-11-10', $settlement->last_working_day->toDateString());
+        $this->assertSame($company->id, $settlement->company_id);
+        $this->assertTrue($settlement->period_start->lte($settlement->last_working_day));
+        $this->assertTrue($settlement->period_end->gte($settlement->last_working_day));
+        $this->assertNull($settlement->approved_at, 'no auto-approval');
+        $this->assertNull($settlement->paid_at, 'no auto-payout');
+
+        // Repeated saves of the same terminal state never duplicate the draft.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'resignation',
+            'termination_date' => '2026-11-10',
+        ])->assertSessionDoesntHaveErrors();
+        $this->assertSame(1, Settlement::where('employee_id', $employee->id)->count());
+    }
+
+    public function test_terminal_save_without_reason_or_last_day_keeps_status_without_settlement(): void
+    {
+        $company = $this->makeCompany('settle-i');
+        $employee = $this->employee($company, 'SI1');
+        $terminated = EmployeeStatus::where('name', 'منتهي الخدمة')->first();
+
+        // Status saves cleanly but no settlement is started without the recorded
+        // reason and last working day; the flash message says so explicitly.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+        ])->assertSessionDoesntHaveErrors();
+
+        $this->assertSame($terminated->id, $employee->fresh()->status_id, 'saved status is never rolled back');
+        $this->assertSame(0, Settlement::where('employee_id', $employee->id)->count());
+
+        // Once the reason and last day are recorded, the next save starts the draft.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'contract_end',
+            'termination_date' => '2026-11-15',
+        ])->assertSessionDoesntHaveErrors();
+        $this->assertSame('contract_end', Settlement::where('employee_id', $employee->id)->sole()->reason);
+    }
+
+    public function test_terminal_save_without_settlement_permission_keeps_status_without_settlement(): void
+    {
+        $company = $this->makeCompany('settle-l');
+        $employee = $this->employee($company, 'SL1');
+        $terminated = EmployeeStatus::where('name', 'منتهي الخدمة')->first();
+
+        // A role that may edit employees but may NOT create settlements: no
+        // blanket grant is inferred from the employee edit permission.
+        $editPermission = DB::table('permissions')->where('name', 'employees.edit')->firstOrFail();
+        $role = Role::create(['name' => 'hr_editor', 'display_name' => 'HR Editor', 'company_id' => $company->id]);
+        DB::table('role_permissions')->insert(['role_id' => $role->id, 'permission_id' => $editPermission->id]);
+        $user = User::create(['name' => 'Editor', 'email' => 'settle-l-editor@example.test', 'password' => bcrypt('test-only'), 'role_id' => $role->id, 'company_id' => $company->id, 'is_active' => true]);
+        $this->actingAs($user);
+
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'dismissal',
+            'termination_date' => '2026-11-12',
+        ])->assertSessionDoesntHaveErrors();
+
+        $fresh = $employee->fresh();
+        $this->assertSame($terminated->id, $fresh->status_id, 'saved status is never rolled back');
+        $this->assertSame('dismissal', $fresh->termination_type);
+        $this->assertSame(0, Settlement::where('employee_id', $employee->id)->count());
+    }
+
+    public function test_cross_company_status_save_cannot_start_a_settlement(): void
+    {
+        $companyA = $this->makeCompany('settle-n');
+        $employeeA = $this->employee($companyA, 'SN1');
+        $terminated = EmployeeStatus::where('name', 'منتهي الخدمة')->first();
+
+        $this->makeCompany('settle-o'); // switches the acting user to another company
+        $response = $this->put(route('employees.update', $employeeA), [
+            'full_name' => $employeeA->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'resignation',
+            'termination_date' => '2026-11-10',
+        ]);
+        $this->assertContains($response->getStatusCode(), [403, 404]);
+
+        $this->assertSame(0, Settlement::withoutGlobalScopes()->where('employee_id', $employeeA->id)->count());
+        $this->assertSame($this->active->id, $employeeA->fresh()->status_id);
+    }
+
+    public function test_reactivation_after_settlement_keeps_history_and_creates_no_new_settlement(): void
+    {
+        $company = $this->makeCompany('settle-m');
+        $employee = $this->employee($company, 'SM1');
+        $this->salary($company, $employee);
+        $terminated = EmployeeStatus::where('name', 'منتهي الخدمة')->first();
+
+        // Terminate via the profile form: the draft settlement is created automatically.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'resignation',
+            'termination_date' => '2026-11-10',
+        ])->assertSessionDoesntHaveErrors();
+        $settlement = Settlement::where('employee_id', $employee->id)->sole();
+
+        app(SettlementService::class)->updateDraft($settlement, [
+            'leave_payout_mode' => 'skip', 'advance_recovery_mode' => 'scheduled',
+        ]);
+        app(SettlementService::class)->approve($settlement->fresh());
+
+        // Reactivate with the actual return date: old settlement and history stay.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $this->active->id,
+            'termination_type' => '',
+            'termination_date' => '',
+            'return_date' => '2026-11-20',
+        ])->assertSessionDoesntHaveErrors();
+
+        $fresh = $employee->fresh();
+        $this->assertSame($this->active->id, $fresh->status_id);
+        $this->assertSame('2026-11-20', $fresh->return_date->toDateString());
+        $this->assertSame('Approved', $settlement->fresh()->status);
+        $this->assertSame(1, Settlement::where('employee_id', $employee->id)->count(), 'reactivation creates no settlement');
+        $this->assertGreaterThanOrEqual(2, MovementRecord::where('employee_id', $employee->id)->count(), 'termination and reactivation movements are both recorded');
+
+        // Re-terminating later must not duplicate a settlement: the Approved one is still active.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $terminated->id,
+            'termination_type' => 'dismissal',
+            'termination_date' => '2026-12-31',
+        ])->assertSessionDoesntHaveErrors();
+        $this->assertSame(1, Settlement::where('employee_id', $employee->id)->count());
     }
 }
