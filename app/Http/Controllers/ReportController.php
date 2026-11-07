@@ -59,7 +59,7 @@ class ReportController extends Controller
             }
 
             foreach ($data['rows'] as $row) {
-                fputcsv($handle, $row);
+                fputcsv($handle, \App\Support\CsvSafe::row($row));
             }
 
             fclose($handle);
