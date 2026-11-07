@@ -322,7 +322,8 @@ class EmployeeController extends Controller
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'contract_duration' => ['nullable', 'string', 'max:100'],
             'termination_date' => ['nullable', 'date'],
-            'termination_type' => ['nullable', Rule::in(['resignation', 'dismissal'])],
+            'return_date' => ['nullable', 'date'],
+            'termination_type' => ['nullable', Rule::in(['resignation', 'dismissal', 'contract_end'])],
             'notes' => ['nullable', 'string'],
             'profile' => ['nullable', 'array'],
             'profile.nationality' => ['nullable', 'string', 'max:100'],
@@ -410,7 +411,7 @@ class EmployeeController extends Controller
                     ['company_id' => $fresh->company_id]
                 );
                 $statusLabel = match ($fresh->status?->name) {
-                    'Terminated', 'منتهي الخدمة', 'منتهى الخدمة' => $fresh->termination_type === 'dismissal' ? 'فصل' : ($fresh->termination_type === 'resignation' ? 'استقالة' : 'انتهاء خدمة'),
+                    'Terminated', 'منتهي الخدمة', 'منتهى الخدمة' => $fresh->termination_type === 'dismissal' ? 'فصل' : ($fresh->termination_type === 'resignation' ? 'استقالة' : ($fresh->termination_type === 'contract_end' ? 'إنهاء عقد' : 'انتهاء خدمة')),
                     'Suspended', 'موقوف' => 'إيقاف',
                     'Active', 'نشط' => 'عودة إلى العمل',
                     default => $fresh->status?->name ?? 'تغيير الحالة',
@@ -524,6 +525,18 @@ class EmployeeController extends Controller
             // would otherwise make payroll treat an active employee as ended.
             $validated['termination_type'] = null;
             $validated['termination_date'] = null;
+            // Reactivation records the effective return date the reviewer entered
+            // so payroll accrues from the actual return, not the old contract
+            // start; the original contract dates stay untouched.
+            $wasTerminal = $employee && (
+                filled($employee->termination_type) || filled($employee->termination_date)
+                || in_array($employee->status?->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقال', 'استقالة', 'Suspended', 'موقوف'], true)
+            );
+            if ($wasTerminal) {
+                $validated['return_date'] = blank($validated['return_date'] ?? null) ? today()->toDateString() : $validated['return_date'];
+            } else {
+                unset($validated['return_date']);
+            }
             return $validated;
         }
 
