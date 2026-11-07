@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Fingerprint;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Fingerprint\FingerprintDeviceFilterRequest;
 use App\Http\Requests\Fingerprint\FingerprintDeviceRequest;
+use App\Enums\FingerprintSyncStatus;
 use App\Jobs\SyncDueDevicesJob;
 use App\Models\FingerprintDevice;
 use App\Services\DeviceConnectionService;
@@ -96,13 +97,20 @@ class FingerprintDeviceController extends Controller
             'force' => true,
         ]);
 
-        return back()->with('success', 'تم إرسال طلب المزامنة للمعالجة في الخلفية، سيتم تحديث البيانات قريباً.');
+        // The sync runs synchronously inside this request, so report its real outcome.
+        if ($log->status !== FingerprintSyncStatus::Success) {
+            return back()->with('error', 'فشلت المزامنة: '.$log->error_message);
+        }
+
+        $unresolved = (int) ($log->metadata['unresolved_count'] ?? 0);
+
+        return back()->with('success', "اكتملت المزامنة: {$log->imported_count} بصمة جديدة، {$log->duplicate_count} مكررة، {$unresolved} غير مطابقة.");
     }
 
     public function syncAll(): RedirectResponse
     {
         $summary = $this->syncService->syncDueDevices(auth()->id(), ['force' => true]);
 
-        return back()->with('success', 'تم إرسال طلب المزامنة للمعالجة في الخلفية، سيتم تحديث البيانات قريباً.');
+        return back()->with('success', "اكتملت مزامنة الأجهزة المستحقة: {$summary['success']} ناجحة و{$summary['failed']} فاشلة.");
     }
 }

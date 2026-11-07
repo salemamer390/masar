@@ -66,7 +66,10 @@ class FingerprintAttendanceSyncService extends BaseService
         // where no authenticated user activates the company global scope, so the
         // company filter must be explicit here; employee codes are only unique
         // per company and may legitimately repeat across companies.
-        $employees = Employee::query()->where('company_id', $device->company_id)->get()->flatMap(fn (Employee $e) => collect([(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e]))->filter(fn ($e, $key) => $key !== '')->all();
+        // mapWithKeys, not flatMap: flatMap collapses through array_merge, which
+        // re-indexes numeric keys and silently drops purely numeric employee
+        // codes (the common case for device user IDs) from the match map.
+        $employees = Employee::query()->where('company_id', $device->company_id)->get()->mapWithKeys(fn (Employee $e) => [(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e])->filter(fn (Employee $e, $key) => $key !== '')->all();
         $affected = [];
         foreach ($punches as $punch) {
             if (!$punch instanceof FingerprintRawPunch) { $result['skipped_count']++; continue; }
