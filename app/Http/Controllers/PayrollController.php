@@ -796,14 +796,14 @@ class PayrollController extends Controller
                 fputcsv($out, ['الموظف', 'كود الموظف', 'القسم', 'صافي المتفق عليه', 'الأساسي', 'إجمالي البدلات', 'الإضافي', 'مكافآت وحوافز وعمولات واستحقاقات أخرى', 'السلفة المصروفة', 'Gross', 'الأجر التأميني', 'تأمين الموظف', 'ضريبة الدخل', 'صندوق أسر الشهداء', 'خصم الغياب', 'خصم الجزاءات', 'قسط السلفة', 'خصومات أخرى', 'إجمالي الخصومات', 'صافي الراتب', 'حصة صاحب العمل', 'تكلفة الموظف', 'أيام مدفوعة', 'الحالة']);
                 foreach ($records as $r) {
                     $extras = (float) $r->bonus + (float) $r->incentives + (float) $r->commission + (float) $r->profit_share + (float) $r->other_earnings;
-                    fputcsv($out, [
+                    fputcsv($out, \App\Support\CsvSafe::row([
                         $r->employee?->full_name, $r->employee?->employee_code, $r->employee?->department?->name,
                         $r->agreed_net_salary, $r->basic_salary, $r->allowances, $r->overtime_amount, round($extras, 2),
                         data_get($r->calculation_snapshot, 'inputs.advance_earnings', 0),
                         $r->gross_salary, $r->insurance_wage, $r->employee_insurance, $r->income_tax, $r->martyrs_fund,
                         $r->absence_deduction, $r->penalty_deduction, $r->loans, $r->other_deductions, $r->deductions, $r->net_salary,
                         $r->employer_insurance, $r->employee_cost, data_get($r->calculation_snapshot, 'paid_days'), $r->status,
-                    ]);
+                    ]));
                 }
                 fclose($out);
             }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
