@@ -194,7 +194,7 @@
     </div>
 
     @if(auth()->user()?->hasPermission('employees.edit'))
-    <section class="panel profile-panel mt-3" id="employment-status">
+    <section class="panel profile-panel mt-3" id="employment-status-panel">
         <div class="panel-head"><div><h3>حالة الموظف</h3><span>اختر الحالة من القوائم الأساسية ثم احفظ التغيير.</span></div></div>
         <form method="POST" action="{{ route('employees.update', $employee) }}" class="p-3 row g-3 align-items-end">
             @csrf @method('PUT')
