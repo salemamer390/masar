@@ -426,6 +426,40 @@ class FinalSettlementTest extends TestCase
         $this->assertSame('Draft', $second->status);
     }
 
+    public function test_reactivation_requires_an_actual_return_date(): void
+    {
+        $company = $this->makeCompany('settle-g');
+        $employee = $this->employee($company, 'SG1');
+        $this->salary($company, $employee);
+        $settlement = $this->start($employee);
+        app(SettlementService::class)->updateDraft($settlement, [
+            'leave_payout_mode' => 'skip', 'advance_recovery_mode' => 'scheduled',
+        ]);
+        app(SettlementService::class)->approve($settlement->fresh());
+
+        // The list quick action (status only, no return date) is rejected with a clear prompt.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $this->active->id,
+        ])->assertSessionHasErrors('return_date');
+        $this->assertNotNull($employee->fresh()->termination_date, 'rejected quick action leaves termination data intact');
+
+        // The profile form path supplies the actual return date and reactivates cleanly.
+        $this->put(route('employees.update', $employee), [
+            'full_name' => $employee->full_name,
+            'status_id' => $this->active->id,
+            'termination_type' => '',
+            'termination_date' => '',
+            'return_date' => '2026-11-20',
+        ])->assertSessionDoesntHaveErrors();
+        $fresh = $employee->fresh();
+        $this->assertSame($this->active->id, $fresh->status_id);
+        $this->assertSame('2026-11-20', $fresh->return_date->toDateString());
+        $this->assertNull($fresh->termination_date);
+        // The approved settlement is untouched by the reactivation.
+        $this->assertSame('Approved', $settlement->fresh()->status);
+    }
+
     private function rehire(Employee $employee, string $returnDate): void
     {
         DB::table('employees')->where('id', $employee->id)->update([
