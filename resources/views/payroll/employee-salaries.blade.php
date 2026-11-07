@@ -93,6 +93,9 @@
       <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> تحديث المسير</button>
     </form>
   @endif
+  @if(!empty($lastPayrollRefreshAt))
+    <span class="text-muted small align-self-center" title="{{ $lastPayrollRefreshAt->format('d/m/Y H:i') }}"><i class="bi bi-clock-history"></i> آخر تحديث: {{ $lastPayrollRefreshAt->isToday() ? $lastPayrollRefreshAt->format('H:i') : $lastPayrollRefreshAt->format('d/m/Y') }}</span>
+  @endif
 </div>
 
 <div id="payrollPrototype" class="payroll-prototype-page">{!! $pageBody !!}</div>

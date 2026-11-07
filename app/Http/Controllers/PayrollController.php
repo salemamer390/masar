@@ -57,6 +57,16 @@ class PayrollController extends Controller
         $totalEmployerInsurance = (clone $summaryQuery)->sum('employer_insurance');
         $totalMartyrs = (clone $summaryQuery)->sum('martyrs_fund');
         $runs = PayrollRun::withCount('records')->when($companyId, fn ($query) => $query->where('company_id', $companyId))->orderByDesc('payroll_month')->limit(12)->get();
+
+        // Truthful «آخر تحديث» for the displayed month's run: the created_at of the
+        // latest successful payroll_generate log for that exact run - never the
+        // page-open time and never an unrelated update timestamp.
+        $currentRun = PayrollRun::when($companyId, fn ($query) => $query->where('company_id', $companyId))
+            ->whereDate('payroll_month', $month->toDateString())->first();
+        $lastPayrollRefreshAt = $currentRun ? ActivityLog::where('company_id', $currentRun->company_id)
+            ->where('model_type', PayrollRun::class)->where('model_id', $currentRun->id)
+            ->where('action', 'payroll_generate')->latest('created_at')->value('created_at') : null;
+        $lastPayrollRefreshAt = $lastPayrollRefreshAt ? Carbon::parse($lastPayrollRefreshAt) : null;
         // Draft runs show who was skipped (and why) before the approve button; every run shows when it closes.
         $runReports = [];
         foreach ($runs as $run) {
@@ -331,7 +341,7 @@ class PayrollController extends Controller
             ->values();
 
         $view = $request->attributes->get('payroll_view', 'payroll.index');
-        return view($view, compact('payrollHistory', 'records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta'));
+        return view($view, compact('payrollHistory', 'records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta', 'lastPayrollRefreshAt'));
     }
 
     /** Render a standalone, print-ready payslip. The screen drawer is not used. */
@@ -554,6 +564,9 @@ class PayrollController extends Controller
         if ($complete) {
             $run->records()->whereNull('paid_at')->when($allIds->isNotEmpty(), fn ($query) => $query->whereNotIn('employee_id', $allIds->all()))->delete();
             $run->update(['status' => 'Draft']);
+            // Batched generation writes no per-batch activity log; record the completed
+            // refresh once so «آخر تحديث» reflects refreshes started from the runs page too.
+            ActivityLog::record('payroll_generate', 'Payroll run generated.', $run, null, $run->toArray(), 'payroll');
         }
         return response()->json(['success' => true, 'processed' => $processed, 'total' => $allIds->count(), 'percent' => $allIds->count() ? (int) round(($processed / $allIds->count()) * 100) : 100, 'complete' => $complete]);
     }
