@@ -5,20 +5,18 @@ namespace App\Http\Controllers;
 use App\Models\Leave;
 use App\Models\PayrollRecord;
 use App\Services\DashboardDataService;
-use App\Services\UnifiedRequestService;
 use Illuminate\Http\Request;
 
 class DashboardDetailController extends Controller
 {
     public function __construct(
         private readonly DashboardDataService $dashboard,
-        private readonly UnifiedRequestService $requests,
     ) {}
 
     public function show(string $type, Request $request)
     {
         abort_unless(auth()->user()->hasPermission('dashboard.view'), 403);
-        $allowed = ['employees', 'new-employees', 'attendance', 'present', 'absent', 'late', 'payroll-cost', 'payroll-net', 'payroll-summary', 'documents-expiring', 'documents-incomplete', 'requests', 'leaves'];
+        $allowed = ['employees', 'new-employees', 'attendance', 'present', 'absent', 'late', 'payroll-cost', 'payroll-net', 'payroll-summary', 'documents-expiring', 'documents-incomplete', 'leaves'];
         abort_unless(in_array($type, $allowed, true), 404);
         $user = auth()->user();
         $search = trim((string) $request->query('search', ''));
@@ -27,7 +25,7 @@ class DashboardDetailController extends Controller
         $title = match ($type) {
             'employees' => 'الموظفون النشطون', 'new-employees' => 'الموظفون الجدد', 'attendance' => 'حالة الحضور اليوم', 'present' => 'الحاضرون اليوم', 'absent' => 'الغائبون اليوم', 'late' => 'المتأخرون اليوم',
             'payroll-cost', 'payroll-summary' => 'ملخص الرواتب', 'payroll-net' => 'تفاصيل صافي الرواتب', 'documents-expiring' => 'المستندات التي تنتهي قريبًا',
-            'documents-incomplete' => 'ملفات الموظفين غير المكتملة', 'requests' => 'آخر الطلبات', 'leaves' => 'آخر الإجازات', default => 'طلبات الإجازات المعلقة',
+            'documents-incomplete' => 'ملفات الموظفين غير المكتملة', 'leaves' => 'آخر الإجازات',
         };
         $sectionUrl = match ($type) {
             'employees', 'new-employees' => route('employees.index'),
@@ -35,8 +33,7 @@ class DashboardDetailController extends Controller
             'payroll-cost', 'payroll-net', 'payroll-summary' => route('payroll.index', ['month' => (string) $request->query('payroll_month', today()->startOfMonth()->format('Y-m-01'))]),
             'documents-expiring' => route('documents.index'),
             'documents-incomplete' => route('employees.index'),
-            'requests' => $this->requests->listingUrl($user), 'leaves' => route('leaves.index'),
-            default => route('leaves.index', ['status' => 'Pending']),
+            'leaves' => route('leaves.index'),
         };
 
         if (in_array($type, ['employees', 'new-employees'], true)) {
@@ -57,11 +54,8 @@ class DashboardDetailController extends Controller
         } elseif ($type === 'documents-incomplete') {
             $items = collect($this->dashboard->documentCompleteness($user)['employees'])->filter(fn ($item) => count($item['missing_fields'] ?? []) > 0 || count($item['missing_documents'] ?? []) > 0)->filter(fn ($item) => !$search || str_contains(mb_strtolower($item['employee']->full_name), mb_strtolower($search)))->values();
             $items = new \Illuminate\Pagination\LengthAwarePaginator($items->forPage((int) $request->query('page', 1), $perPage)->values(), $items->count(), $perPage, (int) $request->query('page', 1), ['path' => $request->url(), 'query' => $request->query()]);
-        } elseif ($type === 'requests') {
-            $items = $this->requests->pending($user, null, $search);
         } else {
-            $statuses = $type === 'leaves' ? ['Approved', 'Rejected'] : ['Pending', 'Manager Approved'];
-            $items = Leave::with(['employee', 'leaveType'])->whereIn('status', $statuses)->when($search, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', "%{$search}%")))->latest()->paginate($perPage)->withQueryString();
+            $items = Leave::with(['employee', 'leaveType'])->whereIn('status', ['Approved', 'Rejected'])->when($search, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', "%{$search}%")))->latest()->paginate($perPage)->withQueryString();
         }
         return view('dashboard.partials.details', compact('type', 'title', 'items', 'sectionUrl'));
     }
