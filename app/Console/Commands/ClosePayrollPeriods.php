@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Company;
 use App\Models\PayrollRun;
+use App\Models\User;
+use App\Notifications\PayrollPeriodClosedNotification;
 use App\Services\HrOperationalSettingsService;
 use App\Services\PayrollRunService;
 use App\Support\CompanyContext;
@@ -52,6 +54,7 @@ class ClosePayrollPeriods extends Command
                 try {
                     $closed = $service->closeRun($run, true);
                     $this->info("الشركة {$companyId}: تم قفل مسير {$closed->payroll_month->format('Y-m')}" . ($closed->is_transition ? ' (انتقالي)' : '') . " ({$closed->status}).");
+                    $this->notifyPeriodClosed($closed);
                 } catch (\Throwable $e) {
                     $failed++;
                     report($e);
@@ -61,5 +64,25 @@ class ClosePayrollPeriods extends Command
         }
 
         return $failed ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Tell the company's payroll users that the period froze: one notification
+     * per run, tenant-scoped, permission-gated.
+     */
+    private function notifyPeriodClosed(PayrollRun $run): void
+    {
+        $recipients = User::with('role.permissions')->where('is_active', true)
+            ->where('company_id', $run->company_id)->get()
+            ->filter(fn (User $user) => $user->hasPermission('payroll.view'));
+        foreach ($recipients as $recipient) {
+            $alreadySent = $recipient->notifications()
+                ->where('type', PayrollPeriodClosedNotification::class)
+                ->where('data->payroll_run_id', $run->id)
+                ->exists();
+            if (! $alreadySent) {
+                $recipient->notify(new PayrollPeriodClosedNotification($run));
+            }
+        }
     }
 }
