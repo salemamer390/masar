@@ -68,7 +68,7 @@ Route::get('/login.html', fn () => redirect()->route('login'));
 
 Route::get('/signup.html', [MarketingSiteController::class, 'signup'])->name('site.signup');
 Route::get('/contact.html', [MarketingSiteController::class, 'contact'])->name('site.contact');
-Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->name('site.contact.submit');
+Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->middleware('throttle:5,1')->name('site.contact.submit');
 Route::get('/forgot-password.html', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
 Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
