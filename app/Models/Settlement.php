@@ -77,7 +77,9 @@ class Settlement extends Model
     public function pendingDecisions(): array
     {
         $pending = [];
-        if ((float) $this->leave_balance_days > 0 && $this->leave_payout_mode === 'pending') {
+        if ((float) $this->leave_balance_days > 0
+            && ($this->leave_payout_mode === 'pending' || ($this->leave_payout_mode === 'pay' && $this->leave_payout_amount === null))
+        ) {
             $pending[] = 'leave_payout';
         }
         if ((float) $this->advance_outstanding > 0 && $this->advance_recovery_mode === 'pending') {
