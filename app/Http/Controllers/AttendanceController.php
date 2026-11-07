@@ -75,7 +75,7 @@ class AttendanceController extends Controller
             foreach ($data['rows'] as $row) {
                 $model = $row['model'];
                 $minutes = fn (?int $value) => $value === null ? '—' : sprintf('%02d:%02d', intdiv($value, 60), $value % 60);
-                fputcsv($out, [
+                fputcsv($out, \App\Support\CsvSafe::row([
                     \Carbon\Carbon::parse($row['date'])->format('d/m/Y'), $row['employee']?->employee_code,
                     $row['employee']?->full_name, $row['employee']?->department?->name,
                     $model?->check_in ?? '—', $model?->check_out ?? '—',
@@ -84,7 +84,7 @@ class AttendanceController extends Controller
                     $minutes($model?->day_overtime_minutes !== null ? (int) $model->day_overtime_minutes : null),
                     $minutes($model?->night_overtime_minutes !== null ? (int) $model->night_overtime_minutes : null),
                     $row['status_label'],
-                ], ',');
+                ]), ',');
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
@@ -460,11 +460,11 @@ class AttendanceController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['التاريخ', 'كود الموظف', 'الموظف', 'القسم', 'الحضور', 'الانصراف', 'التأخير', 'الانصراف المبكر', 'الإضافي النهاري', 'الإضافي الليلي', 'الحالة'], ',');
             foreach ($archive->rows as $row) {
-                fputcsv($out, [
+                fputcsv($out, \App\Support\CsvSafe::row([
                     $row['date'] ? Carbon::parse($row['date'])->format('d/m/Y') : '', $row['employee_code'], $row['employee_name'], $row['department'],
                     $row['check_in'], $row['check_out'], $hm($row['late_minutes']), $hm($row['early_leave_minutes']),
                     $hm($row['day_overtime_minutes']), $hm($row['night_overtime_minutes']), arabic_label($row['status']),
-                ], ',');
+                ]), ',');
             }
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
