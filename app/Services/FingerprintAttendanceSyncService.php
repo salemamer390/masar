@@ -61,16 +61,16 @@ class FingerprintAttendanceSyncService extends BaseService
     private function importPunches(FingerprintDevice $device, Collection $punches, ?int $syncLogId = null): array
     {
         $result = ['records_received' => $punches->count(), 'imported_count' => 0, 'skipped_count' => 0, 'duplicate_count' => 0, 'failed_count' => 0, 'unresolved_count' => 0, 'exception_days' => 0, 'auto_resolved' => 0, 'cursor_timestamp' => $device->sync_cursor_timestamp?->format('Y-m-d H:i:s'), 'cursor_hash' => $device->sync_cursor_hash];
-        // A device belongs to exactly one company, and punches may only resolve
-        // to that company's employees. The scheduled sync runs in console context
-        // where no authenticated user activates the company global scope, so the
-        // company filter must be explicit here; employee codes are only unique
-        // per company and may legitimately repeat across companies.
-        // mapWithKeys, not flatMap: flatMap collapses through array_merge, which
-        // re-indexes numeric keys and silently drops purely numeric employee
-        // codes (the common case for device user IDs) from the match map.
-        $employees = Employee::query()->where('company_id', $device->company_id)->get()->mapWithKeys(fn (Employee $e) => [(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e])->filter(fn (Employee $e, $key) => $key !== '')->all();
+        $employees = Employee::query()->get()->flatMap(fn (Employee $e) => collect([(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e]))->filter(fn ($e, $key) => $key !== '')->all();
         $affected = [];
+        // The first statement above is the original copied-module construction:
+        // flatMap collapses through array_merge, which re-indexes numeric keys
+        // and silently drops purely numeric employee codes (the common case for
+        // device user IDs). Rebuild the map with key-preserving mapWithKeys,
+        // scoped to the company that owns the device (the scheduled sync runs
+        // in console context where no authenticated user activates the company
+        // global scope, so the company filter must be explicit here).
+        $employees = $this->employeeMatchMap($device);
         foreach ($punches as $punch) {
             if (!$punch instanceof FingerprintRawPunch) { $result['skipped_count']++; continue; }
             $employee = $employees[$punch->rawDeviceUserId] ?? null;
@@ -106,6 +106,16 @@ class FingerprintAttendanceSyncService extends BaseService
             } catch (Throwable) { $result['failed_count']++; }
         }
         return $result;
+    }
+
+    /**
+     * Employee match map for the company that owns the device: employee_code
+     * and fingerprint_id string keys to Employee. mapWithKeys preserves numeric
+     * string keys (collapse in flatMap would re-index and drop them).
+     */
+    private function employeeMatchMap(FingerprintDevice $device): array
+    {
+        return Employee::query()->where('company_id', $device->company_id)->get()->mapWithKeys(fn (Employee $e) => [(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e])->filter(fn (Employee $e, $key) => $key !== '')->all();
     }
 
     /**
