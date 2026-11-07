@@ -1223,8 +1223,10 @@ class PayrollRunService
             ? Carbon::parse($employee->termination_date)->startOfDay()
             : ($terminal && $employee->contract_end_date ? Carbon::parse($employee->contract_end_date)->startOfDay() : null);
         if ($terminal) {
-            // No termination date means there is no reliable month to include.
-            if (!$terminationDate || !$terminationDate->isSameMonth($month)) return null;
+            // No termination date means there is no reliable period to include. The run
+            // pays him when its actual payroll period contains the termination date;
+            // the anchor calendar month is irrelevant for cross-month periods (26th-25th).
+            if (!$terminationDate || !$terminationDate->betweenIncluded($periodStart, $periodEnd)) return null;
         }
         $contractEnd = $terminationDate;
         if (!$contractEnd && $employee->contract_start_date) {
