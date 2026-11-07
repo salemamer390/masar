@@ -438,12 +438,16 @@ class EmployeeController extends Controller
             }
         });
         $employee->refresh();
+        $settlementNotice = $this->ensureDraftSettlementForTerminalSave($employee, $newStatusName);
         $terminationDetailsCleared = $hadTerminationDetails
             && blank($employee->termination_type)
             && blank($employee->termination_date);
         $successMessage = $terminationDetailsCleared
             ? 'تمت إعادة الموظف إلى حالة نشط وإلغاء نوع وتاريخ انتهاء الخدمة السابقين.'
             : 'تم تحديث بيانات الموظف.';
+        if ($settlementNotice) {
+            $successMessage .= ' '.$settlementNotice;
+        }
         ActivityLog::record(
             'employee_update_snapshot',
             'Employee change snapshot.',
@@ -458,6 +462,7 @@ class EmployeeController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $successMessage,
+                'settlement_notice' => $settlementNotice,
                 'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
@@ -508,6 +513,42 @@ class EmployeeController extends Controller
     private function isTerminalEmployeeStatus(?string $statusName): bool
     {
         return $statusName !== null && in_array($statusName, ['منتهي الخدمة', 'منتهى الخدمة', 'Terminated', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true);
+    }
+
+    /**
+     * When a terminal status is saved, ensure exactly one active settlement
+     * exists: create a Draft from the recorded reason and last working day
+     * (with its company payroll period) when the actor may create settlements,
+     * or keep the existing Draft/Approved one untouched. Missing reason/date
+     * or missing permission never rolls the saved status back and never grants
+     * anything; it is reported so the settlement can be started manually from
+     * the profile. No approval or payout ever happens here.
+     */
+    private function ensureDraftSettlementForTerminalSave(Employee $employee, ?string $newStatusName): ?string
+    {
+        if (! $this->isTerminalEmployeeStatus($newStatusName)) {
+            return null;
+        }
+
+        if (\App\Services\SettlementService::hasActiveSettlement($employee->id)) {
+            return 'توجد تسوية نشطة لهذا الموظف — تابعها من ملف الموظف.';
+        }
+
+        if (blank($employee->termination_type) || blank($employee->termination_date)) {
+            return 'لم تُبدأ تسوية تلقائيًا: سجّل نوع انتهاء الخدمة وتاريخ آخر يوم عمل ثم احفظ مجددًا، أو ابدأ التسوية يدويًا من ملف الموظف.';
+        }
+
+        if (! auth()->user()?->hasPermission('settlements.create')) {
+            return 'لم تُنشأ مسودة تسوية لعدم توفر صلاحية إنشاء التسويات — اطلب من مخوّل بدءها من ملف الموظف.';
+        }
+
+        app(\App\Services\SettlementService::class)->start($employee, [
+            'reason' => $employee->termination_type,
+            'last_working_day' => $employee->termination_date->toDateString(),
+            'notes' => 'أُنشئت تلقائيًا عند تسجيل انتهاء الخدمة من ملف الموظف.',
+        ]);
+
+        return 'وتم إنشاء مسودة تسوية ترك الخدمة تلقائيًا من بيانات انتهاء الخدمة المسجلة.';
     }
 
     /**
