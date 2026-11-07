@@ -15,3 +15,5 @@ database/database.sqlite
 .phpunit.result.cache
 /public/storage/*
 !/public/storage/.gitkeep
+/storage/app/private/
+/storage/app/backups/
