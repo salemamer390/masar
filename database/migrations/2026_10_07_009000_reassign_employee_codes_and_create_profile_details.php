@@ -19,8 +19,15 @@ return new class extends Migration
             'محمد صلاح عسكر' => '107',
         ];
 
+        if (DB::table('employees')->count() === 0) {
+            // Fresh installs never had the legacy dataset; nothing to reassign.
+        } else {
         DB::transaction(function () use ($codes): void {
             $employees = DB::table('employees')->whereIn('full_name', array_keys($codes))->get(['id', 'full_name']);
+            if ($employees->isEmpty()) {
+                // A different dataset without the legacy people; nothing to reassign.
+                return;
+            }
             if ($employees->count() !== count($codes)) {
                 throw new RuntimeException('Employee-code reassignment stopped: one or more expected employee records were not found.');
             }
@@ -32,6 +39,7 @@ return new class extends Migration
                 DB::table('employees')->where('id', $employee->id)->update(['employee_code' => $codes[$employee->full_name]]);
             }
         });
+        }
 
         if (! Schema::hasTable('employee_profile_details')) {
             Schema::create('employee_profile_details', function (Blueprint $table) {
