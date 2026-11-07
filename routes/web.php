@@ -24,6 +24,7 @@ use App\Http\Controllers\PenaltyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalaryController;
+use App\Http\Controllers\SettlementController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\CompanyAccountController;
@@ -417,6 +418,26 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::get('/export', [PayrollController::class, 'export'])
             ->middleware('permission:payroll.export')
             ->name('export');
+    });
+
+    // Final settlements (end of service)
+    Route::prefix('settlements')->name('settlements.')->group(function () {
+        Route::get('/', [SettlementController::class, 'index'])
+            ->middleware('permission:settlements.view')->name('index');
+        Route::get('/create', [SettlementController::class, 'create'])
+            ->middleware('permission:settlements.create')->name('create');
+        Route::post('/', [SettlementController::class, 'store'])
+            ->middleware('permission:settlements.create')->name('store');
+        Route::get('/{settlement}', [SettlementController::class, 'show'])
+            ->middleware('permission:settlements.view')->name('show');
+        Route::put('/{settlement}', [SettlementController::class, 'update'])
+            ->middleware('permission:settlements.create')->name('update');
+        Route::post('/{settlement}/approve', [SettlementController::class, 'approve'])
+            ->middleware('permission:settlements.approve')->name('approve');
+        Route::post('/{settlement}/pay', [SettlementController::class, 'pay'])
+            ->middleware('permission:settlements.approve')->name('pay');
+        Route::post('/{settlement}/cancel', [SettlementController::class, 'cancel'])
+            ->middleware('permission:settlements.create')->name('cancel');
     });
 
     // Employee salaries (separate from the monthly payroll route)
