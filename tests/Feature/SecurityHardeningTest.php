@@ -105,10 +105,12 @@ class SecurityHardeningTest extends TestCase
         $this->assertSame([], $offenders, 'Files under public/storage are served by the web server without authentication.');
     }
 
-    public function test_legacy_documents_moved_to_private_disk(): void
+    public function test_no_uploaded_files_are_tracked_in_git(): void
     {
-        $this->assertFileDoesNotExist(public_path('storage/documents/1/zZJcv6Z1dyaSgIfcTnmQVTLifEo6jGggEhrvqZuJ.png'));
-        $this->assertFileExists(storage_path('app/private/documents/1/zZJcv6Z1dyaSgIfcTnmQVTLifEo6jGggEhrvqZuJ.png'));
-        $this->assertFileExists(storage_path('app/private/employees/3/profile/HKlpeKiWfP0SK9jvoIeUhGrrDtjJ8RxY1eYGHOWk.png'));
+        $root = base_path();
+        $tracked = [];
+        exec('git -C '.escapeshellarg($root).' ls-files storage/app/private public/storage', $tracked);
+        $tracked = array_filter($tracked, fn ($f) => basename($f) !== '.gitkeep');
+        $this->assertSame([], $tracked, 'Uploaded files and DB dumps must never be committed to the repository.');
     }
 }
