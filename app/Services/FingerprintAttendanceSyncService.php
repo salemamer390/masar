@@ -61,7 +61,12 @@ class FingerprintAttendanceSyncService extends BaseService
     private function importPunches(FingerprintDevice $device, Collection $punches, ?int $syncLogId = null): array
     {
         $result = ['records_received' => $punches->count(), 'imported_count' => 0, 'skipped_count' => 0, 'duplicate_count' => 0, 'failed_count' => 0, 'unresolved_count' => 0, 'exception_days' => 0, 'auto_resolved' => 0, 'cursor_timestamp' => $device->sync_cursor_timestamp?->format('Y-m-d H:i:s'), 'cursor_hash' => $device->sync_cursor_hash];
-        $employees = Employee::query()->get()->flatMap(fn (Employee $e) => collect([(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e]))->filter(fn ($e, $key) => $key !== '')->all();
+        // A device belongs to exactly one company, and punches may only resolve
+        // to that company's employees. The scheduled sync runs in console context
+        // where no authenticated user activates the company global scope, so the
+        // company filter must be explicit here; employee codes are only unique
+        // per company and may legitimately repeat across companies.
+        $employees = Employee::query()->where('company_id', $device->company_id)->get()->flatMap(fn (Employee $e) => collect([(string) $e->employee_code => $e, (string) ($e->fingerprint_id ?? '') => $e]))->filter(fn ($e, $key) => $key !== '')->all();
         $affected = [];
         foreach ($punches as $punch) {
             if (!$punch instanceof FingerprintRawPunch) { $result['skipped_count']++; continue; }
