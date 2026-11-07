@@ -292,12 +292,35 @@ class SalaryController extends Controller
     /** Salary structures are available to every employee except resigned/terminated staff. */
     private function eligibleEmployeesForSalary(?int $companyId): Builder
     {
-        return Employee::query()
+        // A terminal employee's salary structure stays listed until the payroll
+        // period that contains the departure ends; it leaves the list only after
+        // that period's last day, mirroring how payroll still pays the departure
+        // period. Structures with no recorded departure date are hidden immediately.
+        $hiddenTerminalIds = Employee::query()
             ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
-            ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', [
+            ->whereHas('status', fn (Builder $status) => $status->whereIn('name', [
                 'Terminated', 'منتهي الخدمة', 'منتهى الخدمة',
                 'Resigned', 'Resignation', 'مستقيل', 'استقال', 'استقالة',
-            ]));
+            ]))
+            ->get(['id', 'company_id', 'termination_date'])
+            ->filter(function (Employee $employee): bool {
+                if (!$employee->termination_date) {
+                    return true;
+                }
+
+                return \App\Support\CompanyContext::run((int) $employee->company_id, function () use ($employee): bool {
+                    $hr = app(\App\Services\HrOperationalSettingsService::class);
+                    $anchor = $hr->payrollMonthForDate(\Carbon\Carbon::parse($employee->termination_date));
+                    $period = $hr->payrollPeriod($anchor);
+
+                    return \Carbon\Carbon::today()->gt($period['end']);
+                });
+            })
+            ->pluck('id');
+
+        return Employee::query()
+            ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
+            ->whereNotIn('id', $hiddenTerminalIds);
     }
 
     private function ensureEmployeeIsEligibleForSalary(?Employee $employee): void
