@@ -58,7 +58,15 @@ class PenaltyController extends Controller
         if (empty($validated['penalty_type_id'])) {
             $name = $request->input('penalty_type_name', 'لفت نظر');
             $type = PenaltyType::where('name', 'like', "%{$name}%")->first();
-            $validated['penalty_type_id'] = $type?->id ?? 1;
+            if (!$type) {
+                // No usable penalty type: report it clearly instead of falling back
+                // to a hard-coded id that may not exist (foreign-key failure).
+                $message = 'لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.';
+                return $request->wantsJson()
+                    ? response()->json(['message' => $message, 'errors' => ['penalty_type_id' => [$message]]], 422)
+                    : back()->withErrors(['penalty_type_id' => $message])->withInput();
+            }
+            $validated['penalty_type_id'] = $type->id;
         }
 
         $typeObj = PenaltyType::find($validated['penalty_type_id']);
