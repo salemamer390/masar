@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
+  <link rel="shortcut icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
+  <link rel="apple-touch-icon" href="{{ asset('images/masar-hr-logo.png') }}">
+  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', 'إدارة الموارد البشرية')</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/lucide@1.70.0/dist/umd/lucide.min.js" integrity="sha384-64z4N640tVzhAicQVGzxE/48VNN9yS53U5kv9UH8ca7xGU4KSJ9zz8nD4C2BEerP" crossorigin="anonymous"></script>
+  
+  <!-- Application CSS: ordered sources in resources/styles; build with php scripts/build-styles.php. -->
+  <link href="{{ asset('app.css') }}?v={{ @filemtime(public_path('app.css')) }}" rel="stylesheet">
+  
+  @stack('styles')
+  <link href="{{ asset('dark-mode.css') }}?v={{ @filemtime(public_path('dark-mode.css')) }}" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+  <script>try{if(localStorage.getItem('masar_sidebar_collapsed')==='1')document.currentScript.parentElement.classList.add('sidebar-collapsed')}catch(e){}</script>
+  @include('layouts.sidebar')
+
+  <main class="main">
+    @include('layouts.topbar')
+
+    <section class="content">
+      @php
+        $viewErrors = $errors ?? new \Illuminate\Support\MessageBag();
+        $persistentAlertMessage = $viewErrors->any() ? $viewErrors->first() : (session('error') ?? session('warning') ?? session('toast'));
+        $persistentAlertType = $viewErrors->any() || session('error') ? 'danger' : (session('warning') ? 'warning' : 'success');
+      @endphp
+      @if($persistentAlertMessage && !session('toast'))
+        <div class="global-alert global-alert-{{ $persistentAlertType }}" role="alert">
+          <i class="bi {{ $persistentAlertType === 'danger' ? 'bi-exclamation-triangle-fill' : ($persistentAlertType === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill') }}"></i>
+          <span>{{ $persistentAlertMessage }}</span>
+          <button type="button" class="global-alert-close" aria-label="إغلاق" onclick="this.closest('.global-alert')?.remove()"><i class="bi bi-x-lg"></i></button>
+        </div>
+      @endif
+      @yield('content')
+    </section>
+  </main>
+</div>
+
+<!-- Global Generic Action Modal (from prototype) -->
+<div class="modal fade" id="genericActionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="genericActionTitle">إجراء</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">البيان</label>
+        <input class="form-control" id="genericActionInput" placeholder="اكتب القيمة...">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+        <button class="btn btn-primary" id="genericActionSubmit">حفظ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container global-toast-container position-fixed p-3">
+  <div id="liveToast" class="toast align-items-center" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-body d-flex align-items-center gap-2">
+      <i class="bi bi-check-circle-fill text-success fs-5"></i>
+      <span id="toastText"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Core Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+<script>
+  function refreshLucideIcons(root = document) {
+    if (window.lucide?.createIcons) window.lucide.createIcons();
+  }
+  document.addEventListener('DOMContentLoaded', () => refreshLucideIcons());
+
+  // Convert internal English values to Arabic at presentation time only.
+  // Stored codes remain unchanged because application logic relies on them.
+  const arabicUiLabels = {
+    'Active':'نشط', 'Inactive':'غير نشط', 'Pending':'قيد الانتظار',
+    'Manager Approved':'بانتظار اعتماد الموارد البشرية', 'Approved':'معتمد',
+    'Rejected':'مرفوض', 'Draft':'مسودة', 'Locked':'مقفل', 'Paid':'تم الصرف',
+    'Required':'مطلوب', 'Completed':'مكتمل', 'Under Review':'قيد المراجعة',
+    'Present':'حاضر', 'Late':'متأخر', 'Absent':'غائب', 'Leave':'إجازة',
+    'On Leave':'في إجازة', 'manual':'إدخال يدوي', 'device':'جهاز حضور',
+    'api':'تكامل نظامي', 'Gross':'الراتب الإجمالي', 'Net':'الراتب الصافي',
+    'Gross Salary':'الراتب الإجمالي', 'Payroll Payslip':'قسيمة راتب',
+    'Leave request created.':'تم إنشاء طلب الإجازة بنجاح.',
+    'Leave request moved to HR review.':'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.',
+    'Leave request approved.':'تم اعتماد طلب الإجازة بنجاح.',
+    'Leave request rejected.':'تم رفض طلب الإجازة.',
+    'Leave request deleted.':'تم حذف طلب الإجازة.',
+    'Insurance record saved.':'تم حفظ بيانات التأمين بنجاح.',
+    'Insurance record updated.':'تم تحديث بيانات التأمين بنجاح.',
+    'Payroll run generated in Draft status.':'تم إنشاء مسير الرواتب كمسودة.',
+    'Payroll run approved.':'تم اعتماد مسير الرواتب.',
+    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.'
+  };
+  function translateInterfaceText(root = document.body) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const source = node.nodeValue;
+      const compact = source.trim();
+      if (!arabicUiLabels[compact]) return;
+      node.nodeValue = source.replace(compact, arabicUiLabels[compact]);
+    });
+  }
+  document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
+
+  // استخراج تاريخ الميلاد والنوع من الرقم القومي، بما في ذلك النماذج التي تُحقن داخل نافذة منبثقة.
+  document.addEventListener('input', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || input.name !== 'national_id') return;
+    const form = input.closest('form');
+    if (!form) return;
+    const nationalId = input.value.replace(/\D/g, '').slice(0, 14);
+    const birth = form.querySelector('[name="birth_date"]');
+    const gender = form.querySelector('[name="gender"]');
+    if (nationalId.length !== 14 || !birth || !gender || !['2', '3'].includes(nationalId[0])) return;
+    const year = (nationalId[0] === '3' ? 2000 : 1900) + Number(nationalId.slice(1, 3));
+    const month = Number(nationalId.slice(3, 5));
+    const day = Number(nationalId.slice(5, 7));
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() + 1 !== month || date.getDate() !== day) return;
+    birth.value = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    gender.value = Number(nationalId[12]) % 2 === 1 ? '\u0630\u0643\u0631' : '\u0623\u0646\u062b\u0649';
+    birth.dispatchEvent(new Event('change', { bubbles: true }));
+    gender.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // Bootstrap close controls inside forms must never submit the surrounding form.
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.btn-close').forEach(button => {
+      if (!button.getAttribute('type')) button.setAttribute('type', 'button');
+    });
+    document.querySelectorAll('.page-head').forEach(head => {
+      const filter = head.previousElementSibling;
+      if (filter?.classList.contains('filter-bar')) head.after(filter);
+    });
+
+    // Keep every listing filter consistent with the employee filter: changing
+    // a select applies immediately, while reset removes all query filters.
+    const filterForms = document.querySelectorAll(
+      'form.filter-bar, form.documents-toolbar, form.salary-filter-bar, form.panel-filter, .panel > form.row.g-2.align-items-end'
+    );
+    filterForms.forEach((form) => {
+      form.classList.add('unified-filter');
+      form.setAttribute('role', 'search');
+      form.querySelectorAll('select').forEach((select) => {
+        if (!select.hasAttribute('onchange')) {
+          select.addEventListener('change', () => form.requestSubmit());
+        }
+      });
+      const hasQuery = [...new URLSearchParams(window.location.search).keys()]
+        .some((key) => key !== 'page');
+      if (!hasQuery || form.querySelector('.filter-reset, a.btn-light[href]')) return;
+      const reset = document.createElement('a');
+      reset.href = window.location.pathname;
+      reset.className = 'btn btn-light filter-reset';
+      reset.innerHTML = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>مسح</span>';
+      reset.setAttribute('aria-label', 'مسح الفلاتر');
+      form.appendChild(reset);
+    });
+  });
+
+  // Global Toast function matching prototype
+  function showToast(msg) {
+    const textEl = document.getElementById('toastText');
+    const toastEl = document.getElementById('liveToast');
+    if (textEl && toastEl) {
+      textEl.textContent = arabicUiLabels[msg] || msg;
+      const existingToast = bootstrap.Toast.getInstance(toastEl);
+      existingToast?.dispose();
+      const toast = new bootstrap.Toast(toastEl, { delay: 2200, autohide: true });
+      toast.show();
+      window.setTimeout(() => toast.hide(), 2300);
+    }
+  }
+
+  // Notifications center shortcut
+  document.addEventListener('DOMContentLoaded', () => {
+    const menu = document.querySelector('.notification-menu');
+    if (menu && !menu.querySelector('.notification-all-link')) {
+      const link = document.createElement('a');
+      link.className = 'dropdown-item notification-all-link text-center border-top py-2 fw-bold';
+      link.href = @json(route('notifications.index'));
+      link.textContent = 'عرض كل الإشعارات';
+      menu.appendChild(link);
+    }
+  });
+
+  // عرض إشعار مختصر في كل صفحات التطبيق عند وصول إشعار جديد.
+  document.addEventListener('DOMContentLoaded', () => {
+    const alert = document.getElementById('notificationLiveAlert');
+    if (!alert) return;
+    const id = alert.dataset.notificationId;
+    const storageKey = 'masar_last_notification_popup';
+    const close = () => {
+      alert.classList.remove('is-visible');
+      window.setTimeout(() => alert.remove(), 260);
+    };
+    alert.querySelector('.notification-live-close')?.addEventListener('click', close);
+    alert.querySelector('.notification-live-content')?.addEventListener('click', () => {
+      if (alert.dataset.notificationUrl) window.location.href = alert.dataset.notificationUrl;
+    });
+    if (id && localStorage.getItem(storageKey) !== id) {
+      localStorage.setItem(storageKey, id);
+      window.setTimeout(() => alert.classList.add('is-visible'), 180);
+      window.setTimeout(close, 6200);
+    }
+  });
+
+  // Sidebar toggle
+  const mobileSidebar = document.getElementById('sidebar');
+  const closeMobileSidebar = () => mobileSidebar?.classList.remove('open');
+  document.getElementById('menuBtn')?.addEventListener('click', function() {
+    mobileSidebar?.classList.toggle('open');
+  });
+   document.getElementById('topbarSidebarBtn')?.addEventListener('click', function() {
+     if (window.matchMedia('(max-width: 800px)').matches) mobileSidebar?.classList.toggle('open');
+   });
+  document.querySelector('[data-sidebar-mobile-close]')?.addEventListener('click', closeMobileSidebar);
+  document.querySelector('[data-sidebar-overlay]')?.addEventListener('click', closeMobileSidebar);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeMobileSidebar();
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const shell = document.querySelector('.app-shell');
+    const toggles = document.querySelectorAll('[data-sidebar-toggle]');
+    if (!shell || !toggles.length) return;
+
+    // تلميح باسم الصفحة عند مرور الماوس على الأيقونة وهي في وضع الشريط
+    document.querySelectorAll('.sidebar .nav-item').forEach(link => {
+      const label = link.querySelector('span')?.textContent.trim();
+      if (label) {
+        link.dataset.tooltip = label;
+        if (!link.title) link.title = label;
+      }
+    });
+
+    // Render collapsed-sidebar tooltips in the document body so they are not
+    // clipped by the sidebar's scroll container.
+    let sidebarTooltip;
+    const hideSidebarTooltip = () => {
+      sidebarTooltip?.remove();
+      sidebarTooltip = null;
+    };
+    document.querySelectorAll('.sidebar .nav-item').forEach(link => {
+      const showSidebarTooltip = () => {
+        if (!shell.classList.contains('sidebar-collapsed') || !link.dataset.tooltip) return;
+        hideSidebarTooltip();
+        sidebarTooltip = document.createElement('div');
+        sidebarTooltip.className = 'sidebar-tooltip';
+        sidebarTooltip.textContent = link.dataset.tooltip;
+        document.body.appendChild(sidebarTooltip);
+        const rect = link.getBoundingClientRect();
+        sidebarTooltip.style.top = `${rect.top + rect.height / 2}px`;
+        sidebarTooltip.style.right = `${window.innerWidth - rect.left + 10}px`;
+        requestAnimationFrame(() => sidebarTooltip?.classList.add('is-visible'));
+      };
+      link.addEventListener('mouseenter', showSidebarTooltip);
+      link.addEventListener('focusin', showSidebarTooltip);
+      link.addEventListener('mouseleave', hideSidebarTooltip);
+      link.addEventListener('focusout', hideSidebarTooltip);
+    });
+
+    const applySidebarState = (collapsed) => {
+      shell.classList.toggle('sidebar-collapsed', collapsed);
+      const text = collapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية';
+      toggles.forEach(btn => {
+        btn.setAttribute('aria-label', text);
+        btn.setAttribute('title', text);
+      });
+    };
+    applySidebarState(shell.classList.contains('sidebar-collapsed'));
+
+     toggles.forEach(btn => btn.addEventListener('click', () => {
+       if (window.matchMedia('(max-width: 800px)').matches) return;
+      const collapsed = !shell.classList.contains('sidebar-collapsed');
+      try { localStorage.setItem('masar_sidebar_collapsed', collapsed ? '1' : '0'); } catch (e) {}
+      applySidebarState(collapsed);
+    }));
+  });
+
+  // Dark mode toggle with persistence
+  const themeBtn = document.getElementById('themeToggleBtn');
+  if (localStorage.getItem('masar_theme') === 'dark') {
+    document.body.classList.add('preview-dark');
+  }
+
+  themeBtn?.addEventListener('click', function() {
+    document.body.classList.toggle('preview-dark');
+    const isDark = document.body.classList.contains('preview-dark');
+    localStorage.setItem('masar_theme', isDark ? 'dark' : 'light');
+    showToast(isDark ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح');
+  });
+
+  // Summary-card visibility is a presentation preference only. It never
+  // changes, filters, or removes any database data.
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('cardsVisibilityToggle');
+    if (!toggle) return;
+    const cardGroups = '.stat-grid.compact, .employee-kpi-grid, .reference-kpi-grid--six, .payroll-employee-kpi-grid';
+    if (!document.querySelector(cardGroups)) {
+      toggle.hidden = true;
+      return;
+    }
+    const setCardsVisible = (visible) => {
+      document.body.classList.toggle('masar-cards-hidden', !visible);
+      toggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      toggle.setAttribute('aria-label', visible ? 'إخفاء الكروت' : 'إظهار الكروت');
+      toggle.title = visible ? 'إخفاء الكروت' : 'إظهار الكروت';
+      const icon = toggle.querySelector('i');
+      if (icon) icon.className = visible ? 'bi bi-eye-slash' : 'bi bi-eye';
+    };
+    let visible = true;
+    try { visible = localStorage.getItem('masar_summary_cards_visible') !== '0'; } catch (e) {}
+    setCardsVisible(visible);
+    toggle.addEventListener('click', () => {
+      const next = document.body.classList.contains('masar-cards-hidden');
+      try { localStorage.setItem('masar_summary_cards_visible', next ? '1' : '0'); } catch (e) {}
+      setCardsVisible(next);
+    });
+  });
+
+  // CSRF setup for Fetch API
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+  // Shared, opt-in request helper for the staged smooth-navigation rollout.
+  // It is deliberately not attached to forms automatically: existing Laravel
+  // submissions keep their normal validation, redirects, uploads, and errors
+  // until each screen has been migrated and tested independently.
+  window.MasarUI = window.MasarUI || {};
+  window.MasarUI.request = async function (formOrUrl, options = {}) {
+    const form = formOrUrl instanceof HTMLFormElement ? formOrUrl : null;
+    const url = form ? form.action : String(formOrUrl);
+    const method = (options.method || form?.method || 'GET').toUpperCase();
+    const headers = new Headers(options.headers || {});
+    headers.set('Accept', 'application/json');
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+    if (csrfToken) headers.set('X-CSRF-TOKEN', csrfToken);
+
+    const request = { ...options, method, headers, credentials: 'same-origin' };
+    if (form && method !== 'GET' && method !== 'HEAD' && request.body === undefined) {
+      request.body = new FormData(form);
+    }
+
+    const response = await fetch(url, request);
+    const contentType = response.headers.get('content-type') || '';
+    const payload = contentType.includes('application/json')
+      ? await response.json()
+      : await response.text();
+
+    if (!response.ok) {
+      const error = new Error(payload?.message || 'Request failed.');
+      error.status = response.status;
+      error.payload = payload;
+      throw error;
+    }
+
+    return payload;
+  };
+
+  window.MasarUI.setBusy = function (form, busy, label = 'جارٍ الحفظ') {
+    if (!(form instanceof HTMLFormElement)) return;
+    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(button => {
+      if (busy) {
+        if (button.dataset.masarOriginalText === undefined) {
+          button.dataset.masarOriginalText = button.tagName === 'BUTTON' ? button.innerHTML : button.value;
+        }
+        button.disabled = true;
+        if (button.tagName === 'BUTTON') {
+          button.innerHTML = `<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> ${label}`;
+        } else {
+          button.value = label;
+        }
+      } else {
+        button.disabled = false;
+        if (button.dataset.masarOriginalText !== undefined) {
+          if (button.tagName === 'BUTTON') button.innerHTML = button.dataset.masarOriginalText;
+          else button.value = button.dataset.masarOriginalText;
+          delete button.dataset.masarOriginalText;
+        }
+      }
+    });
+  };
+
+  // Forms opt into AJAX individually with data-ajax="true".  The event-based
+  // result lets each screen update only the affected row/card after its own
+  // controller has confirmed a successful, authorized server-side change.
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.dataset.ajax !== 'true' || form.classList.contains('request-delete-form')) return;
+
+    if (form.dataset.ajaxConfirm && !window.confirm(form.dataset.ajaxConfirm)) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const beforeSubmit = new CustomEvent('masar:before-submit', { cancelable: true });
+    if (!form.dispatchEvent(beforeSubmit)) return;
+
+    window.MasarUI.setBusy(form, true, form.dataset.ajaxLabel || 'جارٍ الحفظ');
+    try {
+      const payload = await window.MasarUI.request(form);
+      form.dispatchEvent(new CustomEvent('masar:success', { bubbles: true, detail: payload }));
+      showToast(payload?.message || form.dataset.ajaxSuccess || 'تم الحفظ بنجاح.');
+    } catch (error) {
+      const validationErrors = error.payload?.errors;
+      const message = validationErrors
+        ? Object.values(validationErrors).flat().find(Boolean)
+        : (error.payload?.message || error.message || 'تعذر حفظ التغييرات.');
+      form.dispatchEvent(new CustomEvent('masar:error', { bubbles: true, detail: error }));
+      showToast(message);
+    } finally {
+      window.MasarUI.setBusy(form, false);
+    }
+  }, true);
+
+  // Preserve the user's place in long pages across normal Laravel redirects.
+  // This is intentionally global and does not replace normal form validation,
+  // uploads, or server-side redirects with unsafe client-side approximations.
+  (() => {
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    const key = `masar_scroll:${location.pathname}`;
+    let saveTimer;
+    const save = () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => sessionStorage.setItem(key, String(window.scrollY)), 80);
+    };
+    window.addEventListener('scroll', save, { passive: true });
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('DOMContentLoaded', () => {
+      const saved = Number(sessionStorage.getItem(key));
+      if (!Number.isFinite(saved) || saved <= 0) return;
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: saved, behavior: 'auto' })));
+    });
+    document.addEventListener('submit', (event) => {
+      save();
+      const form = event.target;
+      if (!(form instanceof HTMLFormElement) || form.dataset.ajax === 'true' || form.dataset.allowDuplicateSubmit === 'true') return;
+      const submitters = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+      submitters.forEach(button => {
+        if (button.disabled) return;
+        button.dataset.originalText = button.innerHTML ?? button.value;
+        button.disabled = true;
+        if (button.tagName === 'BUTTON') button.innerHTML = '<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> جارٍ الحفظ';
+        else button.value = 'جارٍ الحفظ';
+      });
+    }, true);
+  })();
+
+  // Trigger flash toasts from Laravel session
+  @if(session('toast'))
+    document.addEventListener('DOMContentLoaded', function() {
+      showToast(@json(session('toast')));
+    });
+  @endif
+
+  @if(($errors ?? new \Illuminate\Support\MessageBag())->any())
+    document.addEventListener('DOMContentLoaded', function() {
+      showToast(@json(($errors ?? new \Illuminate\Support\MessageBag())->first()));
+    });
+  @endif
+
+  (() => {
+    // Company-isolation diagnostic removed after verification.
+  })();
+      /* Company-isolation diagnostic removed.
+  })(); */
+
+  // Unified live search for list screens. The server-side filter remains the
+  // source of truth; this only narrows the already-rendered, company-scoped
+  // rows/cards while the user types, matching the subscriptions screen UX.
+  (() => {
+    const containers = '.table-panel, .salary-layout, .documents-card-grid';
+    const rowsFor = (container) => [...container.querySelectorAll('tbody tr, .salary-card, .doc-card')]
+      .filter((item) => !item.querySelector('[colspan]'));
+    const after = (form, element) => Boolean(form.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    document.querySelectorAll('form.filter-bar:not([data-server-live-search="true"]) input[name="search"], form.salary-filter-bar:not([data-server-live-search="true"]) input[name="search"]').forEach((input) => {
+      const form = input.form;
+      const allContainers = [...document.querySelectorAll(containers)];
+      const container = allContainers.find((candidate) => after(form, candidate))
+        || allContainers.find((candidate) => after(candidate, form));
+      if (!form || !container) return;
+      const rows = rowsFor(container);
+      if (!rows.length) return;
+      const empty = document.createElement('div');
+      empty.className = 'live-filter-empty text-muted text-center py-4';
+      empty.textContent = 'لا توجد نتائج مطابقة.';
+      empty.hidden = true;
+      container.appendChild(empty);
+      const apply = () => {
+        const query = input.value.trim().toLocaleLowerCase();
+        let visible = 0;
+        rows.forEach((row) => {
+          const match = !query || row.textContent.toLocaleLowerCase().includes(query);
+          row.hidden = !match;
+          if (match) visible++;
+        });
+        empty.hidden = visible !== 0;
+      };
+      input.addEventListener('input', apply);
+      apply();
+    });
+  })();
+</script>
+
+<script>
+  // A logged-out user must never see an authenticated page restored from the
+  // browser back/forward cache. Reloading makes the auth middleware redirect
+  // to /login immediately.
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) window.location.reload();
+  });
+</script>
+@stack('scripts')
+</body>
+</html>
