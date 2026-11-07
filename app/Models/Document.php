@@ -74,7 +74,13 @@ class Document extends Model
         if (!$this->file_path) {
             return null;
         }
-        return Storage::url($this->file_path);
+        return route('documents.preview', $this);
+    }
+
+    /** Legacy public files remain readable through the guarded route until migrated. */
+    public function storageDisk(): string
+    {
+        return $this->file_path && Storage::disk('local')->exists($this->file_path) ? 'local' : 'public';
     }
 
     public function isImage(): bool

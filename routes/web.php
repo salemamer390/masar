@@ -76,7 +76,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.attempt');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
     Route::post('/register/company', [AuthController::class, 'registerCompany'])
         ->middleware('throttle:5,1')
         ->name('register.company');
@@ -163,6 +163,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware('permission:employees.edit')
             ->name('update');
+        Route::get('/{employee}/photo', [EmployeeController::class, 'showPhoto'])
+            ->middleware('permission:employees.view')
+            ->name('photo.show');
         Route::patch('/{employee}/photo', [EmployeeController::class, 'updatePhoto'])
             ->middleware('permission:employees.edit')
             ->name('photo');

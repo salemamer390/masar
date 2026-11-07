@@ -208,9 +208,9 @@ class EmployeeController extends Controller
             'gross_salary' => ['nullable', 'numeric', 'min:0.01'],
             'salary_source' => ['nullable', 'in:gross,net'],
             'salary_value' => ['nullable', 'numeric', 'min:0.01'],
-            'department_id' => ['nullable', 'exists:departments,id'],
-            'job_id' => ['nullable', 'exists:hr_jobs,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
+            'department_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Department::class)],
+            'job_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Job::class)],
+            'branch_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Branch::class)],
             'hire_date' => ['nullable', 'date'],
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
@@ -267,7 +267,7 @@ class EmployeeController extends Controller
             return $employee;
         });
         if ($request->hasFile('profile_photo')) {
-            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
         }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
 
@@ -310,10 +310,10 @@ class EmployeeController extends Controller
             'address' => ['nullable', 'string', 'max:500'],
             'marital_status' => ['nullable', 'string', 'max:50'],
             'qualification' => ['nullable', 'string', 'max:150'],
-            'department_id' => ['nullable', 'exists:departments,id'],
-            'job_id' => ['nullable', 'exists:hr_jobs,id'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
-            'employment_type_id' => ['nullable', 'exists:employment_types,id'],
+            'department_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Department::class)],
+            'job_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Job::class)],
+            'branch_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Branch::class)],
+            'employment_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\EmploymentType::class)],
             'status_id' => ['nullable', 'exists:employee_statuses,id'],
             'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous'],
             'manager_employee_id' => ['nullable', 'exists:employees,id', Rule::notIn([$employee->id])],
@@ -365,9 +365,9 @@ class EmployeeController extends Controller
         unset($validated['profile_photo']);
         if ($request->hasFile('profile_photo')) {
             if ($employee->profile_photo_path) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($employee->profile_photo_path);
+                \Illuminate\Support\Facades\Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
             }
-            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public');
+            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local');
         }
         if ($request->filled('contract_start_date')) {
             $hireDate = \Carbon\Carbon::parse($validated['contract_start_date'])->toDateString();
@@ -563,20 +563,30 @@ class EmployeeController extends Controller
         }
     }
 
+    public function showPhoto(Employee $employee)
+    {
+        $disk = $employee->profilePhotoDisk();
+        if (!$employee->profile_photo_path || !Storage::disk($disk)->exists($employee->profile_photo_path)) {
+            abort(404, 'الصورة غير موجودة.');
+        }
+
+        return Storage::disk($disk)->response($employee->profile_photo_path);
+    }
+
     public function updatePhoto(Request $request, Employee $employee)
     {
         $request->validate(['profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
         if (!$request->hasFile('profile_photo')) {
             return back()->with('toast', 'لم يتم اختيار صورة جديدة.');
         }
-        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
-        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'public')]);
+        if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
+        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
         return back()->with('toast', 'تم تحديث صورة الموظف.');
     }
 
     public function deletePhoto(Employee $employee)
     {
-        if ($employee->profile_photo_path) Storage::disk('public')->delete($employee->profile_photo_path);
+        if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
         $employee->update(['profile_photo_path' => null]);
         return back()->with('toast', 'تم حذف صورة الموظف.');
     }

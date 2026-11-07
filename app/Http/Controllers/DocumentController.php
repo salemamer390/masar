@@ -37,7 +37,7 @@ class DocumentController extends Controller
     {
         $request->validate([
             'document_name' => ['required', 'string', 'max:200'],
-            'document_type_id' => ['nullable', 'exists:document_types,id'],
+            'document_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\DocumentType::class)],
             'expiry_date' => ['nullable', 'date'],
             'document_file' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ], [
@@ -66,7 +66,7 @@ class DocumentController extends Controller
             $mimeType = $file->getClientMimeType();
             $fileSize = $file->getSize();
 
-            $path = $file->store("documents/{$employee->id}", 'public');
+            $path = $file->store("documents/{$employee->id}", 'local');
 
             $document->file_name = $originalName;
             $document->file_path = $path;
@@ -98,12 +98,12 @@ class DocumentController extends Controller
             'document_file' => ['required', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
 
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if ($document->file_path && Storage::disk($document->storageDisk())->exists($document->file_path)) {
+            Storage::disk($document->storageDisk())->delete($document->file_path);
         }
 
         $file = $request->file('document_file');
-        $path = $file->store("documents/{$document->employee_id}", 'public');
+        $path = $file->store("documents/{$document->employee_id}", 'local');
 
         $document->file_name = $file->getClientOriginalName();
         $document->file_path = $path;
@@ -130,17 +130,17 @@ class DocumentController extends Controller
 
     public function preview(Document $document)
     {
-        if (!$document->file_path || !Storage::disk('public')->exists($document->file_path)) {
+        if (!$document->file_path || !Storage::disk($document->storageDisk())->exists($document->file_path)) {
             abort(404, 'الملف غير موجود.');
         }
 
-        return Storage::disk('public')->response($document->file_path, $document->file_name);
+        return Storage::disk($document->storageDisk())->response($document->file_path, $document->file_name);
     }
 
     public function destroy(Document $document, Request $request)
     {
-        if ($document->file_path && Storage::disk('public')->exists($document->file_path)) {
-            Storage::disk('public')->delete($document->file_path);
+        if ($document->file_path && Storage::disk($document->storageDisk())->exists($document->file_path)) {
+            Storage::disk($document->storageDisk())->delete($document->file_path);
         }
 
         // If it's a fixed required document template, reset it to 'مطلوب' instead of dropping the row,

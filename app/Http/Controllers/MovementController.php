@@ -32,10 +32,10 @@ class MovementController extends Controller
     {
         $validated = $request->validate([
             'employee_id' => ['required', 'exists:employees,id'],
-            'movement_type_id' => ['required', 'exists:movement_types,id'],
+            'movement_type_id' => ['required', new \App\Rules\VisibleModel(\App\Models\MovementType::class)],
             'movement_date' => ['required', 'date'],
-            'new_department_id' => ['nullable', 'exists:departments,id'],
-            'new_job_id' => ['nullable', 'exists:hr_jobs,id'],
+            'new_department_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Department::class)],
+            'new_job_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Job::class)],
             'new_salary' => ['nullable', 'numeric', 'min:0'],
             'reason' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:500'],

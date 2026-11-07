@@ -164,6 +164,7 @@ class MasterDataController extends Controller
         $currentMeta = $meta[$type];
         $modelClass = $currentMeta['model'];
 
+        abort_if(!auth()->user()->isSuperAdmin() && !Schema::hasColumn((new $modelClass)->getTable(), 'company_id'), 403, 'هذه قائمة عامة لا يمكن تعديلها من حساب الشركة.');
         $nameCol = $currentMeta['name_col'];
         $data = [$nameCol => $request->name];
 
@@ -229,6 +230,7 @@ class MasterDataController extends Controller
         abort_if(!isset($meta[$type]) || $type === 'documents', 404);
         $currentMeta = $meta[$type];
         $model = $currentMeta['model']::query()->findOrFail($item);
+        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, 'لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.');
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'code' => ['nullable', 'string', 'max:100'],
@@ -248,6 +250,7 @@ class MasterDataController extends Controller
         abort_if(!isset($meta[$type]) || $type === 'documents', 404);
         $currentMeta = $meta[$type];
         $model = $currentMeta['model']::query()->findOrFail($item);
+        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, 'لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.');
         $name = (string) ($model->{$currentMeta['name_col']} ?? '');
         if (Schema::hasColumn($model->getTable(), 'is_active')) {
             $model->forceFill(['is_active' => false])->save();
