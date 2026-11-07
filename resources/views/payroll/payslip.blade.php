@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>قسيمة راتب — MASAR HR</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
     <style>body{font-family:Cairo,Arial,sans-serif;background:#f4f8fd}.sheet{max-width:900px;margin:30px auto;background:#fff;padding:32px;border-radius:16px;box-shadow:0 10px 30px #0000000d}.label{color:#7586a6;font-size:13px}.value{font-weight:700}.line{border-top:1px solid #e3ebf5;margin:20px 0}.net{font-size:24px;font-weight:800;color:#10204b}.section-title{font-weight:800;color:#10204b;margin:16px 0 10px}@media print{body{background:#fff}.sheet{box-shadow:none;margin:0;max-width:none}}</style>
 </head>
 <body><div class="sheet">

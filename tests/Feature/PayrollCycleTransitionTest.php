@@ -7,6 +7,7 @@ use App\Models\CompanySubscription;
 use App\Models\Employee;
 use App\Models\EmployeeStatus;
 use App\Models\HrRequest;
+use App\Models\MonthlySummarySnapshot;
 use App\Models\PayrollRecord;
 use App\Models\PayrollRun;
 use App\Models\Role;
@@ -281,5 +282,55 @@ class PayrollCycleTransitionTest extends TestCase
                 \Illuminate\Support\Facades\DB::table('companies')->where('id', $companyId)->delete();
             }
         }
+    }
+    public function test_nightly_close_captures_the_missing_summary_for_the_closed_period_month_without_a_web_user(): void
+    {
+        Carbon::setTestNow('2026-11-26 09:00:00');
+        $ended = app(\App\Services\PayrollRunService::class)->generate(Carbon::parse('2026-10-01'), null, $this->company->id); // 26/09..25/10, closes 29/10
+        auth()->logout();
+
+        $cmd = app(\App\Console\Commands\ClosePayrollPeriods::class);
+        $cmd->setLaravel(app());
+        $buf = new \Symfony\Component\Console\Output\BufferedOutput();
+        $exit = $cmd->run(new \Symfony\Component\Console\Input\ArrayInput(['--company' => $this->company->id]), $buf);
+
+        $this->assertSame(0, $exit, $buf->fetch());
+        $this->assertSame('Locked', $ended->fresh()->status);
+        $snapshot = MonthlySummarySnapshot::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)->whereDate('summary_month', '2026-10-01')->first();
+        $this->assertNotNull($snapshot, 'closing an ended period must capture its missing monthly summary even from the console');
+        $this->assertSame(1, (int) $snapshot->employee_count);
+        $this->assertNull($snapshot->created_by, 'the scheduled close has no web user');
+        Carbon::setTestNow();
+    }
+
+    public function test_transition_close_captures_the_period_end_month_not_the_transition_anchor_month(): void
+    {
+        Carbon::setTestNow('2026-12-05 09:00:00');
+        $old = $this->finalizedRun('2026-11-01', '2026-10-20', '2026-11-19');
+        $this->saveDays('19', '18')->assertSessionHasNoErrors();
+        $transition = $this->transitionRun();
+        $this->assertNotNull($transition);
+        $this->assertSame('2026-11-20', $transition->payroll_month->toDateString());
+        $this->assertSame('2026-12-18', $transition->period_end->toDateString());
+        // Keep the already-final old run out of this regression: only the transition closes here.
+        PayrollRun::withoutGlobalScopes()->whereKey($old->id)->update(['status' => 'Locked']);
+
+        Carbon::setTestNow('2026-12-22 09:00:00'); // period end + 3 grace days + 1
+        auth()->logout();
+        $cmd = app(\App\Console\Commands\ClosePayrollPeriods::class);
+        $cmd->setLaravel(app());
+        $buf = new \Symfony\Component\Console\Output\BufferedOutput();
+        $exit = $cmd->run(new \Symfony\Component\Console\Input\ArrayInput(['--company' => $this->company->id]), $buf);
+
+        $this->assertSame(0, $exit, $buf->fetch());
+        $this->assertSame('Locked', $transition->fresh()->status);
+        $this->assertNotNull(MonthlySummarySnapshot::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)->whereDate('summary_month', '2026-12-01')->first(),
+            'a transition run belongs to the month containing its period end');
+        $this->assertNull(MonthlySummarySnapshot::withoutGlobalScopes()
+            ->where('company_id', $this->company->id)->whereDate('summary_month', '2026-11-01')->first(),
+            'the transition anchor date is not a monthly-summary key');
+        Carbon::setTestNow();
     }
 }

@@ -108,17 +108,21 @@ class JobDataController extends Controller
     }
 
 
-    public function captureSnapshot(Carbon $month, ?int $createdBy = null): MonthlySummarySnapshot
+    public function captureSnapshot(Carbon $month, ?int $createdBy = null, ?int $companyId = null): MonthlySummarySnapshot
     {
         $month = $month->copy()->startOfMonth();
-        $existing = MonthlySummarySnapshot::where('company_id', auth()->user()->company_id)->whereDate('summary_month', $month)->first();
+        // Web callers resolve the company from the authenticated user; the scheduled
+        // close passes it explicitly because there is no web user in the console.
+        $companyId ??= auth()->user()->company_id;
+        $existing = MonthlySummarySnapshot::withoutGlobalScopes()->where('company_id', $companyId)->whereDate('summary_month', $month)->first();
         if ($existing) return $existing;
-        $employees = Employee::select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end', 'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id'])
+        $employees = Employee::withoutGlobalScopes()->where('company_id', $companyId)
+            ->select(['id', 'employee_code', 'full_name', 'department_id', 'job_id', 'hire_date', 'birth_date', 'shift_start', 'shift_end', 'leave_entitlement_category', 'manual_annual_balance', 'termination_date', 'status_id'])
             ->with(['department:id,name', 'job:id,title', 'currentSalary', 'status'])->orderBy('id')->get();
         $rows = $this->snapshotRows($this->buildMonthlyRows($employees, $month));
 
         return MonthlySummarySnapshot::firstOrCreate(
-            ['company_id' => auth()->user()->company_id, 'summary_month' => $month->toDateString()],
+            ['company_id' => $companyId, 'summary_month' => $month->toDateString()],
             ['rows' => $rows, 'employee_count' => count($rows), 'created_by' => $createdBy ?? auth()->id()]
         );
 
