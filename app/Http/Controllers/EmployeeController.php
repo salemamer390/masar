@@ -350,6 +350,14 @@ class EmployeeController extends Controller
         $oldStatusName = EmployeeStatus::find($employee->status_id)?->name;
         $newStatusName = EmployeeStatus::find($validated['status_id'] ?? $employee->status_id)?->name;
         if ($this->isTerminalEmployeeStatus($oldStatusName) && ! $this->isInactiveEmployeeStatus($newStatusName)) {
+            // Reactivation requires the actual return date: the list quick action
+            // carries no date, so it is rejected with a prompt to use the profile
+            // form instead of silently defaulting one.
+            if (blank($request->input('return_date'))) {
+                throw ValidationException::withMessages([
+                    'return_date' => 'حدد تاريخ الرجوع الفعلي من نموذج بيانات الموظف قبل إعادة الموظف إلى نشط.',
+                ]);
+            }
             $this->ensureReactivationCapacity($employee);
         }
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
@@ -541,6 +549,7 @@ class EmployeeController extends Controller
         }
 
         if ($isSuspended) {
+            unset($validated['return_date']);
             if ($employee?->termination_type && blank($validated['termination_type'] ?? null)) {
                 unset($validated['termination_type'], $validated['termination_date']);
                 return $validated;
@@ -550,6 +559,7 @@ class EmployeeController extends Controller
             return $validated;
         }
 
+        unset($validated['return_date']);
         if ($isResigned && blank($validated['termination_type'] ?? null)) {
             $validated['termination_type'] = 'resignation';
         }
