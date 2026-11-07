@@ -5,8 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\Leave;
 use App\Models\MovementRecord;
-use App\Models\CompanySubscription;
-use App\Models\Employee;
 use App\Services\DashboardDataService;
 use App\Services\UnifiedRequestService;
 
@@ -21,18 +19,6 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
         abort_if($user?->role?->name === 'employee', 403, 'لوحة التحكم الإدارية غير متاحة لحساب الموظف.');
-        $companySubscription = null;
-        $companyEmployeeCount = null;
-        if ($user?->company_id) {
-            $companySubscription = CompanySubscription::with('plan')
-                ->where('company_id', $user->company_id)
-                ->whereIn('status', ['trial', 'active'])
-                ->latest('id')
-                ->first();
-            $companyEmployeeCount = Employee::where('company_id', $user->company_id)
-                ->whereHas('status', fn ($query) => $query->whereNotIn('name', ['منتهي الخدمة', 'موقوف', 'قيد التعيين', 'Terminated', 'Suspended', 'Pending']))
-                ->count();
-        }
         $can = fn (string $permission) => (bool) $user?->hasPermission($permission);
         $today = today();
         $currentMonth = $today->copy()->startOfMonth();
@@ -86,11 +72,10 @@ class DashboardController extends Controller
             $can('attendance.create') ? ['label' => 'تسجيل حضور', 'short' => 'حضور', 'icon' => 'clock-fill', 'page' => route('attendance.index', ['create' => 1]), 'source_modal' => 'attendanceModal'] : null,
             $can('penalties.create') ? ['label' => 'تسجيل جزاء', 'short' => 'جزاء', 'icon' => 'gavel', 'page' => route('discipline.index', ['create' => 1]), 'source_modal' => 'penaltyModal'] : null,
             $can('requests.create') ? ['label' => 'طلب HR جديد', 'short' => 'طلب', 'icon' => 'file-earmark-plus-fill', 'page' => route('requests.index', ['create' => 1]), 'source_modal' => 'requestCreateModal'] : null,
-            $can('payroll.create') ? ['label' => 'إصدار مسير الرواتب', 'short' => 'رواتب', 'icon' => 'currency-dollar', 'page' => route('payroll.index', ['month' => $month->format('Y-m-01')]), 'source_selector' => 'form[action*="/payroll/runs/generate"]'] : null,
         ]));
 
         $payrollYears = $can('payroll.view') ? \App\Models\PayrollRun::query()->selectRaw('YEAR(payroll_month) year')->distinct()->orderByDesc('year')->pluck('year') : collect();
         if ($payrollYears->isEmpty()) $payrollYears = collect([$today->year]);
-        return view('dashboard.index', compact('today', 'month', 'heroMetrics', 'attendance', 'payroll', 'documents', 'expiringDocuments', 'pendingRequests', 'requestsIndexUrl', 'recentLeaves', 'recentEmployees', 'recentMovements', 'attentionItems', 'activities', 'quickActions', 'payrollYears', 'companySubscription', 'companyEmployeeCount'));
+        return view('dashboard.index', compact('today', 'month', 'heroMetrics', 'attendance', 'payroll', 'documents', 'expiringDocuments', 'pendingRequests', 'requestsIndexUrl', 'recentLeaves', 'recentEmployees', 'recentMovements', 'attentionItems', 'activities', 'quickActions', 'payrollYears'));
     }
 }

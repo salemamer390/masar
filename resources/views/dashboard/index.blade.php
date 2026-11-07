@@ -8,32 +8,13 @@
 @section('content')
 <div class="dashboard-command-bar dashboard-command-bar--reference" aria-label="إجراءات سريعة">
     @foreach($quickActions as $action)
-    @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus','إصدار مسير الرواتب'=>'fa-circle-dollar-to-slot'])
+    @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus'])
     <button type="button" class="dashboard-existing-action" data-short-label="{{ $action['short'] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
   @endforeach
   @if(auth()->user()?->hasPermission('employees.import'))
     <button type="button" class="dashboard-import-action" data-short-label="استيراد" data-bs-toggle="modal" data-bs-target="#employeesImportModal"><i class="fa-solid fa-file-excel"></i><span>استيراد موظفين</span></button>
   @endif
 </div>
-@if($companySubscription?->plan)
-<section class="panel mb-3 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
-    <div>
-        <small class="text-muted d-block">الباقة الحالية</small>
-        <strong>{{ $companySubscription->plan->name }}</strong>
-    </div>
-    <div>
-        <small class="text-muted d-block">الموظفون المستخدمون</small>
-        <strong>{{ format_number($companyEmployeeCount ?? 0) }} / {{ format_number($companySubscription->plan->employee_limit) }}</strong>
-    </div>
-    <div class="text-muted small">
-        @if($companySubscription->ends_at)
-            تنتهي في {{ $companySubscription->ends_at->format('d/m/Y') }}
-        @else
-            اشتراك نشط
-        @endif
-    </div>
-</section>
-@endif
 
 <div class="reference-kpi-grid reference-kpi-grid--six">
   @forelse($heroMetrics as $metric)
