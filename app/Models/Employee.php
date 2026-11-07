@@ -45,6 +45,7 @@ class Employee extends Model
         'contract_end_date',
         'contract_duration',
         'termination_date',
+        'return_date',
         'termination_type',
         'shift_start',
         'shift_end',
@@ -61,6 +62,7 @@ class Employee extends Model
         'contract_start_date' => 'date',
         'contract_end_date' => 'date',
         'termination_date' => 'date',
+        'return_date' => 'date',
         'manual_annual_balance' => 'decimal:2',
         'gross_salary' => 'decimal:2',
     ];

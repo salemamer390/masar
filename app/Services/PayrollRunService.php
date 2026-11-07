@@ -11,6 +11,7 @@ use App\Models\PayrollRecord;
 use App\Models\PayrollRun;
 use App\Models\Penalty;
 use App\Models\Salary;
+use App\Models\Settlement;
 use App\Http\Controllers\JobDataController;
 use App\Support\CompanyContext;
 use Carbon\Carbon;
@@ -143,9 +144,90 @@ class PayrollRunService
                     ActivityLog::record('payroll_generate', 'Payroll run generated.', $run, null, $run->toArray(), 'payroll');
                 }
 
+                $this->reapplyApprovedSettlements($run);
+
                 return $run->fresh();
             });
         });
+    }
+
+    /**
+     * An approved settlement folded into a draft run must survive regeneration:
+     * the rebuild re-applies its lines so payroll neither silently drops the
+     * settlement nor double-charges it (the same-month schedule is computed
+     * before the settlement's recovery is counted).
+     */
+    private function reapplyApprovedSettlements(PayrollRun $run): void
+    {
+        $settlements = Settlement::withoutGlobalScopes()
+            ->where('company_id', $run->company_id)
+            ->where('status', 'Approved')
+            ->where('reconciliation', 'draft_run')
+            ->whereDate('anchor_month', Carbon::parse($run->payroll_month)->startOfMonth()->toDateString())
+            ->get();
+        foreach ($settlements as $settlement) {
+            $record = PayrollRecord::withoutGlobalScopes()
+                ->where('payroll_run_id', $run->id)
+                ->where('employee_id', $settlement->employee_id)
+                ->first();
+            if (! $record || $record->is_locked || $record->paid_at !== null) continue;
+            if ((int) data_get($record->calculation_snapshot, 'settlement.id') === (int) $settlement->id) continue;
+            $this->applySettlementToRecord($record, $settlement);
+            $settlement->forceFill(['payroll_run_id' => $run->id, 'payroll_record_id' => $record->id])->save();
+        }
+    }
+
+    /**
+     * Fold settlement lines into the employee's payroll record using the same
+     * recalculation path as manual payroll edits, so salary, insurance, tax and
+     * attendance keep following the existing rules unchanged. The advance
+     * recovery raises this month's total loan deduction and each advance
+     * absorbs it up to its remaining balance — the same shape as
+     * PayrollController::updateInputs.
+     */
+    public function applySettlementToRecord(PayrollRecord $record, Settlement $settlement): PayrollRecord
+    {
+        abort_if($record->is_locked || $record->paid_at !== null || in_array($record->status, self::FINAL_RECORD_STATUSES, true), 422, 'لا يمكن تعديل سجل راتب معتمد أو مقفل أو مصروف.');
+
+        $lines = [
+            'leave_payout' => (float) $settlement->leave_payout_amount,
+            'gratuity' => (float) $settlement->gratuity_amount,
+            'manual_earnings' => (float) $settlement->manual_earnings,
+            'advance_recovery' => (float) $settlement->advance_recovery_amount,
+            'manual_deductions' => (float) $settlement->manual_deductions,
+        ];
+
+        $changes = [
+            'other_earnings' => round((float) $record->other_earnings + $lines['leave_payout'] + $lines['gratuity'] + $lines['manual_earnings'], 2),
+            'other_deductions' => round((float) $record->other_deductions + $lines['manual_deductions'], 2),
+        ];
+
+        if ($lines['advance_recovery'] > 0.004) {
+            $details = (array) data_get($record->calculation_snapshot, 'advance_details', []);
+            $availableTotal = round(collect($details)->sum(fn ($d) => (float) ($d['installment'] ?? 0) + (float) ($d['remaining_after'] ?? 0)), 2);
+            $target = min(round((float) $record->loans + $lines['advance_recovery'], 2), $availableTotal);
+            $remainingToAllocate = $target;
+            $updated = [];
+            foreach ($details as $detail) {
+                $available = (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0);
+                $installment = round(min($available, $remainingToAllocate), 2);
+                $detail['installment'] = $installment;
+                $detail['remaining_after'] = round($available - $installment, 2);
+                $updated[] = $detail;
+                $remainingToAllocate = round(max(0.0, $remainingToAllocate - $installment), 2);
+            }
+            $changes['loans'] = $target;
+            $changes['advance_details'] = $updated;
+        }
+
+        $record = $this->recalculateRecord($record, $changes);
+        $record->forceFill([
+            'calculation_snapshot' => array_merge($record->calculation_snapshot ?? [], [
+                'settlement' => ['id' => $settlement->id, 'lines' => $lines],
+            ]),
+        ])->save();
+
+        return $record;
     }
 
     /** Refresh the affected employee in every open draft run of the employee's own company. */
@@ -630,6 +712,27 @@ class PayrollRunService
                 $paidByRequest[$request->id] = round(($paidByRequest[$request->id] ?? 0) + $allocated, 2);
                 $remainingLegacy = round($remainingLegacy - $allocated, 2);
                 if ($remainingLegacy <= 0) break;
+            }
+        }
+
+        // Settlement recoveries collected outside this month's schedule: an advance
+        // recovered through an approved/paid final settlement must never be deducted
+        // again by a later payroll run. The settlement's own anchor month is excluded:
+        // that month's schedule is computed first, then the settlement folds its
+        // recovery on top (and re-folds it after every regeneration).
+        foreach (Settlement::withoutGlobalScopes()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', ['Approved', 'Paid'])
+            ->whereDate('anchor_month', '<', $month->copy()->startOfMonth()->toDateString())
+            ->get(['advance_recovery_details']) as $settled) {
+            foreach ((array) ($settled->advance_recovery_details ?? []) as $recovered) {
+                $requestId = (int) ($recovered['request_id'] ?? 0);
+                if ($requestId > 0) {
+                    $paidByRequest[$requestId] = round(
+                        ($paidByRequest[$requestId] ?? 0) + (float) ($recovered['amount'] ?? 0),
+                        2
+                    );
+                }
             }
         }
 
@@ -1223,9 +1326,37 @@ class PayrollRunService
             ? Carbon::parse($employee->termination_date)->startOfDay()
             : ($terminal && $employee->contract_end_date ? Carbon::parse($employee->contract_end_date)->startOfDay() : null);
         if ($terminal) {
-            // No termination date means there is no reliable month to include.
-            if (!$terminationDate || !$terminationDate->isSameMonth($month)) return null;
+            // No termination date means there is no reliable period to include. The run
+            // pays him when its actual payroll period contains the termination date;
+            // the anchor calendar month is irrelevant for cross-month periods (26th-25th).
+            if (!$terminationDate || !$terminationDate->betweenIncluded($periodStart, $periodEnd)) return null;
         }
+        $returnDate = !$terminal && $employee->return_date
+            ? Carbon::parse($employee->return_date)->startOfDay()
+            : null;
+        $departureLastDay = null;
+        if ($returnDate) {
+            // After a rehire, the departure period of a service break stays
+            // payable through the last working day recorded by its approved/paid
+            // settlement; periods fully inside the break pay nothing.
+            $departureLastDay = \App\Models\Settlement::withoutGlobalScopes()
+                ->where('company_id', $employee->company_id)
+                ->where('employee_id', $employee->id)
+                ->whereIn('status', ['Approved', 'Paid'])
+                ->whereBetween('last_working_day', [$periodStart->toDateString(), $periodEnd->toDateString()])
+                ->max('last_working_day');
+            $departureLastDay = $departureLastDay ? Carbon::parse($departureLastDay)->startOfDay() : null;
+            if (!$departureLastDay && $returnDate->greaterThan($periodEnd)) {
+                $earlierDeparture = \App\Models\Settlement::withoutGlobalScopes()
+                    ->where('company_id', $employee->company_id)
+                    ->where('employee_id', $employee->id)
+                    ->whereIn('status', ['Approved', 'Paid'])
+                    ->whereDate('last_working_day', '<', $periodStart->toDateString())
+                    ->exists();
+                if ($earlierDeparture) return null; // period lies fully inside the service break
+            }
+        }
+
         $contractEnd = $terminationDate;
         if (!$contractEnd && $employee->contract_start_date) {
             $contractEnd = $this->renewedContractEnd(Carbon::parse($employee->contract_start_date), $calendarMonthEnd);
@@ -1236,10 +1367,23 @@ class PayrollRunService
         $contractEnd ??= ($employee->contract_end_date ? Carbon::parse($employee->contract_end_date) : $monthEnd->copy());
         $start = $hireDate->greaterThan($monthStart) ? $hireDate : $monthStart;
         $end = $contractEnd->lessThan($monthEnd) ? $contractEnd : $monthEnd;
-        if ($start->greaterThan($end)) return null;
 
         $basis = $this->settings->prorationDays();
-        $days = PayrollProration::paidDays($start, $end, $basis);
+        if ($returnDate && $departureLastDay && $returnDate->greaterThan($departureLastDay) && $returnDate->lessThanOrEqualTo($end)) {
+            // Same-period return: pay the departure segment through the last
+            // working day plus the return segment from the effective return date.
+            $days = PayrollProration::paidDays($start, $departureLastDay, $basis)
+                + PayrollProration::paidDays($returnDate, $end, $basis);
+        } else {
+            if ($departureLastDay && $departureLastDay->lessThan($end)) {
+                $end = $departureLastDay->copy();
+            }
+            if ($returnDate && !$departureLastDay && $returnDate->greaterThan($start)) {
+                $start = $returnDate->copy();
+            }
+            if ($start->greaterThan($end)) return null;
+            $days = PayrollProration::paidDays($start, $end, $basis);
+        }
 
         return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => $periodOverride ? max(0, $days / $basis) : min(1, $days / $basis)];
     }
