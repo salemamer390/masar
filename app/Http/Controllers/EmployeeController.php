@@ -322,7 +322,8 @@ class EmployeeController extends Controller
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'contract_duration' => ['nullable', 'string', 'max:100'],
             'termination_date' => ['nullable', 'date'],
-            'termination_type' => ['nullable', Rule::in(['resignation', 'dismissal'])],
+            'return_date' => ['nullable', 'date'],
+            'termination_type' => ['nullable', Rule::in(['resignation', 'dismissal', 'contract_end'])],
             'notes' => ['nullable', 'string'],
             'profile' => ['nullable', 'array'],
             'profile.nationality' => ['nullable', 'string', 'max:100'],
@@ -349,6 +350,14 @@ class EmployeeController extends Controller
         $oldStatusName = EmployeeStatus::find($employee->status_id)?->name;
         $newStatusName = EmployeeStatus::find($validated['status_id'] ?? $employee->status_id)?->name;
         if ($this->isTerminalEmployeeStatus($oldStatusName) && ! $this->isInactiveEmployeeStatus($newStatusName)) {
+            // Reactivation requires the actual return date: the list quick action
+            // carries no date, so it is rejected with a prompt to use the profile
+            // form instead of silently defaulting one.
+            if (blank($request->input('return_date'))) {
+                throw ValidationException::withMessages([
+                    'return_date' => 'حدد تاريخ الرجوع الفعلي من نموذج بيانات الموظف قبل إعادة الموظف إلى نشط.',
+                ]);
+            }
             $this->ensureReactivationCapacity($employee);
         }
         $salaryChanged = $request->filled('salary_source') && $request->filled('salary_value');
@@ -410,7 +419,7 @@ class EmployeeController extends Controller
                     ['company_id' => $fresh->company_id]
                 );
                 $statusLabel = match ($fresh->status?->name) {
-                    'Terminated', 'منتهي الخدمة', 'منتهى الخدمة' => $fresh->termination_type === 'dismissal' ? 'فصل' : ($fresh->termination_type === 'resignation' ? 'استقالة' : 'انتهاء خدمة'),
+                    'Terminated', 'منتهي الخدمة', 'منتهى الخدمة' => $fresh->termination_type === 'dismissal' ? 'فصل' : ($fresh->termination_type === 'resignation' ? 'استقالة' : ($fresh->termination_type === 'contract_end' ? 'إنهاء عقد' : 'انتهاء خدمة')),
                     'Suspended', 'موقوف' => 'إيقاف',
                     'Active', 'نشط' => 'عودة إلى العمل',
                     default => $fresh->status?->name ?? 'تغيير الحالة',
@@ -429,12 +438,16 @@ class EmployeeController extends Controller
             }
         });
         $employee->refresh();
+        $settlementNotice = $this->ensureDraftSettlementForTerminalSave($employee, $newStatusName);
         $terminationDetailsCleared = $hadTerminationDetails
             && blank($employee->termination_type)
             && blank($employee->termination_date);
         $successMessage = $terminationDetailsCleared
             ? 'تمت إعادة الموظف إلى حالة نشط وإلغاء نوع وتاريخ انتهاء الخدمة السابقين.'
             : 'تم تحديث بيانات الموظف.';
+        if ($settlementNotice) {
+            $successMessage .= ' '.$settlementNotice;
+        }
         ActivityLog::record(
             'employee_update_snapshot',
             'Employee change snapshot.',
@@ -449,6 +462,7 @@ class EmployeeController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $successMessage,
+                'settlement_notice' => $settlementNotice,
                 'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
@@ -502,6 +516,42 @@ class EmployeeController extends Controller
     }
 
     /**
+     * When a terminal status is saved, ensure exactly one active settlement
+     * exists: create a Draft from the recorded reason and last working day
+     * (with its company payroll period) when the actor may create settlements,
+     * or keep the existing Draft/Approved one untouched. Missing reason/date
+     * or missing permission never rolls the saved status back and never grants
+     * anything; it is reported so the settlement can be started manually from
+     * the profile. No approval or payout ever happens here.
+     */
+    private function ensureDraftSettlementForTerminalSave(Employee $employee, ?string $newStatusName): ?string
+    {
+        if (! $this->isTerminalEmployeeStatus($newStatusName)) {
+            return null;
+        }
+
+        if (\App\Services\SettlementService::hasActiveSettlement($employee->id)) {
+            return 'توجد تسوية نشطة لهذا الموظف — تابعها من ملف الموظف.';
+        }
+
+        if (blank($employee->termination_type) || blank($employee->termination_date)) {
+            return 'لم تُبدأ تسوية تلقائيًا: سجّل نوع انتهاء الخدمة وتاريخ آخر يوم عمل ثم احفظ مجددًا، أو ابدأ التسوية يدويًا من ملف الموظف.';
+        }
+
+        if (! auth()->user()?->hasPermission('settlements.create')) {
+            return 'لم تُنشأ مسودة تسوية لعدم توفر صلاحية إنشاء التسويات — اطلب من مخوّل بدءها من ملف الموظف.';
+        }
+
+        app(\App\Services\SettlementService::class)->start($employee, [
+            'reason' => $employee->termination_type,
+            'last_working_day' => $employee->termination_date->toDateString(),
+            'notes' => 'أُنشئت تلقائيًا عند تسجيل انتهاء الخدمة من ملف الموظف.',
+        ]);
+
+        return 'وتم إنشاء مسودة تسوية ترك الخدمة تلقائيًا من بيانات انتهاء الخدمة المسجلة.';
+    }
+
+    /**
      * Keep the termination classification and its effective date together.
      * Lightweight status-only actions in the employee list intentionally do
      * not overwrite existing termination data; the profile form owns it.
@@ -524,10 +574,23 @@ class EmployeeController extends Controller
             // would otherwise make payroll treat an active employee as ended.
             $validated['termination_type'] = null;
             $validated['termination_date'] = null;
+            // Reactivation records the effective return date the reviewer entered
+            // so payroll accrues from the actual return, not the old contract
+            // start; the original contract dates stay untouched.
+            $wasTerminal = $employee && (
+                filled($employee->termination_type) || filled($employee->termination_date)
+                || in_array($employee->status?->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقال', 'استقالة', 'Suspended', 'موقوف'], true)
+            );
+            if ($wasTerminal) {
+                $validated['return_date'] = blank($validated['return_date'] ?? null) ? today()->toDateString() : $validated['return_date'];
+            } else {
+                unset($validated['return_date']);
+            }
             return $validated;
         }
 
         if ($isSuspended) {
+            unset($validated['return_date']);
             if ($employee?->termination_type && blank($validated['termination_type'] ?? null)) {
                 unset($validated['termination_type'], $validated['termination_date']);
                 return $validated;
@@ -537,6 +600,7 @@ class EmployeeController extends Controller
             return $validated;
         }
 
+        unset($validated['return_date']);
         if ($isResigned && blank($validated['termination_type'] ?? null)) {
             $validated['termination_type'] = 'resignation';
         }
