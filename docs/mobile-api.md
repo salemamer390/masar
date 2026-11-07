@@ -16,3 +16,11 @@ Legacy payroll redirect/flash responses are adapted to JSON only within the mobi
 Payroll XLSX, report CSV/XLSX, payslip PDF and document-file routes retain existing permissions and company isolation. Native sharing uses authenticated bytes, never a public storage URL. HTML/JSON masquerading as a successful file is rejected. Files over 25 MB must use the website export. The native share sheet still requires device testing. The payroll report display follows approved/locked records, while its existing web Excel export also includes drafts; this difference is stated in the mobile UI.
 
 The single employee start input is contract_start_date, labelled تاريخ بداية العقد. Create and edit delegate to EmployeeController normalization, which synchronizes legacy hire_date to the same value. No independent mobile hire-date input is introduced.
+
+### Employee profile/history and contacts
+
+- `GET employees/{employee}/profile`: stored personal and employment fields, requiring employees.view.
+- `GET employees/{employee}/history?section=movements|salaries|payroll|leaves|attendance|penalties|requests|documents|contacts|banks&page=N`: 20 stored records per page, same profile audience as the existing web employee page; company scope applies. No recalculation or writes.
+- `POST employees/{employee}/emergency-contacts` and `POST employees/{employee}/bank-accounts`: existing audited EmployeeContactController validation, requiring employees.edit, with normal CSRF and company guards.
+
+The separate offline preview entrypoint has an in-memory client and does not call these endpoints or authenticate to production.

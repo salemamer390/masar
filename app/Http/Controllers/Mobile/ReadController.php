@@ -133,7 +133,7 @@ class ReadController extends Controller
             return response()->json(['request_types' => $data['requestTypes']->map(fn($t)=>['id'=>$t->id,'name'=>$t->display_name,'source'=>$t->source_key])->values()]);
         }
         $models = match($module) {
-            'employees' => ['departments'=>\App\Models\Department::class,'jobs'=>\App\Models\Job::class,'branches'=>\App\Models\Branch::class,'statuses'=>\App\Models\EmployeeStatus::class],
+            'employees' => ['departments'=>\App\Models\Department::class,'jobs'=>\App\Models\Job::class,'branches'=>\App\Models\Branch::class,'statuses'=>\App\Models\EmployeeStatus::class,'employment_types'=>\App\Models\EmploymentType::class,'banks'=>\App\Models\Bank::class,'payment_methods'=>\App\Models\PaymentMethod::class],
             'leaves' => ['leave_types'=>\App\Models\LeaveType::class],
             'penalties' => ['penalty_types'=>\App\Models\PenaltyType::class],
             'documents' => ['document_types'=>\App\Models\DocumentType::class],
