@@ -1051,8 +1051,12 @@ class PayrollRunService
                 }
 
                 // 4) Refresh the saved monthly summary with the final numbers.
+                // The summary belongs to the month containing the period END: for a
+                // transition run that is the charge month, not the anchor date stored
+                // in payroll_month. The company is passed explicitly because the
+                // scheduled close runs without an authenticated web user.
                 try {
-                    app(JobDataController::class)->captureSnapshot($month, auth()->id());
+                    app(JobDataController::class)->captureSnapshot($period['end']->copy()->startOfMonth(), auth()->id(), $companyId);
                 } catch (\Throwable $e) {
                     report($e); // the lock itself already succeeded; the summary can be recaptured
                 }

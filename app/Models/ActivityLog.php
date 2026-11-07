@@ -45,7 +45,10 @@ class ActivityLog extends Model
     {
         self::create([
             'company_id' => $model?->company_id ?? auth()->user()?->company_id,
-            'user_id' => auth()->id() ?? 1,
+            // No fallback to a fixed user id: console runs (scheduled period close,
+            // imports) have no web user, and attributing their actions to user 1 both
+            // misstates the actor and fatals on installs where that id does not exist.
+            'user_id' => auth()->id(),
             'action' => $action,
             'model_type' => $model ? get_class($model) : null,
             'model_id' => $model ? $model->getKey() : null,
