@@ -13,6 +13,10 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-TOKEN}]
 
+    # Uploaded files are served only through the app's guarded routes, never
+    # directly, even if a storage symlink or leftover directory exists here.
+    RewriteRule ^storage/ - [F,L]
+
     # "payroll" is also a public assets directory. Route the exact URL to
     # Laravel instead of letting Apache try to browse that directory.
     RewriteRule ^payroll/?$ index.php [L]
