@@ -374,6 +374,8 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
             ->middleware('permission:payroll.settings')->name('settings.tax');
         Route::put('/settings/operational', [PayrollSettingsController::class, 'updateOperational'])
             ->middleware('permission:payroll.settings')->name('settings.operational.update');
+        Route::put('/settings/attendance-penalties', [PayrollSettingsController::class, 'updateAttendancePenalties'])
+            ->middleware('permission:payroll.settings')->name('settings.attendance-penalties.update');
         Route::put('/settings/leaves', [PayrollSettingsController::class, 'updateLeavePolicy'])
             ->middleware('permission:payroll.settings')->name('settings.leaves.update');
         Route::post('/settings/holidays', [PayrollSettingsController::class, 'storeHoliday'])
