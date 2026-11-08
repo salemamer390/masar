@@ -1383,6 +1383,14 @@ class PayrollRunService
             }
             if ($start->greaterThan($end)) return null;
             $days = PayrollProration::paidDays($start, $end, $basis);
+            // An employee who serves the company's whole payroll period is paid the
+            // full fixed salary even when the period is shorter than the month basis
+            // (e.g. 26 Feb - 25 Mar in a 28-day February). Partial service (hire or
+            // leaving mid-period, today-to-date accrual) and transition runs keep the
+            // day count.
+            if (!$periodOverride && $days < $basis && $start->isSameDay($periodStart) && $end->isSameDay($periodEnd)) {
+                $days = $basis;
+            }
         }
 
         return ['start' => $start, 'end' => $end, 'days' => $days, 'factor' => $periodOverride ? max(0, $days / $basis) : min(1, $days / $basis)];
