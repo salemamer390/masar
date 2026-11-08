@@ -215,7 +215,10 @@ class PayrollController extends Controller
             $policyDetails = (array) data_get($inputs, 'attendance_penalty_details', []);
             $penaltyTotal = (float) $record->penalty_deduction;
             $requestedDays = (float) data_get($snapshot, 'penalty_days_requested', data_get($inputs, 'penalty_days', 0));
-            $policyShare = ($policyDays > 0 && $requestedDays > 0) ? round($penaltyTotal * min(1, $policyDays / $requestedDays), 2) : 0.0;
+            // The calculator prices the policy share from the basic exactly; fall back to the
+            // proportional estimate only for snapshots stored before that split existed.
+            $policyShare = (float) data_get($snapshot, 'attendance_penalty_deduction', 0);
+            if ($policyShare <= 0 && $policyDays > 0 && $requestedDays > 0) $policyShare = round($penaltyTotal * min(1, $policyDays / $requestedDays), 2);
             $penaltyLines = $policyShare > 0
                 ? [['جزاءات التأخير والخروج المبكر ('.count($policyDetails).' مخالفة)', $policyShare], ['خصم الجزاءات', round($penaltyTotal - $policyShare, 2)]]
                 : [['خصم الجزاءات', $penaltyTotal]];
@@ -225,6 +228,7 @@ class PayrollController extends Controller
                 ['صندوق الشهداء', (float) $record->martyrs_fund],
                 ['خصم الغياب', (float) $record->absence_deduction],
                 ...$penaltyLines,
+                ['خصم وقت التأخير والخروج المبكر', (float) ($record->attendance_time_deduction ?? 0)],
                 ['قسط السلفة', $advanceInstallment],
                 ['خصومات أخرى', (float) $record->other_deductions],
             ];
@@ -417,11 +421,12 @@ class PayrollController extends Controller
             ['صندوق الشهداء', (float) $payrollRecord->martyrs_fund],
             ['خصم الغياب', (float) $payrollRecord->absence_deduction],
             ['خصم الجزاءات', (float) $payrollRecord->penalty_deduction],
+            ['خصم وقت التأخير والخروج المبكر', (float) ($payrollRecord->attendance_time_deduction ?? 0)],
             ['قسط السلفة', (float) $payrollRecord->loans],
             ['استقطاعات أخرى', (float) $payrollRecord->other_deductions],
         ], fn ($item) => $positive($item[1])));
 
-        $deductionLabels = [$arabic('&#x62a;&#x623;&#x645;&#x64a;&#x646; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;'), $arabic('&#x627;&#x644;&#x636;&#x631;&#x64a;&#x628;&#x629;'), $arabic('&#x635;&#x646;&#x62f;&#x648;&#x642; &#x627;&#x644;&#x634;&#x647;&#x62f;&#x627;&#x621;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x63a;&#x64a;&#x627;&#x628;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x62c;&#x632;&#x627;&#x621;&#x627;&#x62a;'), $arabic('&#x642;&#x633;&#x637; &#x627;&#x644;&#x633;&#x644;&#x641;&#x629;'), $arabic('&#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;')];
+        $deductionLabels = [$arabic('&#x62a;&#x623;&#x645;&#x64a;&#x646; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;'), $arabic('&#x627;&#x644;&#x636;&#x631;&#x64a;&#x628;&#x629;'), $arabic('&#x635;&#x646;&#x62f;&#x648;&#x642; &#x627;&#x644;&#x634;&#x647;&#x62f;&#x627;&#x621;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x63a;&#x64a;&#x627;&#x628;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x62c;&#x632;&#x627;&#x621;&#x627;&#x62a;'), $arabic('&#x62e;&#x635;&#x645; &#x648;&#x642;&#x62a; &#x627;&#x644;&#x62a;&#x623;&#x62e;&#x64a;&#x631; &#x648;&#x627;&#x644;&#x62e;&#x631;&#x648;&#x62c; &#x627;&#x644;&#x645;&#x628;&#x643;&#x631;'), $arabic('&#x642;&#x633;&#x637; &#x627;&#x644;&#x633;&#x644;&#x641;&#x629;'), $arabic('&#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;')];
         foreach ($deductions as $index => &$item) { $item[0] = $deductionLabels[$index] ?? $item[0]; }
         unset($item);
         $viewData = [
