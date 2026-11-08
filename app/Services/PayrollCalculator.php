@@ -120,6 +120,9 @@ class PayrollCalculator
         $penaltyDays = $penaltyCap > 0 ? min($penaltyDaysRequested, $penaltyCap) : $penaltyDaysRequested;
         $loans = max(0, (float)($monthly['loans'] ?? 0));
         $otherDeductions = max(0, (float)($monthly['other_deductions'] ?? 0));
+        // Lost-time wage for late/early minutes: priced upstream from the gross, kept apart from
+        // the capped disciplinary days above; it joins the deductions here, outside the cap.
+        $timeDeduction = max(0, (float)($monthly['attendance_time_deduction'] ?? 0));
 
         $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
         $variableTaxable = $overtime + $bonus + $incentives + $commission + $otherEarnings + $profitTaxable;
@@ -130,10 +133,24 @@ class PayrollCalculator
         $tax = $this->round2($structureTax + $variableTax);
 
         $absenceDeduction = $absenceDays * $absenceBase / max(1, $this->settings->absenceDailyDivisor());
-        $penaltyDeduction = $penaltyDays * $penaltyBase / max(1, $this->settings->penaltyDailyDivisor());
+        // Disciplinary split: automatic lateness/early-departure policy days are ALWAYS priced
+        // from the basic salary, whatever the company's general penalty basis is; manual
+        // penalties keep the configured basis. The monthly cap trims the combined days
+        // proportionally, so with a Basic basis the amounts are exactly the old single-line math.
+        // Policy share = day-denominated rows + minute-denominated rows in day-equivalents
+        // (basic/240 per hour implies 480 penalty minutes per day), so a minute penalty is
+        // priced exactly like its day-equivalent from the basic: amount x basic / 240 / 60.
+        $policyDayEquivalents = max(0, (float)($monthly['attendance_penalty_days'] ?? 0))
+            + \App\Services\AttendancePenaltyPolicyService::dayEquivalent(max(0, (float)($monthly['attendance_penalty_minutes'] ?? 0)), 'minutes');
+        $policyDaysRequested = min($penaltyDaysRequested, $policyDayEquivalents);
+        $capScale = $penaltyDaysRequested > 0 ? $penaltyDays / $penaltyDaysRequested : 0.0;
+        $penaltyDivisor = max(1, $this->settings->penaltyDailyDivisor());
+        $policyPenaltyDeduction = $policyDaysRequested * $capScale * $basic / $penaltyDivisor;
+        $manualPenaltyDeduction = ($penaltyDays - $policyDaysRequested * $capScale) * $penaltyBase / $penaltyDivisor;
+        $penaltyDeduction = $policyPenaltyDeduction + $manualPenaltyDeduction;
         $entitlements = $structure['basic_salary'] + $structure['allowances'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
         $monthlyTotal = $structure['gross'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
-        $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $loans + $otherDeductions;
+        $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $timeDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
             'hourly_rate'=>$hourly, 'daily_rate'=>$daily, 'ot_day_hours'=>$dayHours, 'ot_night_hours'=>$nightHours, 'ot_day_amount'=>$otDay, 'ot_night_amount'=>$otNight,
@@ -142,6 +159,7 @@ class PayrollCalculator
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'penalty_days_requested'=>$penaltyDaysRequested, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
             'income_tax'=>$tax, 'absence_base'=>$this->round2($absenceBase), 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
+            'attendance_time_deduction'=>$timeDeduction, 'attendance_penalty_deduction'=>$policyPenaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
     }
