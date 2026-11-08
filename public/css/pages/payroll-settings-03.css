@@ -62,6 +62,10 @@
 .ap-band{grid-column:1/-1}
 .ap-cell-inputs input{flex:1;width:auto;min-width:0}
 .ap-del{justify-self:end}
-.ap-custom-grid{grid-template-columns:1fr 1fr}
+.ap-row-custom{grid-template-columns:1fr 32px}
+.ap-custom-grid{grid-template-columns:1fr 1fr;gap:12px}
+.ap-custom-grid .ap-f>input,.ap-custom-grid .ap-f>select{width:100%}
+.ap-f-amount{grid-column:1/-1}
+.ap-f-amount .ap-cell-inputs{flex-wrap:nowrap}
 .ap-status{flex-direction:column;gap:14px}
 }
