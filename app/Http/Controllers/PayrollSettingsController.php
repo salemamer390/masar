@@ -110,9 +110,9 @@ class PayrollSettingsController extends Controller
             \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $data['manual_replaces_types'] ?? [])->pluck('id')->all(),
             (bool) ($data['deduct_time_wage'] ?? false));
         $drafts = $payrollRuns->refreshOpenDraftsForCompany($companyId);
-        ActivityLog::record('attendance_penalty_policy_update', 'تم تحديث لائحة جزاءات التأخير والخروج المبكر.');
+        ActivityLog::record('attendance_penalty_policy_update', 'تم تحديث لائحة الجزاءات.');
 
-        return redirect()->route('payroll.settings.index')->with('toast', "تم حفظ لائحة التأخير والخروج المبكر وإعادة حساب {$drafts} مسير مسودة.");
+        return redirect()->route('payroll.settings.index')->with('toast', "تم حفظ لائحة الجزاءات وإعادة حساب {$drafts} مسير مسودة.");
     }
 
     public function updateLeavePolicy(Request $request)
