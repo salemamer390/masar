@@ -77,9 +77,14 @@ class AttendancePenaltyPolicyTest extends TestCase
         ];
     }
 
-    private function enable(?array $tiers = null, string $from = '2026-10-01', bool $both = true, array $replacing = []): void
+    private function enable(?array $tiers = null, string $from = '2026-10-01', bool $both = true, array $replacing = [], bool $timeWage = false): void
     {
-        app(AttendancePenaltyPolicyService::class)->save($this->company->id, true, $from, $tiers ?? $this->tiers(), $both, $replacing);
+        app(AttendancePenaltyPolicyService::class)->save($this->company->id, true, $from, $tiers ?? $this->tiers(), $both, $replacing, $timeWage);
+    }
+
+    private function enableSuggested(string $from = '2026-10-01', bool $timeWage = false): void
+    {
+        app(AttendancePenaltyPolicyService::class)->save($this->company->id, true, $from, AttendancePenaltyPolicyService::suggestedTiers(), true, [], $timeWage);
     }
 
     private function record(Employee $employee): PayrollRecord
@@ -196,7 +201,9 @@ class AttendancePenaltyPolicyTest extends TestCase
         $policy = $service->forCompany($this->company->id);
         $this->assertFalse($policy['enabled']);
         $this->assertCount(20, $policy['tiers']);
-        $this->assertSame([1, 16, 31, 61, 121], array_values(array_unique(array_column(array_filter($policy['tiers'], fn ($t) => $t['kind'] === 'late'), 'from_minutes'))));
+        $this->assertSame([1, 16, 31, 61], array_values(array_unique(array_column(array_filter($policy['tiers'], fn ($t) => $t['kind'] === 'late'), 'from_minutes'))));
+        $this->assertTrue($policy['deduct_time_wage']);
+        $this->assertSame(['days'], array_values(array_unique(array_column($policy['tiers'], 'unit'))));
         $service->save($this->company->id, false, null, [$this->tiers()[0]]);
         $service->ensureSuggested($this->company->id);
         $this->assertCount(1, $service->forCompany($this->company->id)['tiers']);
@@ -270,5 +277,157 @@ class AttendancePenaltyPolicyTest extends TestCase
         $role = Role::create(['name' => 'plain_staff', 'display_name' => 'Staff', 'company_id' => $this->company->id]);
         $staff = User::create(['name' => 'S', 'email' => 'staff-pen@example.test', 'password' => bcrypt('x'), 'role_id' => $role->id, 'company_id' => $this->company->id, 'is_active' => true]);
         $this->actingAs($staff)->putJson(route('payroll.settings.attendance-penalties.update'), ['is_enabled' => 0])->assertForbidden();
+    }
+
+    public function test_a_zero_deduction_tier_is_a_recorded_warning_that_counts(): void
+    {
+        $employee = $this->employee($this->company, 'W1');
+        $this->day($employee, '2026-10-05', 10);
+        $this->day($employee, '2026-10-06', 10);
+        $this->enableSuggested();
+        $record = $this->record($employee);
+        // First short late: warning only; second: 0.25 day from the basic (0.25 x 320).
+        $this->assertEqualsWithDelta(0.25, (float) $record->penalty_days, 0.001);
+        $this->assertEqualsWithDelta(80.0, (float) $record->penalty_deduction, 0.01);
+        $details = data_get($record->calculation_snapshot, 'inputs.attendance_penalty_details');
+        $this->assertCount(2, $details);
+        $this->assertTrue($details[0]['warning']);
+        $this->assertStringContainsString('إنذار', $details[0]['reason']);
+        $this->assertFalse($details[1]['warning']);
+        $this->assertSame(1, $details[0]['occurrence']);
+        $this->assertSame(2, $details[1]['occurrence']);
+    }
+
+    public function test_each_minute_band_escalates_on_its_own_counter(): void
+    {
+        $employee = $this->employee($this->company, 'W2');
+        $this->day($employee, '2026-10-05', 10);
+        $this->day($employee, '2026-10-06', 45);
+        $this->day($employee, '2026-10-07', 10);
+        $this->day($employee, '2026-10-08', 45);
+        $this->enableSuggested();
+        $record = $this->record($employee);
+        // Band 1-15: warning + 0.25. Band 31-60: 0.25 + 0.5. Total 1 day.
+        $this->assertEqualsWithDelta(1.0, (float) $record->penalty_days, 0.001);
+        $details = data_get($record->calculation_snapshot, 'inputs.attendance_penalty_details');
+        $this->assertSame([1, 1, 2, 2], array_column($details, 'occurrence'));
+    }
+
+    public function test_the_fifth_occurrence_repeats_the_fourth_penalty(): void
+    {
+        $employee = $this->employee($this->company, 'W3');
+        foreach (range(5, 9) as $d) $this->day($employee, sprintf('2026-10-%02d', $d), 10);
+        $this->enableSuggested();
+        $record = $this->record($employee);
+        // 0 + 0.25 + 0.5 + 1 + 1 = 2.75 days from the basic.
+        $this->assertEqualsWithDelta(2.75, (float) $record->penalty_days, 0.001);
+        $this->assertEqualsWithDelta(880.0, (float) $record->penalty_deduction, 0.01);
+        $details = data_get($record->calculation_snapshot, 'inputs.attendance_penalty_details');
+        $this->assertSame(5, $details[4]['occurrence']);
+        $this->assertEqualsWithDelta(1.0, (float) $details[4]['deduction_days'], 0.001);
+    }
+
+    public function test_the_lost_time_wage_is_a_separate_line_priced_from_the_gross(): void
+    {
+        $employee = $this->employee($this->company, 'W4');
+        $this->day($employee, '2026-10-05', 60);
+        $baseline = $this->record($employee);
+
+        $this->enableSuggested('2026-10-01', true);
+        $withPolicy = $this->record($employee);
+
+        // Disciplinary: band 31-60 first occurrence = 0.25 day from the basic (80).
+        $this->assertEqualsWithDelta(80.0, (float) $withPolicy->penalty_deduction, 0.01);
+        // Time wage: 60 minutes x 12000 gross / (240 x 60) = 50, stored on its own column.
+        $this->assertEqualsWithDelta(50.0, (float) $withPolicy->attendance_time_deduction, 0.01);
+        $this->assertEqualsWithDelta((float) $baseline->net_salary - 130.0, (float) $withPolicy->net_salary, 0.01);
+        $this->assertSame(60, (int) data_get($withPolicy->calculation_snapshot, 'inputs.attendance_time_minutes'));
+    }
+
+    public function test_the_lost_time_wage_is_off_unless_the_policy_opts_in(): void
+    {
+        $employee = $this->employee($this->company, 'W5');
+        $this->day($employee, '2026-10-05', 60);
+        $baseline = $this->record($employee);
+        $this->enableSuggested('2026-10-01', false);
+        $withPolicy = $this->record($employee);
+        $this->assertEqualsWithDelta(0.0, (float) $withPolicy->attendance_time_deduction, 0.001);
+        $this->assertEqualsWithDelta((float) $baseline->net_salary - 80.0, (float) $withPolicy->net_salary, 0.01);
+    }
+
+    public function test_automatic_policy_days_are_priced_from_the_basic_even_on_a_gross_penalty_basis(): void
+    {
+        // The seeded basis row is global; claim it for this company with a Gross basis (rolled back after the test).
+        DB::table('payroll_calculation_rules')->where('rule_group', 'penalty')->where('rule_key', 'calculation_basis')
+            ->update(['company_id' => $this->company->id, 'rule_value' => 'Gross', 'updated_at' => now()]);
+        $employee = $this->employee($this->company, 'W7');
+        $this->day($employee, '2026-10-05', 45);
+        $type = PenaltyType::create(['name' => 'gross-basis manual', 'is_active' => true, 'default_deduction_days' => 1, 'company_id' => $this->company->id]);
+        Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => '2026-10-06', 'title' => 'manual', 'deduction_days' => 1]);
+        $this->enable();
+        $record = $this->record($employee);
+        // Policy day: ALWAYS the basic (9600/30 = 320). Manual day: the configured Gross basis (12000/30 = 400).
+        $this->assertEqualsWithDelta(720.0, (float) $record->penalty_deduction, 0.01);
+        $this->assertEqualsWithDelta(320.0, (float) data_get($record->calculation_snapshot, 'attendance_penalty_deduction'), 0.01);
+    }
+
+    public function test_a_tier_can_penalize_in_minutes_priced_from_the_basic(): void
+    {
+        $employee = $this->employee($this->company, 'M1');
+        $this->day($employee, '2026-10-05', 10);
+        $baseline = $this->record($employee);
+        $this->enable([['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 30, 'occurrence_from' => 1, 'occurrence_to' => null, 'deduction_days' => 30, 'unit' => 'minutes']]);
+        $record = $this->record($employee);
+        // 30 penalty minutes from the basic: 30 x 9600 / 14400 = 20. Day-equivalent 30/480 = 0.0625.
+        $this->assertEqualsWithDelta(20.0, (float) $record->penalty_deduction, 0.01);
+        $this->assertEqualsWithDelta(0.06, (float) $record->penalty_days, 0.001); // 0.0625 rounded by the decimal(2) column
+        $this->assertEqualsWithDelta((float) $baseline->net_salary - 20.0, (float) $record->net_salary, 0.01);
+        $details = data_get($record->calculation_snapshot, 'inputs.attendance_penalty_details');
+        $this->assertSame('minutes', $details[0]['unit']);
+        $this->assertStringContainsString('جزاء 30 دقيقة', $details[0]['reason']);
+    }
+
+    public function test_mixed_unit_tiers_price_each_row_in_its_own_unit(): void
+    {
+        $employee = $this->employee($this->company, 'M2');
+        $this->day($employee, '2026-10-05', 10);
+        $this->day($employee, '2026-10-06', 30);
+        $this->enable([
+            ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 1, 'occurrence_to' => null, 'deduction_days' => 0.5, 'unit' => 'days'],
+            ['kind' => 'late', 'from_minutes' => 16, 'to_minutes' => 60, 'occurrence_from' => 1, 'occurrence_to' => null, 'deduction_days' => 60, 'unit' => 'minutes'],
+        ]);
+        $record = $this->record($employee);
+        // 0.5 day (160) + 60 minutes (60 x 9600/14400 = 40) = 200; days column 0.5 + 0.125.
+        $this->assertEqualsWithDelta(200.0, (float) $record->penalty_deduction, 0.01);
+        $this->assertEqualsWithDelta(0.63, (float) $record->penalty_days, 0.001); // 0.625 rounded by the decimal(2) column
+    }
+
+    public function test_minute_penalties_count_toward_the_monthly_cap_in_day_equivalents(): void
+    {
+        $employee = $this->employee($this->company, 'M3');
+        $type = PenaltyType::create(['name' => 'cap-manual', 'is_active' => true, 'default_deduction_days' => 4, 'company_id' => $this->company->id]);
+        Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => '2026-10-04', 'title' => 'm', 'deduction_days' => 4]);
+        $this->day($employee, '2026-10-05', 60);
+        $this->day($employee, '2026-10-06', 60);
+        // Two 300-minute penalties = 600 minutes = 1.25 day-equivalents; with 4 manual days that is 5.25, capped at 5.
+        $this->enable([['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 120, 'occurrence_from' => 1, 'occurrence_to' => null, 'deduction_days' => 300, 'unit' => 'minutes']]);
+        $record = $this->record($employee);
+        $this->assertEqualsWithDelta(5.0, (float) $record->penalty_days, 0.001);
+        $this->assertEqualsWithDelta(1600.0, (float) $record->penalty_deduction, 0.01);
+    }
+
+    public function test_the_lost_time_wage_is_not_limited_by_the_monthly_penalty_cap(): void
+    {
+        $employee = $this->employee($this->company, 'W6');
+        foreach (range(5, 11) as $d) $this->day($employee, sprintf('2026-10-%02d', $d), 45);
+        $baseline = $this->record($employee);
+        $this->enableSuggested('2026-10-01', true);
+        $record = $this->record($employee);
+        // Disciplinary days: 0.25+0.5+1+2+2+2+2 = 9.75, capped at 5 days (1600).
+        $this->assertEqualsWithDelta(5.0, (float) $record->penalty_days, 0.001);
+        $this->assertEqualsWithDelta(1600.0, (float) $record->penalty_deduction, 0.01);
+        // Time wage: 7 x 45 = 315 minutes x 12000/14400 = 262.5, in full.
+        $this->assertEqualsWithDelta(262.5, (float) $record->attendance_time_deduction, 0.01);
+        $this->assertEqualsWithDelta((float) $baseline->net_salary - 1862.5, (float) $record->net_salary, 0.01);
     }
 }

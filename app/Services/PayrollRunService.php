@@ -372,6 +372,7 @@ class PayrollRunService
             'income_tax' => $calculation['income_tax'], 'martyrs_fund' => $calculation['martyrs_fund'],
             'employer_insurance' => $calculation['employer_insurance'], 'employee_cost' => $calculation['employee_cost'],
             'fixed_deductions' => 0, 'absence_deduction' => $calculation['absence_deduction'],
+            'attendance_time_deduction' => (float) ($calculation['attendance_time_deduction'] ?? 0),
             'attendance_deduction' => $calculation['absence_deduction'], 'penalties' => $calculation['penalty_deduction'],
             'penalty_deduction' => $calculation['penalty_deduction'], 'net_salary' => $calculation['net_monthly'],
             'status' => 'Draft', 'is_locked' => false,
@@ -592,15 +593,26 @@ class PayrollRunService
                 ->map(fn (Penalty $penalty) => $penalty->penalty_date->toDateString())->values()->all(),
             $priorDays
         );
-        $penaltyDays = $manualPenaltyDays + $attendancePenalty['days'];
+        $penaltyDays = $manualPenaltyDays + $attendancePenalty['days']
+            + \App\Services\AttendancePenaltyPolicyService::dayEquivalent((float) ($attendancePenalty['penalty_minutes'] ?? 0), 'minutes');
+        // Lost-time wage: every effective late/early minute, priced from the gross (gross/240 per
+        // hour). Separate from the disciplinary days (priced from the penalty basis), and not
+        // limited by the monthly penalty cap. Only when the company policy opts in.
+        $timeMinutes = (int) ($attendancePenalty['time_minutes'] ?? 0);
+        $timeDeduction = !empty($penaltyPolicy['deduct_time_wage']) && $timeMinutes > 0
+            ? round($timeMinutes * (float) $structure['gross'] / 14400, 2)
+            : 0.0;
         $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross'], $forRun);
 
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'official_holiday_days' => $overtime['holiday_days'], 'weekly_rest_days' => $overtime['rest_days'],
             'absence_days' => $absenceDays, 'penalty_days' => (float) $penaltyDays,
+            'attendance_time_minutes' => $timeMinutes, 'attendance_time_deduction' => $timeDeduction,
             'manual_penalty_days' => (float) $manualPenaltyDays,
-            'attendance_penalty_days' => (float) $attendancePenalty['days'], 'attendance_penalty_details' => $attendancePenalty['details'],
+            'attendance_penalty_days' => (float) $attendancePenalty['days'],
+            'attendance_penalty_minutes' => (float) ($attendancePenalty['penalty_minutes'] ?? 0),
+            'attendance_penalty_details' => $attendancePenalty['details'],
             'bonus' => $financialAmounts['bonus'], 'incentives' => $financialAmounts['incentive'], 'commission' => $financialAmounts['commission'], 'profit_share' => $financialAmounts['profit_share'],
             'advance_earnings' => $advancePlan['grant_amount'], 'loans' => $advancePlan['amount'], 'advance_details' => $advancePlan['details'],
             'other_earnings' => $otherEarnings, 'other_deductions' => $otherDeductions,
@@ -1240,6 +1252,7 @@ class PayrollRunService
         $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) * $insuranceMonths : 0.0;
         $deductions = $employeeInsurance + $incomeTax + $martyrsFund
             + (float) $calculation['absence_deduction'] + (float) $calculation['penalty_deduction']
+            + (float) ($calculation['attendance_time_deduction'] ?? 0)
             + (float) $calculation['loans'] + (float) $calculation['other_deductions'];
 
         return array_merge($calculation, [

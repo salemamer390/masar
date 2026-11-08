@@ -12,7 +12,7 @@ class PayrollRecord extends Model
     protected $fillable = [
         'payroll_run_id','employee_id','salary_id','payroll_month','basic_salary','allowances','housing_allowance','transportation_allowance','meal_allowance','clothing_allowance','overtime_amount','deductions','absence_deduction',
         'gross_salary','monthly_total','insurance_wage','employee_insurance','income_tax','martyrs_fund','employer_insurance',
-        'employee_cost','fixed_deductions','attendance_deduction','penalties','penalty_deduction','day_overtime_hours','night_overtime_hours','day_overtime_amount','night_overtime_amount','total_overtime','net_salary','status','paid_at','notes','calculation_snapshot','approved_at','approved_by','is_locked',
+        'employee_cost','fixed_deductions','attendance_deduction','attendance_time_deduction','penalties','penalty_deduction','day_overtime_hours','night_overtime_hours','day_overtime_amount','night_overtime_amount','total_overtime','net_salary','status','paid_at','notes','calculation_snapshot','approved_at','approved_by','is_locked',
         'absence_days','penalty_days','ot_day_hours','ot_night_hours','ot_day_amount','ot_night_amount','bonus','incentives','commission','profit_share','loans','other_earnings','other_deductions',
         'agreed_net_salary','official_holiday_days','official_holiday_amount','weekly_rest_days','weekly_rest_amount',
     ];
@@ -21,7 +21,7 @@ class PayrollRecord extends Model
         'payroll_month' => 'date','basic_salary' => 'decimal:2','allowances' => 'decimal:2','housing_allowance' => 'decimal:2','transportation_allowance' => 'decimal:2','meal_allowance' => 'decimal:2','clothing_allowance' => 'decimal:2','overtime_amount' => 'decimal:2',
         'deductions' => 'decimal:2','absence_deduction' => 'decimal:2','agreed_net_salary' => 'decimal:2','gross_salary' => 'decimal:2','monthly_total' => 'decimal:2','insurance_wage' => 'decimal:2',
         'employee_insurance' => 'decimal:2','income_tax' => 'decimal:2','martyrs_fund' => 'decimal:2','employer_insurance' => 'decimal:2',
-        'employee_cost' => 'decimal:2','fixed_deductions' => 'decimal:2','attendance_deduction' => 'decimal:2','penalties' => 'decimal:2','penalty_deduction' => 'decimal:2','day_overtime_hours' => 'decimal:2','night_overtime_hours' => 'decimal:2','day_overtime_amount' => 'decimal:2','night_overtime_amount' => 'decimal:2','total_overtime' => 'decimal:2',
+        'employee_cost' => 'decimal:2','fixed_deductions' => 'decimal:2','attendance_deduction' => 'decimal:2','attendance_time_deduction' => 'decimal:2','penalties' => 'decimal:2','penalty_deduction' => 'decimal:2','day_overtime_hours' => 'decimal:2','night_overtime_hours' => 'decimal:2','day_overtime_amount' => 'decimal:2','night_overtime_amount' => 'decimal:2','total_overtime' => 'decimal:2',
         'net_salary' => 'decimal:2','paid_at' => 'datetime','calculation_snapshot' => 'array','approved_at' => 'datetime','is_locked' => 'boolean',
         'absence_days'=>'decimal:2','penalty_days'=>'decimal:2','ot_day_hours'=>'decimal:2','ot_night_hours'=>'decimal:2','ot_day_amount'=>'decimal:2','ot_night_amount'=>'decimal:2','bonus'=>'decimal:2','incentives'=>'decimal:2','commission'=>'decimal:2','profit_share'=>'decimal:2','loans'=>'decimal:2','other_earnings'=>'decimal:2','other_deductions'=>'decimal:2',
         'official_holiday_days'=>'decimal:2','official_holiday_amount'=>'decimal:2','weekly_rest_days'=>'decimal:2','weekly_rest_amount'=>'decimal:2',
