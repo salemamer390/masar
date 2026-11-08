@@ -209,12 +209,22 @@ class PayrollController extends Controller
             $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
             if ($advance > 0) $items[] = ['السلفة المصروفة', $advance];
             $advanceInstallment = (float) data_get($inputs, 'loans', data_get($snapshot, 'loans', $record->loans ?? 0));
+            // Split the penalty deduction between automatic lateness/early-departure tiers and manual
+            // penalties in proportion to their requested days (a monthly cap reduces both equally).
+            $policyDays = (float) data_get($inputs, 'attendance_penalty_days', 0);
+            $policyDetails = (array) data_get($inputs, 'attendance_penalty_details', []);
+            $penaltyTotal = (float) $record->penalty_deduction;
+            $requestedDays = (float) data_get($snapshot, 'penalty_days_requested', data_get($inputs, 'penalty_days', 0));
+            $policyShare = ($policyDays > 0 && $requestedDays > 0) ? round($penaltyTotal * min(1, $policyDays / $requestedDays), 2) : 0.0;
+            $penaltyLines = $policyShare > 0
+                ? [['جزاءات التأخير والخروج المبكر ('.count($policyDetails).' مخالفة)', $policyShare], ['خصم الجزاءات', round($penaltyTotal - $policyShare, 2)]]
+                : [['خصم الجزاءات', $penaltyTotal]];
             $deductions = [
                 ['تأمين الموظف', (float) $record->employee_insurance],
                 ['الضريبة', (float) $record->income_tax],
                 ['صندوق الشهداء', (float) $record->martyrs_fund],
                 ['خصم الغياب', (float) $record->absence_deduction],
-                ['خصم الجزاءات', (float) $record->penalty_deduction],
+                ...$penaltyLines,
                 ['قسط السلفة', $advanceInstallment],
                 ['خصومات أخرى', (float) $record->other_deductions],
             ];
@@ -295,6 +305,7 @@ class PayrollController extends Controller
                 'salaryUrl' => $record->salary_id ? route('salaries.index', ['employee_id' => $employee?->id]) : null,
                 'items' => array_merge([['المستحق حتى اليوم', $toDateEntitlement]], array_slice($items, 1)),
                 'deductions' => $deductions,
+                'penaltyReasons' => array_values(array_map(fn ($d) => (string) ($d['reason'] ?? ''), $policyDetails)),
                 'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
                 'absenceDays' => (float) ($record->absence_days ?? 0),
                 'overtimeHours' => (float) ($record->ot_day_hours ?? 0) + (float) ($record->ot_night_hours ?? 0),
