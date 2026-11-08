@@ -22,3 +22,13 @@
 .settings-save-text b{color:#ffd166;margin:0 2px}
 .settings-save-actions{display:flex;gap:8px}
 @media(max-width:900px){.settings-cards{grid-template-columns:1fr}.settings-card-grid,.settings-card-grid.two,.category-head-grid{grid-template-columns:1fr}.settings-save-bar{flex-direction:column;align-items:stretch;text-align:center}.settings-save-actions{justify-content:center}}
+#apTierTable{min-width:820px}#apTierTable select.form-select{min-width:130px}#apTierTable input.form-control{min-width:84px}
+#attendancePenalties .table-responsive{overflow-x:auto}
+@media (max-width:768px){
+#apTierTable{min-width:0}#apTierTable thead{display:none}
+#apTierTable,#apTierTable tbody,#apTierTable tr,#apTierTable td{display:block;width:100%}
+#apTierTable tr{border:1px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:10px;margin-bottom:10px}
+#apTierTable td{border:0;padding:4px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}
+#apTierTable td::before{content:attr(data-label);font-size:.8rem;font-weight:600;flex:0 0 42%}
+#apTierTable td>*{flex:1 1 58%;min-width:0}
+}
