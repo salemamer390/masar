@@ -570,13 +570,37 @@ class PayrollRunService
 
         $penalties = Penalty::withoutGlobalScopes()->with('penaltyType')->where('employee_id', $employee->id)->whereBetween('penalty_date', [$from, $to])
             ->effective()->get();
-        $penaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
+        $manualPenaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
+        // Company lateness / early-departure policy. Its days join the manual penalty days, so the
+        // monthly penalty cap and basis apply once, and dates with a manual penalty are not charged twice.
+        $penaltyPolicyService = app(AttendancePenaltyPolicyService::class);
+        $penaltyPolicy = $penaltyPolicyService->forCompany($employee->company_id ? (int) $employee->company_id : null);
+        $priorDays = [];
+        if ($range = $penaltyPolicyService->priorRange($employee, $windowFrom)) {
+            $priorAttendance = Attendance::withoutGlobalScopes()->effective()->where('employee_id', $employee->id)
+                ->whereBetween('attendance_date', [$range[0]->toDateString(), $range[1]->toDateString()])->get();
+            $priorLeaves = Leave::withoutGlobalScopes()->with('leaveType')->where('employee_id', $employee->id)->effective()
+                ->whereDate('start_date', '<=', $range[1]->toDateString())->whereDate('end_date', '>=', $range[0]->toDateString())->get();
+            $priorExcuses = $this->requestsInMonth($employee, ['permission', 'mission'], $range[0]->toDateString(), $range[1]->toDateString(), false);
+            $priorDays = app(EmployeePeriodMetrics::class)->days($employee, $range[0], $range[1], $priorAttendance, $priorLeaves, $priorExcuses);
+        }
+        $replacing = array_flip($penaltyPolicy['manual_replaces_types']);
+        $attendancePenalty = $penaltyPolicyService->evaluate(
+            $employee,
+            app(EmployeePeriodMetrics::class)->days($employee, $windowFrom, $windowTo, $attendance, $approvedLeaves, $excuses),
+            $penalties->filter(fn (Penalty $penalty) => isset($replacing[(int) $penalty->penalty_type_id]))
+                ->map(fn (Penalty $penalty) => $penalty->penalty_date->toDateString())->values()->all(),
+            $priorDays
+        );
+        $penaltyDays = $manualPenaltyDays + $attendancePenalty['days'];
         $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross'], $forRun);
 
         return [
             'ot_day_hours' => round($overtime['day_minutes'] / 60, 2), 'ot_night_hours' => round($overtime['night_minutes'] / 60, 2),
             'official_holiday_days' => $overtime['holiday_days'], 'weekly_rest_days' => $overtime['rest_days'],
             'absence_days' => $absenceDays, 'penalty_days' => (float) $penaltyDays,
+            'manual_penalty_days' => (float) $manualPenaltyDays,
+            'attendance_penalty_days' => (float) $attendancePenalty['days'], 'attendance_penalty_details' => $attendancePenalty['details'],
             'bonus' => $financialAmounts['bonus'], 'incentives' => $financialAmounts['incentive'], 'commission' => $financialAmounts['commission'], 'profit_share' => $financialAmounts['profit_share'],
             'advance_earnings' => $advancePlan['grant_amount'], 'loans' => $advancePlan['amount'], 'advance_details' => $advancePlan['details'],
             'other_earnings' => $otherEarnings, 'other_deductions' => $otherDeductions,
