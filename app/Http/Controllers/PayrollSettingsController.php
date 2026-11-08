@@ -66,7 +66,9 @@ class PayrollSettingsController extends Controller
         $attendancePenaltyPolicy = $penaltyService->forCompany($companyId ? (int) $companyId : null);
         $penaltyTypes = $companyId ? \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->orderBy('name')->get(['id', 'name']) : collect();
 
-        return view('payroll.settings', compact('attendancePenaltyPolicy', 'penaltyTypes', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories'));
+        $suggestedPenaltyTiers = \App\Services\AttendancePenaltyPolicyService::suggestedTiers();
+
+        return view('payroll.settings', compact('attendancePenaltyPolicy', 'penaltyTypes', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers'));
     }
 
     /** Lateness / early-departure penalty tiers of this company. Saving rebuilds open payroll drafts so the policy reaches the salary. */
@@ -77,6 +79,7 @@ class PayrollSettingsController extends Controller
             'is_enabled' => ['nullable', 'boolean'],
             'effective_from' => ['nullable', 'date'],
             'charge_both_same_day' => ['nullable', 'boolean'],
+            'deduct_time_wage' => ['nullable', 'boolean'],
             'manual_replaces_types' => ['nullable', 'array'],
             'manual_replaces_types.*' => ['integer'],
             'tiers' => ['nullable', 'array', 'max:60'],
@@ -85,13 +88,14 @@ class PayrollSettingsController extends Controller
             'tiers.*.to_minutes' => ['nullable', 'integer', 'min:1', 'max:1440', 'gte:tiers.*.from_minutes'],
             'tiers.*.occurrence_from' => ['nullable', 'integer', 'min:1', 'max:400'],
             'tiers.*.occurrence_to' => ['nullable', 'integer', 'min:1', 'max:400', 'gte:tiers.*.occurrence_from'],
-            'tiers.*.deduction_days' => ['required', 'numeric', 'gt:0', 'max:30'],
+            'tiers.*.deduction_days' => ['required', 'numeric', 'gte:0', 'max:1440'],
+            'tiers.*.unit' => ['nullable', 'in:days,minutes'],
         ], [
             'tiers.*.to_minutes.gte' => '«إلى دقيقة» لازم تكون أكبر من أو تساوي «من دقيقة».',
             'tiers.*.occurrence_to.gte' => '«إلى المرة» لازم تكون أكبر من أو تساوي «من المرة».',
             'tiers.*.from_minutes.required' => 'حدد «من دقيقة» لكل شريحة.',
-            'tiers.*.deduction_days.required' => 'حدد أيام الخصم لكل شريحة.',
-            'tiers.*.deduction_days.gt' => 'أيام الخصم لازم تكون أكبر من صفر.',
+            'tiers.*.deduction_days.required' => 'حدد قيمة الجزاء لكل شريحة.',
+            'tiers.*.deduction_days.gte' => 'قيمة الجزاء لا تقل عن صفر (صفر يعني إنذار بدون خصم).',
         ]);
         $tiers = collect($data['tiers'] ?? [])->map(fn ($tier) => [
             'kind' => $tier['kind'], 'from_minutes' => (int) $tier['from_minutes'],
@@ -99,10 +103,12 @@ class PayrollSettingsController extends Controller
             'occurrence_from' => (int) ($tier['occurrence_from'] ?? 1) ?: 1,
             'occurrence_to' => isset($tier['occurrence_to']) && $tier['occurrence_to'] !== '' ? (int) $tier['occurrence_to'] : null,
             'deduction_days' => round((float) $tier['deduction_days'], 2),
+            'unit' => ($tier['unit'] ?? 'days') === 'minutes' ? 'minutes' : 'days',
         ])->all();
 
         $policy->save($companyId, (bool) ($data['is_enabled'] ?? false), $data['effective_from'] ?? null, $tiers, (bool) ($data['charge_both_same_day'] ?? false),
-            \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $data['manual_replaces_types'] ?? [])->pluck('id')->all());
+            \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $data['manual_replaces_types'] ?? [])->pluck('id')->all(),
+            (bool) ($data['deduct_time_wage'] ?? false));
         $drafts = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         ActivityLog::record('attendance_penalty_policy_update', 'تم تحديث لائحة جزاءات التأخير والخروج المبكر.');
 
