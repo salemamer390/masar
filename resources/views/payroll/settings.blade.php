@@ -126,7 +126,8 @@
       if (!isset($leavePolicies[$key])) return '';
       $ref = \App\Support\LeaveLegalReference::class;
       $status = $key === 'annual_first_year' ? 'review' : $ref::policyStatus($key, $leavePolicies[$key]->setting_value);
-      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small>'.e($ref::policyHint($key)).'</small><span class="badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span></div>';
+      $implBadge = $readonly ? '<span class="badge text-bg-secondary">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
+      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small>'.e($ref::policyHint($key)).'</small><span class="badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span>'.$implBadge.'</div>';
   };
 ?>
 <div class="settings-card lv-wide"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</span></div><div class="settings-card-grid lv-grid4">
