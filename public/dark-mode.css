@@ -294,6 +294,13 @@ body.preview-dark .modal-content {
 }
 body.preview-dark .modal-header, body.preview-dark .modal-footer { border-color: var(--dm-border); }
 body.preview-dark .modal-title { color: var(--dm-text); }
+
+/* Dashboard/document modals set their own title ink with id-level specificity;
+   keep the title readable on the dark header. */
+body.preview-dark .modal#dashboardDetailModal .modal-title,
+body.preview-dark .modal#documentUploadModal .modal-title { color: var(--dm-text); }
+body.preview-dark .dashboard-modal-tools h6 { color: var(--dm-text); }
+
 body.preview-dark .offcanvas { background: var(--dm-surface); color: var(--dm-text); }
 body.preview-dark .modal-backdrop.show { opacity: .65; }
 
