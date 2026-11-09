@@ -56,7 +56,7 @@ class DashboardDataService
     public function attendance(User $user, ?Carbon $date = null): array
     {
         $date ??= today();
-        $holiday = DB::table('hr_holidays')->whereDate('holiday_date', $date)->exists();
+        $holiday = $this->settings->isHoliday($date);
         $employees = $this->attendanceEmployeesFor($user, $date)->get(['id', 'full_name', 'employee_code', 'shift_start', 'shift_end']);
         $records = Attendance::whereDate('attendance_date', $date)->whereIn('employee_id', $employees->pluck('id'))
             ->get()->keyBy('employee_id');
