@@ -30,6 +30,12 @@ class LeaveType extends Model
         'requires_document' => 'boolean',
     ];
 
+    /** Company-owned art. 132 templates retain a unique storage code; policy consumers see the statutory kind. */
+    public function getPolicyCodeAttribute($value): ?string
+    {
+        return is_string($value) && preg_match('/^contagious_contact_company_[0-9]+$/', $value) ? 'contagious_contact' : $value;
+    }
+
     public function leaves(): HasMany
     {
         return $this->hasMany(Leave::class);
