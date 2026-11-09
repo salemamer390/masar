@@ -1072,3 +1072,8 @@ body.preview-dark .salary-detail-grid span,
 body.preview-dark .salary-cost-box span { color: var(--dm-muted); }
 body.preview-dark .salary-detail-grid strong,
 body.preview-dark .salary-cost-box b { color: var(--dm-text); }
+/* Leave settings (single-source layout) */
+body.preview-dark .lv-sub { color: #7db0ff; border-color: var(--dm-border); }
+body.preview-dark .lv-note, body.preview-dark .lv-auto, body.preview-dark .lv-ref summary small { color: var(--dm-muted); }
+body.preview-dark .lv-ref summary { color: var(--dm-text); }
+body.preview-dark .lv-ref .form-control:disabled { background: var(--dm-surface-2, var(--dm-surface)); color: var(--dm-muted); opacity: .85; }
