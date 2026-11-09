@@ -202,7 +202,7 @@
 </div>
 <div class="settings-card wide">
 <div class="settings-card-head"><h3>شرائح الجزاء</h3><span>الجزاء حسب دقائق المخالفة وتكرارها طوال مدة عمل الموظف بالشركة. عدّاد مستقل لكل شريحة، وبعد آخر مرة معرّفة يتكرر نفس الجزاء.</span></div>
-<div class="alert alert-warning mt-1 mb-2">الدقائق خارج الشرائح المعرّفة لا يُخصم عنها جزاء تلقائي (ويظل أجر الوقت الضائع محسوبًا لو فعّلته أدناه). أضف شريحة لتغطيتها.</div>
+<div class="alert alert-warning mt-1 mb-2">الدقائق خارج الشرائح المعرّفة لا يُخصم عنها جزاء تلقائي (ويظل أجر الوقت الضائع محسوبًا دائمًا). أضف شريحة لتغطيتها.</div>
 @foreach(['late', 'early_leave'] as $apKind)
 @php($apKindCount = array_sum(array_map('count', $apGroups[$apKind])))
 <div class="ap-section" data-ap-section="{{ $apKind }}">
@@ -257,17 +257,12 @@
 <li>القيمة 0 تعني إنذارًا مسجلًا بدون خصم.</li>
 <li>اليوم يُحسب من الأساسي، والدقيقة من الأساسي بنفس أساس الساعة: 480 دقيقة جزاء = يوم جزاء.</li>
 <li>أيام الجزاء خاضعة لسقف أيام الجزاءات الشهري.</li>
+<li>في اليوم الواحد يُخصم جزاء التأخير وجزاء الخروج المبكر معًا.</li>
+<li>يُخصم أجر الوقت الضائع دائمًا من الإجمالي في سطر مستقل، ولا يدخل في سقف الجزاءات.</li>
+<li>الجزاء اليدوي في صفحة الجزاءات مستقل ولا يُلغي الجزاء التلقائي.</li>
 </ul>
-<div class="d-flex gap-2 flex-wrap mt-2"><button type="button" class="btn btn-outline-primary" id="apAddTier"><i class="bi bi-plus-lg"></i> إضافة شريحة</button><button type="button" class="btn btn-outline-secondary" id="apRestoreSuggested"><i class="bi bi-arrow-counterclockwise"></i> استعادة الاقتراح المبدئي</button></div>
+<div class="d-flex gap-2 flex-wrap mt-2"><button type="button" class="btn btn-outline-primary" data-ap-add="late"><i class="bi bi-plus-lg"></i> إضافة شريحة تأخير</button><button type="button" class="btn btn-outline-primary" data-ap-add="early_leave"><i class="bi bi-plus-lg"></i> إضافة شريحة انصراف مبكر</button><button type="button" class="btn btn-outline-secondary" id="apRestoreSuggested"><i class="bi bi-arrow-counterclockwise"></i> استعادة الاقتراح المبدئي</button></div>
 <small class="settings-hint d-block mt-1">«استعادة الاقتراح المبدئي» تملأ الجدول بالقيم المقترحة فقط، ولا تُحفظ التغييرات إلا بضغط «حفظ اللائحة».</small>
-</div>
-<div class="settings-card wide">
-<div class="settings-card-head"><h3>خيارات إضافية</h3></div>
-<div class="settings-card-grid three">
-<div class="settings-field"><label class="form-label">يوم فيه تأخير وخروج مبكر معًا</label><label class="form-check"><input type="checkbox" class="form-check-input" name="charge_both_same_day" value="1" @checked(old('charge_both_same_day', $attendancePenaltyPolicy['charge_both_same_day']))> خصم الاثنين معًا</label><small class="settings-hint">إن أُلغي التحديد يُخصم الجزاء الأكبر فقط في ذلك اليوم، ويُعد كل منهما مرة في تكراره.</small></div>
-<div class="settings-field"><label class="form-label">خصم أجر الوقت الضائع</label><label class="form-check"><input type="checkbox" class="form-check-input" name="deduct_time_wage" value="1" @checked(old('deduct_time_wage', $attendancePenaltyPolicy['deduct_time_wage'] ?? false))> خصم أجر دقائق التأخير والخروج المبكر</label><small class="settings-hint">أجر الساعة = الإجمالي ÷ 240 بالدقائق الفعلية. يظهر سطرًا مستقلًا في المرتب، منفصلًا عن أيام الجزاء ولا يدخل في سقفها الشهري.</small></div>
-<div class="settings-field"><label class="form-label">جزاء يدوي في نفس التاريخ</label><select name="manual_replaces_types[]" class="form-select" multiple size="3">@foreach($penaltyTypes as $pt)<option value="{{ $pt->id }}" @selected(in_array($pt->id, old('manual_replaces_types', $attendancePenaltyPolicy['manual_replaces_types'])))>{{ $pt->name }}</option>@endforeach</select><small class="settings-hint">الأنواع المحددة تحل محل الجزاء التلقائي في نفس التاريخ (لا يُخصم الاثنان).</small></div>
-</div>
 </div>
 </div>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ اللائحة</button></span></div>
@@ -284,7 +279,7 @@ const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row><div clas
 const customRow=(i,t)=>{const kind=t&&t.kind==='early_leave'?'early_leave':'late';t=t||{};return `<div class="ap-row ap-row-custom" data-ap-row><div class="ap-custom-grid"><div class="ap-f"><label>النوع</label><select name="tiers[${i}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late"${kind==='late'?' selected':''}>تأخير</option><option value="early_leave"${kind==='early_leave'?' selected':''}>خروج مبكر</option></select></div><div class="ap-f"><label>من دقيقة</label><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control form-control-sm" value="${esc(t.from_minutes)}" required></div><div class="ap-f"><label>إلى دقيقة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control form-control-sm" value="${esc(t.to_minutes)}"></div><div class="ap-f"><label>من المرة</label><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control form-control-sm" value="${esc(t.occurrence_from??1)}"></div><div class="ap-f"><label>إلى المرة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control form-control-sm" value="${esc(t.occurrence_to)}"></div><div class="ap-f ap-f-amount"><label>الجزاء (0 = إنذار)</label><div class="ap-cell-inputs${Number(t.deduction_days)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control form-control-sm" value="${esc(t.deduction_days)}" required>${unitSel(i,t.unit)}${warnTag}</div></div></div><button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button></div>`;};
 const refreshCounts=()=>{form.querySelectorAll('[data-ap-section]').forEach(sec=>{const c=sec.querySelectorAll('[data-ap-row]').length;const el=sec.querySelector('[data-ap-count]');if(el)el.textContent=c+' '+(c===1?'شريحة':'شرائح');const empty=sec.querySelector('[data-ap-empty]');if(empty)empty.hidden=c>0;});};
 const markDirty=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
-document.getElementById('apAddTier').addEventListener('click',()=>{form.querySelector('[data-ap-section="late"] [data-ap-rows]').insertAdjacentHTML('beforeend',customRow(n++,{kind:'late'}));refreshCounts();markDirty();});
+form.querySelectorAll('[data-ap-add]').forEach(btn=>btn.addEventListener('click',()=>{const kind=btn.dataset.apAdd==='early_leave'?'early_leave':'late';form.querySelector(`[data-ap-section="${kind}"] [data-ap-rows]`).insertAdjacentHTML('beforeend',customRow(n++,{kind}));refreshCounts();markDirty();}));
 document.getElementById('apRestoreSuggested').addEventListener('click',()=>{
 const suggested=@json($suggestedPenaltyTiers ?? []);
 const seen={late:{},early_leave:{}},order={late:[],early_leave:[]};
