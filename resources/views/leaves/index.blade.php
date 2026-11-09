@@ -30,8 +30,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const errors = event.detail?.payload?.errors;
     if (!(form instanceof HTMLFormElement) || !errors?.early_grant_available || !canApprove) return;
     if (form.querySelector('input[name="is_early_grant"]')) return;
+    event.preventDefault();
     const message = (errors.start_date || [])[0] || 'الموظف لم يستوفِ مدة الاستحقاق.';
-    if (!await askEarlyGrant(message + ' هل تريد منح الإجازة استثنائيًا؟')) return;
+    const parentEl = form.closest('.modal');
+    const parent = parentEl ? bootstrap.Modal.getInstance(parentEl) : null;
+    if (parentEl && parentEl.classList.contains('show')) {
+      await new Promise((done) => { parentEl.addEventListener('hidden.bs.modal', done, { once: true }); parent.hide(); });
+    }
+    const confirmed = await askEarlyGrant(message + ' هل تريد منح الإجازة استثنائيًا؟');
+    if (parent) { await new Promise((done) => { parentEl.addEventListener('shown.bs.modal', done, { once: true }); parent.show(); }); }
+    if (!confirmed) return;
     const add = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; input.dataset.earlyGrant = '1'; form.appendChild(input); };
     add('is_early_grant', '1'); add('early_wait_only', '1'); add('early_grant_reason', message);
     const clear = () => form.querySelectorAll('input[data-early-grant]').forEach((input) => input.remove());
