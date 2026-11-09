@@ -994,3 +994,74 @@ body.preview-dark .btn.btn-success,
 body.preview-dark .btn.btn-success:hover { color: #062f24; }
 body.preview-dark .attendance-row-btn.attendance-row-edit { background: var(--dm-primary-soft); border-color: var(--dm-border); color: #a8caff; }
 body.preview-dark .attendance-row-btn.attendance-row-delete { background: var(--dm-red-soft); border-color: var(--dm-border); color: #fca5a5; }
+
+/* Shared horizontal rows: darken the row itself as well as its cells.
+   A translucent cell hover over a light tr was washing out pale text. */
+body.preview-dark .table > tbody > tr:hover,
+body.preview-dark .company-account-panel tbody tr:hover {
+  background: var(--dm-surface-2) !important;
+  color: var(--dm-text);
+}
+body.preview-dark .table > tbody > tr:hover > td,
+body.preview-dark .table > tbody > tr:hover > th {
+  background: var(--dm-surface-2) !important;
+  --bs-table-accent-bg: transparent;
+  --bs-table-bg-state: transparent;
+}
+body.preview-dark .ap-row {
+  background: var(--dm-surface);
+  border-color: var(--dm-border);
+  color: var(--dm-text);
+}
+body.preview-dark .ap-row:hover {
+  background: var(--dm-surface-2);
+}
+body.preview-dark .salary-compact-grid > div,
+body.preview-dark .salary-card-cost {
+  background: var(--dm-surface-2);
+  border-color: var(--dm-border);
+  color: var(--dm-text);
+}
+body.preview-dark .salary-compact-grid span,
+body.preview-dark .salary-card-cost span {
+  color: var(--dm-muted);
+}
+body.preview-dark .salary-compact-grid b,
+body.preview-dark .salary-card-cost strong {
+  color: var(--dm-text);
+}
+body.preview-dark .ap-band { color: var(--dm-text-2); }
+body.preview-dark .ap-cell > label,
+body.preview-dark .ap-f label { color: var(--dm-muted); }
+body.preview-dark .notification-item:hover { background: var(--dm-surface-3); color: var(--dm-text); }
+
+/* The shared HR request form keeps the same contrast at both entry points. */
+body.preview-dark #requestCreateModal .request-conditional-card {
+  background: var(--dm-surface-2);
+  border-color: var(--dm-border);
+  box-shadow: none;
+}
+body.preview-dark #requestCreateModal .request-conditional-card .form-label {
+  color: var(--dm-text-2);
+}
+body.preview-dark #requestCreateModal .advance-limit-box {
+  background: var(--dm-red-soft);
+  border-color: rgba(239,68,68,.3);
+  color: #fca5a5;
+}
+body.preview-dark .salary-details-modal .modal-body,
+body.preview-dark .salary-detail-section {
+  background: var(--dm-surface);
+  border-color: var(--dm-border);
+}
+body.preview-dark .salary-detail-title,
+body.preview-dark .salary-detail-grid > div,
+body.preview-dark .salary-cost-box > div {
+  background: var(--dm-surface-2);
+  border-color: var(--dm-border);
+  color: var(--dm-text);
+}
+body.preview-dark .salary-detail-grid span,
+body.preview-dark .salary-cost-box span { color: var(--dm-muted); }
+body.preview-dark .salary-detail-grid strong,
+body.preview-dark .salary-cost-box b { color: var(--dm-text); }
