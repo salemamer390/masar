@@ -39,7 +39,8 @@ class DashboardDataService
         return $this->employeesFor($user)
             ->whereHas('status', fn (Builder $q) => $q->whereIn('name', ['Active', 'نشط']))
             ->where(fn (Builder $q) => $q->whereNull('hire_date')->orWhereDate('hire_date', '<=', $date))
-            ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date));
+            ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date))
+            ->orderBy('id');
     }
 
     /** Employees expected to have an attendance state today, including approved leave. */
@@ -50,7 +51,8 @@ class DashboardDataService
         return $this->employeesFor($user)
             ->whereHas('status', fn (Builder $q) => $q->whereIn('name', ['Active', 'نشط', 'Leave', 'إجازة']))
             ->where(fn (Builder $q) => $q->whereNull('hire_date')->orWhereDate('hire_date', '<=', $date))
-            ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date));
+            ->where(fn (Builder $q) => $q->whereNull('termination_date')->orWhereDate('termination_date', '>=', $date))
+            ->orderBy('id');
     }
 
     public function attendance(User $user, ?Carbon $date = null): array
@@ -120,7 +122,7 @@ class DashboardDataService
             })
             ->whereBetween('documents.expiry_date', [today(), today()->copy()->addDays($days)])
             ->whereIn('documents.employee_id', $this->employeesFor($user)->select('id'))
-            ->orderBy('documents.expiry_date')->get(['documents.*'])
+            ->orderBy('documents.expiry_date')->orderBy('documents.id')->get(['documents.*'])
             ->map(fn (Document $document) => [
                 'employee' => $document->employee,
                 'label' => $document->type?->name ?? $document->document_name,
@@ -131,6 +133,7 @@ class DashboardDataService
         $contracts = $this->activeEmployeesFor($user)
             ->whereNotNull('contract_end_date')
             ->whereBetween('contract_end_date', [today(), today()->copy()->addDays($days)])
+            ->orderBy('contract_end_date')->orderBy('id')
             ->get(['id', 'full_name', 'employee_code', 'contract_end_date'])
             ->map(fn (Employee $employee) => [
                 'employee' => $employee,
@@ -139,13 +142,13 @@ class DashboardDataService
                 'kind' => 'contract',
             ]);
 
-        return $documents->concat($contracts)->sortBy('expiry_date')->values();
+        return $documents->concat($contracts)->sortBy([['expiry_date', 'asc'], ['employee.id', 'asc']])->values();
     }
 
     public function documentCompleteness(User $user): array
     {
         $requiredDocuments = $this->profileCompletion->requiredDocumentTypes();
-        $employees = $this->activeEmployeesFor($user)->with(['profileDetail', 'documents'])->get();
+        $employees = $this->activeEmployeesFor($user)->with(['profileDetail', 'documents'])->orderBy('id')->get();
         $items = $employees->map(function (Employee $employee) use ($requiredDocuments): array {
             return ['employee' => $employee] + $this->profileCompletion->evaluate($employee, $requiredDocuments);
         });
