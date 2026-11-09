@@ -222,7 +222,7 @@ class LeaveBalanceService
             }
         }
         $proofErrors = [];
-        if ($calendar) {
+        if ($calendar && $legacyDayCap) {
             [$unit, $policyKey, $default] = $calendar;
             $amount = (int) $this->policyFor($policyKey, $default, $companyIdForPolicy);
             if ($amount <= 0) $this->fail('end_date', 'سياسة الشركة الحالية لا تتيح مدة لهذا النوع. راجع إعدادات الإجازات.');
