@@ -199,6 +199,7 @@ class LeaveBalanceService
         $start = Carbon::parse($leave->start_date);
         $days = (float) $leave->days;
         if (!$type || !$employee) return;
+        if ($type->policy_code === 'contagious_contact' && !$type->is_active) $this->fail('leave_type_id', 'نوع المخالطة غير مفعّل. حدد سياسة الأجر وفعّل نسخة الشركة من إعدادات الإجازات أولًا.');
         $limits = $this->limitsFor($type, $employee->company_id ? (int) $employee->company_id : null);
         $calendar = self::CALENDAR_TYPES[$type->policy_code] ?? null;
         $companyIdForPolicy = $employee->company_id ? (int) $employee->company_id : null;
@@ -247,7 +248,8 @@ class LeaveBalanceService
             $minPost = (int) $this->policyFor('maternity_min_postpartum_days', '45', $companyIdForPolicy);
             $birth = $leave->birth_date ? Carbon::parse($leave->birth_date)->startOfDay() : null;
             if ($birth && $minPost > 0) {
-                $needed = $birth->copy()->addDays($minPost);
+                $postStart = $start->copy()->startOfDay()->max($birth->copy()->addDay());
+                $needed = $postStart->copy()->addDays($minPost - 1);
                 if (Carbon::parse($leave->end_date)->startOfDay()->lt($needed)) $this->fail('end_date', "لا يمكن اعتماد {$type->name}: يجب ألا تقل المدة بعد الوضع عن {$minPost} يومًا، فلا تنتهي الإجازة قبل {$needed->format('d/m/Y')}.");
             } elseif (!$birth && $minPost > 0) {
                 $proofErrors[] = "{$type->name}: لم يُسجَّل تاريخ الولادة (أو التاريخ المرجح)، فلا يمكن التحقق من حد {$minPost} يومًا بعد الوضع.";
