@@ -202,6 +202,8 @@ class EmployeeController extends Controller
             'profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp'],
             'gender' => ['nullable', 'string', 'max:30'],
             'birth_date' => ['nullable', 'date'],
+            'expected_delivery_date' => ['nullable', 'date'],
+            'pregnancy_reduction_start' => ['nullable', 'date'],
             'profile' => ['nullable', 'array'],
             'profile.nationality' => ['nullable', 'string', 'max:100'],
             'profile.currency' => ['nullable', 'string', 'max:10'],
@@ -349,6 +351,13 @@ class EmployeeController extends Controller
         $validated = $this->applyTerminationDetails($request, $validated, $employee);
         $oldStatusName = EmployeeStatus::find($employee->status_id)?->name;
         $newStatusName = EmployeeStatus::find($validated['status_id'] ?? $employee->status_id)?->name;
+        if ($newStatusName === 'اجازة وضع' && $oldStatusName !== 'اجازة وضع') {
+            // The maternity status always comes with a leave and an expected
+            // delivery date; a bare status edit would create neither.
+            throw ValidationException::withMessages([
+                'status_id' => 'حالة «اجازة وضع» تُسجَّل من إجراء «تسجيل إجازة وضع» في قائمة الموظفين، حتى تُنشأ الإجازة ويُحفظ التاريخ المتوقع للولادة معها.',
+            ]);
+        }
         if ($this->isTerminalEmployeeStatus($oldStatusName) && ! $this->isInactiveEmployeeStatus($newStatusName)) {
             // Reactivation requires the actual return date: the list quick action
             // carries no date, so it is rejected with a prompt to use the profile
@@ -503,6 +512,136 @@ class EmployeeController extends Controller
     private function inactiveEmployeeStatuses(): array
     {
         return ['منتهي الخدمة', 'منتهى الخدمة', 'موقوف', 'قيد التعيين', 'Terminated', 'Suspended', 'Pending'];
+    }
+
+    /**
+     * Guided maternity action (Amer's 2026-11-09 answer): picking the «اجازة
+     * وضع» status opens a form with the art. 54 guidance and the expected
+     * delivery date. Submitting creates the maternity leave on the leaves page
+     * (calendar duration from the company policy, at least the configured
+     * postpartum minimum after the expected date) and moves the employee to
+     * the maternity status; the leave-status sync returns her to her previous
+     * status when the leave ends. The expected date stays the plan; the actual
+     * birth is recorded later on the leave itself.
+     */
+    public function maternityLeave(Request $request, Employee $employee, \App\Services\PayrollPeriodGuard $periodGuard, \App\Services\PayrollRunService $payrollRuns)
+    {
+        abort_unless($request->user()?->hasPermission('employees.edit'), 403, 'لا تملك صلاحية تعديل الموظفين.');
+        if (!\Illuminate\Support\Facades\Schema::hasColumn('leaves', 'expected_delivery_date')) {
+            $message = 'لازم تشغّل php artisan migrate قبل تسجيل إجازة الوضع.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+        $data = $request->validate([
+            // Optional in the request: the guided form pre-fills it from the
+            // employee file, where HR records it from the certificate.
+            'expected_delivery_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'start_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'document' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
+        ]);
+        $data['expected_delivery_date'] = $data['expected_delivery_date'] ?? $employee->expected_delivery_date?->toDateString();
+        if (empty($data['expected_delivery_date'])) {
+            $message = 'سجّل التاريخ المتوقع للولادة أولًا (من الشهادة الطبية) في بيانات الموظفة أو في هذا النموذج.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+        $status = EmployeeStatus::where('name', 'اجازة وضع')->first();
+        $type = \App\Models\LeaveType::withoutGlobalScopes()->where('policy_code', 'maternity')
+            ->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $employee->company_id))
+            ->orderByRaw('company_id is null')->first();
+        if (!$status || !$type) {
+            $message = 'حالة «اجازة وضع» أو نوع إجازة الوضع غير موجود. شغّل php artisan migrate ثم أعد المحاولة.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+        if ((int) $employee->status_id === (int) $status->id) {
+            $message = 'الموظفة مسجلة بالفعل في حالة «اجازة وضع».';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+
+        $rights = app(\App\Services\PregnancyNursingRightsService::class);
+        $companyId = $employee->company_id ? (int) $employee->company_id : null;
+        $months = (int) $rights->policy('maternity_months', '4', $companyId);
+        $expected = \Carbon\Carbon::parse($data['expected_delivery_date'])->startOfDay();
+        // HR picks when the leave starts (default: today, the day the status is
+        // registered) exactly like every leave on the leaves page; the duration
+        // is the company policy's calendar months from that start. The existing
+        // approval validator enforces the postpartum minimum against the
+        // expected date, so a start too early for the due date fails clearly.
+        $start = !empty($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->startOfDay() : today()->startOfDay();
+        $end = $start->copy()->addMonthsNoOverflow(max(1, $months))->subDay();
+
+        $overlap = \App\Models\Leave::where('employee_id', $employee->id)->effective()
+            ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
+        if ($overlap) {
+            $message = "يوجد طلب إجازة غير مرفوض يتداخل مع مدة إجازة الوضع المحسوبة ({$start->format('d/m/Y')} - {$end->format('d/m/Y')}). عدّل الإجازة المتداخلة أولًا.";
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+        $periodGuard->ensureRangeOpen($start, $end);
+
+        $hrSettings = app(\App\Services\HrOperationalSettingsService::class);
+        $days = 0;
+        if (!$hrSettings->excludeRestAndHolidaysFromLeave()) {
+            $days = $start->diffInDays($end) + 1;
+        } else {
+            for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+                if ($hrSettings->isWeeklyRest($date) || $hrSettings->isHoliday($date)) continue;
+                $days++;
+            }
+        }
+        if ($days < 1) {
+            $message = 'المدة المحسوبة لإجازة الوضع لا تحتوي أيام عمل وفق تقويم الشركة.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
+        }
+
+        $leave = new \App\Models\Leave([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $type->id,
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'days' => $days,
+            'reason' => 'إجازة وضع مسجلة من إجراء حالة الموظفة بالتاريخ المتوقع للولادة.',
+            'status' => 'Approved',
+            'approved_by' => $request->user()->id,
+            'approved_at' => now(),
+            'expected_delivery_date' => $expected->toDateString(),
+            // The certificate's reduction start follows from the employee file.
+            'pregnancy_reduction_start' => $employee->pregnancy_reduction_start?->toDateString(),
+        ]);
+        // Proof rules apply on this entry point like any other: when the
+        // maternity type requires a document, validation below fails without
+        // one. The certificate carrying the expected date is that document.
+        if ($request->hasFile('document')) {
+            $leave->document_path = '(uploaded)';
+            $leave->document_name = $request->file('document')->getClientOriginalName();
+        }
+        app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+        if ($request->hasFile('document')) {
+            $leave->document_path = $request->file('document')->store('leave-documents/'.$employee->id, 'local');
+        }
+        DB::transaction(function () use ($leave, $employee): void {
+            $leave->save();
+            // The leave now carries the pregnancy dates: clear them from the
+            // employee file so stale data can never re-activate rights later.
+            // One transaction: the leave and the clear commit or fail together.
+            $employee->expected_delivery_date = null;
+            $employee->pregnancy_reduction_start = null;
+            $employee->save();
+        });
+
+        // The status follows the leave, never the registration moment: when the
+        // leave covers today the sync below moves her to «اجازة وضع» now; when
+        // it starts later, the daily leave-status sync moves her on the start
+        // day, and back to her previous status after it ends.
+        app(\App\Services\LeaveBalanceService::class)->sync($employee, $start);
+        app(\App\Services\EmployeeLeaveStatusService::class)->sync();
+        $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id);
+        ActivityLog::record('employee_maternity_leave', 'تم تسجيل إجازة وضع وتغيير حالة الموظفة.', $leave, null, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'expected_delivery_date']), 'leaves');
+
+        $statusNote = $employee->fresh()->status_id === $status->id || $employee->fresh()->status?->name === 'اجازة وضع'
+            ? 'وتغيير حالة الموظفة إلى «اجازة وضع».'
+            : "وستتغير حالة الموظفة إلى «اجازة وضع» يوم {$start->format('d/m/Y')} مع بداية الإجازة.";
+        $message = "تم تسجيل إجازة الوضع من {$start->format('d/m/Y')} إلى {$end->format('d/m/Y')} {$statusNote}";
+        return $request->wantsJson()
+            ? response()->json(['success' => true, 'message' => $message, 'leave' => $leave->fresh()->load('leaveType'), 'employee' => $employee->fresh()->load('status')])
+            : back()->with('toast', $message);
     }
 
     private function isInactiveEmployeeStatus(?string $statusName): bool
