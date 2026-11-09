@@ -53,7 +53,18 @@ class PayrollSettingsController extends Controller
             'childcare_max_years_per_request' => 'رعاية الطفل (سنوات للطلب)', 'childcare_max_occurrences' => 'مرات رعاية الطفل بالخدمة',
             'pilgrimage_min_service_months' => 'خدمة الحج / القدس (شهر)', 'newborn_max_occurrences' => 'مرات إجازة المولود بالخدمة',
         ];
-        $leaveTypes = LeaveType::where('is_active', true)->orderBy('id')->get();
+        // Effective limits per type for THIS company (own copy of a shared type, casual per-request/year from the company policy).
+        $leaveBalances = app(\App\Services\LeaveBalanceService::class);
+        $leaveTypes = LeaveType::where('is_active', true)->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
+            $limits = $leaveBalances->limitsFor($type, $companyId ? (int) $companyId : null);
+            if ($type->policy_code === 'casual') {
+                $perRequest = $leavePolicies['casual_max_days_request']->setting_value ?? null;
+                $limits['max_days_per_request'] = $perRequest !== null ? (float) $perRequest : null;
+                $perYear = $leavePolicies['casual_max_days_year']->setting_value ?? null;
+                if ($perYear !== null && ($limits['max_days_per_year'] === null || (float) $perYear < $limits['max_days_per_year'])) $limits['max_days_per_year'] = (float) $perYear;
+            }
+            $type->setAttribute('limits', $limits);
+        });
         $rules = DB::table('payroll_calculation_rules')->where('company_id', $companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->rule_group.$item->rule_key");
         $taxCategories = DB::table('tax_categories')->where('company_id', $companyId)->orderBy('sort_order')->get()
@@ -120,19 +131,48 @@ class PayrollSettingsController extends Controller
         $data = $request->validate([
             'policies' => ['required', 'array'],
             'policies.*' => ['nullable', 'numeric', 'min:0'],
-            'types' => ['required', 'array'],
-            'types.*.default_days' => ['nullable', 'numeric', 'min:0'],
+            'types' => ['nullable', 'array'],
             'types.*.max_days_per_request' => ['nullable', 'numeric', 'min:0'],
             'types.*.max_days_per_year' => ['nullable', 'numeric', 'min:0'],
             'types.*.min_service_months' => ['nullable', 'integer', 'min:0'],
             'types.*.max_occurrences_service' => ['nullable', 'integer', 'min:0'],
         ]);
-        DB::transaction(function () use ($data): void {
+        if (!Schema::hasTable('leave_type_company_limits')) {
+            $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
+        }
+        $companyId = (int) auth()->user()->company_id;
+        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service'];
+        $balances = app(\App\Services\LeaveBalanceService::class);
+        DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
+            $setPolicy = fn (string $key, $value) => DB::table('leave_policy_settings')->where('company_id', $companyId)->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
             foreach ($data['policies'] as $key => $value) {
-                DB::table('leave_policy_settings')->where('company_id', auth()->user()->company_id)->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
+                $setPolicy($key, $value);
             }
-            foreach ($data['types'] as $id => $values) {
-                LeaveType::whereKey($id)->update(array_intersect_key($values, array_flip(['default_days', 'max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service'])));
+            foreach (($data['types'] ?? []) as $id => $values) {
+                $type = LeaveType::find($id);
+                if (!$type) continue;
+                $values = array_intersect_key($values, array_flip($limitKeys));
+                // Single source per rule: casual per-request/per-year live in this table but are kept in the company policy.
+                if ($type->policy_code === 'casual') {
+                    if (isset($values['max_days_per_request']) && $values['max_days_per_request'] !== '') $setPolicy('casual_max_days_request', $values['max_days_per_request']);
+                    if (isset($values['max_days_per_year']) && $values['max_days_per_year'] !== '') $setPolicy('casual_max_days_year', $values['max_days_per_year']);
+                    unset($values['max_days_per_request']);
+                }
+                // Annual / casual waiting time is the «مدة الانتظار» setting, not a per-type field; annual request size is limited by the balance.
+                if (in_array($type->policy_code, ['annual', 'casual'], true)) unset($values['min_service_months']);
+                if ($type->policy_code === 'annual') unset($values['max_days_per_request']);
+                if (!$values) continue;
+                if ((int) $type->company_id === $companyId && $companyId) {
+                    $type->update($values);
+                } elseif (!$type->company_id && $companyId) {
+                    // Shared type: save this company's own copy, never the shared row other companies use.
+                    $merged = array_merge($balances->limitsFor($type, $companyId), $values);
+                    $row = array_intersect_key($merged, array_flip($limitKeys)) + ['updated_at' => now()];
+                    $exists = DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->exists();
+                    if ($exists) DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->update($row);
+                    else DB::table('leave_type_company_limits')->insert($row + ['company_id' => $companyId, 'leave_type_id' => $type->id, 'created_at' => now()]);
+                }
             }
         });
         ActivityLog::record('leave_policy_update', 'Leave policy settings updated.');
