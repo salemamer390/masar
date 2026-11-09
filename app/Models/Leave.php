@@ -29,6 +29,7 @@ class Leave extends Model
         'early_grant_approved_by',
         'early_grant_approved_at',
         'birth_date',
+        'expected_delivery_date', 'pregnancy_reduction_start',
         'document_path',
         'document_name',
     ];
@@ -41,6 +42,7 @@ class Leave extends Model
         'manager_approved_at' => 'datetime',
         'is_early_grant' => 'boolean',
         'birth_date' => 'date',
+        'expected_delivery_date' => 'date', 'pregnancy_reduction_start' => 'date',
         'early_grant_approved_at' => 'datetime',
     ];
 
