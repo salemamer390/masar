@@ -101,6 +101,10 @@
 <script>
 document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
   button.addEventListener('click', async () => {
+    if (button.dataset.dashboardSourceModal === 'requestCreateModal' && document.getElementById('requestCreateModal')) {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCreateModal')).show();
+      return;
+    }
     const modalEl = document.getElementById('dashboardExistingActionModal');
     const body = modalEl?.querySelector('.modal-content');
     if (!modalEl || !body) return;
@@ -111,6 +115,35 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const source = new DOMParser().parseFromString(await response.text(), 'text/html');
       const sourceModal = button.dataset.dashboardSourceModal ? source.getElementById(button.dataset.dashboardSourceModal) : source.querySelector(button.dataset.dashboardSourceSelector);
+      if (button.dataset.dashboardSourceModal === 'requestCreateModal') {
+        if (!sourceModal) throw new Error('Request form unavailable');
+        document.getElementById('requestCreateModal')?.remove();
+        const imported = document.importNode(sourceModal, true);
+        document.body.appendChild(imported);
+        source.querySelectorAll('link[rel="stylesheet"][href*="requests-index-"]').forEach((link) => {
+          if (![...document.querySelectorAll('link[rel="stylesheet"]')].some((item) => item.href === link.href)) document.head.appendChild(document.importNode(link, true));
+        });
+        source.querySelectorAll('script[data-request-create-runtime]').forEach((script) => {
+          const runtime = document.createElement('script');
+          runtime.textContent = script.textContent;
+          document.body.appendChild(runtime);
+          runtime.remove();
+        });
+        const form = imported.querySelector('form');
+        form.dataset.ajax = 'true';
+        form.dataset.dashboardAction = 'true';
+        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+        const hideLoader = () => bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        modalEl.addEventListener('hidden.bs.modal', () => {
+          modalEl.removeEventListener('shown.bs.modal', hideLoader);
+          bootstrap.Modal.getOrCreateInstance(imported).show();
+        }, {once: true});
+        // Fast responses can arrive during the loader's opening transition.
+        // Bootstrap ignores hide() then, so also hide as soon as it is shown.
+        modalEl.addEventListener('shown.bs.modal', hideLoader, {once: true});
+        hideLoader();
+        return;
+      }
       const content = sourceModal?.querySelector('.modal-content') || sourceModal;
       if (!content) throw new Error('لم يتم العثور على نموذج الإدخال الأصلي');
       body.innerHTML = content.innerHTML;
