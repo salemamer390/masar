@@ -427,8 +427,9 @@
       const message = validationErrors
         ? Object.values(validationErrors).flat().find(Boolean)
         : (error.payload?.message || error.message || 'تعذر حفظ التغييرات.');
-      form.dispatchEvent(new CustomEvent('masar:error', { bubbles: true, detail: error }));
-      showToast(message);
+      const errorEvent = new CustomEvent('masar:error', { bubbles: true, cancelable: true, detail: error });
+      form.dispatchEvent(errorEvent);
+      if (!errorEvent.defaultPrevented) showToast(message);
     } finally {
       window.MasarUI.setBusy(form, false);
     }

@@ -7,6 +7,7 @@ use App\Models\Leave;
 use App\Models\LeaveType;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Collection;
 
@@ -14,6 +15,14 @@ class LeaveBalanceService
 {
     /** Policies are identical for all employees in one request. */
     private array $policyCache = [];
+    /** Screen-confirmed waiting-time exception: waives only the wait, the balance check stays on. */
+    private bool $enforceBalanceOnEarlyGrant = false;
+
+    public function enforceBalanceOnEarlyGrant(bool $enforce = true): static
+    {
+        $this->enforceBalanceOnEarlyGrant = $enforce;
+        return $this;
+    }
 
     public function policy(string $key, string $default = ''): string
     {
@@ -151,6 +160,28 @@ class LeaveBalanceService
         return ['annual_entitlement' => $annual, 'annual_used' => $used, 'carried_balance' => $carried, 'usable_capacity' => $allocation['usable_capacity'], 'annual_balance_remaining' => $allocation['remaining'], 'casual_used' => $casual, 'advance_used' => $allocation['advance'], 'remaining' => $allocation['remaining']];
     }
 
+    /**
+     * Effective limits of a leave type for one company: a company-owned type
+     * uses its own columns; a shared type uses the company's own copy when it
+     * has saved one, otherwise the shared values.
+     *
+     * @return array{max_days_per_request:?float,max_days_per_year:?float,min_service_months:?int,max_occurrences_service:?int}
+     */
+    public function limitsFor(LeaveType $type, ?int $companyId): array
+    {
+        $row = null;
+        if ($companyId && !$type->company_id && Schema::hasTable('leave_type_company_limits')) {
+            $row = DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->first();
+        }
+        $src = $row ?? $type;
+        return [
+            'max_days_per_request' => $src->max_days_per_request !== null ? (float) $src->max_days_per_request : null,
+            'max_days_per_year' => $src->max_days_per_year !== null ? (float) $src->max_days_per_year : null,
+            'min_service_months' => $src->min_service_months !== null ? (int) $src->min_service_months : null,
+            'max_occurrences_service' => $src->max_occurrences_service !== null ? (int) $src->max_occurrences_service : null,
+        ];
+    }
+
     public function validateForApproval(Leave $leave, ?int $excludeId = null): void
     {
         $type = $leave->leaveType;
@@ -158,28 +189,35 @@ class LeaveBalanceService
         $start = Carbon::parse($leave->start_date);
         $days = (float) $leave->days;
         if (!$type || !$employee) return;
-        if ($type->policy_code !== 'casual' && $type->max_days_per_request !== null && $days > (float) $type->max_days_per_request) {
-            $this->fail('days', "لا يمكن اعتماد {$type->name}: الطلب {$this->number($days)} أيام، والحد الأقصى للطلب الواحد {$this->number($type->max_days_per_request)} أيام.");
+        $limits = $this->limitsFor($type, $employee->company_id ? (int) $employee->company_id : null);
+        if (!in_array($type->policy_code, ['annual', 'casual'], true) && $limits['max_days_per_request'] !== null && $days > $limits['max_days_per_request']) {
+            $this->fail('days', "لا يمكن اعتماد {$type->name}: الطلب {$this->number($days)} أيام، والحد الأقصى للطلب الواحد {$this->number($limits['max_days_per_request'])} أيام.");
         }
         $gender = match (mb_strtolower((string) $employee->gender)) { 'female', 'أنثى', 'انثى' => 'female', 'male', 'ذكر' => 'male', default => null };
         if ($type->eligibility_gender && $gender !== $type->eligibility_gender) $this->fail('employee_id', "لا يمكن اعتماد {$type->name}: هذا النوع متاح للموظفات فقط.");
         if ($type->min_employees && ($currentEmployees = Employee::count()) < (int) $type->min_employees) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: عدد العاملين الحالي {$currentEmployees}، بينما الحد الأدنى المطلوب {$type->min_employees} عاملًا.");
-        if ($type->min_service_months && !in_array($type->policy_code, ['annual', 'casual'], true) && $employee->hire_date && ($eligibleAt = Carbon::parse($employee->hire_date)->addMonths((int) $type->min_service_months))->gt($start)) $this->fail('start_date', "لا يمكن اعتماد {$type->name}: يشترط إتمام {$type->min_service_months} شهر خدمة. يصبح الموظف مستحقًا في {$eligibleAt->format('d/m/Y')}.");
-        if ($type->max_occurrences_service && ($usedOccurrences = $this->occurrences($employee, $type, $excludeId)) >= (int) $type->max_occurrences_service) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: استخدم الموظف {$usedOccurrences} من الحد الأقصى {$type->max_occurrences_service} مرات طوال مدة الخدمة.");
-        if ($type->max_days_per_year !== null) {
+        if ($limits['min_service_months'] && !in_array($type->policy_code, ['annual', 'casual'], true) && $employee->hire_date && ($eligibleAt = Carbon::parse($employee->hire_date)->addMonths((int) $limits['min_service_months']))->gt($start)) $this->fail('start_date', "لا يمكن اعتماد {$type->name}: يشترط إتمام {$limits['min_service_months']} شهر خدمة. يصبح الموظف مستحقًا في {$eligibleAt->format('d/m/Y')}.");
+        if ($limits['max_occurrences_service'] && ($usedOccurrences = $this->occurrences($employee, $type, $excludeId)) >= (int) $limits['max_occurrences_service']) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: استخدم الموظف {$usedOccurrences} من الحد الأقصى {$limits['max_occurrences_service']} مرات طوال مدة الخدمة.");
+        if ($limits['max_days_per_year'] !== null) {
             $usedThisYear = $this->approvedDays($employee, $start->year, fn (LeaveType $item) => $item->id === $type->id, $excludeId);
-            if ($usedThisYear + $days > (float) $type->max_days_per_year) {
-                $cap = (float) $type->max_days_per_year;
+            if ($usedThisYear + $days > $limits['max_days_per_year']) {
+                $cap = $limits['max_days_per_year'];
                 $this->fail('days', "لا يمكن اعتماد {$type->name}: الحد السنوي {$this->number($cap)} أيام، استُخدم {$this->number($usedThisYear)} أيام، والمتبقي {$this->number(max(0, $cap - $usedThisYear))} يوم، بينما الطلب {$this->number($days)} أيام.");
             }
         }
-        if (in_array($type->policy_code, ['annual', 'casual'], true) && $employee->hire_date && Carbon::parse($employee->hire_date)->addMonths((int) $this->policy('annual_wait_months', '6'))->gt($start)) {
-            if (!$leave->is_early_grant || !filter_var($this->policy('allow_early_leave', '1'), FILTER_VALIDATE_BOOLEAN)) {
+        if ($type->policy_code === 'annual' && $employee->hire_date && Carbon::parse($employee->hire_date)->addMonths((int) $this->policy('annual_wait_months', '6'))->gt($start)) {
+            $earlyAllowed = filter_var($this->policy('allow_early_leave', '1'), FILTER_VALIDATE_BOOLEAN);
+            if (!$leave->is_early_grant || !$earlyAllowed) {
                 $eligibleAt = Carbon::parse($employee->hire_date)->addMonths((int) $this->policy('annual_wait_months', '6'));
-                $this->fail('start_date', "لا يمكن اعتماد {$type->name}: يلزم إتمام {$this->policy('annual_wait_months', '6')} أشهر خدمة. يصبح الموظف مستحقًا في {$eligibleAt->format('d/m/Y')}، أو يُمنح استثنائيًا بصلاحية الاعتماد.");
+                $messages = ['start_date' => "لا يمكن اعتماد {$type->name}: يلزم إتمام {$this->policy('annual_wait_months', '6')} أشهر خدمة. يصبح الموظف مستحقًا في {$eligibleAt->format('d/m/Y')}."];
+                // The screen offers a confirm button only when the company allows exceptional grants.
+                if ($earlyAllowed) $messages['early_grant_available'] = '1';
+                throw ValidationException::withMessages($messages);
             }
         }
         if ($type->policy_code === 'casual') {
+            $perRequest = (float) $this->policyFor('casual_max_days_request', '2', $employee->company_id ? (int) $employee->company_id : null);
+            if ($perRequest > 0 && $days > $perRequest) $this->fail('days', "لا يمكن اعتماد الإجازة العارضة: الحد الأقصى للطلب الواحد {$this->number($perRequest)} أيام.");
             $used = $this->approvedDays($employee, $start->year, fn (LeaveType $item) => $item->policy_code === 'casual', $excludeId);
             $cap = (float) $this->policy('casual_max_days_year', '7');
             if ($used + $days > $cap) $this->fail('days', "لا يمكن اعتماد الإجازة العارضة: الحد السنوي {$this->number($cap)} أيام، استُخدم {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $cap - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
@@ -195,7 +233,7 @@ class LeaveBalanceService
             // changes the total, so this is stable for reservation checks.
             $usable = $balance['usable_capacity'];
             $used = $this->approvedDaysWithinCycle($employee, $cycle, fn (LeaveType $item) => (bool) $item->deducts_annual_balance, $excludeId);
-            if ($used + $days > $usable && !$leave->is_early_grant) $this->fail('days', "لا يمكن اعتماد {$type->name}: الرصيد السنوي المتاح {$this->number($usable)} يوم، محجوز {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $usable - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
+            if ($used + $days > $usable && (!$leave->is_early_grant || $this->enforceBalanceOnEarlyGrant)) $this->fail('days', "لا يمكن اعتماد {$type->name}: الرصيد السنوي المتاح {$this->number($usable)} يوم، محجوز {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $usable - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
         }
     }
 

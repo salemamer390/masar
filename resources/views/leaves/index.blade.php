@@ -11,10 +11,42 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const addEarlyGrantFields = (root) => { const reason = root?.querySelector('textarea[name="reason"]'); if (!reason || root.querySelector('[name="is_early_grant"]')) return; reason.insertAdjacentHTML('afterend', '<div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="is_early_grant" value="1"><label class="form-check-label">منح استثنائي قبل اكتمال مدة الاستحقاق</label></div><input name="early_grant_reason" class="form-control mt-2" placeholder="سبب المنح الاستثنائي">'); };
-  addEarlyGrantFields(document.getElementById('leaveModal'));
-  document.querySelectorAll('.modal[id^="editLeave"]').forEach(addEarlyGrantFields);
-  new MutationObserver(() => document.querySelectorAll('.modal[id^="editLeave"]').forEach(addEarlyGrantFields)).observe(document.body, { childList: true });
+  const canApprove = @json(auth()->user()?->hasPermission('leaves.approve'));
+  const askEarlyGrant = (message) => new Promise((resolve) => {
+    document.getElementById('earlyGrantConfirm')?.remove();
+    const wrap = document.createElement('div');
+    wrap.innerHTML = '<div class="modal fade" id="earlyGrantConfirm" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning"></i> تنبيه قبل الحفظ</h5></div><div class="modal-body"><p class="mb-2 early-grant-reason"></p><p class="mb-0 text-muted small">لو وافقت تُسجَّل الإجازة كمنح استثنائي باسمك وبتاريخ اليوم.</p></div><div class="modal-footer"><button type="button" class="btn btn-light" data-answer="no">إلغاء</button><button type="button" class="btn btn-primary" data-answer="yes">موافق</button></div></div></div></div>';
+    const modalEl = wrap.firstElementChild;
+    modalEl.querySelector('.early-grant-reason').textContent = message;
+    document.body.appendChild(modalEl);
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    let answer = false;
+    modalEl.addEventListener('click', (event) => { const b = event.target.closest('[data-answer]'); if (!b) return; answer = b.dataset.answer === 'yes'; modal.hide(); });
+    modalEl.addEventListener('hidden.bs.modal', () => { modalEl.remove(); resolve(answer); });
+    modal.show();
+  });
+  document.addEventListener('masar:error', async (event) => {
+    const form = event.target;
+    const errors = event.detail?.payload?.errors;
+    if (!(form instanceof HTMLFormElement) || !errors?.early_grant_available || !canApprove) return;
+    if (form.querySelector('input[name="is_early_grant"]')) return;
+    event.preventDefault();
+    const message = (errors.start_date || [])[0] || 'الموظف لم يستوفِ مدة الاستحقاق.';
+    const parentEl = form.closest('.modal');
+    const parent = parentEl ? bootstrap.Modal.getInstance(parentEl) : null;
+    if (parentEl && parentEl.classList.contains('show')) {
+      await new Promise((done) => { parentEl.addEventListener('hidden.bs.modal', done, { once: true }); parent.hide(); });
+    }
+    const confirmed = await askEarlyGrant(message + ' هل تريد منح الإجازة استثنائيًا؟');
+    if (parent) { await new Promise((done) => { parentEl.addEventListener('shown.bs.modal', done, { once: true }); parent.show(); }); }
+    if (!confirmed) return;
+    const add = (name, value) => { const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; input.dataset.earlyGrant = '1'; form.appendChild(input); };
+    add('is_early_grant', '1'); add('early_wait_only', '1'); add('early_grant_reason', message);
+    const clear = () => form.querySelectorAll('input[data-early-grant]').forEach((input) => input.remove());
+    form.addEventListener('masar:success', clear, { once: true });
+    form.addEventListener('masar:error', clear, { once: true });
+    form.requestSubmit();
+  });
 });
 </script>
 
