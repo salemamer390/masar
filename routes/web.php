@@ -340,6 +340,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::get('/', [SalaryController::class, 'index'])
             ->middleware('permission:salary.view')
             ->name('index');
+        Route::get('/{salary}/details', [SalaryController::class, 'details'])
+            ->middleware('permission:salary.view')
+            ->name('details');
         Route::post('/', [SalaryController::class, 'store'])
             ->middleware('permission:salary.create')
             ->name('store');
