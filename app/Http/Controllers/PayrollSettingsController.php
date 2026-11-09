@@ -64,11 +64,10 @@ class PayrollSettingsController extends Controller
         $penaltyService = app(\App\Services\AttendancePenaltyPolicyService::class);
         if ($companyId) $penaltyService->ensureSuggested((int) $companyId);
         $attendancePenaltyPolicy = $penaltyService->forCompany($companyId ? (int) $companyId : null);
-        $penaltyTypes = $companyId ? \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->orderBy('name')->get(['id', 'name']) : collect();
 
         $suggestedPenaltyTiers = \App\Services\AttendancePenaltyPolicyService::suggestedTiers();
 
-        return view('payroll.settings', compact('attendancePenaltyPolicy', 'penaltyTypes', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers'));
+        return view('payroll.settings', compact('attendancePenaltyPolicy', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers'));
     }
 
     /** Lateness / early-departure penalty tiers of this company. Saving rebuilds open payroll drafts so the policy reaches the salary. */
@@ -78,10 +77,6 @@ class PayrollSettingsController extends Controller
         $data = $request->validate([
             'is_enabled' => ['nullable', 'boolean'],
             'effective_from' => ['nullable', 'date'],
-            'charge_both_same_day' => ['nullable', 'boolean'],
-            'deduct_time_wage' => ['nullable', 'boolean'],
-            'manual_replaces_types' => ['nullable', 'array'],
-            'manual_replaces_types.*' => ['integer'],
             'tiers' => ['nullable', 'array', 'max:60'],
             'tiers.*.kind' => ['required', 'in:late,early_leave'],
             'tiers.*.from_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
@@ -106,9 +101,9 @@ class PayrollSettingsController extends Controller
             'unit' => ($tier['unit'] ?? 'days') === 'minutes' ? 'minutes' : 'days',
         ])->all();
 
-        $policy->save($companyId, (bool) ($data['is_enabled'] ?? false), $data['effective_from'] ?? null, $tiers, (bool) ($data['charge_both_same_day'] ?? false),
-            \App\Models\PenaltyType::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $data['manual_replaces_types'] ?? [])->pluck('id')->all(),
-            (bool) ($data['deduct_time_wage'] ?? false));
+        // Both violations of a day are always charged, the lost-time wage is always deducted,
+        // and no manual penalty replaces the automatic one (fixed rules, not options).
+        $policy->save($companyId, (bool) ($data['is_enabled'] ?? false), $data['effective_from'] ?? null, $tiers);
         $drafts = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         ActivityLog::record('attendance_penalty_policy_update', 'تم تحديث لائحة الجزاءات.');
 

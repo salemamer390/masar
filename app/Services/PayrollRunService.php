@@ -573,9 +573,9 @@ class PayrollRunService
             ->effective()->get();
         $manualPenaltyDays = $penalties->sum(fn (Penalty $penalty) => $penalty->deduction_days ?? $penalty->penaltyType?->default_deduction_days ?? 0);
         // Company lateness / early-departure policy. Its days join the manual penalty days, so the
-        // monthly penalty cap and basis apply once, and dates with a manual penalty are not charged twice.
+        // monthly penalty cap and basis apply once. Manual penalties are independent: they never
+        // replace the automatic policy penalty of the same date, both are charged.
         $penaltyPolicyService = app(AttendancePenaltyPolicyService::class);
-        $penaltyPolicy = $penaltyPolicyService->forCompany($employee->company_id ? (int) $employee->company_id : null);
         $priorDays = [];
         if ($range = $penaltyPolicyService->priorRange($employee, $windowFrom)) {
             $priorAttendance = Attendance::withoutGlobalScopes()->effective()->where('employee_id', $employee->id)
@@ -585,21 +585,18 @@ class PayrollRunService
             $priorExcuses = $this->requestsInMonth($employee, ['permission', 'mission'], $range[0]->toDateString(), $range[1]->toDateString(), false);
             $priorDays = app(EmployeePeriodMetrics::class)->days($employee, $range[0], $range[1], $priorAttendance, $priorLeaves, $priorExcuses);
         }
-        $replacing = array_flip($penaltyPolicy['manual_replaces_types']);
         $attendancePenalty = $penaltyPolicyService->evaluate(
             $employee,
             app(EmployeePeriodMetrics::class)->days($employee, $windowFrom, $windowTo, $attendance, $approvedLeaves, $excuses),
-            $penalties->filter(fn (Penalty $penalty) => isset($replacing[(int) $penalty->penalty_type_id]))
-                ->map(fn (Penalty $penalty) => $penalty->penalty_date->toDateString())->values()->all(),
             $priorDays
         );
         $penaltyDays = $manualPenaltyDays + $attendancePenalty['days']
             + \App\Services\AttendancePenaltyPolicyService::dayEquivalent((float) ($attendancePenalty['penalty_minutes'] ?? 0), 'minutes');
         // Lost-time wage: every effective late/early minute, priced from the gross (gross/240 per
-        // hour). Separate from the disciplinary days (priced from the penalty basis), and not
-        // limited by the monthly penalty cap. Only when the company policy opts in.
+        // hour). Separate from the disciplinary days (priced from the penalty basis), not limited
+        // by the monthly penalty cap, and always deducted once the policy is enabled.
         $timeMinutes = (int) ($attendancePenalty['time_minutes'] ?? 0);
-        $timeDeduction = !empty($penaltyPolicy['deduct_time_wage']) && $timeMinutes > 0
+        $timeDeduction = $timeMinutes > 0
             ? round($timeMinutes * (float) $structure['gross'] / 14400, 2)
             : 0.0;
         $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross'], $forRun);
