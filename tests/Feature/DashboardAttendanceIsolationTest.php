@@ -42,4 +42,29 @@ class DashboardAttendanceIsolationTest extends TestCase
         $js=file_get_contents(public_path('dashboard-details.js'));
         $this->assertStringContainsString('IntersectionObserver',$js);
     }
+    public function test_new_employees_pagination_is_deterministic_under_equal_hire_dates(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-11-09 18:00:00','Africa/Cairo'));
+        $plan=SubscriptionPlan::firstOrCreate(['slug'=>'dashboard-isolation'],['name'=>'Test','employee_limit'=>10000,'features'=>[]]);
+        $a=Company::create(['slug'=>'dash-page','name'=>'Paging','status'=>'active']);
+        CompanySubscription::create(['company_id'=>$a->id,'subscription_plan_id'=>$plan->id,'status'=>'active','starts_at'=>today()]);
+        $role=Role::create(['company_id'=>$a->id,'name'=>'company_manager','display_name'=>'Manager']);
+        $user=User::create(['name'=>'Manager','email'=>'dash-page@example.test','password'=>bcrypt('test-only'),'company_id'=>$a->id,'role_id'=>$role->id,'is_active'=>true]);
+        $this->actingAs($user);
+        $status=EmployeeStatus::firstOrCreate(['name'=>'Active']);
+        for($i=1;$i<=40;$i++) Employee::create(['employee_code'=>'DASH-P'.str_pad((string)$i,2,'0',STR_PAD_LEFT),'full_name'=>'Paging employee '.$i,'first_name'=>'Paging','company_id'=>$a->id,'status_id'=>$status->id,'hire_date'=>'2025-01-01']);
+        $seen=[];
+        $firstPageBody=null;
+        foreach([1,2,3] as $page) {
+            $body=$this->get(route('dashboard.details','new-employees').'?page='.$page)->assertOk()->getContent();
+            if($page===1) $firstPageBody=$body;
+            preg_match_all('/DASH-P\d+/',$body,$m);
+            foreach($m[0] as $code) $seen[]=$code;
+        }
+        $this->assertCount(40,$seen);
+        $this->assertCount(40,array_unique($seen));
+        $this->get(route('dashboard.details','new-employees').'?page=1')->assertOk()->assertSee($firstPageBody===null?'':'',false);
+        $repeat=$this->get(route('dashboard.details','new-employees').'?page=1')->assertOk()->getContent();
+        $this->assertSame($firstPageBody,$repeat);
+    }
 }
