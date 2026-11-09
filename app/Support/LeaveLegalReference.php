@@ -55,6 +55,14 @@ final class LeaveLegalReference
             'childcare_min_gap_years' => ['label' => 'الفاصل بين إجازات رعاية الطفل', 'article' => 57, 'ref' => 2, 'dir' => 'max', 'unit' => 'سنة'],
             'exam_notice_days' => ['label' => 'مهلة إخطار إجازة الامتحانات', 'article' => 126, 'ref' => 10, 'dir' => 'max', 'unit' => 'يوم'],
             'contagious_max_months' => ['label' => 'مدة المنع للمخالطة (حد أقصى قانوني)', 'article' => 132, 'ref' => 3, 'dir' => 'cap', 'unit' => 'شهر'],
+            // حقوق واردة في القانون لكنها محفوظة للعرض فقط حاليًا (لا تدخل في الحساب بعد).
+            // dir "bool": القيمة 1 هي المطابقة للمرجع، و0 تعني منحًا أوسع يحتاج مراجعة.
+            'annual_prorate_first_year' => ['label' => 'احتساب السنة الأولى نسبيًا', 'article' => 124, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
+            'pregnancy_reduced_hours_from_month' => ['label' => 'بدء تخفيض ساعات الحامل (الشهر)', 'article' => 54, 'ref' => 6, 'dir' => 'max', 'unit' => 'شهر'],
+            'pregnancy_reduced_hours_per_day' => ['label' => 'تخفيض ساعات الحامل يوميًا', 'article' => 54, 'ref' => 1, 'dir' => 'min', 'unit' => 'ساعة'],
+            'pregnancy_overtime_protection_months' => ['label' => 'حماية منع الإضافي بعد الوضع (شهر)', 'article' => 54, 'ref' => 6, 'dir' => 'min', 'unit' => 'شهر'],
+            'nursing_sessions_per_day' => ['label' => 'فترات الرضاعة يوميًا', 'article' => 56, 'ref' => 2, 'dir' => 'min', 'unit' => 'فترة'],
+            'nursing_minutes_per_session' => ['label' => 'مدة فترة الرضاعة (دقيقة)', 'article' => 56, 'ref' => 30, 'dir' => 'min', 'unit' => 'دقيقة'],
         ];
     }
 
@@ -86,6 +94,8 @@ final class LeaveLegalReference
         return match ($dir) {
             'min' => $value >= (float) $ref ? self::OK : self::BELOW,
             'max' => $value <= (float) $ref ? self::OK : self::BELOW,
+            // المرجع يتطلب التفعيل (1)؛ القيمة 0 هنا منح أوسع من المرجع وليست نقصًا، لكنها تحتاج مراجعة
+            'bool' => $value === (float) $ref ? self::OK : self::REVIEW,
             // statutory ceiling on how long someone may be kept away: a lower number is never a reduction of a right
             'cap' => $value === (float) $ref ? self::OK : self::REVIEW,
             default => self::REVIEW,
@@ -109,6 +119,7 @@ final class LeaveLegalReference
         $r = self::policyRules()[$key] ?? null;
         if (!$r) return '';
         $ref = rtrim(rtrim(number_format((float) $r['ref'], 2, '.', ''), '0'), '.');
+        if ($r['dir'] === 'bool') return "المرجع (م{$r['article']}): بنسبة المدة (1). القيمة 0 تمنح الرصيد كاملًا بعد الانتظار، وهو أكثر من المرجع ويحتاج مراجعة.";
         $bound = match ($r['dir']) { 'min' => 'على الأقل', 'max' => 'على الأكثر', default => 'حد أقصى' };
         return "المرجع (م{$r['article']}): {$ref} {$r['unit']} {$bound}";
     }
