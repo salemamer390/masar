@@ -125,7 +125,7 @@
       return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="0.01" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"></div>';
   };
 ?>
-<div class="settings-card"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. لا يتم خصم الرصيد إلا عند الاعتماد النهائي.</span></div><div class="settings-card-grid">
+<div class="settings-card lv-wide"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. لا يتم خصم الرصيد إلا عند الاعتماد النهائي.</span></div><div class="settings-card-grid lv-grid4">
 <div class="lv-sub">الاستحقاق (يوم)</div>
 {!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}
 <div class="lv-sub">شروط الأرصدة الأعلى</div>
@@ -140,7 +140,7 @@
 <td><input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_year]" value="{{ $lvNum($lim['max_days_per_year']) }}" class="form-control"></td>
 <td>@if($isAnnual || $isCasual)<span class="lv-auto">{{ $isAnnual ? 'من «مدة الانتظار»' : 'بدون انتظار' }}</span>@else<input type="number" min="0" name="types[{{ $type->id }}][min_service_months]" value="{{ $lvNum($lim['min_service_months']) }}" class="form-control">@endif</td>
 <td><input type="number" min="0" name="types[{{ $type->id }}][max_occurrences_service]" value="{{ $lvNum($lim['max_occurrences_service']) }}" class="form-control"></td></tr>@endforeach
-</tbody></table></div></div>
+</tbody></table></div><p class="lv-scroll-hint">اسحب الجدول يمينًا ويسارًا لعرض كل الأعمدة.</p></div>
 <details class="settings-card wide lv-ref"><summary>إعدادات محفوظة للعرض فقط <small>لا تؤثر على الحساب حاليًا</small></summary><div class="settings-card-grid">
 {!! $lvField('annual_prorate_first_year', true) !!}{!! $lvField('maternity_min_postpartum_days', true) !!}{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('pregnancy_reduced_hours_per_day', true) !!}{!! $lvField('pregnancy_overtime_protection_months', true) !!}{!! $lvField('nursing_sessions_per_day', true) !!}{!! $lvField('nursing_minutes_per_session', true) !!}{!! $lvField('childcare_max_years_per_request', true) !!}
 </div></details>
