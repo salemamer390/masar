@@ -69,3 +69,26 @@
 .ap-f-amount .ap-cell-inputs{flex-wrap:nowrap}
 .ap-status{flex-direction:column;gap:14px}
 }
+
+/* Allowance distribution: compact one-row layout + live share bar */
+.allowance-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px 16px}
+.allowance-item{min-width:0}
+.allowance-prorate{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#44536b;margin-top:6px;cursor:pointer}
+.allowance-prorate input{margin:0;flex-shrink:0}
+.allowance-bar{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-top:14px;border:1px solid var(--color-border,#dfe5ee);background:#f6f8fb}
+.allowance-seg{min-width:0;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:width .25s ease}
+.allowance-seg span{font-size:10px;font-weight:800;color:#fff;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.allowance-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.allowance-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#44536b}
+.allowance-chip i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.allowance-chip b{font-weight:800;color:#1f2a44}
+.allowance-bar .allowance-seg:nth-of-type(6n+1),.allowance-legend .allowance-chip:nth-of-type(6n+1) i{background:#1769e0}
+.allowance-bar .allowance-seg:nth-of-type(6n+2),.allowance-legend .allowance-chip:nth-of-type(6n+2) i{background:#0ea5e9}
+.allowance-bar .allowance-seg:nth-of-type(6n+3),.allowance-legend .allowance-chip:nth-of-type(6n+3) i{background:#f59e0b}
+.allowance-bar .allowance-seg:nth-of-type(6n+4),.allowance-legend .allowance-chip:nth-of-type(6n+4) i{background:#10b981}
+.allowance-bar .allowance-seg:nth-of-type(6n+5),.allowance-legend .allowance-chip:nth-of-type(6n+5) i{background:#8b5cf6}
+.allowance-bar .allowance-seg:nth-of-type(6n),.allowance-legend .allowance-chip:nth-of-type(6n) i{background:#ef4444}
+body.preview-dark .allowance-bar{background:var(--dm-surface-3,#1a2436);border-color:var(--dm-border,#2a3850)}
+body.preview-dark .allowance-prorate{color:var(--dm-text-2,#b9c6da)}
+body.preview-dark .allowance-chip{color:var(--dm-text-2,#b9c6da)}
+body.preview-dark .allowance-chip b{color:var(--dm-text,#e8eef8)}
