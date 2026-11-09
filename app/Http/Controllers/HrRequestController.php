@@ -241,6 +241,14 @@ class HrRequestController extends Controller
         abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
         $employee = Employee::findOrFail($validated['employee_id']);
         abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
+        if ($type->source_key === 'overtime') {
+            // Art. 54: no overtime during pregnancy or the configured postpartum
+            // months. Dates come only from the recorded maternity leave.
+            $overtimeBlock = app(\App\Services\PregnancyNursingRightsService::class)->overtimeBlockReason($employee, \Carbon\Carbon::parse($validated['overtime_request_date']));
+            if ($overtimeBlock) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['overtime_request_date' => $overtimeBlock]);
+            }
+        }
         $requestDate = match ($type->source_key) {
             'advance' => $validated['advance_request_date'] ?? null,
             'overtime' => $validated['overtime_request_date'] ?? null,
@@ -394,6 +402,10 @@ class HrRequestController extends Controller
                 $request->merge(['overtime_request_date' => $request->input('request_date')]);
             }
             $data = $request->validate(['overtime_request_date' => ['required', 'date'], 'overtime_period' => ['required', 'in:day,night'], 'day_overtime_hours' => ['nullable', 'numeric', 'gt:0'], 'night_overtime_hours' => ['nullable', 'numeric', 'gt:0'], 'from_time' => ['required', 'date_format:H:i'], 'to_time' => ['required', 'date_format:H:i', 'different:from_time']]);
+            $overtimeBlock = app(\App\Services\PregnancyNursingRightsService::class)->overtimeBlockReason($hrRequest->employee, \Carbon\Carbon::parse($data['overtime_request_date']));
+            if ($overtimeBlock) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['overtime_request_date' => $overtimeBlock]);
+            }
             $payload = array_merge($payload, ['request_date' => $data['overtime_request_date'], 'hours' => $this->overtimeWindowHours($data['from_time'], $data['to_time']), 'overtime_period' => $data['overtime_period'], 'from_time' => $data['from_time'], 'to_time' => $data['to_time']]);
         } elseif ($source === 'other') {
             $data = $request->validate(['other_request_date' => ['required', 'date'], 'affects_payroll' => ['nullable', 'boolean'], 'impact_type' => ['required_if:affects_payroll,1', 'nullable', 'in:earning,deduction'], 'impact_amount' => ['required_if:affects_payroll,1', 'nullable', 'numeric', 'gt:0']]);
