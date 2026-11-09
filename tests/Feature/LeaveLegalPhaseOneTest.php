@@ -202,4 +202,24 @@ class LeaveLegalPhaseOneTest extends TestCase
         $this->request($this->ua,$e2,$t,'2027-01-01','2027-07-31',['birth_date'=>'2027-02-01'])->assertStatus(422)->assertJsonValidationErrors('end_date');
     }
 
+    public function test_display_only_rights_have_legal_reference_not_outside_label(): void
+    {
+        $ref = \App\Support\LeaveLegalReference::class;
+        // None of the legal-right settings may be labelled "خارج نطاق القانون".
+        foreach (['annual_prorate_first_year','pregnancy_reduced_hours_from_month','pregnancy_reduced_hours_per_day','pregnancy_overtime_protection_months','nursing_sessions_per_day','nursing_minutes_per_session'] as $key) {
+            $this->assertArrayHasKey($key, $ref::policyRules());
+            $this->assertNotSame($ref::OUTSIDE, $ref::policyStatus($key, $ref::policyRules()[$key]['ref']), $key.' must never be outside');
+            $this->assertNotSame('', $ref::policyHint($key));
+        }
+        // Proration flag: 1 matches the law, 0 grants more than the minimum and is a review, never below.
+        $this->assertSame($ref::OK, $ref::policyStatus('annual_prorate_first_year', 1));
+        $this->assertSame($ref::REVIEW, $ref::policyStatus('annual_prorate_first_year', 0));
+        // Legal minimums still catch reductions.
+        $this->assertSame($ref::BELOW, $ref::policyStatus('pregnancy_reduced_hours_per_day', 0));
+        $this->assertSame($ref::BELOW, $ref::policyStatus('nursing_sessions_per_day', 1));
+        $this->assertSame($ref::BELOW, $ref::policyStatus('nursing_minutes_per_session', 20));
+        $this->assertSame($ref::BELOW, $ref::policyStatus('pregnancy_reduced_hours_from_month', 7));
+        $this->assertSame($ref::OK, $ref::policyStatus('pregnancy_reduced_hours_from_month', 6));
+    }
+
 }
