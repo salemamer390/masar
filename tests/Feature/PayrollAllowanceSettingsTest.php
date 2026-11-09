@@ -51,6 +51,20 @@ class PayrollAllowanceSettingsTest extends TestCase
         $this->assertEquals(1, (int) $rows['meal']->is_prorated);
     }
 
+    public function test_settings_page_renders_share_bar_and_proration_toggles_when_migration_applied(): void
+    {
+        $response = $this->get(route('payroll.settings.index'));
+        $response->assertOk();
+        // Live share bar + legend for the allowance distribution.
+        $response->assertSee('data-allowance-seg="transport"', false);
+        $response->assertSee('data-allowance-chip="clothing"', false);
+        // Independent proration toggle per allowance (hidden 0 + checkbox 1 pair).
+        $response->assertSee('name="allowance_prorated[housing]"', false);
+        // The migrate-needed warning shows only when the column is genuinely absent.
+        $response->assertDontSee('php artisan migrate', false);
+        $this->assertTrue(\Illuminate\Support\Facades\Schema::hasColumn('payroll_allowance_settings', 'is_prorated'));
+    }
+
     public function test_shares_above_100_before_the_last_allowance_are_rejected(): void
     {
         $this->from(route('payroll.settings.index'))->put(route('payroll.settings.update'), [
