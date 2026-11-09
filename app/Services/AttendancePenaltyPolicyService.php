@@ -24,10 +24,15 @@ use Illuminate\Validation\ValidationException;
  * return date after a dismissal, resignation or contract end, and violations before the
  * policy's effective date are neither charged nor counted.
  *
- * Optionally the wage of the lost time itself is deducted too: the effective late and early
+ * The wage of the lost time itself is always deducted too: the effective late and early
  * minutes of the period are summed (time_minutes) so the payroll run can price them from the
  * gross salary (gross / 240 per hour). That line is separate from the disciplinary days, which
  * are priced from the penalty basis, and is not limited by the monthly penalty cap.
+ *
+ * Fixed behaviour (owner decision, 2026-11-09): a day with both lateness and early departure is
+ * always charged for both, the lost-time wage is always deducted, and a manual penalty never
+ * replaces the automatic one. These are no longer options; any legacy values stored in
+ * charge_both_same_day / deduct_time_wage / manual_replaces_types are ignored and overwritten.
  */
 class AttendancePenaltyPolicyService
 {
@@ -36,7 +41,7 @@ class AttendancePenaltyPolicyService
     /** @return array{enabled: bool, effective_from: ?string, tiers: array<int, array<string, mixed>>} */
     public function forCompany(?int $companyId): array
     {
-        $empty = ['enabled' => false, 'effective_from' => null, 'tiers' => [], 'charge_both_same_day' => true, 'manual_replaces_types' => [], 'deduct_time_wage' => false];
+        $empty = ['enabled' => false, 'effective_from' => null, 'tiers' => [], 'charge_both_same_day' => true, 'manual_replaces_types' => [], 'deduct_time_wage' => true];
         if (!$companyId || !Schema::hasTable('attendance_penalty_policies')) return $empty;
         $policy = DB::table('attendance_penalty_policies')->where('company_id', $companyId)->first();
         if (!$policy) return $empty;
@@ -48,11 +53,14 @@ class AttendancePenaltyPolicyService
                 'deduction_days' => (float) $t->deduction_days, 'unit' => ($t->unit ?? 'days') === 'minutes' ? 'minutes' : 'days',
             ])->all();
 
+        // charge_both_same_day, manual_replaces_types and deduct_time_wage are fixed behaviour,
+        // not options: both violations of a day are always charged, no manual penalty replaces the
+        // automatic one, and the lost-time wage is always deducted. Legacy stored values are ignored.
         return [
             'enabled' => (bool) $policy->is_enabled, 'effective_from' => $policy->effective_from, 'tiers' => $tiers,
-            'charge_both_same_day' => (bool) ($policy->charge_both_same_day ?? true),
-            'manual_replaces_types' => array_map('intval', (array) json_decode((string) ($policy->manual_replaces_types ?? '[]'), true)),
-            'deduct_time_wage' => (bool) ($policy->deduct_time_wage ?? false),
+            'charge_both_same_day' => true,
+            'manual_replaces_types' => [],
+            'deduct_time_wage' => true,
         ];
     }
 
@@ -60,7 +68,7 @@ class AttendancePenaltyPolicyService
      * Replace the company's policy. Tiers of one kind must not overlap on both
      * the minute range and the occurrence range, so every violation has one answer.
      */
-    public function save(int $companyId, bool $enabled, ?string $effectiveFrom, array $tiers, bool $chargeBothSameDay = true, array $manualReplacesTypes = [], bool $deductTimeWage = false): void
+    public function save(int $companyId, bool $enabled, ?string $effectiveFrom, array $tiers): void
     {
         $tiers = array_values($tiers);
         if ($enabled && !$tiers) {
@@ -79,10 +87,12 @@ class AttendancePenaltyPolicyService
             }
         }
 
-        DB::transaction(function () use ($companyId, $enabled, $effectiveFrom, $tiers, $chargeBothSameDay, $manualReplacesTypes, $deductTimeWage) {
+        DB::transaction(function () use ($companyId, $enabled, $effectiveFrom, $tiers) {
             DB::table('attendance_penalty_policies')->updateOrInsert(
                 ['company_id' => $companyId],
-                ['is_enabled' => $enabled, 'effective_from' => $effectiveFrom, 'charge_both_same_day' => $chargeBothSameDay, 'manual_replaces_types' => json_encode(array_values(array_map('intval', $manualReplacesTypes))), 'deduct_time_wage' => $deductTimeWage, 'updated_at' => now(), 'created_at' => now()]
+                // The three former option columns are pinned to the fixed behaviour, so saving
+                // the form also normalises any legacy values a company stored before.
+                ['is_enabled' => $enabled, 'effective_from' => $effectiveFrom, 'charge_both_same_day' => true, 'manual_replaces_types' => '[]', 'deduct_time_wage' => true, 'updated_at' => now(), 'created_at' => now()]
             );
             DB::table('attendance_penalty_tiers')->where('company_id', $companyId)->delete();
             foreach ($tiers as $tier) {
@@ -135,7 +145,7 @@ class AttendancePenaltyPolicyService
     {
         if (!Schema::hasTable('attendance_penalty_policies')) return;
         if (DB::table('attendance_penalty_policies')->where('company_id', $companyId)->exists()) return;
-        $this->save($companyId, false, null, self::suggestedTiers(), true, [], true);
+        $this->save($companyId, false, null, self::suggestedTiers());
     }
 
     /** First date of the employee's current employment spell (hire, or return after leaving). */
@@ -172,27 +182,25 @@ class AttendancePenaltyPolicyService
     /**
      * Penalty days for one employee over the period's classified days (EmployeePeriodMetrics::days).
      * $priorDays are earlier days of the same spell: they only advance the occurrence counters.
-     * A date with a manual penalty of a type the company marked as "replaces automatic" is not charged
-     * again (it still counts as an occurrence). Other manual penalties never block the automatic one.
+     * Manual penalties are a separate, independent deduction: they never block or replace the
+     * automatic policy penalty of the same date.
      *
      * @param array<int, array<string, mixed>> $days
-     * @param array<int, string> $replacingManualDates Y-m-d dates covered by a replacing manual penalty
      * @param array<int, array<string, mixed>> $priorDays
      * @return array{days: float, penalty_minutes: float, details: array<int, array<string, mixed>>, time_minutes: int}
      */
-    public function evaluate(Employee $employee, array $days, array $replacingManualDates = [], array $priorDays = []): array
+    public function evaluate(Employee $employee, array $days, array $priorDays = []): array
     {
         $result = ['days' => 0.0, 'penalty_minutes' => 0.0, 'details' => [], 'time_minutes' => 0];
         $policy = $this->forCompany($employee->company_id ? (int) $employee->company_id : null);
         if (!$policy['enabled'] || !$policy['tiers']) return $result;
-        $manual = array_flip($replacingManualDates);
         // Repetition is counted per violation band (kind + minute range), so each row of the
         // schedule escalates on its own; an occurrence beyond the defined rows keeps the last one.
         $count = [];
         $effective = $policy['effective_from'] ? substr((string) $policy['effective_from'], 0, 10) : null;
         $spell = $this->spellStart($employee)?->toDateString();
 
-        $violations = function (array $dayList, bool $charge) use (&$count, &$result, $policy, $manual, $effective, $spell) {
+        $violations = function (array $dayList, bool $charge) use (&$count, &$result, $policy, $effective, $spell) {
             foreach ($dayList as $day) {
                 if (!empty($day['state']) && in_array($day['state'], ['future', 'before_hire', 'after_termination'], true)) continue;
                 $date = (string) $day['date'];
@@ -202,8 +210,8 @@ class AttendancePenaltyPolicyService
                 foreach (['late' => 'late_minutes', 'early_leave' => 'early_leave_minutes'] as $kind => $field) {
                     $minutes = (int) ($day[$field] ?? 0);
                     if ($minutes <= 0) continue;
-                    // The lost-time wage covers every effective minute, even when the disciplinary
-                    // part is replaced by a manual penalty or the minutes fall outside the tiers.
+                    // The lost-time wage covers every effective minute, even when the minutes
+                    // fall outside the defined tiers.
                     if ($charge) $result['time_minutes'] += $minutes;
                     $band = $this->bandOf($policy['tiers'], $kind, $minutes);
                     if ($band === null) continue;
@@ -213,13 +221,8 @@ class AttendancePenaltyPolicyService
                     // A zero-amount tier is a recorded warning: it counts as an occurrence, deducts nothing.
                     $found[$kind] = [$minutes, $count[$band], (float) $tier['deduction_days'], ($tier['unit'] ?? 'days') === 'minutes' ? 'minutes' : 'days'];
                 }
-                if (!$charge || isset($manual[$date])) continue;
-                // Same-day collision compares day-equivalents so minute- and day-denominated
-                // penalties compete fairly (480 penalty minutes = 1 penalty day).
-                if (!$policy['charge_both_same_day'] && count($found) > 1) {
-                    uasort($found, fn ($x, $y) => self::dayEquivalent($y[2], $y[3]) <=> self::dayEquivalent($x[2], $x[3]));
-                    $found = array_slice($found, 0, 1, true);
-                }
+                if (!$charge) continue;
+                // A day with both lateness and early departure is always charged for both.
                 foreach ($found as $kind => [$minutes, $occurrence, $deduction, $unit]) {
                     if ($unit === 'minutes') $result['penalty_minutes'] += $deduction; else $result['days'] += $deduction;
                     $result['details'][] = [
