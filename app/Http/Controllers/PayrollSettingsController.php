@@ -68,7 +68,11 @@ class PayrollSettingsController extends Controller
 
         $suggestedPenaltyTiers = \App\Services\AttendancePenaltyPolicyService::suggestedTiers();
 
-        return view('payroll.settings', compact('attendancePenaltyPolicy', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers'));
+        // When the proration column is missing (migration not run yet) the save
+        // silently skips the flags; surface that instead of showing a dead toggle.
+        $allowanceProrationReady = Schema::hasColumn('payroll_allowance_settings', 'is_prorated');
+
+        return view('payroll.settings', compact('attendancePenaltyPolicy', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers', 'allowanceProrationReady'));
     }
 
     /** Lateness / early-departure penalty tiers of this company. Saving rebuilds open payroll drafts so the policy reaches the salary. */
