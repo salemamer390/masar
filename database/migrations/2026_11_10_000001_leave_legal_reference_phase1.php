@@ -7,8 +7,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Leave settings phase 1 (Law 14/2025):
- * - leaves keep the birth date (post-birth minimum, art. 54), the attached proof, and the
- *   soft-rule exceptions the user explicitly confirmed;
+ * - leaves keep the birth date (post-birth minimum, art. 54), the attached proof;
  * - a company can switch the document requirement per leave type;
  * - new company policy keys and the contagious-contact leave type (art. 132).
  * Nothing existing is overwritten: existing company values stay as they are.
