@@ -17,7 +17,10 @@ class DashboardTopbarCssTest extends TestCase
         foreach (['.topbar-reference{', '.topbar-tools{', '.topbar-date{', '.topbar-search-area{', '.global-search-reference{', 'body:has(.dashboard-command-bar--reference) .topbar'] as $selector) {
             $this->assertStringNotContainsString($selector, $css, "dashboard stylesheet still overrides $selector");
         }
-        // The notification dropdown positioning is intentionally kept on the dashboard.
-        $this->assertStringContainsString('.topbar .notification-menu', $css);
+        // Shared notifications must stay above the sidebar on every page.
+        $this->assertStringNotContainsString('.topbar .notification-menu', $css);
+        $shared = file_get_contents(resource_path('styles/02-components.css'));
+        $this->assertStringContainsString('.topbar .notification-menu', $shared);
+        $this->assertStringContainsString('.notification-menu .notification-scroll', $shared);
     }
 }
