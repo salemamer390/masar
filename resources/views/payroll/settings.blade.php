@@ -437,12 +437,5 @@ document.addEventListener('masar:error', (event) => {
 </script>
 @endpush
 @push('styles')
-<style>
-#leavePolicy .lv-table{min-width:1050px;table-layout:fixed}
-#leavePolicy .lv-table th,#leavePolicy .lv-table td{white-space:normal;vertical-align:top;overflow-wrap:anywhere}
-#leavePolicy .lv-table th:first-child{width:180px}
-#leavePolicy .lv-table th:last-child{width:240px}
-#leavePolicy .lv-table input[type=number]{min-width:72px;width:100%}
-#leavePolicy .settings-field .badge{align-self:flex-start;margin-top:4px;white-space:normal}
-</style>
+<link href="{{ asset('leave-policy.css') }}?v={{ @filemtime(public_path('leave-policy.css')) }}" rel="stylesheet">
 @endpush
