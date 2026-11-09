@@ -118,12 +118,32 @@
 <form method="POST" action="{{ route('payroll.settings.leaves.update') }}" data-ajax="true" data-track-dirty="true">
 @csrf @method('PUT')
 <div class="settings-cards">
-<div class="settings-card"><div class="settings-card-head"><h3>أرصدة الاستحقاق وقواعد الإجازات</h3><span>حدد الاستحقاقات ومدة الانتظار. لا يتم خصم الرصيد إلا عند الاعتماد النهائي.</span></div><div class="settings-card-grid">
-@foreach($leavePolicies as $key => $policy)<div class="settings-field"><label class="form-label">{{ $leavePolicyLabels[$key] ?? ($policy->label ?: $key) }}</label><input type="number" step="0.01" min="0" name="policies[{{ $key }}]" value="{{ $policy->setting_value }}" class="form-control"></div>@endforeach
+<?php
+  $lvNum = fn ($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.');
+  $lvField = function (string $key, bool $readonly = false) use ($leavePolicies, $leavePolicyLabels, $lvNum) {
+      if (!isset($leavePolicies[$key])) return '';
+      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="0.01" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"></div>';
+  };
+?>
+<div class="settings-card"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. لا يتم خصم الرصيد إلا عند الاعتماد النهائي.</span></div><div class="settings-card-grid">
+<div class="lv-sub">الاستحقاق (يوم)</div>
+{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}
+<div class="lv-sub">شروط الأرصدة الأعلى</div>
+{!! $lvField('annual_long_service_years') !!}{!! $lvField('annual_age_threshold') !!}{!! $lvField('annual_hazardous_extra_days') !!}
+<div class="lv-sub">الانتظار والاستثناء</div>
+{!! $lvField('annual_wait_months') !!}{!! $lvField('allow_early_leave') !!}
+<p class="lv-note span-all">لو الموظف لم يكمل مدة الانتظار، تظهر رسالة بسبب المنع وزر «موافق» لمن يملك صلاحية الاعتماد، وتُسجَّل الإجازة كمنح استثنائي. تظهر الرسالة فقط لو «السماح بمنح استثنائي» = 1.</p>
 </div></div>
-<div class="settings-card"><div class="settings-card-head"><h3>حدود أنواع الإجازات</h3><span>الحد الأقصى لكل طلب ولكل سنة، وشروط الخدمة.</span></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>النوع</th><th>الحد في الطلب</th><th>الحد السنوي</th><th>الحد الأدنى للخدمة (شهر)</th><th>عدد المرات بالخدمة</th></tr></thead><tbody>
-@foreach($leaveTypes as $type)<tr><td>{{ $type->name }}</td><td><input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_request]" value="{{ $type->max_days_per_request }}" class="form-control"></td><td><input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_year]" value="{{ $type->max_days_per_year }}" class="form-control"></td><td><input type="number" min="0" name="types[{{ $type->id }}][min_service_months]" value="{{ $type->min_service_months }}" class="form-control"></td><td><input type="number" min="0" name="types[{{ $type->id }}][max_occurrences_service]" value="{{ $type->max_occurrences_service }}" class="form-control"></td></tr>@endforeach
+<div class="settings-card lv-wide"><div class="settings-card-head"><h3>حدود أنواع الإجازات</h3><span>كل قاعدة تُضبط هنا في مكان واحد. التعديل يخص شركتك فقط.</span></div><div class="table-responsive"><table class="table align-middle lv-table"><thead><tr><th>النوع</th><th>الحد في الطلب (يوم)</th><th>الحد السنوي (يوم)</th><th>الحد الأدنى للخدمة (شهر)</th><th>مرات طوال الخدمة</th></tr></thead><tbody>
+@foreach($leaveTypes as $type)<?php $lim = $type->limits; $isAnnual = $type->policy_code === 'annual'; $isCasual = $type->policy_code === 'casual'; ?><tr><td class="lv-type">{{ $type->name }}</td>
+<td>@if($isAnnual)<span class="lv-auto">حسب الرصيد المتاح</span>@else<input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_request]" value="{{ $lvNum($lim['max_days_per_request']) }}" class="form-control">@endif</td>
+<td><input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_year]" value="{{ $lvNum($lim['max_days_per_year']) }}" class="form-control"></td>
+<td>@if($isAnnual || $isCasual)<span class="lv-auto">{{ $isAnnual ? 'من «مدة الانتظار»' : 'بدون انتظار' }}</span>@else<input type="number" min="0" name="types[{{ $type->id }}][min_service_months]" value="{{ $lvNum($lim['min_service_months']) }}" class="form-control">@endif</td>
+<td><input type="number" min="0" name="types[{{ $type->id }}][max_occurrences_service]" value="{{ $lvNum($lim['max_occurrences_service']) }}" class="form-control"></td></tr>@endforeach
 </tbody></table></div></div>
+<details class="settings-card wide lv-ref"><summary>إعدادات محفوظة للعرض فقط <small>لا تؤثر على الحساب حاليًا</small></summary><div class="settings-card-grid">
+{!! $lvField('annual_prorate_first_year', true) !!}{!! $lvField('maternity_min_postpartum_days', true) !!}{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('pregnancy_reduced_hours_per_day', true) !!}{!! $lvField('pregnancy_overtime_protection_months', true) !!}{!! $lvField('nursing_sessions_per_day', true) !!}{!! $lvField('nursing_minutes_per_session', true) !!}{!! $lvField('childcare_max_years_per_request', true) !!}
+</div></details>
 </div>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ التعديلات</button></span></div>
 </form>
