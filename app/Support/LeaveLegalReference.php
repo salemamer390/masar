@@ -43,6 +43,7 @@ final class LeaveLegalReference
             'annual_second_year' => ['label' => 'رصيد ما بعد السنة الأولى', 'article' => 124, 'ref' => 21, 'dir' => 'min', 'unit' => 'يوم'],
             'annual_long_service' => ['label' => 'رصيد 10 سنوات / تجاوز 50 سنة', 'article' => 124, 'ref' => 30, 'dir' => 'min', 'unit' => 'يوم'],
             'annual_disability_days' => ['label' => 'رصيد ذوي الإعاقة والأقزام', 'article' => 124, 'ref' => 45, 'dir' => 'min', 'unit' => 'يوم'],
+            'annual_wait_months' => ['label' => 'مدة الانتظار', 'article' => 124, 'ref' => 6, 'dir' => 'max', 'unit' => 'شهر'],
             'annual_hazardous_extra_days' => ['label' => 'إضافة العمل الخطر أو النائي', 'article' => 124, 'ref' => 7, 'dir' => 'min', 'unit' => 'يوم'],
             'annual_long_service_years' => ['label' => 'سنوات الخدمة للرصيد الأعلى', 'article' => 124, 'ref' => 10, 'dir' => 'max', 'unit' => 'سنة'],
             'annual_age_threshold' => ['label' => 'السن للرصيد الأعلى (تجاوز)', 'article' => 124, 'ref' => 50, 'dir' => 'max', 'unit' => 'سنة'],
@@ -86,7 +87,7 @@ final class LeaveLegalReference
             'min' => $value >= (float) $ref ? self::OK : self::BELOW,
             'max' => $value <= (float) $ref ? self::OK : self::BELOW,
             // statutory ceiling on how long someone may be kept away: a lower number is never a reduction of a right
-            'cap' => $value <= (float) $ref ? self::OK : self::REVIEW,
+            'cap' => $value === (float) $ref ? self::OK : self::REVIEW,
             default => self::REVIEW,
         };
     }
