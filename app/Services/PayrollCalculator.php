@@ -164,6 +164,21 @@ class PayrollCalculator
         ]);
     }
 
+    /**
+     * Extra income tax on additional taxable earnings above the fixed
+     * structure: the month's share of the annual-tax difference when the extra
+     * is annualised on top of the fixed taxable base. This is the same
+     * marginal rule monthly() applies to taxable variable earnings.
+     */
+    public function extraIncomeTax(array $calculation, float $extraTaxable): float
+    {
+        if (abs($extraTaxable) < 0.000001) return 0.0;
+        $base = (float) ($calculation['taxable_annual'] ?? 0);
+        $annualTax = (float) ($calculation['annual_tax'] ?? 0);
+
+        return $this->round2(($this->tax->annualTax($base + 12 * $extraTaxable) - $annualTax) / 12);
+    }
+
     public function persistFields(array $s): array
     {
         return [

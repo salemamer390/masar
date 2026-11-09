@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Salary;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use App\Models\LeaveType;
 use App\Services\PayrollCalculator;
@@ -370,6 +371,8 @@ class PayrollSettingsController extends Controller
             'settings' => ['required', 'array'],
             'allowances' => ['required', 'array', 'min:1'],
             'allowances.*' => ['numeric', 'min:0', 'max:100'],
+            'allowance_prorated' => ['nullable', 'array'],
+            'allowance_prorated.*' => ['nullable', 'boolean'],
         ]);
 
         abort_if(array_diff(array_keys($data['settings']), self::SETTING_KEYS) !== [], 422, 'Invalid payroll setting.');
@@ -378,12 +381,23 @@ class PayrollSettingsController extends Controller
                 return back()->withErrors(['settings' => 'كل قيم الإعدادات يجب أن تكون أرقامًا موجبة.'])->withInput();
             }
         }
-        if (abs(round(array_sum($data['allowances']), 4) - 100) > 0.0001) {
-            return back()->withErrors(['allowances' => 'يجب أن يساوي مجموع توزيع البدلات 100%.'])->withInput();
+        // The last allowance (by sort order) takes the remaining share of the
+        // pool automatically, so the split always totals 100%.
+        $activeAllowances = DB::table('payroll_allowance_settings')->where('company_id', $companyId)->where('is_active', true)->orderBy('sort_order')->get();
+        abort_if($activeAllowances->isEmpty(), 422, 'Invalid payroll allowance.');
+        $knownKeys = $activeAllowances->pluck('allowance_key')->all();
+        abort_if(array_diff(array_keys($data['allowances']), $knownKeys) !== [], 422, 'Invalid payroll allowance.');
+        abort_if(array_diff(array_keys($data['allowance_prorated'] ?? []), $knownKeys) !== [], 422, 'Invalid payroll allowance.');
+        $lastKey = $activeAllowances->last()->allowance_key;
+        $othersSum = round(array_sum(array_map('floatval', collect($data['allowances'])->except($lastKey)->all())), 4);
+        if ($othersSum - 100 > 0.0001) {
+            return back()->withErrors(['allowances' => 'مجموع البدلات قبل الأخير لا يمكن أن يتجاوز 100%.'])->withInput();
         }
+        $data['allowances'][$lastKey] = round(100 - $othersSum, 4);
 
         app(PayrollDefaultsService::class)->ensureForCompany($companyId);
-        DB::transaction(function () use ($data, $companyId) {
+        $proratedFlags = $data['allowance_prorated'] ?? [];
+        DB::transaction(function () use ($data, $companyId, $proratedFlags) {
             $snapshot = fn () => [
                 'settings' => DB::table('payroll_calculation_settings')->where('company_id', $companyId)->where('is_active', true)->get(),
                 'allowances' => DB::table('payroll_allowance_settings')->where('company_id', $companyId)->where('is_active', true)->get(),
@@ -396,8 +410,15 @@ class PayrollSettingsController extends Controller
                     ->update(['setting_value' => $value, 'is_active' => 1, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
             }
             foreach ($data['allowances'] as $key => $percentage) {
+                $row = ['percentage' => $percentage, 'updated_at' => now()];
+                if (Schema::hasColumn('payroll_allowance_settings', 'effective_from')) {
+                    $row['effective_from'] = $data['effective_from'];
+                }
+                if (Schema::hasColumn('payroll_allowance_settings', 'is_prorated') && $proratedFlags !== []) {
+                    $row['is_prorated'] = !empty($proratedFlags[$key]) ? 1 : 0;
+                }
                 DB::table('payroll_allowance_settings')->where('company_id', $companyId)->where('allowance_key', $key)->where('is_active', true)
-                    ->update(['percentage' => $percentage, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
+                    ->update($row);
             }
             $this->recordChange($companyId, $data['effective_from'], $before, $snapshot());
         });

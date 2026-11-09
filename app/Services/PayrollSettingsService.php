@@ -253,22 +253,58 @@ class PayrollSettingsService
             return $this->allowanceDistributionCache[$cacheKey];
         }
 
+        $columns = ['allowance_key', 'allowance_name', 'percentage', 'calculation_basis', 'sort_order'];
+        $hasProrationColumn = $this->allowancesHaveProrationFlag();
+        if ($hasProrationColumn) $columns[] = 'is_prorated';
+
         return $this->allowanceDistributionCache[$cacheKey] = DB::table('payroll_allowance_settings')
             ->where('company_id', $this->companyId())
             ->where('is_active', 1)
             ->orderBy('sort_order')
-            ->get(['allowance_key', 'allowance_name', 'percentage', 'calculation_basis', 'sort_order'])
-            ->mapWithKeys(function ($row) {
+            ->get($columns)
+            ->mapWithKeys(function ($row) use ($hasProrationColumn) {
                 return [
                     $row->allowance_key => [
                         'name' => $row->allowance_name,
                         'percentage' => (float) $row->percentage,
                         'basis' => $row->calculation_basis,
                         'sort_order' => (int) $row->sort_order,
+                        // Missing column/row means the historical behavior: prorated.
+                        'prorated' => !$hasProrationColumn || (bool) ($row->is_prorated ?? true),
                     ],
                 ];
             })
             ->toArray();
+    }
+
+    /** Payroll-record column => prorated flag, per the company's allowance settings. */
+    public function allowanceProrationMap(): array
+    {
+        $columns = [
+            'transport' => 'transportation_allowance', 'transportation' => 'transportation_allowance',
+            'housing' => 'housing_allowance', 'meal' => 'meal_allowance', 'clothing' => 'clothing_allowance',
+        ];
+        $map = [];
+        foreach ($this->allowanceDistribution() as $key => $row) {
+            if (isset($columns[$key])) $map[$columns[$key]] = (bool) ($row['prorated'] ?? true);
+        }
+
+        return $map;
+    }
+
+    /** Whether one allowance column prorates with the worked part of the month. */
+    public function allowanceIsProrated(string $column): bool
+    {
+        return $this->allowanceProrationMap()[$column] ?? true;
+    }
+
+    private function allowancesHaveProrationFlag(): bool
+    {
+        try {
+            return Schema::hasColumn('payroll_allowance_settings', 'is_prorated');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function snapshot(): array
