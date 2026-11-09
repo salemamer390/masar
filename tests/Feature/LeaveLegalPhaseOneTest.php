@@ -193,4 +193,13 @@ class LeaveLegalPhaseOneTest extends TestCase
         $this->save($this->ua,['annual_second_year'=>''],[])->assertStatus(422)->assertJsonValidationErrors('policies.annual_second_year');
     }
 
+    public function test_custom_legacy_day_cap_is_not_silently_reduced_by_calendar_defaults(): void
+    {
+        $t=$this->type('maternity',['max_days_per_request'=>250]);$e=$this->emp($this->a,'custom-mat','2020-01-01');
+        $this->request($this->ua,$e,$t,'2027-01-01','2027-07-31',['birth_date'=>'2027-02-01'])->assertOk();
+        $this->save($this->ua,['annual_first_year'=>15],[$t->id=>['max_days_per_request'=>null]])->assertOk();
+        $e2=$this->emp($this->a,'custom-mat2','2020-01-01');
+        $this->request($this->ua,$e2,$t,'2027-01-01','2027-07-31',['birth_date'=>'2027-02-01'])->assertStatus(422)->assertJsonValidationErrors('end_date');
+    }
+
 }
