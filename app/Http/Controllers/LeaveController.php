@@ -61,7 +61,7 @@ class LeaveController extends Controller
             'status' => ['nullable', 'in:Pending,Manager Approved,Approved,Rejected'],
             'rejection_reason' => ['nullable', 'string', 'max:500'],
             'is_early_grant' => ['nullable', 'boolean'],
-            'early_grant_reason' => ['required_if:is_early_grant,1', 'nullable', 'string', 'max:500'],
+            'early_grant_reason' => ['nullable', 'string', 'max:500'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
         $start = Carbon::parse($data['start_date']);
@@ -92,6 +92,7 @@ class LeaveController extends Controller
         $proposed = clone $leave;
         $proposed->fill(['employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'], 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'is_early_grant' => (bool) ($data['is_early_grant'] ?? false), 'early_grant_reason' => $data['early_grant_reason'] ?? null]);
         $proposed->unsetRelation('employee')->unsetRelation('leaveType');
+        $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         if ($data['status'] === 'Approved') $this->leaveBalances->validateForApproval($proposed, $leave->id);
         $leave->update([
             'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
@@ -103,7 +104,7 @@ class LeaveController extends Controller
             'manager_approved_by' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? auth()->id() : null,
             'manager_approved_at' => in_array($data['status'], ['Manager Approved', 'Approved'], true) ? now() : null,
             'is_early_grant' => (bool) ($data['is_early_grant'] ?? false),
-            'early_grant_reason' => $data['early_grant_reason'] ?? null,
+            'early_grant_reason' => ($data['early_grant_reason'] ?? null) ?: (!empty($data['is_early_grant']) ? 'منح استثنائي بتأكيد المستخدم' : null),
             'early_grant_approved_by' => ($data['status'] === 'Approved' && !empty($data['is_early_grant'])) ? auth()->id() : null,
             'early_grant_approved_at' => ($data['status'] === 'Approved' && !empty($data['is_early_grant'])) ? now() : null,
         ]);
@@ -128,7 +129,7 @@ class LeaveController extends Controller
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'reason' => ['nullable', 'string', 'max:500'],
             'is_early_grant' => ['nullable', 'boolean'],
-            'early_grant_reason' => ['required_if:is_early_grant,1', 'nullable', 'string', 'max:500'],
+            'early_grant_reason' => ['nullable', 'string', 'max:500'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
         $start = Carbon::parse($data['start_date']);
@@ -155,11 +156,12 @@ class LeaveController extends Controller
             'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(),
             'days' => $days, 'status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now(),
             'is_early_grant' => (bool) ($data['is_early_grant'] ?? false),
-            'early_grant_reason' => $data['early_grant_reason'] ?? null,
+            'early_grant_reason' => ($data['early_grant_reason'] ?? null) ?: (!empty($data['is_early_grant']) ? 'منح استثنائي بتأكيد المستخدم' : null),
             'early_grant_approved_by' => !empty($data['is_early_grant']) ? auth()->id() : null,
             'early_grant_approved_at' => !empty($data['is_early_grant']) ? now() : null,
         ]));
         // Validate before saving, so this record never consumes its own balance twice.
+        $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         $this->leaveBalances->validateForApproval($leave);
         $leave->save();
         $this->leaveBalances->sync($leave->employee, $start);
