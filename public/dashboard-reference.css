@@ -105,15 +105,6 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 }
 
 
-/* Keep the notification panel clear of the fixed sidebar and aligned to its left. */
-@media(min-width:801px){
-  .topbar .notification-menu{position:fixed!important;top:76px!important;right:300px!important;left:auto!important;z-index:100!important;transform:none!important}
-  .app-shell.sidebar-collapsed .topbar .notification-menu{right:88px!important}
-}
-@media(max-width:800px){
-  .topbar .notification-menu{position:fixed!important;top:64px!important;right:10px!important;left:10px!important;width:auto!important;z-index:100!important;transform:none!important}
-}
-
 .dashboard-reference-layout .unified-request-copy{min-width:0;display:flex;flex-direction:column;gap:2px}
 .dashboard-reference-layout .unified-request-copy b{color:#0f172a;font-size:12px;font-weight:700;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dashboard-reference-layout .unified-request-copy small{color:#64748b;font-size:10px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -160,3 +151,10 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
    of crushing employee names into three lines. */
 .dashboard-reference-layout .recent-leaves .table{min-width:460px}
 .dashboard-reference-layout .new-employees .table{min-width:400px}
+
+/* Dashboard cards stay bounded as the company grows. Details load further
+   pages on scroll; the page-size selector does not belong in these dialogs. */
+.dashboard-reference-layout .reference-panel{max-height:520px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.dashboard-reference-layout .reference-panel .panel-head{position:sticky;top:0;z-index:2;background:inherit}
+#dashboardDetailBody{max-height:75dvh;overflow-y:auto;overscroll-behavior:contain}
+@media(max-width:800px){.dashboard-reference-layout .reference-panel{max-height:460px}}
