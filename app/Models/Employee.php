@@ -33,6 +33,8 @@ class Employee extends Model
         'marital_status',
         'qualification',
         'birth_date',
+        'expected_delivery_date',
+        'pregnancy_reduction_start',
         'address',
         'department_id',
         'job_id',
@@ -58,6 +60,8 @@ class Employee extends Model
 
     protected $casts = [
         'birth_date' => 'date',
+        'expected_delivery_date' => 'date',
+        'pregnancy_reduction_start' => 'date',
         'hire_date' => 'date',
         'contract_start_date' => 'date',
         'contract_end_date' => 'date',
