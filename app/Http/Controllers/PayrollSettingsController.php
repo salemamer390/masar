@@ -56,7 +56,7 @@ class PayrollSettingsController extends Controller
         $leavePolicyLabels += array_map(fn ($r) => $r['label'], \App\Support\LeaveLegalReference::policyRules());
         // Effective limits per type for THIS company (own copy of a shared type, casual per-request/year from the company policy).
         $leaveBalances = app(\App\Services\LeaveBalanceService::class);
-        $leaveTypes = LeaveType::where(fn ($q) => $q->where('is_active', true)->orWhere('policy_code', 'contagious_contact'))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
+        $leaveTypes = LeaveType::where(fn ($q) => $q->where('is_active', true)->orWhere('policy_code', 'contagious_contact')->orWhere('policy_code', 'like', 'contagious_contact_company_%'))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
             $limits = $leaveBalances->limitsFor($type, $companyId ? (int) $companyId : null);
             if ($type->policy_code === 'casual') {
                 $perRequest = $leavePolicies['casual_max_days_request']->setting_value ?? null;
@@ -131,7 +131,7 @@ class PayrollSettingsController extends Controller
     {
         $data = $request->validate([
             'policies' => ['required', 'array'],
-            'policies.*' => ['nullable', 'numeric', 'min:0'],
+            'policies.*' => ['required', 'numeric', 'min:0'],
             'types' => ['nullable', 'array'],
             'types.*.max_days_per_request' => ['nullable', 'numeric', 'min:0'],
             'types.*.max_days_per_year' => ['nullable', 'numeric', 'min:0'],
@@ -139,6 +139,8 @@ class PayrollSettingsController extends Controller
             'types.*.max_occurrences_service' => ['nullable', 'integer', 'min:0'],
             'types.*.requires_document' => ['nullable', 'boolean'],
             'confirm_below_reference' => ['sometimes', 'accepted'],
+            'contact_pay' => ['nullable', 'in:paid,unpaid'],
+            'contact_active' => ['nullable', 'boolean'],
         ]);
         if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document')) {
             $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
@@ -151,6 +153,8 @@ class PayrollSettingsController extends Controller
         foreach (['maternity_months', 'childcare_max_years_per_request', 'childcare_min_gap_years', 'exam_notice_days', 'contagious_max_months', 'maternity_min_postpartum_days'] as $key) {
             if (isset($data['policies'][$key]) && (float) $data['policies'][$key] != (int) $data['policies'][$key]) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون عددًا صحيحًا.']);
         }
+        if ($request->boolean('contact_active') && !$request->filled('contact_pay')) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => 'اختر سياسة الأجر أولًا قبل تفعيل إجازة المخالطة. المادة 132 لا تحدد الأجر.']);
+        if ($request->has('contact_active') && !$request->filled('contact_pay') && LeaveType::where('company_id', $companyId)->where('policy_code', 'contagious_contact_company_'.$companyId)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => 'اختر سياسة الأجر للنوع المسجل، أو ألغِ تفعيله مع الإبقاء على سياسة أجره.']);
         $currentPolicies = DB::table('leave_policy_settings')->where('company_id', $companyId)->pluck('setting_value', 'setting_key')->all();
         $nextPolicies = array_replace($currentPolicies, $data['policies']);
         $warnings = [];
@@ -179,6 +183,9 @@ class PayrollSettingsController extends Controller
         $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document'];
         $balances = app(\App\Services\LeaveBalanceService::class);
         DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
+            if (!empty($data['contact_pay'])) {
+                LeaveType::updateOrCreate(['company_id' => $companyId, 'policy_code' => 'contagious_contact_company_'.$companyId], ['name' => 'إجازة مخالطة مريض بمرض معد', 'is_paid' => $data['contact_pay'] === 'paid', 'is_active' => (bool) ($data['contact_active'] ?? false), 'deducts_annual_balance' => false, 'requires_document' => true]);
+            }
             $setPolicy = fn (string $key, $value) => DB::table('leave_policy_settings')->where('company_id', $companyId)->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
             foreach ($data['policies'] as $key => $value) {
                 $setPolicy($key, $value);
@@ -209,7 +216,7 @@ class PayrollSettingsController extends Controller
                 }
             }
         });
-        ActivityLog::record('leave_policy_update', 'Leave policy settings updated.', null, $before, ['policies' => $data['policies'], 'types' => $data['types'] ?? [], 'below_reference_confirmed' => $request->boolean('confirm_below_reference'), 'warnings' => $warnings], 'leaves');
+        ActivityLog::record('leave_policy_update', 'Leave policy settings updated.', null, $before, ['policies' => $data['policies'], 'types' => $data['types'] ?? [], 'below_reference_confirmed' => $request->boolean('confirm_below_reference'), 'warnings' => $warnings, 'contact_pay' => $data['contact_pay'] ?? null, 'contact_active' => $data['contact_active'] ?? false], 'leaves');
         return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', 'تم حفظ إعدادات الإجازات بنجاح.');
     }
 
