@@ -1077,3 +1077,6 @@ body.preview-dark .lv-sub { color: #7db0ff; border-color: var(--dm-border); }
 body.preview-dark .lv-note, body.preview-dark .lv-auto, body.preview-dark .lv-ref summary small { color: var(--dm-muted); }
 body.preview-dark .lv-ref summary { color: var(--dm-text); }
 body.preview-dark .lv-ref .form-control:disabled { background: var(--dm-surface-2, var(--dm-surface)); color: var(--dm-muted); opacity: .85; }
+
+/* Guided maternity modal: employee-name strip follows the dark surfaces. */
+body.preview-dark #employeeMaternityName { background: var(--dm-surface-2, #1f2c46); border-color: var(--dm-border, #2a3850); color: var(--dm-text, #e9eef7); }
