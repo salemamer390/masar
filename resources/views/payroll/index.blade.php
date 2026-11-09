@@ -34,7 +34,7 @@
 <tr class="table-light"><td colspan="5"><small class="text-muted">عند الاعتماد كان {{ count($run->skipped_report['skipped']) }} موظف بدون سجل راتب: @foreach(array_slice($run->skipped_report['skipped'], 0, 10) as $item){{ $item['name'] }}@if(!$loop->last)، @endif @endforeach</small></td></tr>
 @endif
 @empty<tr><td colspan="5" class="text-center py-4">لا يوجد مسير بعد. يلزم وجود هيكل راتب نشط للموظفين قبل الإنشاء.</td></tr>@endforelse</tbody></table></div>
-<div class="panel table-panel mt-3"><div class="panel-head"><div><h3>تفاصيل مسير {{ $month->translatedFormat('F Y') }}</h3><span>الغياب والجزاءات تأتي من السجلات المعتمدة؛ أضف البنود المتغيرة قبل اعتماد المسير.</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>الموظف</th><th>هيكل الراتب</th><th>الراتب الإجمالي</th><th>إضافي</th><th>غياب</th><th>جزاءات</th><th>تأمين الموظف</th><th>الضريبة</th><th>الصافي</th><th>تكلفة الشركة</th><th>الحالة</th><th></th></tr></thead><tbody>@forelse($records as $record)<tr><td><a class="employee-link fw-bold" href="{{ route('employees.show',$record->employee) }}">{{ $record->employee?->full_name }}</a><small class="d-block text-muted">{{ $record->employee?->department?->name }}</small></td><td>@if($record->salary)<a href="{{ route('salaries.index',['employee_id'=>$record->employee_id]) }}" class="small fw-semibold">هيكل #{{ $record->salary_id }}</a><small class="d-block text-muted">ساري من {{ $record->salary->effective_from?->format('d/m/Y') ?? '—' }}</small><small class="d-block text-muted">المتفق عليه: {{ format_money($record->agreed_net_salary) }}</small>@else—@endif</td><td>{{ format_money($record->gross_salary) }}</td><td>{{ format_money($record->overtime_amount) }}</td><td>{{ format_money($record->absence_deduction) }} <small class="text-muted">({{ format_number($record->absence_days) }} يوم)</small></td><td>{{ format_money($record->penalties) }} <small class="text-muted">({{ format_number($record->penalty_days) }} يوم)</small></td><td>{{ format_money($record->employee_insurance) }}</td><td>{{ format_money($record->income_tax) }}</td><td class="fw-bold text-success">{{ format_money($record->net_salary) }}</td><td>{{ format_money($record->employee_cost) }}</td><td><span class="badge {{ $record->is_locked ? 'text-bg-dark' : ($record->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $record->status }}</span></td><td>@if(in_array($record->status,['Draft','قيد الإعداد'],true) && !$record->is_locked && auth()->user()?->hasPermission('payroll.edit'))<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#inputs{{ $record->id }}">مدخلات</button>@endif</td></tr>@empty<tr><td colspan="12" class="text-center py-5">لا توجد سجلات لهذا الشهر.</td></tr>@endforelse</tbody></table></div></div>
+<div class="panel table-panel mt-3"><div class="panel-head"><div><h3>تفاصيل مسير {{ $month->translatedFormat('F Y') }}</h3><span>الغياب والجزاءات تأتي من السجلات المعتمدة؛ أضف البنود المتغيرة قبل اعتماد المسير.</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>الموظف</th><th>هيكل الراتب</th><th>الراتب الإجمالي</th><th>إضافي</th><th>غياب</th><th>جزاءات</th><th>تأمين الموظف</th><th>الضريبة</th><th>الصافي</th><th>تكلفة الشركة</th><th>الحالة</th><th></th></tr></thead><tbody>@forelse($records as $record)<tr><td><a class="employee-link fw-bold" href="{{ route('employees.show',$record->employee) }}">{{ $record->employee?->full_name }}</a><small class="d-block text-muted">{{ $record->employee?->department?->name }}</small></td><td>@if($record->salary)<a href="{{ route('salaries.index',['employee_id'=>$record->employee_id]) }}" data-salary-details-url="{{ route('salaries.details', $record->salary) }}" class="small fw-semibold">هيكل #{{ $record->salary_id }}</a><small class="d-block text-muted">ساري من {{ $record->salary->effective_from?->format('d/m/Y') ?? '—' }}</small><small class="d-block text-muted">المتفق عليه: {{ format_money($record->agreed_net_salary) }}</small>@else—@endif</td><td>{{ format_money($record->gross_salary) }}</td><td>{{ format_money($record->overtime_amount) }}</td><td>{{ format_money($record->absence_deduction) }} <small class="text-muted">({{ format_number($record->absence_days) }} يوم)</small></td><td>{{ format_money($record->penalties) }} <small class="text-muted">({{ format_number($record->penalty_days) }} يوم)</small></td><td>{{ format_money($record->employee_insurance) }}</td><td>{{ format_money($record->income_tax) }}</td><td class="fw-bold text-success">{{ format_money($record->net_salary) }}</td><td>{{ format_money($record->employee_cost) }}</td><td><span class="badge {{ $record->is_locked ? 'text-bg-dark' : ($record->status === 'Approved' ? 'text-bg-success' : 'text-bg-warning') }}">{{ $record->status }}</span></td><td>@if(in_array($record->status,['Draft','قيد الإعداد'],true) && !$record->is_locked && auth()->user()?->hasPermission('payroll.edit'))<button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#inputs{{ $record->id }}">مدخلات</button>@endif</td></tr>@empty<tr><td colspan="12" class="text-center py-5">لا توجد سجلات لهذا الشهر.</td></tr>@endforelse</tbody></table></div></div>
 
 <div class="modal fade" id="payrollCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="payrollCardTitle">تفاصيل البطاقة</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="payrollCardBody" class="details-grid"></div></div></div></div></div>
 <script>
@@ -386,26 +386,28 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       openPayrollDetails(record);
     });
     row.querySelectorAll('a[href*="/salaries"]').forEach((link) => {
-      link.addEventListener('click', (event) => { event.preventDefault(); openSalaryDetails(record); });
+      link.addEventListener('click', (event) => { event.preventDefault(); openSalaryDetails(record, link.dataset.salaryDetailsUrl); });
     });
   });
-  const salaryModal = document.createElement('div');
-  salaryModal.className = 'modal fade payroll-salary-modal';
-  salaryModal.id = 'payrollSalaryDetails';
-  salaryModal.innerHTML = '<div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">تفاصيل هيكل الراتب</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" data-salary-body></div></div></div>';
-  document.body.append(salaryModal);
-  const openSalaryDetails = (record) => {
-    const body = salaryModal.querySelector('[data-salary-body]');
-    const value = (label, amount) => detailValue(label, payrollMoney(amount || 0));
-    const decimalValue = (label, amount) => detailValue(label, payrollMoneyDecimal(amount || 0));
-    const section = (title, icon, content) => `<div class="payroll-salary-section"><h6><i class="bi bi-${icon}"></i>${title}</h6><div class="payroll-salary-grid">${content}</div></div>`;
-    body.innerHTML = `<div class="payroll-salary-heading"><strong>${record.name || '—'}</strong><span>هيكل #${record.salary_id || '—'} · ساري من ${record.effective_from || '—'}</span></div>
-      ${section('الراتب والبدلات','cash-stack', value('الراتب الصافي',record.structure_net_salary ?? record.net_salary)+value('الراتب الإجمالي',record.structure_gross_salary ?? record.gross_salary)+value('الأجر الأساسي',record.structure_basic_salary ?? record.basic_salary)+value(`إجمالي البدلات (${record.structure_allowance_limit_pct || 0}%)`,record.structure_allowance_limit)+value('بدل الانتقال',record.structure_transportation_allowance)+value('بدل الوجبة',record.structure_meal_allowance)+value('بدل السكن',record.structure_housing_allowance)+value('بدل الملابس',record.structure_clothing_allowance)+value('المتبقي من البدلات',record.structure_allowance_remaining))}
-      ${section('التأمينات','shield-check', value('الأجر التأميني',record.structure_no_insurance ? 0 : record.structure_applied_insurance_wage)+value('حصة الموظف',record.employee_insurance)+value('حصة صاحب العمل',record.structure_employer_insurance)+detailValue('حالة التأمين',record.structure_no_insurance ? 'بدون تأمينات' : 'مؤمّن'))}
-      ${section('الضرائب والاستقطاعات','receipt', value('الإعفاء الشخصي الشهري',record.structure_personal_exemption)+value('الوعاء الضريبي السنوي',record.structure_taxable_annual)+value('ضريبة الدخل الشهرية',record.income_tax)+decimalValue('صندوق الشهداء',record.structure_martyrs_fund)+value('استقطاعات ثابتة',record.structure_fixed_deductions)+value('إجمالي الاستقطاعات',record.structure_total_deductions)+value('صافي الراتب النهائي',record.structure_net_salary ?? record.net_salary))}
-      <div class="payroll-salary-section"><h6><i class="bi bi-building"></i>تكلفة الشركة</h6><div class="payroll-salary-grid">${value('حصة صاحب العمل',record.structure_employer_insurance)}${value('إجمالي تكلفة الموظف',record.structure_employee_cost ?? record.employee_cost)}</div></div>
-      ${record.structure_notes ? `<div class="alert alert-light border mt-3 mb-0"><strong>ملاحظات:</strong> ${record.structure_notes}</div>` : ''}`;
-    bootstrap.Modal.getOrCreateInstance(salaryModal).show();
+  // Reuse the actual salaries-page modal, rendered by the shared Blade partial.
+  // No financial values or modal markup are reconstructed in JavaScript.
+  const openSalaryDetails = async (record, sourceUrl) => {
+    const modalId = 'salaryDetails' + record.salary_id;
+    const existing = document.getElementById(modalId);
+    if (existing) { bootstrap.Modal.getOrCreateInstance(existing).show(); return; }
+    try {
+      const response = await fetch(sourceUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const source = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const modal = source.getElementById(modalId);
+      if (!modal) throw new Error('Salary structure unavailable');
+      const imported = document.importNode(modal, true);
+      document.body.appendChild(imported);
+      bootstrap.Modal.getOrCreateInstance(imported).show();
+    } catch (error) {
+      window.showToast?.('تعذر تحميل هيكل الراتب. أعد المحاولة أو افتح صفحة هياكل الرواتب.');
+      console.error('Salary structure modal load failed', error);
+    }
   };
   if (payrollDetailsTable) {
     const employeeCodes = @json($records->getCollection()->map(fn ($record) => $record->employee?->employee_code)->values());
@@ -533,4 +535,3 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   });
 </script>
 @endpush
-

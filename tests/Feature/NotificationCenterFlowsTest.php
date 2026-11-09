@@ -43,7 +43,7 @@ class NotificationCenterFlowsTest extends TestCase
         $this->assertNotNull($target->fresh()->read_at);
 
         // The topbar shows the real unread count, not the dropdown page size.
-        $this->get('/notifications')->assertOk()->assertSee('7 جديدة', false);
+        $this->get('/notifications')->assertOk()->assertSee('7 جديدة', false)->assertSee('تعيين الكل كمقروءة')->assertSee('notification-scroll')->assertSee('عرض كل الإشعارات');
 
         $this->post('/notifications/read-all')->assertRedirect();
         $this->assertSame(0, $owner->unreadNotifications()->count());

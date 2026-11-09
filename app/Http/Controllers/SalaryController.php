@@ -47,7 +47,21 @@ class SalaryController extends Controller
         $departments = Department::where('is_active', 1)->orderBy('name')->get();
         $paymentMethods = PaymentMethod::orderBy('name')->get();
         $allowanceRate = $this->settings->allowanceRate();
-        $payrollSettings = [
+        $payrollSettings = $this->viewSettings();
+        $allowanceDistribution = $this->settings->allowanceDistribution();
+        $selectedEmployee = $request->filled('employee_id') ? $employees->firstWhere('id', (int) $request->input('employee_id')) : null;
+
+        // العرض دائماً بحسب منطق الحساب الحالي (بدون حفظ). لحفظ النتائج استخدم زر «إعادة حساب الهياكل».
+        foreach ($salaries as $salary) {
+            $this->syncBreakdown($salary, $calculator, false);
+        }
+
+        return view('salaries.index', compact('salaries', 'employees', 'departments', 'paymentMethods', 'allowanceRate', 'payrollSettings', 'allowanceDistribution', 'selectedEmployee'));
+    }
+
+    private function viewSettings(): array
+    {
+        return [
             'employee_insurance_rate' => $this->settings->employeeInsuranceRate() * 100,
             'employer_insurance_rate' => $this->settings->employerInsuranceRate() * 100,
             'martyrs_fund_rate' => $this->settings->martyrsFundRate() * 100,
@@ -59,15 +73,14 @@ class SalaryController extends Controller
             'day_multiplier' => $this->settings->dayOvertimeMultiplier(),
             'night_multiplier' => $this->settings->nightOvertimeMultiplier(),
         ];
-        $allowanceDistribution = $this->settings->allowanceDistribution();
-        $selectedEmployee = $request->filled('employee_id') ? $employees->firstWhere('id', (int) $request->input('employee_id')) : null;
+    }
 
-        // العرض دائماً بحسب منطق الحساب الحالي (بدون حفظ). لحفظ النتائج استخدم زر «إعادة حساب الهياكل».
-        foreach ($salaries as $salary) {
-            $this->syncBreakdown($salary, $calculator, false);
-        }
-
-        return view('salaries.index', compact('salaries', 'employees', 'departments', 'paymentMethods', 'allowanceRate', 'payrollSettings', 'allowanceDistribution', 'selectedEmployee'));
+    /** The same details component for salary cards and payroll references. */
+    public function details(Salary $salary, PayrollCalculator $calculator)
+    {
+        $salary->load(['employee.department', 'employee.job']);
+        if ($salary->status === 'Active') $this->syncBreakdown($salary, $calculator, false);
+        return view('salaries.partials.details-modal', ['s' => $salary, 'payrollSettings' => $this->viewSettings()]);
     }
 
     public function store(Request $request, PayrollCalculator $calculator, PayrollRunService $payrollRuns)

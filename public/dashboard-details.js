@@ -12,18 +12,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const base = window.location.pathname.replace(/\/dashboard(?:\/.*)?$/, '').replace(/\/$/, '');
     return `${base}/dashboard/details/${encodeURIComponent(type)}`;
   };
+  let pageObserver;
+  const wireMore = () => {
+    pageObserver?.disconnect();
+    const button = body?.querySelector('[data-dashboard-next]');
+    if (!button) return;
+    const more = button.closest('[data-dashboard-more]');
+    const appendPage = async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = 'جارٍ التحميل...';
+      try {
+        const response = await fetch(button.dataset.dashboardNext, {headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'}});
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+        page.querySelectorAll('tbody > tr').forEach(row => body.querySelector('tbody')?.appendChild(document.importNode(row, true)));
+        const next = page.querySelector('[data-dashboard-more]');
+        if (next) more.replaceWith(document.importNode(next, true)); else more.remove();
+        wireMore();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = 'تعذر التحميل. إعادة المحاولة';
+      }
+    };
+    button.addEventListener('click', appendPage);
+    if ('IntersectionObserver' in window) {
+      pageObserver = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) appendPage(); }, {root: body, rootMargin: '100px'});
+      pageObserver.observe(button);
+    }
+  };
   const load = (url, fallbackTried = false) => {
     if (!body || !modal) return;
+    pageObserver?.disconnect();
     body.innerHTML = '<div class="text-center p-5"><span class="spinner-border"></span></div>';
     modal.show();
     fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'}})
       .then(response => { if (!response.ok) { const error = new Error(`HTTP ${response.status}`); error.status = response.status; throw error; } return response.text(); })
       .then(html => {
         body.innerHTML = html;
+        wireMore();
         body.querySelector('[data-dashboard-detail-search]')?.addEventListener('submit', event => {
           event.preventDefault();
           const targetUrl = new URL(url, window.location.origin);
-          new FormData(event.target).forEach((value, key) => value && targetUrl.searchParams.set(key, value));
+          targetUrl.searchParams.delete('page');
+          new FormData(event.target).forEach((value, key) => { if (value) targetUrl.searchParams.set(key, value); else targetUrl.searchParams.delete(key); });
           load(targetUrl.toString());
         });
       })

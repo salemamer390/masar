@@ -7,4 +7,6 @@
 @elseif($type === 'documents-incomplete')<tr><td>{{ $item['employee']->full_name }}</td><td>@if($item['missing_fields']) بيانات: {{ implode('، ', $item['missing_fields']) }}@endif @if($item['missing_fields'] && $item['missing_documents'])<br>@endif @if($item['missing_documents']) مستندات: {{ implode('، ', $item['missing_documents']) }}@endif</td><td><a href="{{ route('employees.show', $item['employee']) }}">فتح الملف</a></td></tr>
 @else<tr><td>{{ $item->employee?->full_name }}</td><td>{{ $item->leaveType?->name }}</td><td>{{ ['Approved' => 'معتمدة', 'Rejected' => 'مرفوضة'][$item->status] ?? $item->status }}</td></tr>@endif
 @empty<tr><td colspan="3" class="text-center text-muted py-4">لا توجد بيانات.</td></tr>@endforelse</tbody></table></div>
-@if($items instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator)<x-pagination-controls :paginator="$items" :default="15" />@endif
+@if($items instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $items->hasMorePages())
+<div data-dashboard-more class="text-center py-2"><button type="button" class="btn btn-sm btn-outline-primary" data-dashboard-next="{{ $items->nextPageUrl() }}">تحميل المزيد</button><span class="visually-hidden" data-dashboard-loaded>{{ $items->lastItem() }} من {{ $items->total() }}</span></div>
+@endif

@@ -21,6 +21,7 @@ class StyleAssetsTest extends TestCase
             'company/account'=>1, 'jobs/index'=>1, 'roles/index'=>1];
         foreach ($pages as $page=>$count) {
             $view = file_get_contents(resource_path('views/'.$page.'.blade.php'));
+            if ($page === 'requests/index') $view .= file_get_contents(resource_path('views/requests/partials/create-behavior.blade.php'));
             $this->assertStringNotContainsString('<style', $view, $page);
             $prefix = 'css/pages/'.str_replace('/', '-', $page).'-';
             for ($i=1; $i<=$count; $i++) {

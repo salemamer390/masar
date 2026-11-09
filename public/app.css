@@ -4180,6 +4180,23 @@ nav[role="navigation"] span[aria-current="page"] > span {
   }
 }
 
+
+/* Keep the notification panel clear of the fixed sidebar and aligned to its left. */
+@media(min-width:801px){
+  .topbar .notification-menu{position:fixed!important;top:76px!important;right:300px!important;left:auto!important;z-index:100!important;transform:none!important}
+  .app-shell.sidebar-collapsed .topbar .notification-menu{right:88px!important}
+}
+@media(max-width:800px){
+  .topbar .notification-menu{position:fixed!important;top:64px!important;right:10px!important;left:10px!important;width:auto!important;z-index:100!important;transform:none!important}
+}
+
+
+.notification-menu .notification-scroll{max-height:min(380px,calc(100dvh - 230px));overflow-y:auto;overscroll-behavior:contain}
+.notification-menu{max-width:calc(100vw - 20px)}
+.topbar .notification-menu{max-height:calc(100dvh - 90px);overflow:hidden}
+/* A fixed dropdown still inherits the topbar's stacking context. Raise that
+   context while open so even an expanded mobile sidebar cannot cover it. */
+.topbar:has(.notification-menu.show){z-index:30}
 /* ====== design-system.css ====== */
 :root {
   --color-primary: #1677FF;
