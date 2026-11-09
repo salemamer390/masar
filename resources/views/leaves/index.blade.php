@@ -60,7 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const canDeleteLeave = @json(auth()->user()?->hasPermission('leaves.delete'));
   const leaveCache = @json($leaves->getCollection()->keyBy('id'));
   const leaveEmployees = @json($employees->map(fn ($employee) => ['id' => $employee->id, 'name' => $employee->full_name]));
-  const leaveTypesData = @json($leaveTypes->map(fn ($type) => ['id' => $type->id, 'name' => $type->name]));
+  @php
+    $leaveTypesForScript = $leaveTypes->map(fn ($type) => ['id' => $type->id, 'name' => $type->name, 'policy_code' => $type->policy_code, 'requires_document' => app(\App\Services\LeaveBalanceService::class)->limitsFor($type, auth()->user()->company_id)['requires_document']]);
+  @endphp
+  const leaveTypesData = @json($leaveTypesForScript);
   const escapeLeaveHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const leaveStatus = (status) => ['Rejected', 'Cancelled', 'Canceled', 'مرفوض', 'مرفوضة', 'ملغاة', 'ملغي', 'ملغى'].includes(status) ? ['ملغاة', 'danger'] : ['مؤكدة', 'success'];
   const leaveDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
@@ -82,8 +85,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = Number(form.closest('.modal')?.id?.replace('editLeave',''));
     const leave = leaveCache[id] || {};
     const area = document.createElement('div'); area.className='mt-3 leave-proof-fields';
-    area.innerHTML = `<label class="form-label">تاريخ الولادة (أو المتوقع، لإجازة الوضع)</label><input type="date" name="birth_date" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.birth_date || '').slice(0,10))}"><label class="form-label">مستند الإجازة (حتى 10 ميجابايت)</label><input type="file" name="document" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><small class="text-muted">المستند مطلوب عندما تنص سياسة الشركة عليه. إجازة الامتحانات تحتاج إثباتًا وإخطارًا قبل البداية بـ10 أيام افتراضيًا.</small>${leave.document_path ? `<a class="d-block mt-1" target="_blank" href="${leaveBaseUrl}/${id}/document">عرض المستند المحفوظ</a>` : ''}`;
+    area.innerHTML = `<div data-birth-fields><label class="form-label">تاريخ الولادة (أو المتوقع، لإجازة الوضع)</label><input type="date" name="birth_date" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.birth_date || '').slice(0,10))}"></div><label class="form-label">مستند الإجازة (حتى 10 ميجابايت)</label><input type="file" name="document" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><small class="text-muted" data-proof-instruction></small>${leave.document_path ? `<a class="d-block mt-1" target="_blank" href="${leaveBaseUrl}/${id}/document">عرض المستند المحفوظ</a>` : ''}`;
     form.querySelector('.modal-body').appendChild(area);
+    const select = form.querySelector('[name="leave_type_id"]');
+    const updateProof = () => {
+      const type = leaveTypesData.find(t => Number(t.id) === Number(select.value)) || {};
+      const maternity = type.policy_code === 'maternity';
+      area.querySelector('[data-birth-fields]').hidden = !maternity;
+      area.querySelector('[name="birth_date"]').disabled = !maternity;
+      area.querySelector('[name="birth_date"]').required = maternity;
+      area.querySelector('[data-proof-instruction]').textContent = type.policy_code === 'exams'
+        ? 'إثبات دخول الامتحان مطلوب حسب سياسة الشركة. مهلة الإخطار المحددة: ' + @json(app(\App\Services\LeaveBalanceService::class)->policy('exam_notice_days', '10')) + ' أيام.'
+        : maternity ? 'شهادة طبية موضح بها تاريخ الولادة المتوقع، مع تاريخ الولادة للتحقق من الحد الأدنى بعدها.'
+        : type.requires_document ? 'مستند الإثبات مطلوب لهذا النوع وفق سياسة الشركة.' : 'المستند اختياري لهذا النوع وفق سياسة الشركة.';
+    };
+    select.addEventListener('change', updateProof); updateProof();
+
   };
   const wireLeaveAjaxForms = (root = document) => {
     root.querySelectorAll('#leaveModal form, .modal[id^="editLeave"] form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; proofFields(form); });
