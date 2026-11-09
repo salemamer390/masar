@@ -339,21 +339,107 @@ class PayrollRunService
     {
         // Persist the contractual amounts actually earned in the period: the
         // engine's internal basic/allowance split drives statutory math only.
-        $contractualBasicEarned = round((float) ($salary->basic_salary ?? $calculation['basic_salary']) * $window['factor'], 2);
+        $contractualBasicEarned = round((float) ($salary->basic_salary ?? $structure['basic_salary']) * $window['factor'], 2);
         // Itemized allowances are the contractual split when the structure has
         // one; a lump-only structure stores zeros so the drawer shows the
         // contractual lump instead of the engine's invented split.
         $hasContractualSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
             + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
+        // Each allowance follows its own proration setting: a prorated one is
+        // scaled by the worked factor, a full one is paid whole.
+        $allowanceEarned = function (string $column) use ($salary, $window) {
+            $full = (float) ($salary->{$column} ?? 0);
+            return $this->settings->allowanceIsProrated($column) ? round($full * $window['factor'], 2) : round($full, 2);
+        };
         $itemized = static fn (string $column): float => $hasContractualSplit
-            ? round((float) ($salary->{$column} ?? 0) * $window['factor'], 2)
+            ? $allowanceEarned($column)
             : 0.0;
+        // A lump-only legacy structure has no per-allowance amounts of its
+        // own. The engine's own pool split supplies the components - the same
+        // configured percentages the calculator splits a gross with - and each
+        // share follows its own proration flag. The clothing share is the
+        // remainder, exactly like the calculator's residual.
+        $lumpEarned = function () use ($salary, $structure, $window) {
+            $lump = (float) ($salary->allowances ?? $structure['allowances']);
+            $factor = $window['factor'];
+            $distribution = $this->settings->allowanceDistribution();
+            if (!$distribution) return round($lump * $factor, 2);
+            $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
+            $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
+            $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
+            $housing = $distribution['housing'] ?? null;
+            $meal = $distribution['meal'] ?? null;
+            $clothing = $distribution['clothing'] ?? null;
+            $transportShare = $share($transport, 0.35);
+            $housingShare = $share($housing, 0.30);
+            $mealShare = $share($meal, 0.20);
+            $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
+            $earned = $lump * $transportShare * ($flag($transport) ? $factor : 1)
+                + $lump * $housingShare * ($flag($housing) ? $factor : 1)
+                + $lump * $mealShare * ($flag($meal) ? $factor : 1)
+                + $lump * $clothingShare * ($flag($clothing) ? $factor : 1);
+
+            return round($earned, 2);
+        };
+        $allowancesEarned = $hasContractualSplit
+            ? round($itemized('housing_allowance') + $itemized('transportation_allowance') + $itemized('meal_allowance') + $itemized('clothing_allowance'), 2)
+            : $lumpEarned();
+
+        $netMonthly = (float) $calculation['net_monthly'];
+        $deductionsTotal = (float) $calculation['monthly_deductions'];
+        $monthlyTotal = (float) $calculation['monthly_total'];
+        $employeeCost = (float) $calculation['employee_cost'];
+        $incomeTax = (float) $calculation['income_tax'];
+        $martyrsFund = (float) $calculation['martyrs_fund'];
+        $prorationAdjustment = 0.0;
+        $prorationAdjustmentTax = 0.0;
+        $prorationAdjustmentMartyrs = 0.0;
+
+        if (abs($window['factor'] - 1) > 0.000001) {
+            // Statutory treatment of the partial month keeps the engine's
+            // established rules exactly: the structure income tax and the
+            // martyrs fund prorate by the day factor; social insurance is
+            // charged in full; every other deduction stays whole. The extra a
+            // full-paid allowance pays over the all-prorated baseline is
+            // additional earned wage, taxed through the engine's existing
+            // marginal path - the same annualised-bracket rule the calculator
+            // applies to overtime, bonuses and other variable earnings - and
+            // carrying the flat martyrs-fund rate like any gross pay.
+            $contractualFullFixed = (float) ($salary->basic_salary ?? $structure['basic_salary'])
+                + ($hasContractualSplit
+                    ? (float) $salary->housing_allowance + (float) $salary->transportation_allowance
+                        + (float) $salary->meal_allowance + (float) $salary->clothing_allowance
+                    : (float) ($salary->allowances ?? $structure['allowances']));
+            $fixedEarned = round($contractualBasicEarned + $allowancesEarned, 2);
+            $structureTax = (float) ($calculation['income_tax_structure'] ?? 0);
+            $martyrsFull = (float) ($salary->martyrs_fund ?? 0);
+            $extra = round($fixedEarned - $contractualFullFixed * $window['factor'], 2);
+            $extraTax = $this->calculator->extraIncomeTax($calculation, $extra);
+            $extraMartyrs = round($extra * $this->settings->martyrsFundRate(), 2);
+            $incomeTax = round($structureTax * $window['factor']
+                + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2);
+            $martyrsFund = round($martyrsFull * $window['factor'] + $extraMartyrs, 2);
+            $engineFixedEarned = round((float) $calculation['basic_salary'] + (float) $calculation['allowances'], 2);
+            $variableEntitlements = round((float) $calculation['entitlements'] - $engineFixedEarned, 2);
+            $entitlements = round($fixedEarned + $variableEntitlements, 2);
+            $deductionsTotal = round((float) $calculation['monthly_deductions']
+                - (float) $calculation['income_tax'] - (float) $calculation['martyrs_fund']
+                + $incomeTax + $martyrsFund, 2);
+            $netMonthly = round($entitlements - $deductionsTotal, 2);
+            $monthlyTotal = round((float) $calculation['monthly_total'] - $engineFixedEarned + $fixedEarned, 2);
+            $employeeCost = round($entitlements + (float) $calculation['employer_insurance'], 2);
+            // Audit trail: the gross extra the full-paid allowances pay over
+            // the all-prorated baseline, and the statutory amounts it carries.
+            $prorationAdjustment = $extra;
+            $prorationAdjustmentTax = $extraTax;
+            $prorationAdjustmentMartyrs = $extraMartyrs;
+        }
 
         return [
             'payroll_run_id' => $run->id, 'salary_id' => $salary->id,
             'agreed_net_salary' => (float) $salary->net_salary,
             'basic_salary' => $contractualBasicEarned,
-            'allowances' => round((float) ($salary->allowances ?? $calculation['allowances']) * $window['factor'], 2),
+            'allowances' => $allowancesEarned,
             'housing_allowance' => $itemized('housing_allowance'), 'transportation_allowance' => $itemized('transportation_allowance'),
             'meal_allowance' => $itemized('meal_allowance'), 'clothing_allowance' => $itemized('clothing_allowance'),
             'overtime_amount' => $calculation['overtime_amount'], 'total_overtime' => $calculation['overtime_amount'],
@@ -367,14 +453,14 @@ class PayrollRunService
             'bonus' => $calculation['bonus'], 'incentives' => $calculation['incentives'], 'commission' => $calculation['commission'],
             'profit_share' => $calculation['profit_share'], 'loans' => $calculation['loans'],
             'other_earnings' => $calculation['other_earnings'], 'other_deductions' => $calculation['other_deductions'],
-            'deductions' => $calculation['monthly_deductions'], 'gross_salary' => $calculation['gross'], 'monthly_total' => $calculation['monthly_total'],
+            'deductions' => $deductionsTotal, 'gross_salary' => $calculation['gross'], 'monthly_total' => $monthlyTotal,
             'insurance_wage' => $calculation['insurance_wage'], 'employee_insurance' => $calculation['employee_insurance'],
-            'income_tax' => $calculation['income_tax'], 'martyrs_fund' => $calculation['martyrs_fund'],
-            'employer_insurance' => $calculation['employer_insurance'], 'employee_cost' => $calculation['employee_cost'],
+            'income_tax' => $incomeTax, 'martyrs_fund' => $martyrsFund,
+            'employer_insurance' => $calculation['employer_insurance'], 'employee_cost' => $employeeCost,
             'fixed_deductions' => 0, 'absence_deduction' => $calculation['absence_deduction'],
             'attendance_time_deduction' => (float) ($calculation['attendance_time_deduction'] ?? 0),
             'attendance_deduction' => $calculation['absence_deduction'], 'penalties' => $calculation['penalty_deduction'],
-            'penalty_deduction' => $calculation['penalty_deduction'], 'net_salary' => $calculation['net_monthly'],
+            'penalty_deduction' => $calculation['penalty_deduction'], 'net_salary' => $netMonthly,
             'status' => 'Draft', 'is_locked' => false,
             'calculation_snapshot' => array_merge($structure, $calculation, [
                 'inputs' => $inputs, 'advance_details' => $inputs['advance_details'] ?? [], 'settings' => $run->settings_snapshot,
@@ -385,6 +471,9 @@ class PayrollRunService
                 'paid_days' => $window['days'],
                 'proration_factor' => $window['factor'],
                 'proration_basis' => $this->settings->prorationDays(),
+                'proration_adjustment' => $prorationAdjustment,
+                'proration_adjustment_tax' => $prorationAdjustmentTax,
+                'proration_adjustment_martyrs' => $prorationAdjustmentMartyrs,
                 // «المستحق حتى اليوم» in the drawer and payslip is the same
                 // contractual prorated basic stored on the record - not the
                 // engine's internal split, which differs whenever the contractual
