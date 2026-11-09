@@ -158,3 +158,4 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 .dashboard-reference-layout .reference-panel .panel-head{position:sticky;top:0;z-index:2;background:inherit}
 #dashboardDetailBody{max-height:75dvh;overflow-y:auto;overscroll-behavior:contain}
 @media(max-width:800px){.dashboard-reference-layout .reference-panel{max-height:460px}}
+@media (max-width:640px){.dashboard-modal-tools{flex-direction:column;align-items:stretch;gap:10px}.dashboard-modal-tools form{flex-wrap:wrap}.dashboard-modal-tools .form-control{min-width:0;flex:1 1 auto}}
