@@ -92,3 +92,19 @@ body.preview-dark .allowance-bar{background:var(--dm-surface-3,#1a2436);border-c
 body.preview-dark .allowance-prorate{color:var(--dm-text-2,#b9c6da)}
 body.preview-dark .allowance-chip{color:var(--dm-text-2,#b9c6da)}
 body.preview-dark .allowance-chip b{color:var(--dm-text,#e8eef8)}
+/* Leave settings: grouped fields, one source per rule */
+.settings-cards>*{min-width:0}
+.settings-field .form-control{width:100%;min-width:0}
+.lv-sub{grid-column:1/-1;font-size:12px;font-weight:800;color:#1769e0;border-bottom:1px solid var(--color-border,#e5eaf2);padding-bottom:4px;margin-top:4px}
+.lv-note{margin:0;font-size:11px;color:var(--muted,#7c8aa5)}
+.lv-table{min-width:560px;table-layout:fixed}
+.lv-table th{font-size:12px;white-space:normal}
+.lv-table th:first-child,.lv-table td.lv-type{width:24%}
+.lv-table .form-control{min-width:0;padding-inline:8px}
+.lv-auto{font-size:11px;color:var(--muted,#7c8aa5)}
+.lv-ref{grid-column:1/-1}
+.lv-ref summary{cursor:pointer;font-weight:800;font-size:14px}
+.lv-ref summary small{font-weight:400;color:var(--muted,#7c8aa5);margin-inline-start:6px}
+.lv-ref .settings-card-grid{margin-top:12px}
+@media(max-width:900px){.lv-table{min-width:520px}}
+.lv-wide{grid-column:1/-1}
