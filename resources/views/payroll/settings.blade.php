@@ -3,7 +3,7 @@
 @section('content')
 <div class="page-head"><div><h1>الإعدادات</h1><p>إدارة قواعد الحساب وهياكل الرواتب من مكان واحد مع سجل تاريخي لكل تعديل.</p></div><a class="btn btn-outline-primary" href="{{ route('salaries.index') }}"><i class="bi bi-cash-stack"></i> هياكل الرواتب</a></div>
 <div class="alert alert-warning mb-3"><i class="bi bi-shield-check ms-1"></i> التعديلات تطبق على الحسابات الجديدة فقط. المسيرات المعتمدة أو المقفلة تحتفظ بلقطة مستقلة من قواعدها.</div>
-<nav class="settings-tabs" aria-label="أقسام الإعدادات"><button type="button" class="settings-tab active" data-settings-tab="payrollRules"><i class="bi bi-cash-stack"></i> قواعد الرواتب</button><button type="button" class="settings-tab" data-settings-tab="operational"><i class="bi bi-clock-history"></i> أوقات الدوام</button><button type="button" class="settings-tab" data-settings-tab="attendancePenalties"><i class="bi bi-alarm"></i> لائحة التأخير والانصراف المبكر</button><button type="button" class="settings-tab" data-settings-tab="holidays"><i class="bi bi-calendar-event"></i> العطلات الرسمية</button><button type="button" class="settings-tab" data-settings-tab="history"><i class="bi bi-clock-history"></i> سجل التعديلات</button><button type="button" class="settings-tab" data-settings-tab="leavePolicy"><i class="bi bi-calendar2-heart"></i> إعدادات الإجازات</button><button type="button" class="settings-tab" data-settings-tab="calcRules"><i class="bi bi-sliders"></i> قواعد أساس الحساب</button><button type="button" class="settings-tab" data-settings-tab="taxBrackets"><i class="bi bi-percent"></i> شرائح الضرائب</button></nav>
+<nav class="settings-tabs" aria-label="أقسام الإعدادات"><button type="button" class="settings-tab active" data-settings-tab="payrollRules"><i class="bi bi-cash-stack"></i> قواعد الرواتب</button><button type="button" class="settings-tab" data-settings-tab="operational"><i class="bi bi-clock-history"></i> أوقات الدوام</button><button type="button" class="settings-tab" data-settings-tab="attendancePenalties"><i class="bi bi-alarm"></i> لائحة الجزاءات</button><button type="button" class="settings-tab" data-settings-tab="holidays"><i class="bi bi-calendar-event"></i> العطلات الرسمية</button><button type="button" class="settings-tab" data-settings-tab="history"><i class="bi bi-clock-history"></i> سجل التعديلات</button><button type="button" class="settings-tab" data-settings-tab="leavePolicy"><i class="bi bi-calendar2-heart"></i> إعدادات الإجازات</button><button type="button" class="settings-tab" data-settings-tab="calcRules"><i class="bi bi-sliders"></i> قواعد أساس الحساب</button><button type="button" class="settings-tab" data-settings-tab="taxBrackets"><i class="bi bi-percent"></i> شرائح الضرائب</button></nav>
 
 <form id="payrollRules" class="settings-tab-pane" method="POST" action="{{ route('payroll.settings.update') }}" data-track-dirty="true">@csrf @method('PUT')
 <div class="settings-effective"><div class="settings-effective-text"><strong><i class="bi bi-calendar2-check ms-1"></i> التعديلات الجديدة تسري من التاريخ المحدد</strong><span>حدد التاريخ الذي تبدأ منه القواعد الجديدة.</span></div><div class="settings-effective-field"><label class="form-label">تاريخ السريان</label><input type="date" name="effective_from" value="{{ old('effective_from', now()->toDateString()) }}" class="form-control" required></div></div>
@@ -159,36 +159,151 @@
 </div>
 
 
-<form id="attendancePenalties" class="settings-tab-pane" method="POST" action="{{ route('payroll.settings.attendance-penalties.update') }}" hidden>@csrf @method('PUT')
+<form id="attendancePenalties" class="settings-tab-pane" method="POST" action="{{ route('payroll.settings.attendance-penalties.update') }}" data-track-dirty="true" hidden>@csrf @method('PUT')
 @php($apTiers = old('tiers', $attendancePenaltyPolicy['tiers']))
-<div class="settings-cards"><div class="settings-card wide"><div class="settings-card-head"><h3>لائحة جزاءات التأخير والخروج المبكر</h3><span>حدد شرائح بالدقائق، وتدرّج الجزاء حسب تكرار المخالفة طوال مدة عمل الموظف بالشركة (لا يبدأ العد من جديد كل فترة مرتب، ولا يُصفَّر إلا لو ترك العمل بفصل أو استقالة أو انتهاء عقد ثم عاد). لكل شريحة عدّاد تكرار مستقل، وبعد آخر مرة معرّفة في الشريحة يتكرر جزاؤها الأخير. قيمة جزاء صفر تعني إنذارًا مسجلًا بدون خصم. لكل شريحة وحدة الجزاء: أيام أو دقائق (الجزاء بالدقائق يُحسب من الأساسي بنفس أساس الساعة: 480 دقيقة جزاء = يوم جزاء). الجزاء يُحسب بأيام خصم من أساس الجزاءات (الأساسي) ويدخل في المرتب مباشرة، وهو خاضع لسقف أيام الجزاءات الشهري. ومنفصلًا عنه يمكن خصم أجر الوقت الضائع من الإجمالي بخيار مستقل أدناه. الأرقام الظاهرة اقتراح مبدئي من جدول المالك قابل للتعديل وليست لائحة قانونية جاهزة. لا يُخصم شيء قبل أن تراجعها وتفعّلها.</span></div>
+@php([$apGroups, $apMatrixFit, $apByOcc, $apOccLabels, $apKindLabels, $apKindIcons] = call_user_func(function (array $apTiers): array {
+    $apGroups = ['late' => [], 'early_leave' => []];
+    foreach ($apTiers as $i => $tier) {
+        $kind = ($tier['kind'] ?? 'late') === 'early_leave' ? 'early_leave' : 'late';
+        $key = (int) ($tier['from_minutes'] ?? 0).'|'.($tier['to_minutes'] ?? '');
+        $tier['_i'] = $i;
+        $apGroups[$kind][$key][] = $tier;
+    }
+    $apMatrixFit = function (array $tiers): bool {
+        if (count($tiers) !== 4) return false;
+        $want = ['1|1' => 1, '2|2' => 1, '3|3' => 1, '4|' => 1];
+        foreach ($tiers as $t) {
+            $k = (int) ($t['occurrence_from'] ?? 1).'|'.($t['occurrence_to'] ?? '');
+            if (!isset($want[$k])) return false;
+            unset($want[$k]);
+        }
+        return count($want) === 0;
+    };
+    $apByOcc = fn (array $tiers) => collect($tiers)->sortBy(fn ($t) => (int) ($t['occurrence_from'] ?? 1))->values()->all();
+    return [$apGroups, $apMatrixFit, $apByOcc,
+        ['المرة الأولى', 'المرة الثانية', 'المرة الثالثة', 'الرابعة فأكثر'],
+        ['late' => 'التأخير', 'early_leave' => 'الخروج المبكر'],
+        ['late' => 'bi-clock-history', 'early_leave' => 'bi-box-arrow-left']];
+}, $apTiers))
+<div class="settings-cards">
+<div class="settings-card wide">
+<div class="settings-card-head"><h3>لائحة الجزاءات</h3><span>جزاءات التأخير والخروج المبكر. تُطبق على الحسابات الجديدة فقط، والمسيرات المعتمدة أو المقفلة لا تتغير.</span></div>
 @if($errors->any())<div class="alert alert-danger">{{ $errors->first() }}</div>@endif
-<div class="settings-card-grid two">
-<div class="settings-field"><label class="form-label">تفعيل اللائحة</label><label class="form-check"><input type="checkbox" class="form-check-input" name="is_enabled" value="1" @checked(old('is_enabled', $attendancePenaltyPolicy['enabled']))> تطبيق اللائحة على المرتبات</label></div>
-<div class="settings-field"><label class="form-label">تبدأ من تاريخ</label><input type="date" name="effective_from" class="form-control" value="{{ old('effective_from', $attendancePenaltyPolicy['effective_from']) }}"><small class="settings-hint">المخالفات قبل هذا التاريخ لا تُحسب ولا تُعد تكرارًا. المسيرات المعتمدة والمقفلة لا تتغير.</small></div>
+<div class="ap-status">
+<div class="settings-field">
+<label class="form-label">تفعيل اللائحة</label>
+<div class="d-flex align-items-center gap-2 flex-wrap">
+<div class="form-check form-switch mb-0"><input type="checkbox" class="form-check-input" role="switch" id="apEnabled" name="is_enabled" value="1" @checked(old('is_enabled', $attendancePenaltyPolicy['enabled']))><label class="form-check-label" for="apEnabled">تطبيق اللائحة على المرتبات</label></div>
+<span class="ap-state {{ old('is_enabled', $attendancePenaltyPolicy['enabled']) ? 'on' : 'off' }}" id="apStatePill">{{ old('is_enabled', $attendancePenaltyPolicy['enabled']) ? 'مفعّلة' : 'معطّلة' }}</span>
 </div>
-<div class="alert alert-warning mt-3 mb-0">أي تأخير أو خروج مبكر في دقائق لا تغطيها أي شريحة معرّفة لا يُخصم عنه جزاء تلقائي (وإن ظل أجر الوقت الضائع محسوبًا لو فعّلته). أضف شريحة جديدة إذا أردت جزاءً على تلك الدقائق.</div>
-<div class="table-responsive mt-3"><table class="table align-middle" id="apTierTable"><thead><tr><th>النوع</th><th>من دقيقة</th><th>إلى دقيقة (فارغ = بلا حد)</th><th>من المرة</th><th>إلى المرة (فارغ = بلا حد)</th><th>قيمة الجزاء (0 = إنذار)</th><th>الوحدة</th><th></th></tr></thead><tbody id="apTierRows">
-@foreach($apTiers as $i => $tier)<tr>
-<td data-label="النوع"><select name="tiers[{{ $i }}][kind]" class="form-select"><option value="late" @selected(($tier['kind'] ?? '')==='late')>تأخير</option><option value="early_leave" @selected(($tier['kind'] ?? '')==='early_leave')>خروج مبكر</option></select></td>
-<td data-label="من دقيقة"><input type="number" min="1" name="tiers[{{ $i }}][from_minutes]" class="form-control" value="{{ $tier['from_minutes'] ?? '' }}" required></td>
-<td data-label="إلى دقيقة (فارغ = بلا حد)"><input type="number" min="1" name="tiers[{{ $i }}][to_minutes]" class="form-control" value="{{ $tier['to_minutes'] ?? '' }}"></td>
-<td data-label="من المرة"><input type="number" min="1" name="tiers[{{ $i }}][occurrence_from]" class="form-control" value="{{ $tier['occurrence_from'] ?? 1 }}"></td>
-<td data-label="إلى المرة (فارغ = بلا حد)"><input type="number" min="1" name="tiers[{{ $i }}][occurrence_to]" class="form-control" value="{{ $tier['occurrence_to'] ?? '' }}"></td>
-<td data-label="قيمة الجزاء (0 = إنذار)"><input type="number" min="0" step="0.01" name="tiers[{{ $i }}][deduction_days]" class="form-control" value="{{ $tier['deduction_days'] ?? '' }}" required></td><td data-label="الوحدة"><select name="tiers[{{ $i }}][unit]" class="form-select"><option value="days" @selected(($tier['unit'] ?? 'days')==='days')>أيام</option><option value="minutes" @selected(($tier['unit'] ?? '')==='minutes')>دقائق</option></select></td>
-<td data-label=""><button type="button" class="btn btn-outline-danger btn-sm" data-ap-remove><i class="bi bi-trash"></i></button></td></tr>@endforeach
-</tbody></table></div>
-<div class="d-flex gap-2 flex-wrap"><button type="button" class="btn btn-outline-primary" id="apAddTier"><i class="bi bi-plus-lg"></i> إضافة شريحة</button><button type="button" class="btn btn-outline-secondary" id="apRestoreSuggested"><i class="bi bi-arrow-counterclockwise"></i> استعادة الاقتراح المبدئي</button><button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> حفظ اللائحة</button></div>
-<small class="settings-hint d-block mt-1">«استعادة الاقتراح المبدئي» تعيد ملء الجدول بجدول المالك المقترح فقط، ولا تُحفظ التغييرات إلا عند الضغط على «حفظ اللائحة».</small>
-<div class="settings-card-grid two mt-3">
-<div class="settings-field"><label class="form-label">يوم فيه تأخير وخروج مبكر معًا</label><label class="form-check"><input type="checkbox" class="form-check-input" name="charge_both_same_day" value="1" @checked(old('charge_both_same_day', $attendancePenaltyPolicy['charge_both_same_day']))> خصم الاثنين معًا</label><small class="settings-hint">إن أُلغي التحديد يُخصم الجزاء الأكبر فقط في ذلك اليوم. في الحالتين يُعد كل منهما مرة في تكراره.</small></div>
-<div class="settings-field"><label class="form-label">خصم أجر الوقت الضائع</label><label class="form-check"><input type="checkbox" class="form-check-input" name="deduct_time_wage" value="1" @checked(old('deduct_time_wage', $attendancePenaltyPolicy['deduct_time_wage'] ?? false))> خصم أجر دقائق التأخير والخروج المبكر</label><small class="settings-hint">أجر الساعة = الإجمالي ÷ 240، ويُخصم بالنسبة للدقائق الفعلية. يظهر سطرًا مستقلًا في المرتب باسم «خصم وقت التأخير والخروج المبكر»، منفصلًا عن أيام الجزاء (المحسوبة من الأساسي) ولا يدخل في سقف أيام الجزاءات الشهري.</small></div>
-<div class="settings-field"><label class="form-label">جزاء يدوي في نفس التاريخ</label><select name="manual_replaces_types[]" class="form-select" multiple size="4">@foreach($penaltyTypes as $pt)<option value="{{ $pt->id }}" @selected(in_array($pt->id, old('manual_replaces_types', $attendancePenaltyPolicy['manual_replaces_types'])))>{{ $pt->name }}</option>@endforeach</select><small class="settings-hint">الأنواع المحددة هنا تحل محل الجزاء التلقائي في نفس التاريخ (لا يُخصم الاثنان). أي نوع غير محدد لا يمنع الجزاء التلقائي. لو لم تحدد شيئًا فلن يمنع أي جزاء يدوي الجزاء التلقائي.</small></div>
 </div>
-<small class="settings-hint d-block mt-2">مثال للقراءة: «تأخير من 1 إلى 15 دقيقة، المرة الأولى: 0 يوم» أي إنذار مسجل بدون خصم. الدقائق المحسوبة هي دقائق التأخير الفعلية في النظام: تُعد من بداية الدوام، وفترة السماح تحدد فقط هل اليوم يُحسب تأخيرًا أم لا، وتُخصم الدقائق المغطاة بإذن. الخروج المبكر يُحسب بنفس الأسلوب من نهاية الدوام. عدّاد التكرار مستقل لكل شريحة دقائق، وبعد آخر مرة معرّفة يتكرر جزاؤها الأخير. مخالفة خارج كل الشرائح المعرّفة لا يُخصم عنها جزاء تلقائيًا حتى تضيف لها شريحة. أيام الجزاء تدخل تحت سقف أيام الجزاءات الشهري، أما خصم أجر الوقت الضائع فسطر مستقل لا يخضع لهذا السقف.</small>
-</div></div>
+<div class="settings-field"><label class="form-label">تبدأ من تاريخ</label><input type="date" name="effective_from" class="form-control" value="{{ old('effective_from', $attendancePenaltyPolicy['effective_from']) }}"><small class="settings-hint">المخالفات قبل هذا التاريخ لا تُحسب ولا تُعد تكرارًا.</small></div>
+</div>
+</div>
+<div class="settings-card wide">
+<div class="settings-card-head"><h3>شرائح الجزاء</h3><span>الجزاء حسب دقائق المخالفة وتكرارها طوال مدة عمل الموظف بالشركة. عدّاد مستقل لكل شريحة، وبعد آخر مرة معرّفة يتكرر نفس الجزاء.</span></div>
+<div class="alert alert-warning mt-1 mb-2">الدقائق خارج الشرائح المعرّفة لا يُخصم عنها جزاء تلقائي (ويظل أجر الوقت الضائع محسوبًا لو فعّلته أدناه). أضف شريحة لتغطيتها.</div>
+@foreach(['late', 'early_leave'] as $apKind)
+@php($apKindCount = array_sum(array_map('count', $apGroups[$apKind])))
+<div class="ap-section" data-ap-section="{{ $apKind }}">
+<div class="ap-section-title"><i class="bi {{ $apKindIcons[$apKind] }}"></i> {{ $apKindLabels[$apKind] }} <span class="ap-count" data-ap-count>{{ $apKindCount }} {{ $apKindCount === 1 ? 'شريحة' : 'شرائح' }}</span></div>
+<div class="ap-rows" data-ap-rows>
+@foreach($apGroups[$apKind] as $apBandTiers)
+@if($apMatrixFit($apBandTiers))
+@php($apCells = $apByOcc($apBandTiers))
+@php($apFirst = $apCells[0])
+<div class="ap-row" data-ap-row>
+<div class="ap-band"><span class="ap-band-range">من <input type="number" min="1" class="ap-band-from" value="{{ $apFirst['from_minutes'] ?? '' }}" aria-label="من دقيقة"> إلى <input type="number" min="1" class="ap-band-to" value="{{ $apFirst['to_minutes'] ?? '' }}" placeholder="بلا حد" aria-label="إلى دقيقة"> دقيقة</span></div>
+@foreach($apCells as $apPos => $apCell)
+@php($apI = $apCell['_i'])
+<div class="ap-cell">
+<label>{{ $apOccLabels[$apPos] }}</label>
+<div class="ap-cell-inputs {{ (float) ($apCell['deduction_days'] ?? 0) == 0.0 ? 'is-warning' : '' }}">
+<input type="number" min="0" step="0.01" name="tiers[{{ $apI }}][deduction_days]" value="{{ $apCell['deduction_days'] ?? '' }}" required aria-label="قيمة الجزاء">
+<select name="tiers[{{ $apI }}][unit]" aria-label="الوحدة"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>أيام</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>دقائق</option></select>
+<span class="ap-warn-tag">إنذار</span>
+</div>
+<input type="hidden" name="tiers[{{ $apI }}][kind]" value="{{ $apKind }}">
+<input type="hidden" class="ap-h-from" name="tiers[{{ $apI }}][from_minutes]" value="{{ $apFirst['from_minutes'] ?? '' }}">
+<input type="hidden" class="ap-h-to" name="tiers[{{ $apI }}][to_minutes]" value="{{ $apFirst['to_minutes'] ?? '' }}">
+<input type="hidden" name="tiers[{{ $apI }}][occurrence_from]" value="{{ $apCell['occurrence_from'] ?? ($apPos + 1) }}">
+<input type="hidden" name="tiers[{{ $apI }}][occurrence_to]" value="{{ $apCell['occurrence_to'] ?? ($apPos === 3 ? '' : $apPos + 1) }}">
+</div>
+@endforeach
+<button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button>
+</div>
+@else
+@foreach($apBandTiers as $apCell)
+@php($apI = $apCell['_i'])
+<div class="ap-row ap-row-custom" data-ap-row>
+<div class="ap-custom-grid">
+<div class="ap-f"><label>النوع</label><select name="tiers[{{ $apI }}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late" @selected($apKind === 'late')>تأخير</option><option value="early_leave" @selected($apKind === 'early_leave')>خروج مبكر</option></select></div>
+<div class="ap-f"><label>من دقيقة</label><input type="number" min="1" name="tiers[{{ $apI }}][from_minutes]" class="form-control form-control-sm" value="{{ $apCell['from_minutes'] ?? '' }}" required></div>
+<div class="ap-f"><label>إلى دقيقة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[{{ $apI }}][to_minutes]" class="form-control form-control-sm" value="{{ $apCell['to_minutes'] ?? '' }}"></div>
+<div class="ap-f"><label>من المرة</label><input type="number" min="1" name="tiers[{{ $apI }}][occurrence_from]" class="form-control form-control-sm" value="{{ $apCell['occurrence_from'] ?? 1 }}"></div>
+<div class="ap-f"><label>إلى المرة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[{{ $apI }}][occurrence_to]" class="form-control form-control-sm" value="{{ $apCell['occurrence_to'] ?? '' }}"></div>
+<div class="ap-f ap-f-amount"><label>الجزاء (0 = إنذار)</label><div class="ap-cell-inputs {{ (float) ($apCell['deduction_days'] ?? 0) == 0.0 ? 'is-warning' : '' }}"><input type="number" min="0" step="0.01" name="tiers[{{ $apI }}][deduction_days]" class="form-control form-control-sm" value="{{ $apCell['deduction_days'] ?? '' }}" required><select name="tiers[{{ $apI }}][unit]" aria-label="الوحدة"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>أيام</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>دقائق</option></select><span class="ap-warn-tag">إنذار</span></div></div>
+</div>
+<button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button>
+</div>
+@endforeach
+@endif
+@endforeach
+</div>
+<div class="ap-empty" data-ap-empty @if($apKindCount > 0) hidden @endif>لا توجد شرائح معرّفة. أضف شريحة لتغطية هذه المخالفة.</div>
+</div>
+@endforeach
+<ul class="ap-legend">
+<li>القيمة 0 تعني إنذارًا مسجلًا بدون خصم.</li>
+<li>اليوم يُحسب من الأساسي، والدقيقة من الأساسي بنفس أساس الساعة: 480 دقيقة جزاء = يوم جزاء.</li>
+<li>أيام الجزاء خاضعة لسقف أيام الجزاءات الشهري.</li>
+</ul>
+<div class="d-flex gap-2 flex-wrap mt-2"><button type="button" class="btn btn-outline-primary" id="apAddTier"><i class="bi bi-plus-lg"></i> إضافة شريحة</button><button type="button" class="btn btn-outline-secondary" id="apRestoreSuggested"><i class="bi bi-arrow-counterclockwise"></i> استعادة الاقتراح المبدئي</button></div>
+<small class="settings-hint d-block mt-1">«استعادة الاقتراح المبدئي» تملأ الجدول بالقيم المقترحة فقط، ولا تُحفظ التغييرات إلا بضغط «حفظ اللائحة».</small>
+</div>
+<div class="settings-card wide">
+<div class="settings-card-head"><h3>خيارات إضافية</h3></div>
+<div class="settings-card-grid three">
+<div class="settings-field"><label class="form-label">يوم فيه تأخير وخروج مبكر معًا</label><label class="form-check"><input type="checkbox" class="form-check-input" name="charge_both_same_day" value="1" @checked(old('charge_both_same_day', $attendancePenaltyPolicy['charge_both_same_day']))> خصم الاثنين معًا</label><small class="settings-hint">إن أُلغي التحديد يُخصم الجزاء الأكبر فقط في ذلك اليوم، ويُعد كل منهما مرة في تكراره.</small></div>
+<div class="settings-field"><label class="form-label">خصم أجر الوقت الضائع</label><label class="form-check"><input type="checkbox" class="form-check-input" name="deduct_time_wage" value="1" @checked(old('deduct_time_wage', $attendancePenaltyPolicy['deduct_time_wage'] ?? false))> خصم أجر دقائق التأخير والخروج المبكر</label><small class="settings-hint">أجر الساعة = الإجمالي ÷ 240 بالدقائق الفعلية. يظهر سطرًا مستقلًا في المرتب، منفصلًا عن أيام الجزاء ولا يدخل في سقفها الشهري.</small></div>
+<div class="settings-field"><label class="form-label">جزاء يدوي في نفس التاريخ</label><select name="manual_replaces_types[]" class="form-select" multiple size="3">@foreach($penaltyTypes as $pt)<option value="{{ $pt->id }}" @selected(in_array($pt->id, old('manual_replaces_types', $attendancePenaltyPolicy['manual_replaces_types'])))>{{ $pt->name }}</option>@endforeach</select><small class="settings-hint">الأنواع المحددة تحل محل الجزاء التلقائي في نفس التاريخ (لا يُخصم الاثنان).</small></div>
+</div>
+</div>
+</div>
+<div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ اللائحة</button></span></div>
 </form>
-@push('scripts')<script>(function(){const body=document.getElementById('apTierRows');if(!body)return;let n=body.querySelectorAll('tr').length+100;const rowHtml=(i,t)=>`<tr><td data-label="النوع"><select name="tiers[${i}][kind]" class="form-select"><option value="late"${t.kind==='late'?' selected':''}>تأخير</option><option value="early_leave"${t.kind==='early_leave'?' selected':''}>خروج مبكر</option></select></td><td data-label="من دقيقة"><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control" value="${t.from_minutes??''}" required></td><td data-label="إلى دقيقة (فارغ = بلا حد)"><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control" value="${t.to_minutes??''}"></td><td data-label="من المرة"><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control" value="${t.occurrence_from??1}"></td><td data-label="إلى المرة (فارغ = بلا حد)"><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control" value="${t.occurrence_to??''}"></td><td data-label="قيمة الجزاء (0 = إنذار)"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control" value="${t.deduction_days??''}" required></td><td data-label="الوحدة"><select name="tiers[${i}][unit]" class="form-select"><option value="days"${(t.unit??'days')==='days'?' selected':''}>أيام</option><option value="minutes"${t.unit==='minutes'?' selected':''}>دقائق</option></select></td><td data-label=""><button type="button" class="btn btn-outline-danger btn-sm" data-ap-remove><i class="bi bi-trash"></i></button></td></tr>`;document.getElementById('apAddTier').addEventListener('click',()=>{const i=n++;body.insertAdjacentHTML('beforeend',rowHtml(i,{kind:'late'}))});const restoreBtn=document.getElementById('apRestoreSuggested');if(restoreBtn)restoreBtn.addEventListener('click',()=>{const suggested=@json($suggestedPenaltyTiers ?? []);body.innerHTML='';suggested.forEach(t=>{const i=n++;body.insertAdjacentHTML('beforeend',rowHtml(i,t))})});body.addEventListener('click',e=>{const b=e.target.closest('[data-ap-remove]');if(b)b.closest('tr').remove()})})();</script>@endpush
+@push('scripts')<script>(function(){
+const form=document.getElementById('attendancePenalties');if(!form)return;
+let n=1000;
+const occLabels=['المرة الأولى','المرة الثانية','المرة الثالثة','الرابعة فأكثر'];
+const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const warnTag='<span class="ap-warn-tag">إنذار</span>';
+const unitSel=(i,u)=>`<select name="tiers[${i}][unit]" aria-label="الوحدة"><option value="days"${u==='minutes'?'':' selected'}>أيام</option><option value="minutes"${u==='minutes'?' selected':''}>دقائق</option></select>`;
+const cellHtml=(i,kind,from,to,occF,occT,amount,unit,label)=>`<div class="ap-cell"><label>${label}</label><div class="ap-cell-inputs${Number(amount)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" value="${esc(amount)}" required aria-label="قيمة الجزاء">${unitSel(i,unit)}${warnTag}</div><input type="hidden" name="tiers[${i}][kind]" value="${kind}"><input type="hidden" class="ap-h-from" name="tiers[${i}][from_minutes]" value="${esc(from)}"><input type="hidden" class="ap-h-to" name="tiers[${i}][to_minutes]" value="${esc(to)}"><input type="hidden" name="tiers[${i}][occurrence_from]" value="${occF}"><input type="hidden" name="tiers[${i}][occurrence_to]" value="${esc(occT)}"></div>`;
+const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row><div class="ap-band"><span class="ap-band-range">من <input type="number" min="1" class="ap-band-from" value="${esc(from)}" aria-label="من دقيقة"> إلى <input type="number" min="1" class="ap-band-to" value="${esc(to)}" placeholder="بلا حد" aria-label="إلى دقيقة"> دقيقة</span></div>${cells.map((c,p)=>cellHtml(c.i,kind,from,to,c.occF,c.occT,c.amount,c.unit,occLabels[p])).join('')}<button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button></div>`;
+const customRow=(i,t)=>{const kind=t&&t.kind==='early_leave'?'early_leave':'late';t=t||{};return `<div class="ap-row ap-row-custom" data-ap-row><div class="ap-custom-grid"><div class="ap-f"><label>النوع</label><select name="tiers[${i}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late"${kind==='late'?' selected':''}>تأخير</option><option value="early_leave"${kind==='early_leave'?' selected':''}>خروج مبكر</option></select></div><div class="ap-f"><label>من دقيقة</label><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control form-control-sm" value="${esc(t.from_minutes)}" required></div><div class="ap-f"><label>إلى دقيقة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control form-control-sm" value="${esc(t.to_minutes)}"></div><div class="ap-f"><label>من المرة</label><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control form-control-sm" value="${esc(t.occurrence_from??1)}"></div><div class="ap-f"><label>إلى المرة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control form-control-sm" value="${esc(t.occurrence_to)}"></div><div class="ap-f ap-f-amount"><label>الجزاء (0 = إنذار)</label><div class="ap-cell-inputs${Number(t.deduction_days)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control form-control-sm" value="${esc(t.deduction_days)}" required>${unitSel(i,t.unit)}${warnTag}</div></div></div><button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button></div>`;};
+const refreshCounts=()=>{form.querySelectorAll('[data-ap-section]').forEach(sec=>{const c=sec.querySelectorAll('[data-ap-row]').length;const el=sec.querySelector('[data-ap-count]');if(el)el.textContent=c+' '+(c===1?'شريحة':'شرائح');const empty=sec.querySelector('[data-ap-empty]');if(empty)empty.hidden=c>0;});};
+const markDirty=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
+document.getElementById('apAddTier').addEventListener('click',()=>{form.querySelector('[data-ap-section="late"] [data-ap-rows]').insertAdjacentHTML('beforeend',customRow(n++,{kind:'late'}));refreshCounts();markDirty();});
+document.getElementById('apRestoreSuggested').addEventListener('click',()=>{
+const suggested=@json($suggestedPenaltyTiers ?? []);
+const seen={late:{},early_leave:{}},order={late:[],early_leave:[]};
+suggested.forEach(t=>{const k=t.kind==='early_leave'?'early_leave':'late';const key=(t.from_minutes??'')+'|'+(t.to_minutes??'');if(!seen[k][key]){seen[k][key]=[];order[k].push(key);}seen[k][key].push(t);});
+['late','early_leave'].forEach(k=>{
+const rows=form.querySelector(`[data-ap-section="${k}"] [data-ap-rows]`);rows.innerHTML='';
+order[k].forEach(key=>{const list=seen[k][key].slice().sort((a,b)=>(a.occurrence_from||1)-(b.occurrence_from||1));
+const fit=list.length===4&&list.every((t,p)=>Number(t.occurrence_from??1)===p+1&&(p<3?Number(t.occurrence_to??'')===p+1:(t.occurrence_to===null||t.occurrence_to===''||t.occurrence_to===undefined)));
+if(fit){const cells=list.map((t,p)=>({i:n++,amount:t.deduction_days,unit:t.unit||'days',occF:t.occurrence_from??(p+1),occT:p===3?'':(t.occurrence_to??(p+1))}));rows.insertAdjacentHTML('beforeend',matrixRow(k,list[0].from_minutes,list[0].to_minutes??'',cells));}
+else list.forEach(t=>rows.insertAdjacentHTML('beforeend',customRow(n++,t)));
+});});
+refreshCounts();markDirty();});
+form.addEventListener('click',e=>{const b=e.target.closest('[data-ap-remove]');if(!b)return;b.closest('[data-ap-row]').remove();refreshCounts();markDirty();});
+form.addEventListener('change',e=>{const s=e.target.closest('[data-ap-kind]');if(!s)return;const row=s.closest('[data-ap-row]');const target=form.querySelector(`[data-ap-section="${s.value}"] [data-ap-rows]`);if(target&&row.parentElement!==target)target.appendChild(row);refreshCounts();});
+form.addEventListener('input',e=>{const wrap=e.target.closest?e.target.closest('.ap-cell-inputs'):null;if(!wrap||!e.target.name||!e.target.name.includes('deduction_days'))return;wrap.classList.toggle('is-warning',Number(e.target.value)===0);});
+document.addEventListener('input',e=>{const band=e.target.closest?e.target.closest('.ap-band'):null;if(!band)return;const row=band.closest('[data-ap-row]');const from=row.querySelector('.ap-band-from').value,to=row.querySelector('.ap-band-to').value;row.querySelectorAll('.ap-h-from').forEach(h=>h.value=from);row.querySelectorAll('.ap-h-to').forEach(h=>h.value=to);},true);
+const pill=document.getElementById('apStatePill'),sw=document.getElementById('apEnabled');
+if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مفعّلة':'معطّلة';pill.classList.toggle('on',sw.checked);pill.classList.toggle('off',!sw.checked);});
+})();</script>@endpush
 <div id="holidays" class="settings-tab-pane" hidden>
     <div class="settings-cards">
     <div class="settings-card wide"><div class="settings-card-head"><h3>إضافة عطلة رسمية</h3><span>تُستبعد تلقائيًا من احتساب أيام العمل وفق إعدادات النظام.</span></div>

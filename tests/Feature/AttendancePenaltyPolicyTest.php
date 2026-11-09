@@ -266,7 +266,47 @@ class AttendancePenaltyPolicyTest extends TestCase
         $after = PayrollRecord::withoutGlobalScopes()->findOrFail($before->id);
         $this->assertEqualsWithDelta(320.0, (float) $after->penalty_deduction, 0.01);
         $this->assertEqualsWithDelta((float) $before->net_salary - 320.0, (float) $after->net_salary, 0.01);
-        $this->get(route('payroll.settings.index'))->assertOk()->assertSee('لائحة التأخير والانصراف المبكر');
+        $this->get(route('payroll.settings.index'))->assertOk()->assertSee('لائحة الجزاءات');
+    }
+
+
+    public function test_settings_save_keeps_custom_occurrence_ranges_and_mixed_units_without_reshaping(): void
+    {
+        $this->put(route('payroll.settings.attendance-penalties.update'), [
+            'is_enabled' => 1, 'effective_from' => '2026-10-01',
+            'tiers' => [
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 1, 'occurrence_to' => 1, 'deduction_days' => 30, 'unit' => 'minutes'],
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 2, 'occurrence_to' => 2, 'deduction_days' => 0.5, 'unit' => 'days'],
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 3, 'occurrence_to' => '', 'deduction_days' => 1, 'unit' => 'days'],
+            ],
+        ])->assertRedirect(route('payroll.settings.index'));
+
+        $tiers = app(AttendancePenaltyPolicyService::class)->forCompany($this->company->id)['tiers'];
+        $this->assertCount(3, $tiers);
+        $this->assertSame(['minutes', 'days', 'days'], array_column($tiers, 'unit'));
+        $this->assertSame([1, 2, 3], array_map('intval', array_column($tiers, 'occurrence_from')));
+        $this->assertNull($tiers[2]['occurrence_to']);
+
+        // The custom shape renders with explicit occurrence range fields (not forced into the 4-step matrix).
+        $this->get(route('payroll.settings.index'))->assertOk()->assertSee('لائحة الجزاءات')->assertSee('من المرة');
+
+        // Mixed units price each offence in its own unit: 1st = 30 minutes from the basic (9600/14400 x 30 = 20), 2nd = 0.5 day (9600/30 x 0.5 = 160).
+        $employee = $this->employee($this->company, 'PX');
+        $this->day($employee, '2026-10-05', 10);
+        $this->day($employee, '2026-10-06', 10);
+        $this->assertEqualsWithDelta(180.0, (float) $this->record($employee)->penalty_deduction, 0.01);
+
+        // The 4-step shape renders in the matrix columns with the warning tag on zero amounts.
+        $this->put(route('payroll.settings.attendance-penalties.update'), [
+            'is_enabled' => 1, 'effective_from' => '2026-10-01',
+            'tiers' => [
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 1, 'occurrence_to' => 1, 'deduction_days' => 0, 'unit' => 'days'],
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 2, 'occurrence_to' => 2, 'deduction_days' => 0.25, 'unit' => 'days'],
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 3, 'occurrence_to' => 3, 'deduction_days' => 0.5, 'unit' => 'days'],
+                ['kind' => 'late', 'from_minutes' => 1, 'to_minutes' => 15, 'occurrence_from' => 4, 'occurrence_to' => '', 'deduction_days' => 1, 'unit' => 'days'],
+            ],
+        ])->assertRedirect(route('payroll.settings.index'));
+        $this->get(route('payroll.settings.index'))->assertOk()->assertSee('الرابعة فأكثر')->assertSee('إنذار');
     }
 
     public function test_settings_save_rejects_enabling_without_tiers_and_needs_the_permission(): void
