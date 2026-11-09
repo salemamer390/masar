@@ -53,6 +53,37 @@ class PayrollDefaultsService
         ['insurance', 'automatic_calculation_basis', 'Basic', 'أساس حساب الأجر التأميني', 'الحساب التلقائي للأجر التأميني: Basic الأساسي أو Gross الإجمالي'],
     ];
 
+    /**
+     * Leave entitlement policy defaults (key => value). Same values the original
+     * leave-policy migrations seeded; prorate-off matches the full-15-days rule.
+     */
+    public const LEAVE_POLICIES = [
+        'annual_first_year' => '15',
+        'annual_second_year' => '21',
+        'annual_long_service' => '30',
+        'annual_long_service_years' => '10',
+        'annual_age_threshold' => '50',
+        'annual_disability_days' => '45',
+        'annual_hazardous_extra_days' => '7',
+        'annual_wait_months' => '6',
+        'annual_prorate_first_year' => '0',
+        'allow_early_leave' => '1',
+        'casual_max_days_year' => '7',
+        'casual_max_days_request' => '2',
+        'maternity_days' => '120',
+        'maternity_min_postpartum_days' => '45',
+        'maternity_max_occurrences' => '3',
+        'pregnancy_reduced_hours_from_month' => '6',
+        'pregnancy_reduced_hours_per_day' => '1',
+        'pregnancy_overtime_protection_months' => '6',
+        'nursing_sessions_per_day' => '2',
+        'nursing_minutes_per_session' => '30',
+        'childcare_max_years_per_request' => '2',
+        'childcare_max_occurrences' => '3',
+        'pilgrimage_min_service_months' => '60',
+        'newborn_max_occurrences' => '3',
+    ];
+
     public function ensureForCompany(int $companyId): void
     {
         if ($this->isComplete($companyId)) return;
@@ -61,6 +92,31 @@ class PayrollDefaultsService
         $this->ensureAllowances($companyId);
         $this->ensureRules($companyId);
         $this->ensureTax($companyId);
+        $this->ensureLeavePolicies($companyId);
+    }
+
+    /**
+     * Give the company its own editable copy of the leave entitlement policies.
+     * Companies created after the original policy migrations (or a rebuilt DB)
+     * had no rows, so the settings card rendered empty and saving could not
+     * create them. Existing company rows are never overwritten; when a legacy
+     * shared (NULL company) row exists its current value is inherited.
+     */
+    public function ensureLeavePolicies(int $companyId): void
+    {
+        if (!Schema::hasTable('leave_policy_settings') || !Schema::hasColumn('leave_policy_settings', 'company_id')) return;
+        $legacy = DB::table('leave_policy_settings')->whereNull('company_id')->pluck('setting_value', 'setting_key');
+        $now = now();
+        foreach (self::LEAVE_POLICIES as $key => $default) {
+            DB::table('leave_policy_settings')->insertOrIgnore([
+                'company_id' => $companyId,
+                'setting_key' => $key,
+                'setting_value' => (string) ($legacy[$key] ?? $default),
+                'label' => $key,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
     }
 
     /** Cheap check so opening the settings page does not re-run every insert. */
@@ -73,6 +129,8 @@ class PayrollDefaultsService
                 && DB::table('payroll_calculation_rules')->where('company_id', $companyId)->count() < count(self::RULES)) return false;
             if (Schema::hasColumn('tax_categories', 'company_id')
                 && DB::table('tax_categories')->where('company_id', $companyId)->doesntExist()) return false;
+            if (Schema::hasColumn('leave_policy_settings', 'company_id')
+                && DB::table('leave_policy_settings')->where('company_id', $companyId)->count() < count(self::LEAVE_POLICIES)) return false;
 
             return true;
         } catch (\Throwable) {
