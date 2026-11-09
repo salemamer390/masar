@@ -98,6 +98,7 @@ class LeaveLegalPhaseOneTest extends TestCase
         $this->request($this->ua, $e2, $t, '2027-01-01', '2027-05-01', ['birth_date' => '2027-02-01'])->assertStatus(422)->assertJsonValidationErrors('end_date');
         $this->request($this->ua, $e2, $t, '2027-01-01', '2027-04-30', ['birth_date' => '2027-04-01'])->assertStatus(422)->assertJsonValidationErrors('end_date');
         $this->request($this->ua, $e2, $t, '2027-01-01', '2027-04-30')->assertStatus(422)->assertJsonValidationErrors('document');
+        $this->request($this->ua, $e2, $t, '2027-04-01', '2027-04-10', ['birth_date' => '2027-01-01'])->assertStatus(422)->assertJsonValidationErrors('end_date');
     }
 
     public function test_childcare_period_includes_leap_year_and_gap_is_enforced(): void
@@ -157,4 +158,39 @@ class LeaveLegalPhaseOneTest extends TestCase
         $cmp=\App\Support\LeaveLegalReference::typeStatus('contagious_contact',[],true,true,['contagious_max_months'=>3]);
         $this->assertSame('review',$cmp['status']);
     }
+    public function test_contact_activation_requires_explicit_pay_and_is_company_scoped(): void
+    {
+        $this->actingAs($this->ua)->putJson(route('payroll.settings.leaves.update'), ['policies'=>['annual_first_year'=>15],'contact_active'=>1])->assertStatus(422)->assertJsonValidationErrors('contact_pay');
+        $this->putJson(route('payroll.settings.leaves.update'), ['policies'=>['annual_first_year'=>15],'contact_active'=>1,'contact_pay'=>'unpaid'])->assertOk();
+        $t=LeaveType::where('company_id',$this->a->id)->where('policy_code','contagious_contact_company_'.$this->a->id)->firstOrFail();
+        $this->assertTrue($t->is_active);$this->assertFalse($t->is_paid);$this->assertSame('contagious_contact',$t->policy_code);
+        $global=LeaveType::withoutGlobalScopes()->whereNull('company_id')->where('policy_code','contagious_contact')->firstOrFail();
+        $this->assertFalse($global->is_active);
+        $this->actingAs($this->ub);$this->assertNull(LeaveType::find($t->id));
+    }
+
+    public function test_inactive_contact_cannot_be_used_by_direct_post(): void
+    {
+        $t=LeaveType::withoutGlobalScopes()->where('policy_code','contagious_contact')->firstOrFail();
+        $e=$this->emp($this->a,'contact-inactive','2020-01-01');
+        $this->request($this->ua,$e,$t,'2027-08-01','2027-08-01')->assertStatus(422)->assertJsonValidationErrors('leave_type_id');
+    }
+
+    public function test_activated_contact_uses_calendar_limit_and_selected_pay(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $this->actingAs($this->ua)->putJson(route('payroll.settings.leaves.update'), ['policies'=>['annual_first_year'=>15],'contact_active'=>1,'contact_pay'=>'paid'])->assertOk();
+        $t=LeaveType::where('company_id',$this->a->id)->where('policy_code','contagious_contact_company_'.$this->a->id)->firstOrFail();
+        $e=$this->emp($this->a,'contact-active','2020-01-01');$f=\Illuminate\Http\UploadedFile::fake()->create('decision.pdf',10,'application/pdf');
+        $this->request($this->ua,$e,$t,'2027-08-01','2027-10-31',['document'=>$f])->assertOk();
+        $leave=Leave::where('employee_id',$e->id)->firstOrFail();$this->assertTrue($leave->leaveType->is_paid);
+        $e2=$this->emp($this->a,'contact-long','2020-01-01');
+        $this->request($this->ua,$e2,$t,'2027-08-01','2027-11-01',['document'=>$f])->assertStatus(422)->assertJsonValidationErrors('end_date');
+    }
+
+    public function test_blank_policy_cannot_silently_turn_an_entitlement_into_zero(): void
+    {
+        $this->save($this->ua,['annual_second_year'=>''],[])->assertStatus(422)->assertJsonValidationErrors('policies.annual_second_year');
+    }
+
 }
