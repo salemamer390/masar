@@ -17,6 +17,12 @@
             <div class="modal-body">
                 <div class="alert alert-danger py-2 small" data-import-alert hidden role="alert"></div>
 
+                <div data-import-progress hidden class="mb-3" role="status" aria-live="polite">
+                    <div data-import-progress-label class="small mb-1">جارٍ رفع الملف...</div>
+                    <progress data-import-progress-bar max="100" class="w-100" aria-label="تقدم رفع الملف"></progress>
+                    <small class="text-muted">نسبة الرفع تعكس البيانات المرسلة فقط. فحص الصفوف على الخادم يستمر بعدها دون نسبة تقديرية.</small>
+                </div>
+
                 {{-- Step 1: upload --}}
                 <div data-import-step="upload">
                     <p class="text-muted small mb-3">ارفع ملف Excel (xlsx) أو CSV يحتوي على بيانات الموظفين. سيتم فحص الملف أولًا وعرض النتيجة، ولن يُحفظ شيء قبل تأكيدك.</p>
@@ -197,17 +203,46 @@
         return body;
     }
 
-    async function post(url, withAck) {
-        let response;
-        try {
-            response = await fetch(url, {
-                method: 'POST', body: buildBody(withAck), credentials: 'same-origin',
-                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-            });
-        } catch (error) {
-            throw new Error('تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.');
-        }
-        return response;
+    function post(url, withAck) {
+        return new Promise((resolve, reject) => {
+            const panel = q('[data-import-progress]');
+            const bar = q('[data-import-progress-bar]');
+            const label = q('[data-import-progress-label]');
+            panel.hidden = false;
+            bar.removeAttribute('value');
+            label.textContent = 'جارٍ رفع الملف...';
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            xhr.responseType = 'blob';
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.setRequestHeader('X-CSRF-TOKEN', csrf);
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            xhr.upload.onprogress = (event) => {
+                if (!event.lengthComputable) return;
+                const percent = Math.min(100, Math.floor(event.loaded / event.total * 100));
+                bar.value = percent;
+                label.textContent = 'رفع الملف: ' + percent + '٪';
+            };
+            xhr.upload.onload = () => {
+                bar.removeAttribute('value');
+                label.textContent = 'اكتمل الرفع. جارٍ فحص الملف على الخادم...';
+            };
+            xhr.onload = () => {
+                panel.hidden = true;
+                resolve(new Response(xhr.response, {
+                    status: xhr.status,
+                    headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') || 'application/octet-stream' },
+                }));
+            };
+            const fail = () => {
+                panel.hidden = true;
+                reject(new Error('تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.'));
+            };
+            xhr.onerror = fail;
+            xhr.onabort = fail;
+            xhr.ontimeout = fail;
+            xhr.send(buildBody(withAck));
+        });
     }
 
     async function errorFrom(response) {
