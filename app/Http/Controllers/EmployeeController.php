@@ -214,7 +214,7 @@ class EmployeeController extends Controller
             'hire_date' => ['nullable', 'date'],
             'contract_start_date' => ['nullable', 'date'],
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
-            'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous'],
+            'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous,disabled_hazardous'],
         ], [
             'full_name.required' => 'اسم الموظف الكامل مطلوب.',
             'employee_code.unique' => 'كود الموظف مستخدم بالفعل.',
@@ -315,7 +315,7 @@ class EmployeeController extends Controller
             'branch_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\Branch::class)],
             'employment_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\EmploymentType::class)],
             'status_id' => ['nullable', 'exists:employee_statuses,id'],
-            'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous'],
+            'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous,disabled_hazardous'],
             'manager_employee_id' => ['nullable', 'exists:employees,id', Rule::notIn([$employee->id])],
             'hire_date' => ['nullable', 'date'],
             'contract_start_date' => ['nullable', 'date'],

@@ -15,6 +15,8 @@ class LeaveBalanceService
 {
     /** Policies are identical for all employees in one request. */
     private array $policyCache = [];
+    /** Calendar-based leave periods: policy code => [unit, company policy key, default amount]. */
+    public const CALENDAR_TYPES = ['maternity' => ['months', 'maternity_months', '4'], 'childcare' => ['years', 'childcare_max_years_per_request', '2'], 'contagious_contact' => ['months', 'contagious_max_months', '3']];
     /** Screen-confirmed waiting-time exception: waives only the wait, the balance check stays on. */
     private bool $enforceBalanceOnEarlyGrant = false;
 
@@ -122,13 +124,18 @@ class LeaveBalanceService
     {
         $referenceDate = $this->referenceDate($referenceDate);
         $hire = $employee->hire_date ? Carbon::parse($employee->hire_date) : $referenceDate->copy()->startOfYear();
-        $age = $employee->birth_date ? Carbon::parse($employee->birth_date)->age : 0;
         $companyId = $employee->company_id;
         $category = (string) ($employee->leave_entitlement_category ?? 'normal');
-        if ($category === 'disabled') return (float) $this->policyFor('annual_disability_days', '45', $companyId);
-        if ($category === 'hazardous') $extra = (float) $this->policyFor('annual_hazardous_extra_days', '7', $companyId); else $extra = 0;
+        $isDisabled = in_array($category, ['disabled', 'disabled_hazardous'], true);
+        $isHazardous = in_array($category, ['hazardous', 'disabled_hazardous'], true);
+        // Art. 124: the extra 7 days apply "in all cases" to hazardous / remote work, on top of whatever else the person gets.
+        $extra = $isHazardous ? (float) $this->policyFor('annual_hazardous_extra_days', '7', $companyId) : 0.0;
+        if ($isDisabled) return (float) $this->policyFor('annual_disability_days', '45', $companyId) + $extra;
         $serviceYears = $hire->diffInYears($referenceDate);
-        if ($serviceYears >= (int) $this->policyFor('annual_long_service_years', '10', $companyId) || $age >= (int) $this->policyFor('annual_age_threshold', '50', $companyId)) {
+        // Art. 124: "تجاوزت سنه خمسين عامًا": strictly after the 50th birthday, not on it.
+        $ageThreshold = (int) $this->policyFor('annual_age_threshold', '50', $companyId);
+        $exceededAge = $employee->birth_date && Carbon::parse($employee->birth_date)->addYears($ageThreshold)->startOfDay()->lt($referenceDate->copy()->startOfDay());
+        if ($serviceYears >= (int) $this->policyFor('annual_long_service_years', '10', $companyId) || $exceededAge) {
             $annual = (float) $this->policyFor('annual_long_service', '30', $companyId);
         } elseif ($serviceYears >= 1) {
             $annual = (float) $this->policyFor('annual_second_year', '21', $companyId);
@@ -165,7 +172,7 @@ class LeaveBalanceService
      * uses its own columns; a shared type uses the company's own copy when it
      * has saved one, otherwise the shared values.
      *
-     * @return array{max_days_per_request:?float,max_days_per_year:?float,min_service_months:?int,max_occurrences_service:?int}
+     * @return array{requires_document:bool,max_days_per_request:?float,max_days_per_year:?float,min_service_months:?int,max_occurrences_service:?int}
      */
     public function limitsFor(LeaveType $type, ?int $companyId): array
     {
@@ -174,7 +181,10 @@ class LeaveBalanceService
             $row = DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->first();
         }
         $src = $row ?? $type;
+        $requiresDocument = (bool) $type->requires_document;
+        if ($row && property_exists($row, 'requires_document') && $row->requires_document !== null) $requiresDocument = (bool) $row->requires_document;
         return [
+            'requires_document' => $requiresDocument,
             'max_days_per_request' => $src->max_days_per_request !== null ? (float) $src->max_days_per_request : null,
             'max_days_per_year' => $src->max_days_per_year !== null ? (float) $src->max_days_per_year : null,
             'min_service_months' => $src->min_service_months !== null ? (int) $src->min_service_months : null,
@@ -189,8 +199,14 @@ class LeaveBalanceService
         $start = Carbon::parse($leave->start_date);
         $days = (float) $leave->days;
         if (!$type || !$employee) return;
+        if ($type->policy_code === 'contagious_contact' && !$type->is_active) $this->fail('leave_type_id', 'نوع المخالطة غير مفعّل. حدد سياسة الأجر وفعّل نسخة الشركة من إعدادات الإجازات أولًا.');
         $limits = $this->limitsFor($type, $employee->company_id ? (int) $employee->company_id : null);
-        if (!in_array($type->policy_code, ['annual', 'casual'], true) && $limits['max_days_per_request'] !== null && $days > $limits['max_days_per_request']) {
+        $calendar = self::CALENDAR_TYPES[$type->policy_code] ?? null;
+        $companyIdForPolicy = $employee->company_id ? (int) $employee->company_id : null;
+        // Maternity / childcare / contagious-contact are calendar periods (months / years), not a fixed day count. The old fixed
+        // 120 / 730 defaults are replaced by the calendar period; a company's own lower custom day cap still applies.
+        $legacyDayCap = $calendar && in_array((float) ($limits['max_days_per_request'] ?? 0), [0.0, $type->policy_code === 'maternity' ? 120.0 : ($type->policy_code === 'childcare' ? 730.0 : 0.0)], true);
+        if (!in_array($type->policy_code, ['annual', 'casual'], true) && !$legacyDayCap && $limits['max_days_per_request'] !== null && $days > $limits['max_days_per_request']) {
             $this->fail('days', "لا يمكن اعتماد {$type->name}: الطلب {$this->number($days)} أيام، والحد الأقصى للطلب الواحد {$this->number($limits['max_days_per_request'])} أيام.");
         }
         $gender = match (mb_strtolower((string) $employee->gender)) { 'female', 'أنثى', 'انثى' => 'female', 'male', 'ذكر' => 'male', default => null };
@@ -203,6 +219,40 @@ class LeaveBalanceService
             if ($usedThisYear + $days > $limits['max_days_per_year']) {
                 $cap = $limits['max_days_per_year'];
                 $this->fail('days', "لا يمكن اعتماد {$type->name}: الحد السنوي {$this->number($cap)} أيام، استُخدم {$this->number($usedThisYear)} أيام، والمتبقي {$this->number(max(0, $cap - $usedThisYear))} يوم، بينما الطلب {$this->number($days)} أيام.");
+            }
+        }
+        $proofErrors = [];
+        if ($calendar && $legacyDayCap) {
+            [$unit, $policyKey, $default] = $calendar;
+            $amount = (int) $this->policyFor($policyKey, $default, $companyIdForPolicy);
+            if ($amount <= 0) $this->fail('end_date', 'سياسة الشركة الحالية لا تتيح مدة لهذا النوع. راجع إعدادات الإجازات.');
+            $periodEnd = ($unit === 'years' ? $start->copy()->addYearsNoOverflow($amount) : $start->copy()->addMonthsNoOverflow($amount))->subDay()->startOfDay();
+            if ($amount > 0 && Carbon::parse($leave->end_date)->startOfDay()->gt($periodEnd)) {
+                $unitLabel = $unit === 'years' ? ($amount === 1 ? 'سنة' : 'سنوات') : ($amount === 1 ? 'شهر' : 'أشهر');
+                $this->fail('end_date', "لا يمكن اعتماد {$type->name}: المدة تُحسب بالتقويم ({$amount} {$unitLabel}) من تاريخ البداية، وآخر يوم مسموح {$periodEnd->format('d/m/Y')}.");
+            }
+        }
+        if ($type->policy_code === 'childcare') {
+            $gapYears = (int) $this->policyFor('childcare_min_gap_years', '2', $companyIdForPolicy);
+            $end = Carbon::parse($leave->end_date)->startOfDay();
+            $previous = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->effective()
+                ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))->get();
+            foreach ($previous as $prior) {
+                if ($gapYears > 0 && $start->copy()->startOfDay()->lte(Carbon::parse($prior->end_date)->startOfDay()->addYearsNoOverflow($gapYears)) && Carbon::parse($prior->start_date)->startOfDay()->lte($end->copy()->addYearsNoOverflow($gapYears))) {
+                    $next = Carbon::parse($prior->end_date)->addYearsNoOverflow($gapYears)->addDay();
+                    $this->fail('start_date', "لا يمكن اعتماد {$type->name}: يجب ألا تقل المدة بين الإجازتين عن {$gapYears} سنة. آخر إجازة انتهت في ".Carbon::parse($prior->end_date)->format('d/m/Y').'، وأقرب بداية مسموحة '.$next->format('d/m/Y').'.');
+                }
+            }
+        }
+        if ($type->policy_code === 'maternity') {
+            $minPost = (int) $this->policyFor('maternity_min_postpartum_days', '45', $companyIdForPolicy);
+            $birth = $leave->birth_date ? Carbon::parse($leave->birth_date)->startOfDay() : null;
+            if ($birth && $minPost > 0) {
+                $postStart = $start->copy()->startOfDay()->max($birth->copy()->addDay());
+                $needed = $postStart->copy()->addDays($minPost - 1);
+                if (Carbon::parse($leave->end_date)->startOfDay()->lt($needed)) $this->fail('end_date', "لا يمكن اعتماد {$type->name}: يجب ألا تقل المدة بعد الوضع عن {$minPost} يومًا، فلا تنتهي الإجازة قبل {$needed->format('d/m/Y')}.");
+            } elseif (!$birth && $minPost > 0) {
+                $proofErrors[] = "{$type->name}: لم يُسجَّل تاريخ الولادة (أو التاريخ المرجح)، فلا يمكن التحقق من حد {$minPost} يومًا بعد الوضع.";
             }
         }
         if ($type->policy_code === 'annual' && $employee->hire_date && Carbon::parse($employee->hire_date)->addMonths((int) $this->policy('annual_wait_months', '6'))->gt($start)) {
@@ -235,6 +285,19 @@ class LeaveBalanceService
             $used = $this->approvedDaysWithinCycle($employee, $cycle, fn (LeaveType $item) => (bool) $item->deducts_annual_balance, $excludeId);
             if ($used + $days > $usable && (!$leave->is_early_grant || $this->enforceBalanceOnEarlyGrant)) $this->fail('days', "لا يمكن اعتماد {$type->name}: الرصيد السنوي المتاح {$this->number($usable)} يوم، محجوز {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $usable - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
         }
+        // Proof is enforced on every entry point, including imports. No request-level bypass.
+        if ($limits['requires_document'] && empty($leave->document_path)) {
+            $proofErrors[] = "{$type->name}: يلزم مستند (شهادة أو إثبات) ولم يُرفق مستند.";
+        }
+        if ($type->policy_code === 'exams') {
+            $noticeDays = (int) $this->policyFor('exam_notice_days', '10', $companyIdForPolicy);
+            $notifiedOn = ($leave->created_at ? Carbon::parse($leave->created_at) : now())->startOfDay();
+            if ($noticeDays > 0 && $notifiedOn->copy()->addDays($noticeDays)->gt($start->copy()->startOfDay())) {
+                $proofErrors[] = "{$type->name}: الإخطار يجب أن يسبق بداية الإجازة بـ{$noticeDays} أيام على الأقل، والفرق الحالي أقل من ذلك.";
+            }
+        }
+        if ($proofErrors) throw ValidationException::withMessages(['document' => $proofErrors]);
+
     }
 
     public function sync(Employee $employee, Carbon|int|null $referenceDate = null): void { $this->balance($employee, $referenceDate ?? now()); }

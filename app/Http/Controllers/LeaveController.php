@@ -62,6 +62,8 @@ class LeaveController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:500'],
             'is_early_grant' => ['nullable', 'boolean'],
             'early_grant_reason' => ['nullable', 'string', 'max:500'],
+            'birth_date' => ['nullable', 'date'],
+            'document' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
         $start = Carbon::parse($data['start_date']);
@@ -92,9 +94,15 @@ class LeaveController extends Controller
         $proposed = clone $leave;
         $proposed->fill(['employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'], 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'is_early_grant' => (bool) ($data['is_early_grant'] ?? false), 'early_grant_reason' => $data['early_grant_reason'] ?? null]);
         $proposed->unsetRelation('employee')->unsetRelation('leaveType');
+        if ($request->has('birth_date')) $proposed->birth_date = $data['birth_date'] ?? null;
+        if ((int) $leave->employee_id !== (int) $data['employee_id']) { $proposed->document_path = null; $proposed->document_name = null; }
+        if ($request->hasFile('document')) { $proposed->document_path = '(uploaded)'; $proposed->document_name = $request->file('document')->getClientOriginalName(); }
         $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         if ($data['status'] === 'Approved') $this->leaveBalances->validateForApproval($proposed, $leave->id);
+        $newDocumentPath = $request->hasFile('document') ? $request->file('document')->store('leave-documents/'.$data['employee_id'], 'local') : null;
         $leave->update([
+            'birth_date' => $proposed->birth_date,
+            'document_path' => $newDocumentPath ?? $proposed->document_path, 'document_name' => $proposed->document_name,
             'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
             'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days,
             'reason' => $data['reason'] ?? null, 'status' => $data['status'],
@@ -130,6 +138,8 @@ class LeaveController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
             'is_early_grant' => ['nullable', 'boolean'],
             'early_grant_reason' => ['nullable', 'string', 'max:500'],
+            'birth_date' => ['nullable', 'date'],
+            'document' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
         $start = Carbon::parse($data['start_date']);
@@ -160,9 +170,11 @@ class LeaveController extends Controller
             'early_grant_approved_by' => !empty($data['is_early_grant']) ? auth()->id() : null,
             'early_grant_approved_at' => !empty($data['is_early_grant']) ? now() : null,
         ]));
+        if ($request->hasFile('document')) { $leave->document_path = '(uploaded)'; $leave->document_name = $request->file('document')->getClientOriginalName(); }
         // Validate before saving, so this record never consumes its own balance twice.
         $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         $this->leaveBalances->validateForApproval($leave);
+        if ($request->hasFile('document')) $leave->document_path = $request->file('document')->store('leave-documents/'.$leave->employee_id, 'local');
         $leave->save();
         $this->leaveBalances->sync($leave->employee, $start);
         $this->leaveStatus->sync();
@@ -234,6 +246,12 @@ class LeaveController extends Controller
         }
 
         return $days;
+    }
+
+    public function document(Leave $leave)
+    {
+        if (!$leave->document_path || !\Illuminate\Support\Facades\Storage::disk('local')->exists($leave->document_path)) abort(404);
+        return \Illuminate\Support\Facades\Storage::disk('local')->response($leave->document_path, $leave->document_name ?: basename($leave->document_path));
     }
 
     private function ensureOwnedReferences(array $data): void

@@ -77,7 +77,7 @@ class WorkbookLeavePenaltyImporter
                 if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة.');
                 $guard->ensureRangeOpen($start, $end);
                 $typeName = trim((string) ($row[$map['leave_type']] ?? ''));
-                $type = LeaveType::where('name', $typeName)->first() ?: LeaveType::where('name', 'like', '%'.$typeName.'%')->first();
+                $type = LeaveType::where('is_active', true)->where('name', $typeName)->first() ?: LeaveType::where('is_active', true)->where('name', 'like', '%'.$typeName.'%')->first();
                 if (!$type) throw new \RuntimeException('نوع الإجازة غير موجود.');
                 $status = $this->status($row[$map['status'] ?? -1] ?? '');
                 $days = is_numeric($row[$map['days'] ?? -1] ?? null) ? (float) $row[$map['days']] : $this->workingDays($start, $end);

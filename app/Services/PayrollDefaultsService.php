@@ -82,6 +82,10 @@ class PayrollDefaultsService
         'childcare_max_occurrences' => '3',
         'pilgrimage_min_service_months' => '60',
         'newborn_max_occurrences' => '3',
+        'maternity_months' => '4',
+        'childcare_min_gap_years' => '2',
+        'exam_notice_days' => '10',
+        'contagious_max_months' => '3',
     ];
 
     public function ensureForCompany(int $companyId): void

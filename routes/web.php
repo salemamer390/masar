@@ -274,6 +274,10 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
           Route::put('/{leave}', [LeaveController::class, 'update'])
              ->middleware('permission:leaves.edit')
              ->name('update');
+        Route::get('/{leave}/document', [LeaveController::class, 'document'])
+            ->whereNumber('leave')
+            ->middleware('permission:leaves.view')
+            ->name('document');
         Route::get('/opening-balances', [\App\Http\Controllers\LeaveOpeningBalanceController::class, 'index'])
             ->middleware('permission:leaves.view')
             ->name('opening.index');

@@ -782,7 +782,7 @@ document.addEventListener('masar:success', async (event) => {
 document.addEventListener('DOMContentLoaded', () => {
   const annual = document.querySelector('input[name="profile[annual_leave_days]"]');
   if (!annual || document.querySelector('[name="leave_entitlement_category"]')) return;
-  annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', '<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option></select></div>');
+  annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', '<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option><option value="disabled_hazardous">ذوو الإعاقة والأقزام + عمل خطر / نائي (45 + 7 أيام)</option></select></div>');
   const category = document.querySelector('[name="leave_entitlement_category"]'); if (category) category.value = @json(old('leave_entitlement_category', $employee->leave_entitlement_category ?? 'normal'));
 });
 </script>

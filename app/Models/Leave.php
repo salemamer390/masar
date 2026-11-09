@@ -28,6 +28,9 @@ class Leave extends Model
         'early_grant_reason',
         'early_grant_approved_by',
         'early_grant_approved_at',
+        'birth_date',
+        'document_path',
+        'document_name',
     ];
 
     protected $casts = [
@@ -37,6 +40,7 @@ class Leave extends Model
         'approved_at' => 'datetime',
         'manager_approved_at' => 'datetime',
         'is_early_grant' => 'boolean',
+        'birth_date' => 'date',
         'early_grant_approved_at' => 'datetime',
     ];
 
