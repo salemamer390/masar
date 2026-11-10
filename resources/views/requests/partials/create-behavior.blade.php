@@ -21,7 +21,7 @@
   const fields = document.createElement('div');
   fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات (تُحسب تلقائيًا من المدة)</label><input type="number" step="0.25" name="day_overtime_hours" class="form-control" readonly tabindex="-1"></div><div class="col-12"><div class="d-flex gap-2"><div class="flex-fill"><label class="form-label">من الساعة</label><input type="time" name="from_time" class="form-control" dir="ltr"></div><div class="flex-fill"><label class="form-label">إلى الساعة</label><input type="time" name="to_time" class="form-control" dir="ltr"></div></div></div>';
+  fields.innerHTML = window.masarStaticHtml('<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="overtime_request_date" class="form-control"></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select"><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات (تُحسب تلقائيًا من المدة)</label><input type="number" step="0.25" name="day_overtime_hours" class="form-control" readonly tabindex="-1"></div><div class="col-12"><div class="d-flex gap-2"><div class="flex-fill"><label class="form-label">من الساعة</label><input type="time" name="from_time" class="form-control" dir="ltr"></div><div class="flex-fill"><label class="form-label">إلى الساعة</label><input type="time" name="to_time" class="form-control" dir="ltr"></div></div></div>');
   modalFooter?.before(fields);
   const date = fields.querySelector('input[type="date"]');
   const period = fields.querySelector('[name="overtime_period"]');
@@ -88,7 +88,7 @@
   const employeeSelect = form.querySelector('select[name="employee_id"]');
   if (employeeSelect) {
     const wrapper = employeeSelect.parentElement;
-    const lookup = document.createElement('input'); lookup.className = 'form-control'; lookup.name = 'employee_lookup'; lookup.setAttribute('list','requestEmployeesList'); lookup.placeholder = 'ابحث باسم الموظف أو كوده'; lookup.required = true;
+    const lookup = document.createElement('input'); lookup.className = 'form-control'; lookup.name = 'employee_lookup'; lookup.setAttribute('list','requestEmployeesList'); lookup.placeholder = window.masarT('ابحث باسم الموظف أو كوده'); lookup.required = true;
     const hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'employee_id'; hidden.required = true;
     const list = document.createElement('datalist'); list.id = 'requestEmployeesList';
     list.innerHTML = employees.map((employee) => `<option value="${employee.name} — #${employee.code}"></option>`).join('');
@@ -104,7 +104,7 @@
   }
   const type = form.querySelector('[name="request_type_id"]');
   const title = form.querySelector('[name="title"]');
-  const typeMeta = @json($requestTypes->mapWithKeys(fn ($item) => [$item->id => ['label' => $item->display_name, 'source' => $item->source_key]]));
+  const typeMeta = @json($requestTypes->mapWithKeys(fn ($item) => [$item->id => ['label' => __($item->display_name), 'source' => $item->source_key]]));
   let generatedTitle = '';
   const syncTitle = () => { const meta = typeMeta[type?.value]; if (!meta) return; if (!title.value.trim() || title.value === generatedTitle) title.value = meta.label; generatedTitle = meta.label; };
   type?.addEventListener('change', syncTitle); syncTitle();
@@ -118,20 +118,20 @@
     const date = overtimeCard?.querySelector('[name="overtime_request_date"]')?.value || '';
     const period = overtimeCard?.querySelector('[name="overtime_period"]')?.value || '';
     const existing = employeeOvertimeDays[employeeId]?.[date] || [];
-    const labels = { day: 'إضافي نهاري', night: 'إضافي ليلي' };
+    const labels = { day: window.masarT('إضافي نهاري'), night: window.masarT('إضافي ليلي') };
     if (!employeeId || !date || !period || form.dataset.editingId) { overtimeWarning.hidden = true; return; }
     const hasSame = existing.includes(period);
     const hasOther = existing.filter((value) => value !== period).map((value) => labels[value] || value);
     overtimeWarning.hidden = !hasSame && !hasOther.length;
     overtimeWarning.className = 'overtime-existing-notice is-info';
     overtimeWarning.innerHTML = hasSame
-      ? `<i class="bi bi-exclamation-circle"></i> يوجد ${labels[period] || 'إضافي'} لهذا الموظف في نفس اليوم؛ سيُسجَّل الطلب مع تنبيه بالتكرار.`
-      : `<i class="bi bi-info-circle"></i> يوجد ${hasOther.join(' و ')} في هذا اليوم. يمكنك إضافة ${labels[period] || 'النوع الآخر'} أيضًا.`;
+      ? `<i class="bi bi-exclamation-circle"></i> ${window.masarT("يوجد")} ${labels[period] || window.masarT('إضافي')} ${window.masarT("لهذا الموظف في نفس اليوم؛ سيُسجَّل الطلب مع تنبيه بالتكرار.")}`
+      : `<i class="bi bi-info-circle"></i> ${window.masarT("يوجد")} ${hasOther.join(window.masarT(' و '))} ${window.masarT("في هذا اليوم. يمكنك إضافة")} ${labels[period] || window.masarT('النوع الآخر')} ${window.masarT("أيضًا.")}`;
   };
   overtimeCard?.querySelector('[name="overtime_request_date"]')?.addEventListener('change', syncOvertimeWarning);
   overtimeCard?.querySelector('[name="overtime_period"]')?.addEventListener('change', syncOvertimeWarning);
   const otherCard = document.createElement('div'); otherCard.className = 'request-conditional-card'; otherCard.hidden = true;
-  otherCard.innerHTML = '<div class="mb-3"><label class="form-label">تاريخ الطلب المؤثر</label><input type="date" name="request_date" class="form-control"></div><div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="affects_payroll" value="1" id="requestAffectsPayroll"><label class="form-check-label" for="requestAffectsPayroll">يؤثر على دورة الرواتب</label></div><div class="row g-2" data-payroll-impact-fields hidden><div class="col-md-6"><label class="form-label">المبلغ</label><input type="number" name="impact_amount" min="0.01" step="0.01" class="form-control"></div><div class="col-md-6"><label class="form-label">نوع التأثير</label><select name="impact_type" class="form-select"><option value="">اختر نوع التأثير</option><option value="earning">مستحق</option><option value="deduction">مستقطع</option></select></div></div>';
+  otherCard.innerHTML = window.masarStaticHtml('<div class="mb-3"><label class="form-label">تاريخ الطلب المؤثر</label><input type="date" name="request_date" class="form-control"></div><div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" name="affects_payroll" value="1" id="requestAffectsPayroll"><label class="form-check-label" for="requestAffectsPayroll">يؤثر على دورة الرواتب</label></div><div class="row g-2" data-payroll-impact-fields hidden><div class="col-md-6"><label class="form-label">المبلغ</label><input type="number" name="impact_amount" min="0.01" step="0.01" class="form-control"></div><div class="col-md-6"><label class="form-label">نوع التأثير</label><select name="impact_type" class="form-select"><option value="">اختر نوع التأثير</option><option value="earning">مستحق</option><option value="deduction">مستقطع</option></select></div></div>');
   form.querySelector('.modal-footer')?.before(otherCard);
   const otherDate = otherCard.querySelector('[name="request_date"]'); const affects = otherCard.querySelector('[name="affects_payroll"]'); const impactFields = otherCard.querySelector('[data-payroll-impact-fields]'); const impactAmount = otherCard.querySelector('[name="impact_amount"]'); const impactType = otherCard.querySelector('[name="impact_type"]');
   const syncImpact = () => { const active = affects.checked; impactFields.hidden = !active; impactAmount.required = active; impactType.required = active; if (!active) { impactAmount.value = ''; impactType.value = ''; } };
@@ -143,7 +143,7 @@
   const financialCard = document.createElement('div');
   financialCard.className = 'request-conditional-card financial-request-fields';
   financialCard.hidden = true;
-  financialCard.innerHTML = '<div class="row g-3"><div class="col-md-6"><label class="form-label">تاريخ الطلب</label><input type="date" name="financial_request_date" class="form-control"></div><div class="col-md-6"><label class="form-label">المبلغ (جنيه)</label><input type="number" name="financial_amount" class="form-control" min="0.01" step="0.01"></div></div>';
+  financialCard.innerHTML = window.masarStaticHtml('<div class="row g-3"><div class="col-md-6"><label class="form-label">تاريخ الطلب</label><input type="date" name="financial_request_date" class="form-control"></div><div class="col-md-6"><label class="form-label">المبلغ (جنيه)</label><input type="number" name="financial_amount" class="form-control" min="0.01" step="0.01"></div></div>');
   form.querySelector('.modal-footer')?.before(financialCard);
   const financialDate = financialCard.querySelector('[name="financial_request_date"]');
   const financialAmount = financialCard.querySelector('[name="financial_amount"]');
@@ -161,7 +161,7 @@
   const advanceCard = document.createElement('div');
   advanceCard.className = 'request-conditional-card advance-request-fields';
   advanceCard.hidden = true;
-  advanceCard.innerHTML = '<div class="advance-field-grid"><div><label class="form-label">تاريخ طلب السلفة</label><input type="date" name="request_date" class="form-control" required></div><div><label class="form-label">مبلغ السلفة (جنيه)</label><input type="number" name="advance_amount" class="form-control" min="0.01" step="0.01"></div><div class="advance-limit-box"><span>الحد الافتراضي للسلفة</span><strong data-advance-limit>—</strong><small>10% من الراتب الإجمالي</small></div></div><div class="advance-warning" data-advance-warning hidden><i class="bi bi-exclamation-triangle"></i><span>المبلغ يتجاوز 10% من الراتب الإجمالي. يلزم تأكيد المتابعة.</span></div><div class="form-check advance-confirm" data-advance-confirm hidden><input class="form-check-input" type="checkbox" name="advance_over_limit_confirm" value="1" id="advanceOverLimitConfirm"><label class="form-check-label" for="advanceOverLimitConfirm">أؤكد أن مبلغ السلفة يتجاوز الحد الافتراضي وأرغب في المتابعة.</label></div>';
+  advanceCard.innerHTML = window.masarStaticHtml('<div class="advance-field-grid"><div><label class="form-label">تاريخ طلب السلفة</label><input type="date" name="request_date" class="form-control" required></div><div><label class="form-label">مبلغ السلفة (جنيه)</label><input type="number" name="advance_amount" class="form-control" min="0.01" step="0.01"></div><div class="advance-limit-box"><span>الحد الافتراضي للسلفة</span><strong data-advance-limit>—</strong><small>10% من الراتب الإجمالي</small></div></div><div class="advance-warning" data-advance-warning hidden><i class="bi bi-exclamation-triangle"></i><span>المبلغ يتجاوز 10% من الراتب الإجمالي. يلزم تأكيد المتابعة.</span></div><div class="form-check advance-confirm" data-advance-confirm hidden><input class="form-check-input" type="checkbox" name="advance_over_limit_confirm" value="1" id="advanceOverLimitConfirm"><label class="form-check-label" for="advanceOverLimitConfirm">أؤكد أن مبلغ السلفة يتجاوز الحد الافتراضي وأرغب في المتابعة.</label></div>');
   form.querySelector('.modal-footer')?.before(advanceCard);
   const advanceAmount = advanceCard.querySelector('[name="advance_amount"]');
   const advanceDate = advanceCard.querySelector('[name="request_date"]');
@@ -182,7 +182,7 @@
   existingAdvanceConfirm.required = false;
   const existingAdvanceConfirmLabel = document.createElement('label');
   existingAdvanceConfirmLabel.className = 'form-check-label';
-  existingAdvanceConfirmLabel.textContent = 'أؤكد أنني أريد إنشاء سلفة جديدة رغم وجود رصيد سابق غير مسدد.';
+  existingAdvanceConfirmLabel.textContent = window.masarT('أؤكد أنني أريد إنشاء سلفة جديدة رغم وجود رصيد سابق غير مسدد.');
   const existingAdvanceConfirmWrap = document.createElement('div');
   existingAdvanceConfirmWrap.className = 'form-check advance-existing-confirm';
   existingAdvanceConfirmWrap.hidden = true;
@@ -195,7 +195,7 @@
     const employeeId = String(employeeIdInput?.value || '');
     return employeeAdvanceWarnings[employeeId] || employeeAdvanceWarnings[Number(employeeId)] || null;
   };
-  const formatMoney = (value) => `${Number(value || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ج.م`;
+  const formatMoney = (value) => `${Number(value || 0).toLocaleString('ar-EG', {maximumFractionDigits: 2})} ${window.masarT("ج.م")}`;
   const syncAdvance = () => {
     const active = advanceTypeIds.includes(String(type?.value || ''));
     advanceCard.hidden = !active;
@@ -205,7 +205,7 @@
     advanceAmount.required = true;
     const gross = Number(employeeGrossSalaries[employeeIdInput?.value] || 0);
     const limit = gross * 0.10;
-    advanceLimit.textContent = gross > 0 ? formatMoney(limit) : 'اختر الموظف أولًا';
+    advanceLimit.textContent = gross > 0 ? formatMoney(limit) : window.masarT('اختر الموظف أولًا');
     const overLimit = Number(advanceAmount.value || 0) > limit;
     advanceWarning.hidden = !overLimit;
     advanceConfirm.closest('.advance-confirm').hidden = !overLimit;
@@ -221,7 +221,7 @@
     }
     existingAdvanceNotice.hidden = !previous;
     existingAdvanceNotice.innerHTML = previous
-        ? `<i class="bi bi-info-circle"></i> سبق للموظف الحصول على سلفة بقيمة ${formatMoney(previous.original_amount)} بتاريخ ${previous.date || '—'}، والمتبقي منها ${formatMoney(previous.amount)}.`
+        ? `<i class="bi bi-info-circle"></i> ${window.masarT("سبق للموظف الحصول على سلفة بقيمة")} ${formatMoney(previous.original_amount)} ${window.masarT("بتاريخ")} ${previous.date || '—'}${window.masarT("، والمتبقي منها")} ${formatMoney(previous.amount)}.`
         : '';
     existingAdvanceConfirmWrap.hidden = !previous;
     // Keep the confirmation in sync with visibility.  A hidden required
@@ -259,7 +259,7 @@
       existingAdvanceConfirm.required = false;
       existingAdvanceNotice.hidden = false;
       existingAdvanceConfirm.focus();
-      window.showToast?.('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة أو اختر موظفًا آخر.');
+      window.showToast?.(window.masarT('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة أو اختر موظفًا آخر.'));
     }
   }, true);
 
@@ -272,7 +272,7 @@
     existingAdvanceConfirm.required = false;
     existingAdvanceNotice.hidden = false;
     existingAdvanceConfirm.focus();
-    window.showToast?.('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة.');
+    window.showToast?.(window.masarT('يوجد رصيد سلفة سابق غير مسدد. فعّل مربع التأكيد للمتابعة.'));
   });
 
   // Multiple conditional sections use request_date. Submit only the date
