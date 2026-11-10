@@ -97,8 +97,8 @@ class SettlementController extends Controller
 
         $settlement->refresh();
         $message = $settlement->reconciliation === 'draft_run'
-            ? 'تم اعتماد التسوية وإضافتها إلى مسير الرواتب المفتوح للمراجعة.'
-            : 'تم اعتماد التسوية كصرف مستقل (لا يوجد مسير مفتوح للفترة).';
+            ? __('تم اعتماد التسوية وإضافتها إلى مسير الرواتب المفتوح للمراجعة.')
+            : __('تم اعتماد التسوية كصرف مستقل (لا يوجد مسير مفتوح للفترة).');
 
         return back()->with('toast', $message);
     }
