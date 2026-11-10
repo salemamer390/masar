@@ -32,6 +32,7 @@
   @unless($isRtlInterface)
   <link href="{{ asset('ltr.css') }}?v={{ @filemtime(public_path('ltr.css')) }}" rel="stylesheet">
   @endunless
+@include('components.interface-i18n')
 </head>
 <body>
 <div class="app-shell">
@@ -103,45 +104,45 @@
   // Runs only while the interface is Arabic; other locales keep the codes.
   const isArabicInterface = document.documentElement.lang === 'ar';
   const arabicUiLabels = {
-    'Active':'نشط', 'Inactive':'غير نشط', 'Pending':'قيد الانتظار',
-    'Manager Approved':'بانتظار اعتماد الموارد البشرية', 'Approved':'معتمد',
-    'Rejected':'مرفوض', 'Draft':'مسودة', 'Locked':'مقفل', 'Paid':'تم الصرف',
-    'Required':'مطلوب', 'Completed':'مكتمل', 'Under Review':'قيد المراجعة',
-    'Present':'حاضر', 'Late':'متأخر', 'Absent':'غائب', 'Leave':'إجازة',
-    'On Leave':'في إجازة', 'manual':'إدخال يدوي', 'device':'جهاز حضور',
-    'api':'تكامل نظامي', 'Gross':'الراتب الإجمالي', 'Net':'الراتب الصافي',
-    'Gross Salary':'الراتب الإجمالي', 'Payroll Payslip':'قسيمة راتب',
-    'Leave request created.':'تم إنشاء طلب الإجازة بنجاح.',
-    'Leave request moved to HR review.':'تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.',
-    'Leave request approved.':'تم اعتماد طلب الإجازة بنجاح.',
-    'Leave request rejected.':'تم رفض طلب الإجازة.',
-    'Leave request deleted.':'تم حذف طلب الإجازة.',
-    'Insurance record saved.':'تم حفظ بيانات التأمين بنجاح.',
-    'Insurance record updated.':'تم تحديث بيانات التأمين بنجاح.',
-    'Payroll run generated in Draft status.':'تم إنشاء مسير الرواتب كمسودة.',
-    'Payroll run approved.':'تم اعتماد مسير الرواتب.',
-    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.',
-    'Leave request updated.':'تم تحديث طلب الإجازة بنجاح.',
-    'Leave policy saved.':'تم حفظ سياسة الإجازات.',
-    'Operational settings updated and calculations refreshed.':'تم تحديث الإعدادات وإعادة حساب النتائج.',
-    'Holiday saved.':'تم حفظ الإجازة الرسمية.',
-    'Holiday deleted.':'تم حذف الإجازة الرسمية.',
-    'Holiday updated.':'تم تحديث الإجازة الرسمية.',
-    'HR request created.':'تم إنشاء الطلب بنجاح.',
-    'HR request approved.':'تم اعتماد الطلب.',
-    'HR request rejected.':'تم رفض الطلب.',
-    'Attendance updated.':'تم تحديث الحضور بنجاح.',
-    'Attendance deleted.':'تم حذف سجل الحضور.',
-    'Organization insurance settings saved.':'تم حفظ إعدادات تأمينات المنشأة.',
-    'User created.':'تم إنشاء المستخدم بنجاح.',
-    'User updated.':'تم تحديث المستخدم بنجاح.',
-    'Penalty approved.':'تم اعتماد الجزاء.',
-    'Penalty updated.':'تم تحديث الجزاء.',
-    'Penalty deleted.':'تم حذف الجزاء.',
-    'Payroll inputs recalculated.':'تمت إعادة حساب بنود المسير.',
-    'Notifications marked as read.':'تم تعليم الإشعارات كمقروءة.',
-    'Attendance saved.':'تم حفظ الحضور بنجاح.',
-    'Attendance record saved.':'تم حفظ سجل الحضور بنجاح.'
+    'Active':window.masarT('نشط'), 'Inactive':window.masarT('غير نشط'), 'Pending':window.masarT('قيد الانتظار'),
+    'Manager Approved':window.masarT('بانتظار اعتماد الموارد البشرية'), 'Approved':window.masarT('معتمد'),
+    'Rejected':window.masarT('مرفوض'), 'Draft':window.masarT('مسودة'), 'Locked':window.masarT('مقفل'), 'Paid':window.masarT('تم الصرف'),
+    'Required':window.masarT('مطلوب'), 'Completed':window.masarT('مكتمل'), 'Under Review':window.masarT('قيد المراجعة'),
+    'Present':window.masarT('حاضر'), 'Late':window.masarT('متأخر'), 'Absent':window.masarT('غائب'), 'Leave':window.masarT('إجازة'),
+    'On Leave':window.masarT('في إجازة'), 'manual':window.masarT('إدخال يدوي'), 'device':window.masarT('جهاز حضور'),
+    'api':window.masarT('تكامل نظامي'), 'Gross':window.masarT('الراتب الإجمالي'), 'Net':window.masarT('الراتب الصافي'),
+    'Gross Salary':window.masarT('الراتب الإجمالي'), 'Payroll Payslip':window.masarT('قسيمة راتب'),
+    'Leave request created.':window.masarT('تم إنشاء طلب الإجازة بنجاح.'),
+    'Leave request moved to HR review.':window.masarT('تم تحويل طلب الإجازة إلى مراجعة الموارد البشرية.'),
+    'Leave request approved.':window.masarT('تم اعتماد طلب الإجازة بنجاح.'),
+    'Leave request rejected.':window.masarT('تم رفض طلب الإجازة.'),
+    'Leave request deleted.':window.masarT('تم حذف طلب الإجازة.'),
+    'Insurance record saved.':window.masarT('تم حفظ بيانات التأمين بنجاح.'),
+    'Insurance record updated.':window.masarT('تم تحديث بيانات التأمين بنجاح.'),
+    'Payroll run generated in Draft status.':window.masarT('تم إنشاء مسير الرواتب كمسودة.'),
+    'Payroll run approved.':window.masarT('تم اعتماد مسير الرواتب.'),
+    'Payroll run locked.':window.masarT('تم قفل مسير الرواتب نهائيًا.'),
+    'Leave request updated.':window.masarT('تم تحديث طلب الإجازة بنجاح.'),
+    'Leave policy saved.':window.masarT('تم حفظ سياسة الإجازات.'),
+    'Operational settings updated and calculations refreshed.':window.masarT('تم تحديث الإعدادات وإعادة حساب النتائج.'),
+    'Holiday saved.':window.masarT('تم حفظ الإجازة الرسمية.'),
+    'Holiday deleted.':window.masarT('تم حذف الإجازة الرسمية.'),
+    'Holiday updated.':window.masarT('تم تحديث الإجازة الرسمية.'),
+    'HR request created.':window.masarT('تم إنشاء الطلب بنجاح.'),
+    'HR request approved.':window.masarT('تم اعتماد الطلب.'),
+    'HR request rejected.':window.masarT('تم رفض الطلب.'),
+    'Attendance updated.':window.masarT('تم تحديث الحضور بنجاح.'),
+    'Attendance deleted.':window.masarT('تم حذف سجل الحضور.'),
+    'Organization insurance settings saved.':window.masarT('تم حفظ إعدادات تأمينات المنشأة.'),
+    'User created.':window.masarT('تم إنشاء المستخدم بنجاح.'),
+    'User updated.':window.masarT('تم تحديث المستخدم بنجاح.'),
+    'Penalty approved.':window.masarT('تم اعتماد الجزاء.'),
+    'Penalty updated.':window.masarT('تم تحديث الجزاء.'),
+    'Penalty deleted.':window.masarT('تم حذف الجزاء.'),
+    'Payroll inputs recalculated.':window.masarT('تمت إعادة حساب بنود المسير.'),
+    'Notifications marked as read.':window.masarT('تم تعليم الإشعارات كمقروءة.'),
+    'Attendance saved.':window.masarT('تم حفظ الحضور بنجاح.'),
+    'Attendance record saved.':window.masarT('تم حفظ سجل الحضور بنجاح.')
   };
   function translateInterfaceText(root = document.body) {
     if (!isArabicInterface) return;
@@ -224,8 +225,8 @@
       const reset = document.createElement('a');
       reset.href = window.location.pathname;
       reset.className = 'btn btn-light filter-reset';
-      reset.innerHTML = '<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>مسح</span>';
-      reset.setAttribute('aria-label', 'مسح الفلاتر');
+      reset.innerHTML = window.masarStaticHtml('<i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i><span>مسح</span>');
+      reset.setAttribute('aria-label', window.masarT('مسح الفلاتر'));
       form.appendChild(reset);
     });
   });
@@ -251,7 +252,7 @@
       const link = document.createElement('a');
       link.className = 'dropdown-item notification-all-link text-center border-top py-2 fw-bold';
       link.href = @json(route('notifications.index'));
-      link.textContent = 'عرض كل الإشعارات';
+      link.textContent = window.masarT('عرض كل الإشعارات');
       menu.appendChild(link);
     }
   });
@@ -333,7 +334,7 @@
 
     const applySidebarState = (collapsed) => {
       shell.classList.toggle('sidebar-collapsed', collapsed);
-      const text = collapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية';
+      const text = collapsed ? window.masarT('توسيع القائمة الجانبية') : window.masarT('طي القائمة الجانبية');
       toggles.forEach(btn => {
         btn.setAttribute('aria-label', text);
         btn.setAttribute('title', text);
@@ -359,7 +360,7 @@
     document.body.classList.toggle('preview-dark');
     const isDark = document.body.classList.contains('preview-dark');
     localStorage.setItem('masar_theme', isDark ? 'dark' : 'light');
-    showToast(isDark ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح');
+    showToast(isDark ? window.masarT('تم تفعيل الوضع الداكن') : window.masarT('تم تفعيل الوضع الفاتح'));
   });
 
   // Summary-card visibility is a presentation preference only. It never
@@ -375,8 +376,8 @@
     const setCardsVisible = (visible) => {
       document.body.classList.toggle('masar-cards-hidden', !visible);
       toggle.setAttribute('aria-pressed', visible ? 'true' : 'false');
-      toggle.setAttribute('aria-label', visible ? 'إخفاء الكروت' : 'إظهار الكروت');
-      toggle.title = visible ? 'إخفاء الكروت' : 'إظهار الكروت';
+      toggle.setAttribute('aria-label', visible ? @json(__('إخفاء الكروت')) : @json(__('إظهار الكروت')));
+      toggle.title = visible ? @json(__('إخفاء الكروت')) : @json(__('إظهار الكروت'));
       const icon = toggle.querySelector('i');
       if (icon) icon.className = visible ? 'bi bi-eye-slash' : 'bi bi-eye';
     };
@@ -428,7 +429,7 @@
     return payload;
   };
 
-  window.MasarUI.setBusy = function (form, busy, label = 'جارٍ الحفظ') {
+  window.MasarUI.setBusy = function (form, busy, label = window.masarT('جارٍ الحفظ')) {
     if (!(form instanceof HTMLFormElement)) return;
     form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(button => {
       if (busy) {
@@ -468,16 +469,16 @@
     const beforeSubmit = new CustomEvent('masar:before-submit', { cancelable: true });
     if (!form.dispatchEvent(beforeSubmit)) return;
 
-    window.MasarUI.setBusy(form, true, form.dataset.ajaxLabel || 'جارٍ الحفظ');
+    window.MasarUI.setBusy(form, true, form.dataset.ajaxLabel || window.masarT('جارٍ الحفظ'));
     try {
       const payload = await window.MasarUI.request(form);
       form.dispatchEvent(new CustomEvent('masar:success', { bubbles: true, detail: payload }));
-      showToast(payload?.message || form.dataset.ajaxSuccess || 'تم الحفظ بنجاح.');
+      showToast(payload?.message || form.dataset.ajaxSuccess || window.masarT('تم الحفظ بنجاح.'));
     } catch (error) {
       const validationErrors = error.payload?.errors;
       const message = validationErrors
         ? Object.values(validationErrors).flat().find(Boolean)
-        : (error.payload?.message || error.message || 'تعذر حفظ التغييرات.');
+        : (error.payload?.message || error.message || window.masarT('تعذر حفظ التغييرات.'));
       const errorEvent = new CustomEvent('masar:error', { bubbles: true, cancelable: true, detail: error });
       form.dispatchEvent(errorEvent);
       if (!errorEvent.defaultPrevented) showToast(message);
@@ -513,7 +514,7 @@
         if (button.disabled) return;
         button.dataset.originalText = button.innerHTML ?? button.value;
         button.disabled = true;
-        if (button.tagName === 'BUTTON') button.innerHTML = '<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> جارٍ الحفظ';
+        if (button.tagName === 'BUTTON') button.innerHTML = window.masarStaticHtml('<span class="spinner-border spinner-border-sm ms-1" aria-hidden="true"></span> جارٍ الحفظ');
         else button.value = 'جارٍ الحفظ';
       });
     }, true);
@@ -557,7 +558,7 @@
       if (!rows.length) return;
       const empty = document.createElement('div');
       empty.className = 'live-filter-empty text-muted text-center py-4';
-      empty.textContent = 'لا توجد نتائج مطابقة.';
+      empty.textContent = window.masarT('لا توجد نتائج مطابقة.');
       empty.hidden = true;
       container.appendChild(empty);
       const apply = () => {
