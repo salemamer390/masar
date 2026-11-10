@@ -1778,5 +1778,15 @@
   "● قيد المراجعة": "Under review",
   "موظف جديد": "New employee",
   "تسجيل إجازة": "Record leave",
-  "تسجيل جزاء": "Record penalty"
+  "تسجيل جزاء": "Record penalty",
+  "+:n هذا الشهر": "+:n this month",
+  "من أصل :n مجدولين": "of :n scheduled",
+  "بعد وقت احتساب الغياب": "after the absence counting time",
+  "لم يحن وقت الاحتساب": "counting time not reached yet",
+  "جزء من الحاضرين": "part of the present",
+  "دورة :m": "cycle :m",
+  "مستندات أو عقود تنتهي قريبًا": "Documents or contracts expiring soon",
+  "ملفات موظفين غير مكتملة": "Incomplete employee files",
+  "ينقصها مستند مطلوب واحد أو أكثر.": "Missing one or more required documents.",
+  "لا توجد دورة لهذا الشهر": "No cycle for this month"
 }
