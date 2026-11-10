@@ -104,7 +104,9 @@ class PayrollCalculator
         $daily = $overtimeBase / max(1, $this->settings->daysDivisor());
         $otDay = $dayHours * $hourly * $this->settings->dayOvertimeMultiplier();
         $otNight = $nightHours * $hourly * $this->settings->nightOvertimeMultiplier();
-        $otHoliday = $holidayDays * $daily * $this->settings->officialHolidayMultiplier();
+        // Same total semantics as OvertimeEngine: the multiplier counts the worked
+        // holiday's total days' wage; the base day is already inside the salary.
+        $otHoliday = $holidayDays * $daily * max(0.0, $this->settings->officialHolidayMultiplier() - 1);
         $otRest = $restDays * $daily * $this->settings->weeklyRestMultiplier();
         $overtime = $otDay + $otNight + $otHoliday + $otRest;
 
