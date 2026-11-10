@@ -16,7 +16,7 @@
   const canDeletePenalty = @json(auth()->user()?->hasPermission('penalties.delete'));
   const escapePenaltyHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const penaltyStatus = (status) => ['Rejected','Cancelled','Canceled','مرفوض','مرفوضة','ملغى','ملغي','ملغاة'].includes(status) ? ['ملغى','danger'] : ['مؤكد','success'];
-  const penaltyDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
+  const penaltyDate = (value) => { const parts = window.masarYmd(value).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
   const penaltyRow = (penalty) => {
     const employee = penalty.employee || {};
     const type = penalty.penalty_type || penalty.penaltyType || {};
@@ -24,7 +24,7 @@
     const id = Number(penalty.id);
     const days = penalty.deduction_days ?? type.default_deduction_days ?? 0;
     const close = '';
-    const edit = canEditPenalty ? `<button class="btn btn-sm btn-outline-primary penalty-edit-btn" data-bs-toggle="modal" data-bs-target="#editPenaltyModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-type-id="${penalty.penalty_type_id || type.id || ''}" data-date="${String(penalty.penalty_date || '').slice(0, 10)}" data-reason="${escapePenaltyHtml(penalty.reason)}" data-details="${escapePenaltyHtml(penalty.action)}" data-amount="${escapePenaltyHtml(penalty.amount)}" data-days="${escapePenaltyHtml(penalty.deduction_days)}" title="تعديل"><i class="bi bi-pencil"></i></button>` : '';
+    const edit = canEditPenalty ? `<button class="btn btn-sm btn-outline-primary penalty-edit-btn" data-bs-toggle="modal" data-bs-target="#editPenaltyModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-type-id="${penalty.penalty_type_id || type.id || ''}" data-date="${window.masarYmd(penalty.penalty_date)}" data-reason="${escapePenaltyHtml(penalty.reason)}" data-details="${escapePenaltyHtml(penalty.action)}" data-amount="${escapePenaltyHtml(penalty.amount)}" data-days="${escapePenaltyHtml(penalty.deduction_days)}" title="تعديل"><i class="bi bi-pencil"></i></button>` : '';
     const remove = canDeletePenalty ? `<form method="POST" action="${penaltyBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف هذا الإجراء؟')"><input type="hidden" name="_token" value="${escapePenaltyHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
     return `<tr data-penalty-id="${id}"><td><a class="employee-link fw-bold" href="${escapePenaltyHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapePenaltyHtml(employee.full_name)}</a></td><td>${escapePenaltyHtml(type.name)}</td><td>${penaltyDate(penalty.penalty_date)}</td><td>${escapePenaltyHtml(penalty.reason)}</td><td>${escapePenaltyHtml(days)}</td><td><span class="badge-soft ${statusClass}">${statusLabel}</span></td><td><div class="d-flex gap-1 flex-wrap">${close}${edit}${remove}</div></td></tr>`;
   };
