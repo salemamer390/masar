@@ -220,15 +220,15 @@
 {!! $lvN('annual', 'guaranteed', 'الحد الأدنى المضمون سنويًا', 15, 'min', 'يوم', null, 15, 'يظل الرصيد 15 يومًا كاملة بعد مدة الانتظار بدون تناسب، وفق قرار الشركة — مرجع ثابت حاليًا') !!}
 {!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
 {!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'دورة التسوية 3 سنوات مطبقة في احتساب الرصيد المرحّل — غير قابلة للتعديل حاليًا') !!}
-{!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
 {!! $lvCardOpen('casual', !$lvActive($casualType)) !!}
 {!! $lvHead('casual', 'الإجازة العارضة', 'م128', $casualType ? 'types['.$casualType->id.'][is_active]' : null, $lvActive($casualType)) !!}
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('casual', 'days', 'الحد السنوي', 7, 'min', 'يوم', 'policies[casual_max_days_year]', $pol('casual_max_days_year', 7)) !!}
 {!! $lvN('casual', 'perTime', 'الحد الأقصى في المرة', 2, 'min', 'يوم', 'policies[casual_max_days_request]', $pol('casual_max_days_request', 2)) !!}
-{!! $lvS('casual', 'deduct', 'تُخصم من السنوية', true, true, null, true, $constNote) !!}
-{!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('casual', 'deduct', 'تُخصم من السنوية', true, false, $casualType ? 'types['.$casualType->id.'][deducts_annual_balance]' : null, $casualType ? (bool) ($casualType->limits['deducts_annual_balance'] ?? $casualType->deducts_annual_balance) : true, $casualType ? null : $constNote) !!}
+{!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div></div></div>
 {!! $lvCardOpen('holidays') !!}
 {!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
@@ -278,8 +278,8 @@
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('exam', 'noticeAnnual', 'إخطار لتحديد موعد السنوية', 15, 'max', 'يوم', null, 15, 'مرجع قانوني — لا يُتحقق منه في الطلبات حاليًا') !!}
 {!! $lvN('exam', 'noticeStudy', 'إخطار للإجازة الدراسية', 10, 'max', 'يوم', 'policies[exam_notice_days]', $pol('exam_notice_days', 10)) !!}
-{!! $lvS('exam', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
-{!! $lvS('exam', 'deduct', 'تُخصم من السنوية', false, true, null, false, 'ثابت قانوني — لا تُخصم من السنوية') !!}
+{!! $lvS('exam', 'paid', 'مدفوعة الأجر', true, false, $examsType ? 'types['.$examsType->id.'][is_paid]' : null, $examsType ? (bool) ($examsType->limits['is_paid'] ?? $examsType->is_paid) : true, $examsType ? null : $constNote) !!}
+{!! $lvS('exam', 'deduct', 'تُخصم من السنوية', false, false, $examsType ? 'types['.$examsType->id.'][deducts_annual_balance]' : null, $examsType ? (bool) ($examsType->limits['deducts_annual_balance'] ?? $examsType->deducts_annual_balance) : false, $examsType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('exam', !$lvActive($examsType)) !!}</div></div></div>
 {!! $lvCardOpen('hajj', !$lvActive($pilgrimageType)) !!}
 {!! $lvHead('hajj', 'الحج أو زيارة بيت المقدس', 'م130', $pilgrimageType ? 'types['.$pilgrimageType->id.'][is_active]' : null, $lvActive($pilgrimageType)) !!}
@@ -287,15 +287,15 @@
 {!! $lvN('hajj', 'days', 'المدة', 30, 'min', 'يوم', $pilgrimageType ? 'types['.$pilgrimageType->id.'][max_days_per_request]' : null, $pilgrimageType?->limits['max_days_per_request'] ?? 30) !!}
 {!! $lvN('hajj', 'service', 'الخدمة المتصلة المطلوبة', 5, 'max', 'سنة', $pilgrimageType ? 'types['.$pilgrimageType->id.'][min_service_months]' : null, ($pilgrimageType?->limits['min_service_months'] ?? 60) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'hajj-service-months']) !!}
 {!! $lvN('hajj', 'times', 'عدد المرات طوال الخدمة', 1, 'min', 'مرة', $pilgrimageType ? 'types['.$pilgrimageType->id.'][max_occurrences_service]' : null, $pilgrimageType?->limits['max_occurrences_service'] ?? 1) !!}
-{!! $lvS('hajj', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('hajj', 'paid', 'مدفوعة الأجر', true, false, $pilgrimageType ? 'types['.$pilgrimageType->id.'][is_paid]' : null, $pilgrimageType ? (bool) ($pilgrimageType->limits['is_paid'] ?? $pilgrimageType->is_paid) : true, $pilgrimageType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('hajj', !$lvActive($pilgrimageType)) !!}</div></div></div>
 {!! $lvCardOpen('paternity', !$lvActive($newbornType)) !!}
 {!! $lvHead('paternity', 'مولود جديد (للأب)', 'م128', $newbornType ? 'types['.$newbornType->id.'][is_active]' : null, $lvActive($newbornType)) !!}
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('paternity', 'days', 'المدة (يوم الولادة)', 1, 'min', 'يوم', $newbornType ? 'types['.$newbornType->id.'][max_days_per_request]' : null, $newbornType?->limits['max_days_per_request'] ?? 1) !!}
 {!! $lvN('paternity', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $newbornType ? 'types['.$newbornType->id.'][max_occurrences_service]' : null, $newbornType?->limits['max_occurrences_service'] ?? 3) !!}
-{!! $lvS('paternity', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
-{!! $lvS('paternity', 'deduct', 'تُخصم من السنوية', false, true, null, false, 'ثابت قانوني — لا تُخصم من السنوية') !!}
+{!! $lvS('paternity', 'paid', 'مدفوعة الأجر', true, false, $newbornType ? 'types['.$newbornType->id.'][is_paid]' : null, $newbornType ? (bool) ($newbornType->limits['is_paid'] ?? $newbornType->is_paid) : true, $newbornType ? null : $constNote) !!}
+{!! $lvS('paternity', 'deduct', 'تُخصم من السنوية', false, false, $newbornType ? 'types['.$newbornType->id.'][deducts_annual_balance]' : null, $newbornType ? (bool) ($newbornType->limits['deducts_annual_balance'] ?? $newbornType->deducts_annual_balance) : false, $newbornType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('paternity', !$lvActive($newbornType)) !!}</div></div></div>
 {!! $lvCardOpen('jobsearch') !!}
 {!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162') !!}
@@ -313,7 +313,7 @@
 {!! $lvN('maternity', 'months', 'المدة الكلية', 4, 'min', 'شهر', 'policies[maternity_months]', $pol('maternity_months', 4)) !!}
 {!! $lvN('maternity', 'after', 'الحد الأدنى بعد الوضع', 45, 'min', 'يوم', 'policies[maternity_min_postpartum_days]', $pol('maternity_min_postpartum_days', 45)) !!}
 {!! $lvN('maternity', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $maternityType ? 'types['.$maternityType->id.'][max_occurrences_service]' : null, $maternityType?->limits['max_occurrences_service'] ?? 3) !!}
-{!! $lvS('maternity', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('maternity', 'paid', 'مدفوعة الأجر', true, false, $maternityType ? 'types['.$maternityType->id.'][is_paid]' : null, $maternityType ? (bool) ($maternityType->limits['is_paid'] ?? $maternityType->is_paid) : true, $maternityType ? null : $constNote) !!}
 {!! $lvS('maternity', 'cert', 'تتطلب شهادة طبية', true, false, $maternityType ? 'types['.$maternityType->id.'][requires_document]' : null, $maternityType ? (bool) $maternityType->limits['requires_document'] : true) !!}
 </div>{!! $lvOffSlot('maternity', !$lvActive($maternityType)) !!}</div></div></div>
 {!! $lvCardOpen('childcare', !$lvActive($childcareType)) !!}
@@ -324,7 +324,7 @@
 {!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', null, 50, 'مرجع قانوني — أهلية حجم المنشأة لا تُتحقق آليًا حاليًا') !!}
 {!! $lvN('childcare', 'service', 'أقل مدة وجود في المنشأة', 1, 'max', 'سنة', $childcareType ? 'types['.$childcareType->id.'][min_service_months]' : null, ($childcareType?->limits['min_service_months'] ?? 12) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'childcare-service-months']) !!}
 {!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
-{!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, null, false, 'بدون أجر وفق المرجع — صرفها بأجر اختيار للشركة غير مربوط بالمسير حاليًا') !!}
+{!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('childcare', !$lvActive($childcareType)) !!}</div></div></div>
 {!! $lvCardOpen('nursing') !!}
 {!! $lvHead('nursing', 'فترتا الرضاعة', 'م56') !!}
