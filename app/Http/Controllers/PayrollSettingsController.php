@@ -60,7 +60,9 @@ class PayrollSettingsController extends Controller
             // Statutory shared types stay listed even if deactivated wholesale, so a company can switch them back on.
             ->orWhere(fn ($q2) => $q2->whereNull('company_id')->whereIn('policy_code', ['annual', 'casual', 'sick', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare']))
             // The company's own types stay listed while inactive so they can be reactivated.
-            ->when($companyId, fn ($q2) => $q2->orWhere('company_id', $companyId)))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
+            // Types archived through the delete action stay gone: archiving is a deliberate
+            // removal that keeps history, not an ordinary off switch.
+            ->when($companyId, fn ($q2) => $q2->orWhere(fn ($q3) => $q3->where('company_id', $companyId)->whereNull('archived_at'))))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
             $limits = $leaveBalances->limitsFor($type, $companyId ? (int) $companyId : null);
             if ($type->policy_code === 'casual') {
                 $perRequest = $leavePolicies['casual_max_days_request']->setting_value ?? null;
@@ -145,12 +147,13 @@ class PayrollSettingsController extends Controller
             'types.*.is_active' => ['nullable', 'boolean'],
             'types.*.is_paid' => ['nullable', 'boolean'],
             'types.*.deducts_annual_balance' => ['nullable', 'boolean'],
+            'types.*.min_employees' => ['nullable', 'integer', 'min:0'],
             'sick_pay_basis' => ['nullable', 'in:ins,full,none'],
             'confirm_below_reference' => ['sometimes', 'accepted'],
             'contact_pay' => ['nullable', 'in:paid,unpaid'],
             'contact_active' => ['nullable', 'boolean'],
         ]);
-        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance')) {
+        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance') || !Schema::hasColumn('leave_type_company_limits', 'min_employees')) {
             $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
@@ -188,7 +191,7 @@ class PayrollSettingsController extends Controller
         if ($warnings && !$request->boolean('confirm_below_reference')) throw \Illuminate\Validation\ValidationException::withMessages(['below_reference' => array_values(array_unique($warnings))]);
         $before = ['policies' => $currentPolicies, 'types' => []];
         foreach (($data['types'] ?? []) as $id => $values) { $type = LeaveType::find($id); if ($type) $before['types'][$id] = $balances->limitsFor($type, $companyId); }
-        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document', 'is_active', 'is_paid', 'deducts_annual_balance'];
+        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'min_employees', 'requires_document', 'is_active', 'is_paid', 'deducts_annual_balance'];
         $balances = app(\App\Services\LeaveBalanceService::class);
         DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
             if (!empty($data['sick_pay_basis'])) {
@@ -211,6 +214,8 @@ class PayrollSettingsController extends Controller
             foreach (($data['types'] ?? []) as $id => $values) {
                 $type = LeaveType::find($id);
                 if (!$type) continue;
+                // Archived custom types are history-preserved removals: a settings save never resurrects them.
+                if ($type->archived_at) continue;
                 $values = array_intersect_key($values, array_flip($limitKeys));
                 // Single source per rule: casual per-request/per-year live in this table but are kept in the company policy.
                 if ($type->policy_code === 'casual') {
@@ -400,6 +405,35 @@ class PayrollSettingsController extends Controller
         ]);
         ActivityLog::record('leave_type_create', 'Custom leave type created.', null, null, $type->toArray(), 'leaves');
         return back()->with('toast', 'تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.');
+    }
+
+    /**
+     * Delete a company-owned custom leave type. Shared (statutory) types are never
+     * touched. A type that already has requests is archived instead: it leaves the
+     * request choices but its records, balances and payroll history stay intact.
+     */
+    public function destroyLeaveType(int $leaveType, Request $request)
+    {
+        $companyId = $this->companyIdOrFail();
+        $type = LeaveType::where('id', $leaveType)->where('company_id', $companyId)->first();
+        if (!$type) {
+            $message = 'نوع الإجازة غير موجود ضمن أنواع شركتك الخاصة.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 404) : back()->withErrors(['leave' => $message]);
+        }
+        if ($type->leaves()->exists()) {
+            $type->is_active = false;
+            $type->archived_at = now();
+            $type->save();
+            ActivityLog::record('leave_type_archive', 'Custom leave type archived.', null, null, $type->toArray(), 'leaves');
+            $message = 'للنوع طلبات سابقة — أُزيل من الاختيارات الجديدة مع حفظ سجلاته كاملة.';
+            return $request->wantsJson() ? response()->json(['success' => true, 'archived' => true, 'message' => $message]) : back()->with('toast', $message);
+        }
+        $snapshot = $type->toArray();
+        DB::table('leave_type_company_limits')->where('leave_type_id', $type->id)->delete();
+        $type->delete();
+        ActivityLog::record('leave_type_delete', 'Custom leave type deleted.', null, null, $snapshot, 'leaves');
+        $message = 'تم حذف نوع الإجازة نهائيًا — لم تكن له أي طلبات.';
+        return $request->wantsJson() ? response()->json(['success' => true, 'archived' => false, 'message' => $message]) : back()->with('toast', $message);
     }
 
     public function destroyHoliday(int $holiday, Request $request)

@@ -59,3 +59,10 @@
   #leavePolicy .lp-search-row{grid-template-columns:1fr}
   #leavePolicy .lp-summary{justify-content:flex-start}
 }
+
+/* Legal-reference display: statutory values are shown as read-only text, never as dead controls. */
+.law-fixed-badge{display:inline-flex;align-items:center;padding:.18rem .6rem;border-radius:999px;background:#eef2f7;color:#3d4a63;font-size:.72rem;font-weight:700;border:1px solid #d5dce8;white-space:nowrap}
+.law-ref-static{display:flex;align-items:center;gap:.5rem;min-height:31px;padding:.15rem .1rem}
+.law-ref-value{font-weight:700;color:#33415c}
+.law-ref-tag{font-size:.68rem;color:#7a8699;border:1px dashed #c4ccd9;border-radius:999px;padding:.08rem .5rem;white-space:nowrap}
+.lp-delete-type{padding:.2rem .5rem;line-height:1}

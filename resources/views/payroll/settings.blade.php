@@ -133,6 +133,11 @@
       $id = $card.'-'.$key;
       $disabled = $name === null;
       $v = $lvNum($value ?? $law);
+      if ($disabled) {
+          return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+      }
       $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><div class="input-group input-group-sm">'
           .'<input type="number" min="0" step="any" class="form-control" id="'.e($id).'"'
           .($name && !$scale ? ' name="'.e($name).'"' : '')
@@ -149,6 +154,11 @@
       $id = $card.'-'.$key;
       $disabled = $name === null;
       $on = $value ?? $law;
+      if ($disabled) {
+          return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+      }
       return '<div class="col-md-6"><div class="form-check form-switch">'
           .($name ? '<input type="hidden" name="'.e($name).'" value="0">' : '')
           .'<input class="form-check-input" type="checkbox" id="'.e($id).'"'.($name ? ' name="'.e($name).'" value="1"' : '').($on ? ' checked' : '')
@@ -167,14 +177,15 @@
       return $h;
   };
   // رأس بطاقة: الاسم + المادة + مفتاح التفعيل + زر «القانون»، بنفس ترتيب التصميم.
-  $lvHead = function (string $card, string $name, string $art, ?string $toggleName = null, ?bool $active = null) {
+  $lvHead = function (string $card, string $name, string $art, ?string $toggleName = null, ?bool $active = null, ?string $deleteUrl = null, ?string $deleteName = null) {
       $h = '<div class="leave-head"><h3>'.e($name).'</h3><span class="art">'.e($art).'</span>';
       if ($toggleName !== null) {
           $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
               .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
       } else {
-          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون — لا يمكن تعطيله"><input class="form-check-input" type="checkbox" checked disabled></div>';
+          $h .= '<span class="law-fixed-badge" title="حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل، وقيم بطاقته مرجع للمقارنة">حق ثابت بالقانون</span>';
       }
+      if ($deleteUrl !== null) $h .= '<button type="button" class="btn btn-sm btn-outline-danger lp-delete-type" data-url="'.e($deleteUrl).'" data-name="'.e($deleteName ?? $name).'" title="حذف النوع"><i class="bi bi-trash"></i></button>';
       $h .= '<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset="'.e($card).'">القانون</button></div>';
       return $h;
   };
@@ -186,7 +197,7 @@
           $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
               .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
       } else {
-          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون — لا يمكن تعطيله"><input class="form-check-input" type="checkbox" checked disabled></div>';
+          $h .= '<span class="law-fixed-badge" title="حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل">حق ثابت بالقانون</span>';
       }
       return $h.'</div>';
   };
@@ -224,13 +235,12 @@
 {!! $lvCardOpen('annual', !$lvActive($annualType), true) !!}
 {!! $lvHead('annual', 'الإجازة السنوية', 'م124–127', $annualType ? 'types['.$annualType->id.'][is_active]' : null, $lvActive($annualType)) !!}
 <div class="leave-body"><div class="row g-3">
-{!! $lvN('annual', 'd1', 'السنة الأولى', 15, 'min', 'يوم', 'policies[annual_first_year]', $pol('annual_first_year', 15)) !!}
+{!! $lvN('annual', 'd1', 'السنة الأولى', 15, 'min', 'يوم', 'policies[annual_first_year]', $pol('annual_first_year', 15), 'يُمنح الرصيد كاملًا بعد مدة الانتظار بدون تناسب — وفق قرار الشركة') !!}
 {!! $lvN('annual', 'd2', 'من السنة الثانية', 21, 'min', 'يوم', 'policies[annual_second_year]', $pol('annual_second_year', 21)) !!}
 {!! $lvN('annual', 'd3', '10 سنوات خدمة أو تجاوز 50 سنة', 30, 'min', 'يوم', 'policies[annual_long_service]', $pol('annual_long_service', 30)) !!}
 {!! $lvN('annual', 'd4', 'ذوو الإعاقة والأقزام', 45, 'min', 'يوم', 'policies[annual_disability_days]', $pol('annual_disability_days', 45)) !!}
 {!! $lvN('annual', 'extra', 'إضافة للأعمال الخطرة والمناطق النائية', 7, 'min', 'يوم', 'policies[annual_hazardous_extra_days]', $pol('annual_hazardous_extra_days', 7)) !!}
 {!! $lvN('annual', 'minMonths', 'أقل خدمة لإجازة بنسبة المدة', 6, 'max', 'شهر', 'policies[annual_wait_months]', $pol('annual_wait_months', 6)) !!}
-{!! $lvN('annual', 'guaranteed', 'الحد الأدنى المضمون سنويًا', 15, 'min', 'يوم', null, 15, 'يظل الرصيد 15 يومًا كاملة بعد مدة الانتظار بدون تناسب، وفق قرار الشركة — مرجع ثابت حاليًا') !!}
 {!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
 {!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'مرجع قانوني — الرصيد المرحّل لا تنتهي صلاحيته آليًا في النظام حاليًا') !!}
 {!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
@@ -336,7 +346,7 @@
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('childcare', 'months', 'المدة', 24, 'min', 'شهر', 'policies[childcare_max_years_per_request]', ((float) $pol('childcare_max_years_per_request', 2)) * 12, null, ['op' => 'div', 'factor' => 12, 'target' => 'childcare-months-years']) !!}
 {!! $lvN('childcare', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $childcareType ? 'types['.$childcareType->id.'][max_occurrences_service]' : null, $childcareType?->limits['max_occurrences_service'] ?? 3) !!}
-{!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', null, 50, 'مرجع قانوني — تُتحقق آليًا من عدد عمال شركتك عند الاعتماد، وقيمتها ثابتة حاليًا') !!}
+{!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', $childcareType ? 'types['.$childcareType->id.'][min_employees]' : null, $childcareType ? ($childcareType->limits['min_employees'] ?? $childcareType->min_employees ?? 50) : 50, $childcareType ? 'تُتحقق آليًا من عدد عمال شركتك عند الاعتماد — يمكنك خفض الحد لمنح الميزة لمنشأة أصغر' : $constNote) !!}
 {!! $lvN('childcare', 'service', 'أقل مدة وجود في المنشأة', 1, 'max', 'سنة', $childcareType ? 'types['.$childcareType->id.'][min_service_months]' : null, ($childcareType?->limits['min_service_months'] ?? 12) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'childcare-service-months']) !!}
 {!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
 {!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
@@ -363,7 +373,7 @@
 <div class="row g-3" data-lp-group>
 @foreach($extraTypes as $extraType)
 {!! $lvCardOpen('x'.$extraType->id, !$lvActive($extraType)) !!}
-{!! $lvHead('x'.$extraType->id, $extraType->name, 'نوع خاص', 'types['.$extraType->id.'][is_active]', $lvActive($extraType)) !!}
+{!! $lvHead('x'.$extraType->id, $extraType->name, 'نوع خاص', 'types['.$extraType->id.'][is_active]', $lvActive($extraType), route('payroll.settings.leave-types.destroy', $extraType->id), $extraType->name) !!}
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('x'.$extraType->id, 'per', 'الحد في الطلب (يوم)', $extraType->limits['max_days_per_request'] ?? 0, 'min', 'يوم', 'types['.$extraType->id.'][max_days_per_request]', $extraType->limits['max_days_per_request']) !!}
 {!! $lvN('x'.$extraType->id, 'year', 'الحد السنوي (يوم)', $extraType->limits['max_days_per_year'] ?? 0, 'min', 'يوم', 'types['.$extraType->id.'][max_days_per_year]', $extraType->limits['max_days_per_year']) !!}
@@ -789,6 +799,22 @@ if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مف�
   const escapeHolidayHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const holidayDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
   const holidayRow = (holiday) => `<div class="holiday-row" data-holiday-id="${holiday.id}"><div><strong>${escapeHolidayHtml(holiday.name)}</strong><small class="text-muted d-block">${holidayDate(holiday.holiday_date)}</small></div><div class="holiday-actions"><button type="button" class="btn btn-sm btn-outline-primary holiday-edit-ajax"><i class="bi bi-pencil-square"></i> تعديل</button><form method="POST" action="${holidayBaseUrl}/${holiday.id}"><input type="hidden" name="_token" value="${escapeHolidayHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف</button></form></div></div>`;
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest('.lp-delete-type');
+    if (!button) return;
+    const typeName = button.dataset.name || '';
+    if (!confirm('حذف نوع الإجازة «' + typeName + '»؟ إن كانت له طلبات سابقة سيُزال من الاختيارات الجديدة مع حفظ سجلاته، وإلا سيُحذف نهائيًا.')) return;
+    button.disabled = true;
+    try {
+      const body = new URLSearchParams();
+      body.set('_method', 'DELETE');
+      const response = await fetch(button.dataset.url, {method: 'POST', headers: {'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}, body});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { alert(data.message || 'تعذر حذف النوع.'); button.disabled = false; return; }
+      alert(data.message || 'تم الحذف.');
+      location.reload();
+    } catch (error) { alert('تعذر الاتصال بالخادم.'); button.disabled = false; }
+  });
   const wireSettingsAjaxForms = (root = document) => {
     root.querySelectorAll('form[action$="/operational"], form[action$="/holidays"][method="POST"], #editHolidayForm').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
     root.querySelectorAll('form[action*="/settings/holidays/"] input[name="_method"][value="DELETE"]').forEach((input) => { const form = input.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف هذه العطلة؟'; });

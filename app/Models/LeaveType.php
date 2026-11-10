@@ -18,7 +18,7 @@ class LeaveType extends Model
         'is_paid',
         'is_active',
         'policy_code', 'max_days_per_request', 'max_days_per_year', 'min_service_months',
-        'max_occurrences_service', 'requires_document', 'eligibility_gender', 'min_employees', 'company_id',
+        'max_occurrences_service', 'requires_document', 'eligibility_gender', 'min_employees', 'company_id', 'archived_at',
     ];
 
     protected $casts = [
@@ -28,6 +28,7 @@ class LeaveType extends Model
         'is_paid' => 'boolean',
         'max_days_per_request' => 'decimal:2', 'max_days_per_year' => 'decimal:2',
         'requires_document' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
     /** Company-owned art. 132 templates retain a unique storage code; policy consumers see the statutory kind. */
