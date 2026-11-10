@@ -8,18 +8,22 @@
 @section('content')
 <div class="dashboard-command-bar dashboard-command-bar--reference" aria-label="{{ __('إجراءات سريعة') }}">
     @foreach($quickActions as $action)
-    @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus'])
-    <button type="button" class="dashboard-existing-action" data-short-label="{{ $action['short'] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ __($action['label']) }}</span></button>
+    @php
+$actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus'];
+@endphp
+    <button type="button" class="dashboard-existing-action" data-short-label="{{ __($action['short'] ?? __('إجراء')) }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ __($action['label']) }}</span></button>
   @endforeach
   @if(auth()->user()?->hasPermission('employees.import'))
-    <button type="button" class="dashboard-import-action" data-short-label="استيراد" data-bs-toggle="modal" data-bs-target="#employeesImportModal"><i class="fa-solid fa-file-excel"></i><span>{{ __('استيراد موظفين') }}</span></button>
+    <button type="button" class="dashboard-import-action" data-short-label="{{ __('استيراد') }}" data-bs-toggle="modal" data-bs-target="#employeesImportModal"><i class="fa-solid fa-file-excel"></i><span>{{ __('استيراد موظفين') }}</span></button>
   @endif
 </div>
 
 <div class="reference-kpi-grid reference-kpi-grid--six">
   @forelse($heroMetrics as $metric)
     <a href="{{ $metric['url'] }}" class="reference-kpi {{ $metric['tone'] }}" data-dashboard-detail="{{ $metric['key'] }}" data-detail-url="{{ route('dashboard.details', $metric['key']) }}" data-detail-icon="{{ $metric['icon'] }}">
-      @php($kpiIcons = ['employees'=>'fa-users','present'=>'fa-user-check','absent'=>'fa-user-xmark','late'=>'fa-clock','payroll-cost'=>'fa-sack-dollar'])
+      @php
+$kpiIcons = ['employees'=>'fa-users','present'=>'fa-user-check','absent'=>'fa-user-xmark','late'=>'fa-clock','payroll-cost'=>'fa-sack-dollar'];
+@endphp
       <span class="reference-kpi-icon"><i class="fa-solid {{ $kpiIcons[$metric['key']] ?? 'fa-chart-simple' }}"></i></span>
       <span><b>{{ $metric['label'] }}</b>@if($metric['key'] === 'payroll-cost')<strong class="kpi-money-value">{{ trim(str_replace('ج.م', '', $metric['value'])) }} <span class="kpi-currency">{{ __('ج.م') }}</span></strong>@else<strong>{{ $metric['value'] }}</strong>@endif<small>{{ $metric['hint'] }}</small></span>
     </a>
@@ -29,18 +33,22 @@
 <div class="dashboard-reference-layout">
   <div class="dashboard-reference-column">
     @if($attendance)
-      @php($attendanceTotal = $attendance['counts']['scheduled'])
+      @php
+$attendanceTotal = $attendance['counts']['scheduled'];
+@endphp
       <section class="panel reference-panel attendance-panel" data-dashboard-detail="attendance" data-detail-url="{{ route('dashboard.details','attendance') }}" data-detail-icon="pie-chart-fill" tabindex="0" role="button">
-        <div class="panel-head"><div><h3><i class="bi bi-pie-chart-fill"></i> {{ __('حالة الحضور اليوم') }}</h3><span>{{ $today->format('d/m/Y') }} · {{ $attendance['cutoffReached'] ? 'تم احتساب الغياب' : 'قبل وقت الاحتساب' }}</span></div><a class="btn btn-light btn-sm" href="{{ route('attendance.index',['date'=>$today->toDateString()]) }}">{{ __('عرض الكل') }}</a></div>
+        <div class="panel-head"><div><h3><i class="bi bi-pie-chart-fill"></i> {{ __('حالة الحضور اليوم') }}</h3><span>{{ $today->format('d/m/Y') }} · {{ $attendance['cutoffReached'] ? __('تم احتساب الغياب') : __('قبل وقت الاحتساب') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('attendance.index',['date'=>$today->toDateString()]) }}">{{ __('عرض الكل') }}</a></div>
         <div class="attendance-overview"><div class="attendance-ring" style="--present:{{ $attendanceTotal ? (($attendance['counts']['on_time'] / $attendanceTotal) * 100) : 0 }}%;--late:{{ $attendanceTotal ? (($attendance['counts']['late'] / $attendanceTotal) * 100) : 0 }}%;--absent:{{ $attendanceTotal ? (($attendance['counts']['absent'] / $attendanceTotal) * 100) : 0 }}%;--leave:{{ $attendanceTotal ? (($attendance['counts']['leave'] / $attendanceTotal) * 100) : 0 }}%;"><span>{{ format_number($attendanceTotal) }}</span><small>{{ __('مجدول اليوم') }}</small></div><div class="attendance-breakdown"><div><i class="dot green"></i> {{ __('حاضر') }} <b>{{ format_number($attendance['counts']['on_time']) }}</b></div><div><i class="dot orange"></i> {{ __('متأخر') }} <b>{{ format_number($attendance['counts']['late']) }}</b></div><div><i class="dot red"></i> {{ __('غائب') }} <b>{{ format_number($attendance['counts']['absent']) }}</b></div><div><i class="dot purple"></i> {{ __('إجازة') }} <b>{{ format_number($attendance['counts']['leave']) }}</b></div><div><i class="dot gray"></i> {{ __('لم يسجل بعد') }} <b>{{ format_number($attendance['counts']['not_recorded']) }}</b></div></div></div>
       </section>
     @endif
-    <section class="panel reference-panel recent-leaves"><div class="panel-head"><div><h3><i class="bi bi-calendar2-check"></i> {{ __('آخر قرارات الإجازات') }}</h3><span>{{ __('المعتمدة والمرفوضة مع توضيح الحالة.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('leaves.index') }}">{{ __('عرض الكل') }}</a></div><div class="table-responsive"><table class="table"><thead><tr><th>{{ __('الموظف') }}</th><th>{{ __('نوع الإجازة') }}</th><th>{{ __('من') }}</th><th>{{ __('إلى') }}</th><th>{{ __('الحالة') }}</th></tr></thead><tbody>@forelse($recentLeaves as $leave)<tr><td><span class="table-row-icon {{ $leave->status === 'Rejected' ? 'danger' : 'success' }}"><i class="bi bi-calendar-event"></i></span>{{ $leave->employee?->full_name }}</td><td>{{ $leave->leaveType?->name }}</td><td>{{ $leave->start_date?->format('d/m/Y') }}</td><td>{{ $leave->end_date?->format('d/m/Y') }}</td><td><span class="badge-soft {{ $leave->status === 'Rejected' ? 'danger' : 'success' }}">{{ $leave->status === 'Rejected' ? 'مرفوضة' : 'معتمدة' }}</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">{{ __('لا توجد إجازات معتمدة أو مرفوضة حتى الآن.') }}</td></tr>@endforelse</tbody></table></div></section>
+    <section class="panel reference-panel recent-leaves"><div class="panel-head"><div><h3><i class="bi bi-calendar2-check"></i> {{ __('آخر قرارات الإجازات') }}</h3><span>{{ __('المعتمدة والمرفوضة مع توضيح الحالة.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('leaves.index') }}">{{ __('عرض الكل') }}</a></div><div class="table-responsive"><table class="table"><thead><tr><th>{{ __('الموظف') }}</th><th>{{ __('نوع الإجازة') }}</th><th>{{ __('من') }}</th><th>{{ __('إلى') }}</th><th>{{ __('الحالة') }}</th></tr></thead><tbody>@forelse($recentLeaves as $leave)<tr><td><span class="table-row-icon {{ $leave->status === 'Rejected' ? 'danger' : 'success' }}"><i class="bi bi-calendar-event"></i></span>{{ $leave->employee?->full_name }}</td><td>{{ $leave->leaveType?->name }}</td><td>{{ $leave->start_date?->format('d/m/Y') }}</td><td>{{ $leave->end_date?->format('d/m/Y') }}</td><td><span class="badge-soft {{ $leave->status === 'Rejected' ? 'danger' : 'success' }}">{{ $leave->status === 'Rejected' ? __('مرفوضة') : __('معتمدة') }}</span></td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-4">{{ __('لا توجد إجازات معتمدة أو مرفوضة حتى الآن.') }}</td></tr>@endforelse</tbody></table></div></section>
   </div>
 
   <div class="dashboard-reference-column">
-    <section class="panel reference-panel dates-panel"><div class="panel-head"><div><h3><i class="bi bi-calendar-week"></i> {{ __('المستندات والعقود التي تنتهي قريبًا') }}</h3><span>{{ __('كل المستندات والعقود التي تنتهي خلال 30 يومًا أو أقل.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('documents.index') }}" data-dashboard-detail="documents-expiring" data-detail-url="{{ route('dashboard.details','documents-expiring') }}" data-detail-icon="calendar-week">{{ __('عرض الكل') }}</a></div><div class="reference-list">@forelse($expiringDocuments as $item) @php($days = max(0, today()->diffInDays($item['expiry_date'], false)))<a href="{{ route('employees.show', [$item['employee'], 'tab' => $item['kind'] === 'contract' ? 'job' : 'documentsProfile']) }}"><span class="list-square {{ $days <= 7 ? 'red' : 'orange' }}"><i class="bi {{ $item['kind'] === 'contract' ? 'bi-file-earmark-ruled-fill' : 'bi-file-earmark-text-fill' }}"></i></span><span><b>{{ $item['employee']?->full_name }} · {{ $item['label'] }}</b><small>{{ __('ينتهي') }} {{ $item['expiry_date']?->format('d/m/Y') }} · {{ format_number($days) }} {{ __('يومًا') }}</small></span><time>{{ $item['expiry_date']?->format('d/m') }}</time></a>@empty<div class="text-center text-muted small py-4">{{ __('لا توجد مستندات أو عقود تنتهي خلال 30 يومًا.') }}</div>@endforelse</div></section>
-    @if($payroll)<section class="panel reference-panel payroll-panel"><div class="panel-head"><div><h3><i class="bi bi-cash-stack"></i> {{ __('ملخص الرواتب') }}</h3><span>{{ __('البيانات حسب الشهر والسنة المحددين.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('payroll.index',['month'=>$month->format('Y-m-01')]) }}">{{ __('فتح المسير') }}</a></div><form method="GET" class="dashboard-payroll-filter"><select name="payroll_month_number" aria-label="{{ __('شهر الرواتب') }}">@foreach([__('يناير'),__('فبراير'),__('مارس'),__('أبريل'),__('مايو'),__('يونيو'),__('يوليو'),__('أغسطس'),__('سبتمبر'),__('أكتوبر'),__('نوفمبر'),__('ديسمبر')] as $monthIndex => $monthName)<option value="{{ $monthIndex + 1 }}" @selected($month->month === $monthIndex + 1)>{{ $monthName }}</option>@endforeach</select><select name="payroll_year" aria-label="{{ __('سنة الرواتب') }}">@foreach($payrollYears as $year)<option value="{{ $year }}" @selected($month->year == $year)>{{ $year }}</option>@endforeach</select><button class="btn btn-sm btn-outline-primary">{{ __('تحديث') }}</button></form><div class="payroll-dashboard-body"><div><span><i class="bi bi-wallet2"></i> {{ __('إجمالي التكلفة') }}</span><b>{{ $payroll['run'] ? format_money($payroll['cost']).' ج.م' : '—' }}</b></div><div><span><i class="bi bi-cash-stack"></i> {{ __('صافي الرواتب') }}</span><b>{{ $payroll['run'] ? format_money($payroll['net']).' ج.م' : '—' }}</b></div><div><span><i class="bi bi-shield-check"></i> {{ __('إجمالي التأمينات') }}</span><b>{{ $payroll['run'] ? format_money($payroll['insurance']).' ج.م' : '—' }}</b></div><div><span><i class="bi bi-receipt"></i> {{ __('إجمالي الضرائب') }}</span><b>{{ $payroll['run'] ? format_money($payroll['tax']).' ج.م' : '—' }}</b></div></div></section>@endif
+    <section class="panel reference-panel dates-panel"><div class="panel-head"><div><h3><i class="bi bi-calendar-week"></i> {{ __('المستندات والعقود التي تنتهي قريبًا') }}</h3><span>{{ __('كل المستندات والعقود التي تنتهي خلال 30 يومًا أو أقل.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('documents.index') }}" data-dashboard-detail="documents-expiring" data-detail-url="{{ route('dashboard.details','documents-expiring') }}" data-detail-icon="calendar-week">{{ __('عرض الكل') }}</a></div><div class="reference-list">@forelse($expiringDocuments as $item) @php
+$days = max(0, today()->diffInDays($item['expiry_date'], false));
+@endphp<a href="{{ route('employees.show', [$item['employee'], 'tab' => $item['kind'] === 'contract' ? 'job' : 'documentsProfile']) }}"><span class="list-square {{ $days <= 7 ? 'red' : 'orange' }}"><i class="bi {{ $item['kind'] === 'contract' ? 'bi-file-earmark-ruled-fill' : 'bi-file-earmark-text-fill' }}"></i></span><span><b>{{ $item['employee']?->full_name }} · {{ $item['label'] }}</b><small>{{ __('ينتهي') }} {{ $item['expiry_date']?->format('d/m/Y') }} · {{ format_number($days) }} {{ __('يومًا') }}</small></span><time>{{ $item['expiry_date']?->format('d/m') }}</time></a>@empty<div class="text-center text-muted small py-4">{{ __('لا توجد مستندات أو عقود تنتهي خلال 30 يومًا.') }}</div>@endforelse</div></section>
+    @if($payroll)<section class="panel reference-panel payroll-panel"><div class="panel-head"><div><h3><i class="bi bi-cash-stack"></i> {{ __('ملخص الرواتب') }}</h3><span>{{ __('البيانات حسب الشهر والسنة المحددين.') }}</span></div><a class="btn btn-light btn-sm" href="{{ route('payroll.index',['month'=>$month->format('Y-m-01')]) }}">{{ __('فتح المسير') }}</a></div><form method="GET" class="dashboard-payroll-filter"><select name="payroll_month_number" aria-label="{{ __('شهر الرواتب') }}">@foreach([__('يناير'),__('فبراير'),__('مارس'),__('أبريل'),__('مايو'),__('يونيو'),__('يوليو'),__('أغسطس'),__('سبتمبر'),__('أكتوبر'),__('نوفمبر'),__('ديسمبر')] as $monthIndex => $monthName)<option value="{{ $monthIndex + 1 }}" @selected($month->month === $monthIndex + 1)>{{ $monthName }}</option>@endforeach</select><select name="payroll_year" aria-label="{{ __('سنة الرواتب') }}">@foreach($payrollYears as $year)<option value="{{ $year }}" @selected($month->year == $year)>{{ $year }}</option>@endforeach</select><button class="btn btn-sm btn-outline-primary">{{ __('تحديث') }}</button></form><div class="payroll-dashboard-body"><div><span><i class="bi bi-wallet2"></i> {{ __('إجمالي التكلفة') }}</span><b>{{ $payroll['run'] ? format_money($payroll['cost']).' '.__('ج.م') : '—' }}</b></div><div><span><i class="bi bi-cash-stack"></i> {{ __('صافي الرواتب') }}</span><b>{{ $payroll['run'] ? format_money($payroll['net']).' '.__('ج.م') : '—' }}</b></div><div><span><i class="bi bi-shield-check"></i> {{ __('إجمالي التأمينات') }}</span><b>{{ $payroll['run'] ? format_money($payroll['insurance']).' '.__('ج.م') : '—' }}</b></div><div><span><i class="bi bi-receipt"></i> {{ __('إجمالي الضرائب') }}</span><b>{{ $payroll['run'] ? format_money($payroll['tax']).' '.__('ج.م') : '—' }}</b></div></div></section>@endif
   </div>
 
   <div class="dashboard-reference-column">
@@ -61,7 +69,7 @@
 <div class="modal fade" id="dashboardEmployeeModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('employees.store') }}">@csrf<div class="modal-header"><h5>إضافة موظف جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الاسم الكامل</label><input name="full_name" class="form-control" required autofocus></div><div class="row g-2"><div class="col-md-6"><label class="form-label">كود الموظف <small class="text-muted">اختياري</small></label><input name="employee_code" class="form-control" placeholder="يُنشأ تلقائيًا عند تركه فارغًا"></div><div class="col-md-6"><label class="form-label">تاريخ بداية العقد</label><input name="contract_start_date" type="date" class="form-control" value="{{ today()->toDateString() }}"></div><div class="col-md-6"><label class="form-label">الراتب الإجمالي</label><input name="gross_salary" type="number" min="0.01" step="0.01" class="form-control" required></div><div class="col-md-6"><label class="form-label">الرقم القومي</label><input name="national_id" class="form-control" inputmode="numeric"></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الموظف</button></div></form></div></div></div>
 @endif
 @if(false && auth()->user()?->hasPermission('leaves.create'))
-<div class="modal fade" id="dashboardLeaveModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('leaves.store') }}">@csrf<div class="modal-header"><h5>طلب إجازة جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-3" required>@foreach($dashboardLeaveTypes as $type)<option value="{{ $type->id }}">{{ $type->name }} ({{ $type->is_paid ? 'بأجر' : 'بدون أجر' }})</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input name="start_date" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">إلى</label><input name="end_date" type="date" class="form-control" required></div></div><label class="form-label mt-3">السبب</label><textarea name="reason" class="form-control" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الطلب</button></div></form></div></div></div>
+<div class="modal fade" id="dashboardLeaveModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('leaves.store') }}">@csrf<div class="modal-header"><h5>طلب إجازة جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><label class="form-label">نوع الإجازة</label><select name="leave_type_id" class="form-select mb-3" required>@foreach($dashboardLeaveTypes as $type)<option value="{{ $type->id }}">{{ $type->name }} ({{ $type->is_paid ? __('بأجر') : __('بدون أجر') }})</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">من</label><input name="start_date" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">إلى</label><input name="end_date" type="date" class="form-control" required></div></div><label class="form-label mt-3">السبب</label><textarea name="reason" class="form-control" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الطلب</button></div></form></div></div></div>
 @endif
 @if(false && auth()->user()?->hasPermission('attendance.create'))
 <div class="modal fade" id="dashboardAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">الموظف</label><select name="employee_id" class="form-select mb-3" required>@foreach($dashboardActionEmployees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" type="date" class="form-control" value="{{ today()->toDateString() }}" required></div><div class="col-6"><label class="form-label">الحالة</label><select name="status" class="form-select"><option value="Present">حاضر</option><option value="Late">متأخر</option><option value="Absent">غائب</option><option value="Leave">إجازة</option></select></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" type="time" class="form-control" required></div></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
@@ -80,7 +88,8 @@
 @endsection
 
 @push('scripts')
-@php($dashboardDetailUrls = [
+@php
+$dashboardDetailUrls = [
   'employees' => route('dashboard.details', 'employees'),
   'new-employees' => route('dashboard.details', 'new-employees'),
   'attendance' => route('dashboard.details', 'attendance'),
@@ -93,9 +102,23 @@
   'documents-expiring' => route('dashboard.details', 'documents-expiring'),
   'documents-incomplete' => route('dashboard.details', 'documents-incomplete'),
   'leaves' => route('dashboard.details', 'leaves'),
-])
+];
+@endphp
+@php
+$dashboardInterfaceMessages = [
+    'loading' => __('جارٍ التحميل...'),
+    'retry' => __('تعذر التحميل. إعادة المحاولة'),
+    'failed' => __('تعذر تحميل التفاصيل.'),
+    'checkConn' => __('تحقق من اتصال قاعدة البيانات ومسار التطبيق.'),
+    'linkLabel' => __('الرابط:'),
+    'pageLabel' => __('الصفحة الحالية:'),
+    'details' => __('تفاصيل المؤشر'),
+    'noResults' => __('لا توجد نتائج.'),
+  ];
+@endphp
 <script>
   window.dashboardDetailUrls = @json($dashboardDetailUrls);
+  window.dashboardI18n = @json($dashboardInterfaceMessages);
 </script>
 <script src="{{ asset('dashboard-details.js') }}?v={{ @filemtime(public_path('dashboard-details.js')) }}-3"></script>
 <script>
@@ -108,7 +131,7 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
     const modalEl = document.getElementById('dashboardExistingActionModal');
     const body = modalEl?.querySelector('.modal-content');
     if (!modalEl || !body) return;
-    body.innerHTML = '<div class="modal-body p-5 text-center"><span class="spinner-border text-primary"></span><p class="small text-muted mt-3 mb-0">جاري تحميل النموذج...</p></div>';
+    body.innerHTML = '<div class="modal-body p-5 text-center"><span class="spinner-border text-primary"></span><p class="small text-muted mt-3 mb-0">' + @json(__('جاري تحميل النموذج...')) + '</p></div>';
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
     try {
       const response = await fetch(button.dataset.dashboardPage, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
@@ -132,7 +155,7 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
         const form = imported.querySelector('form');
         form.dataset.ajax = 'true';
         form.dataset.dashboardAction = 'true';
-        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+        form.dataset.ajaxLabel = @json(__('جارٍ الحفظ'));
         const hideLoader = () => bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         modalEl.addEventListener('hidden.bs.modal', () => {
           modalEl.removeEventListener('shown.bs.modal', hideLoader);
@@ -145,7 +168,7 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
         return;
       }
       const content = sourceModal?.querySelector('.modal-content') || sourceModal;
-      if (!content) throw new Error('لم يتم العثور على نموذج الإدخال الأصلي');
+      if (!content) throw new Error(@json(__('لم يتم العثور على نموذج الإدخال الأصلي')));
       body.innerHTML = content.innerHTML;
       body.querySelectorAll('.btn-close').forEach((close) => close.addEventListener('click', () => bootstrap.Modal.getOrCreateInstance(modalEl).hide()));
       const ajaxActionPaths = ['/employees', '/leaves', '/attendance', '/discipline/penalties', '/requests'];
@@ -154,7 +177,7 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
         if (!ajaxActionPaths.some((suffix) => path.endsWith(suffix))) return;
         form.dataset.ajax = 'true';
         form.dataset.dashboardAction = 'true';
-        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+        form.dataset.ajaxLabel = @json(__('جارٍ الحفظ'));
       });
       // نموذج الموظف يحتوي حساب Gross/Net واستخراج الرقم القومي في سكربت الصفحة الأصلية.
       // نشغّله هنا فقط بعد تركيب النموذج الأصلي داخل النافذة.
@@ -169,7 +192,7 @@ document.querySelectorAll('.dashboard-existing-action').forEach((button) => {
       }
       body.querySelector('input,select,textarea')?.focus();
     } catch (error) {
-      body.innerHTML = '<div class="modal-body p-4"><div class="alert alert-danger mb-0">تعذر تحميل نموذج الإدخال الأصلي. افتح الصفحة المرتبطة لإعادة المحاولة.</div></div>';
+      body.innerHTML = '<div class="modal-body p-4"><div class="alert alert-danger mb-0">' + @json(__('تعذر تحميل نموذج الإدخال الأصلي. افتح الصفحة المرتبطة لإعادة المحاولة.')) + '</div></div>';
       console.error('Dashboard action form load failed', error);
     }
   });
@@ -184,7 +207,7 @@ document.addEventListener('masar:success', event => {
   if (form instanceof HTMLFormElement && form.dataset.dashboardAction === 'true') {
     const modal = document.getElementById('dashboardExistingActionModal');
     const body = modal?.querySelector('.modal-content');
-    if (body) body.innerHTML = '<div class="modal-body p-4 text-center"><i class="bi bi-check-circle-fill text-success fs-1"></i><p class="mb-0 mt-2">تم حفظ البيانات بنجاح.</p></div>';
+    if (body) body.innerHTML = '<div class="modal-body p-4 text-center"><i class="bi bi-check-circle-fill text-success fs-1"></i><p class="mb-0 mt-2">' + @json(__('تم حفظ البيانات بنجاح.')) + '</p></div>';
     setTimeout(() => bootstrap.Modal.getInstance(modal)?.hide(), 650);
   }
 });
