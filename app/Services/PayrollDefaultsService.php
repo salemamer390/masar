@@ -86,6 +86,14 @@ class PayrollDefaultsService
         'childcare_min_gap_years' => '2',
         'exam_notice_days' => '10',
         'contagious_max_months' => '3',
+        'sick_phase1_months' => '3',
+        'sick_phase1_pct' => '100',
+        'sick_phase2_months' => '6',
+        'sick_phase2_pct' => '85',
+        'sick_phase3_months' => '3',
+        'sick_phase3_pct' => '75',
+        'sick_cycle_years' => '3',
+        'sick_termination_notice_days' => '15',
     ];
 
     public function ensureForCompany(int $companyId): void
