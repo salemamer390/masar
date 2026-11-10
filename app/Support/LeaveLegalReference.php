@@ -17,8 +17,8 @@ final class LeaveLegalReference
     public const OUTSIDE = 'outside';
 
     public const LABELS = [
-        self::OK => 'مطابق للمرجع',
-        self::BELOW => 'أقل من المرجع',
+        self::OK => 'مطابق للقانون',
+        self::BELOW => 'غير مطابق للقانون',
         self::REVIEW => 'يحتاج مراجعة',
         self::OUTSIDE => 'خارج نطاق القانون',
     ];
