@@ -72,12 +72,13 @@ class SendLeaveSmartAlerts extends Command
     {
         $window = max(1, (int) $this->policy('leave_cycle_end_alert_days', '30'));
         $required = (float) $this->policy('annual_min_actual_days', '15');
-        $consecutive = (float) $this->policy('annual_min_consecutive_days', '6');
         $service = app(LeaveBalanceService::class);
         $sent = 0;
 
         foreach (Employee::withoutGlobalScopes()->whereNotNull('hire_date')->get() as $employee) {
             $cycle = $service->cycleFor($employee, today());
+            // Per-company planning threshold (settings leave page); default 6 is the Art. 125 floor.
+            $consecutive = (float) $this->policy('annual_min_consecutive_days', '6', $employee->company_id);
             $daysLeft = today()->diffInDays($cycle['end'], false);
             if ($daysLeft < 0 || $daysLeft > $window) continue;
 
@@ -128,7 +129,7 @@ class SendLeaveSmartAlerts extends Command
                 // three years at most without fixing an anchor, so we anchor
                 // conservatively on the bucket's cycle START (never later than
                 // its end) and keep the cadence configurable per company.
-                $years = max(1, (int) $this->policy('leave_settlement_planning_years', '3'));
+                $years = max(1, (int) $this->policy('leave_settlement_planning_years', '3', $employee->company_id));
                 $deadline = $bucket['start']->copy()->addYears($years);
                 $daysLeft = today()->diffInDays($deadline, false);
                 if ($daysLeft < 0 || $daysLeft > 90) continue;
