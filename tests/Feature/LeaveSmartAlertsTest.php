@@ -100,6 +100,38 @@ class LeaveSmartAlertsTest extends TestCase
         $this->assertCount(1, $this->alerts('leave_cycle_end_planning'));
     }
 
+    public function test_consecutive_days_threshold_reads_the_company_value(): void
+    {
+        // A 6-day block satisfies the statutory floor of 6, so the default stays quiet.
+        $employee = $this->employee('7210', '2025-11-20');
+        Leave::create(['employee_id' => $employee->id, 'leave_type_id' => $this->annualType->id, 'start_date' => '2026-01-05', 'end_date' => '2026-01-10', 'days' => 6, 'status' => 'Approved']);
+
+        Artisan::call('leaves:notify-smart');
+        $this->assertCount(0, $this->alerts('leave_six_consecutive'));
+
+        // A stricter per-company threshold of 8 makes the same 6-day block insufficient.
+        DB::table('leave_policy_settings')->insert(['company_id' => $this->company->id, 'setting_key' => 'annual_min_consecutive_days', 'setting_value' => '8', 'label' => 'consecutive', 'created_at' => now(), 'updated_at' => now()]);
+        Artisan::call('leaves:notify-smart');
+        $this->assertCount(1, $this->alerts('leave_six_consecutive'));
+    }
+
+    public function test_settlement_cadence_reads_the_company_value(): void
+    {
+        DB::table('leave_policy_settings')->insert(['company_id' => $this->company->id, 'setting_key' => 'leave_carryover_baseline', 'setting_value' => '2020-01-01', 'label' => 'baseline', 'created_at' => now(), 'updated_at' => now()]);
+        // Bucket starting 2023-12-01: planning date = bucket start + cadence.
+        $this->employee('7211', '2022-12-01');
+
+        // A far cadence (10y) pushes every bucket's planning date outside the 90-day window.
+        DB::table('leave_policy_settings')->insert(['company_id' => $this->company->id, 'setting_key' => 'leave_settlement_planning_years', 'setting_value' => '10', 'label' => 'cadence', 'created_at' => now(), 'updated_at' => now()]);
+        Artisan::call('leaves:notify-smart');
+        $this->assertCount(0, $this->alerts('leave_settlement_due'));
+
+        // Back to the statutory 3: the 2023 bucket's planning date 01/12/2026 is inside the window.
+        DB::table('leave_policy_settings')->where('company_id', $this->company->id)->where('setting_key', 'leave_settlement_planning_years')->update(['setting_value' => '3']);
+        Artisan::call('leaves:notify-smart');
+        $this->assertCount(1, $this->alerts('leave_settlement_due'));
+    }
+
     public function test_no_planning_alert_outside_window_or_when_quota_met(): void
     {
         // Cycle ends far away.
