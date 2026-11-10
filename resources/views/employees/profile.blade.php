@@ -26,7 +26,7 @@
             <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
             <div class="profile-tags">
                 @php($employeeStatus = $employee->status?->name ?? 'Active')
-                <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}" data-bs-toggle="modal" data-bs-target="#employeeStatusModal">{{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }} <i class="bi bi-chevron-down"></i></button>
+                <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}" data-bs-toggle="modal" data-bs-target="#employeeStatusModal">{{ match($employeeStatus) { 'Active' => __('نشط'), 'Leave' => __('إجازة'), 'Suspended' => __('موقوف'), 'Terminated' => __('منتهي الخدمة'), 'Pending' => __('قيد التعيين'), default => $employeeStatus } }} <i class="bi bi-chevron-down"></i></button>
                 @if($hasPreviousResignation)
                     <span class="badge-soft warning d-block" title="{{ __('استقالة سابقة') }}" aria-label="{{ __('استقالة سابقة') }}"><i class="bi bi-file-earmark-text"></i></span>
                 @endif
@@ -37,13 +37,13 @@
         </div>
         <div class="profile-metrics" aria-label="{{ __('ملخص بيانات الموظف') }}">
             <div class="profile-metric"><i class="bi bi-hash"></i><span>{{ __('كود الموظف') }}</span><b>{{ $employee->employee_code ?? '—' }}</b></div>
-            <div class="profile-metric"><i class="bi bi-person"></i><span>{{ __('العمر') }}</span><b>{{ $ageYears !== null ? $ageYears.' سنة' : '—' }}</b></div>
+            <div class="profile-metric"><i class="bi bi-person"></i><span>{{ __('العمر') }}</span><b>{{ $ageYears !== null ? $ageYears.' '.__('سنة') : '—' }}</b></div>
             <div class="profile-metric"><i class="bi bi-briefcase"></i><span>{{ __('مدة الخدمة') }}</span><b>
                 @if(!$servicePeriod) —
                 @elseif($servicePeriod['years'] > 0)
-                    {{ $servicePeriod['years'] }} {{ __('سنة') }}{{ $servicePeriod['months'] > 0 ? ' و'.$servicePeriod['months'].' شهر' : '' }}
+                    {{ $servicePeriod['years'] }} {{ __('سنة') }}{{ $servicePeriod['months'] > 0 ? ' '.__('و').$servicePeriod['months'].' '.__('شهر') : '' }}
                 @elseif($servicePeriod['months'] > 0)
-                    {{ $servicePeriod['months'] }} {{ __('شهر') }}{{ $servicePeriod['days'] > 0 ? ' و'.$servicePeriod['days'].' يوم' : '' }}
+                    {{ $servicePeriod['months'] }} {{ __('شهر') }}{{ $servicePeriod['days'] > 0 ? ' '.__('و').$servicePeriod['days'].' '.__('يوم') : '' }}
                 @else
                     {{ $servicePeriod['days'] }} {{ __('يوم') }}
                 @endif
@@ -125,7 +125,7 @@
     </div>
 
     <section class="panel profile-panel mt-3 profile-completion {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
-        <div class="panel-head"><div><h3><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-x-fill' }}"></i> {{ __('اكتمال ملف الموظف') }}</h3><span>{{ $profileCompletion['complete'] ? 'البيانات الأساسية والمستندات المطلوبة مكتملة.' : 'لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.' }}</span></div>@if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeMasterModal">{{ __('استكمال البيانات') }}</button>@endif</div>
+        <div class="panel-head"><div><h3><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-x-fill' }}"></i> {{ __('اكتمال ملف الموظف') }}</h3><span>{{ $profileCompletion['complete'] ? __('البيانات الأساسية والمستندات المطلوبة مكتملة.') : __('لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.') }}</span></div>@if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeMasterModal">{{ __('استكمال البيانات') }}</button>@endif</div>
         @if($profileCompletion['complete'])
             <div class="p-3 text-success small"><i class="bi bi-check-circle-fill"></i> {{ __('الملف جاهز للتشغيل والمتابعة.') }}</div>
         @else
@@ -184,7 +184,7 @@
                 @forelse($employee->movements->sortByDesc('movement_date') as $movement)
                     <div>
                         <b>{{ $movement->movement_date?->format('d/m/Y') }}</b>
-                        <span>{{ $movement->movementType?->name ?? 'حركة وظيفية' }}</span>
+                        <span>{{ $movement->movementType?->name ?? __('حركة وظيفية') }}</span>
                     </div>
                 @empty
                     <div><span>{{ __('لا توجد حركات وظيفية مسجلة.') }}</span></div>
@@ -227,21 +227,21 @@
         @forelse($employee->salaries as $s)
             <div class="employee-salary-row" data-bs-toggle="modal" data-bs-target="#employeeSalaryDetails{{ $s->id }}" role="button">
                 <div><small>{{ __('السريان') }}</small><b>{{ $s->effective_from?->format('d/m/Y') ?? '—' }}</b></div>
-                <div><small>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</small><b>{{ format_money($s->salary_input) }} {{ __('ج.م') }}</b></div>
+                <div><small>{{ $s->salary_type === 'net' ? __('الأجر الصافي') : __('الإجمالي المعتمد') }}</small><b>{{ format_money($s->salary_input) }} {{ __('ج.م') }}</b></div>
                 <div><small>Gross</small><b>{{ number_format($s->gross_salary,2) }} {{ __('ج.م') }}</b></div>
                 <div><small>{{ __('إجمالي البدلات') }}</small><b>{{ number_format($s->allowances,2) }} {{ __('ج.م') }}</b></div>
                 <div><small>{{ __('حصة العامل') }}</small><b>{{ number_format($s->employee_insurance,2) }} {{ __('ج.م') }}</b></div>
                 <div><small>{{ __('الضريبة') }}</small><b>{{ number_format($s->income_tax,2) }} {{ __('ج.م') }}</b></div>
-                <div><span class="badge-soft {{ $s->status === 'Active' ? 'success' : 'secondary' }}">{{ $s->status === 'Active' ? 'ساري' : 'سابق' }}</span></div>
+                <div><span class="badge-soft {{ $s->status === 'Active' ? 'success' : 'secondary' }}">{{ $s->status === 'Active' ? __('ساري') : __('سابق') }}</span></div>
             </div>
             <div class="modal fade" id="employeeSalaryDetails{{ $s->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content salary-details-modal">
                     <div class="modal-header"><div><h5 class="modal-title mb-1">{{ __('تفاصيل هيكل الراتب') }}</h5><div class="small text-muted">{{ $employee->full_name }} {{ __('· ساري من') }} {{ $s->effective_from?->format('d/m/Y') }}</div></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
                         <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-cash-stack"></i><span>{{ __('الراتب والبدلات') }}</span></div><div class="salary-detail-grid">
-                            <div><span>{{ $s->salary_type === 'net' ? 'الأجر الصافي' : 'الإجمالي المعتمد' }}</span><strong>{{ format_money($s->salary_input) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('الراتب الإجمالي') }}</span><strong>{{ format_money($s->gross_salary) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('الأجر الأساسي') }}</span><strong>{{ format_money($s->basic_salary) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('إجمالي البدلات (') }}{{ format_number($s->allowance_limit_pct) }}%)</span><strong>{{ format_money($s->allowance_limit) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل انتقال') }}</span><strong>{{ format_money($s->transportation_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل وجبة') }}</span><strong>{{ format_money($s->meal_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل سكن') }}</span><strong>{{ format_money($s->housing_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل ملابس') }}</span><strong>{{ format_money($s->clothing_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('المتبقي من البدلات') }}</span><strong>{{ format_money($s->allowance_remaining) }} {{ __('ج.م') }}</strong></div>
+                            <div><span>{{ $s->salary_type === 'net' ? __('الأجر الصافي') : __('الإجمالي المعتمد') }}</span><strong>{{ format_money($s->salary_input) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('الراتب الإجمالي') }}</span><strong>{{ format_money($s->gross_salary) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('الأجر الأساسي') }}</span><strong>{{ format_money($s->basic_salary) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('إجمالي البدلات (') }}{{ format_number($s->allowance_limit_pct) }}%)</span><strong>{{ format_money($s->allowance_limit) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل انتقال') }}</span><strong>{{ format_money($s->transportation_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل وجبة') }}</span><strong>{{ format_money($s->meal_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل سكن') }}</span><strong>{{ format_money($s->housing_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('بدل ملابس') }}</span><strong>{{ format_money($s->clothing_allowance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('المتبقي من البدلات') }}</span><strong>{{ format_money($s->allowance_remaining) }} {{ __('ج.م') }}</strong></div>
                         </div></div>
-                        <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-shield-check"></i><span>{{ __('التأمينات') }}</span></div><div class="salary-detail-grid"><div><span>{{ __('الأجر التأميني') }}</span><strong>{{ $s->no_insurance ? 'بدون تأمينات' : format_money($s->applied_insurance_wage).' ج.م' }}</strong></div><div><span>{{ __('حصة العامل') }} {{ format_number($payrollRates['employee']) }}%</span><strong>{{ format_money($s->employee_insurance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('حصة صاحب العمل') }} {{ format_number($payrollRates['employer']) }}%</span><strong>{{ format_money($s->employer_insurance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('أساس التأمين التلقائي') }}</span><strong>{{ __('الأجر الأساسي') }}</strong></div></div></div>
+                        <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-shield-check"></i><span>{{ __('التأمينات') }}</span></div><div class="salary-detail-grid"><div><span>{{ __('الأجر التأميني') }}</span><strong>{{ $s->no_insurance ? __('بدون تأمينات') : format_money($s->applied_insurance_wage).' '.__('ج.م') }}</strong></div><div><span>{{ __('حصة العامل') }} {{ format_number($payrollRates['employee']) }}%</span><strong>{{ format_money($s->employee_insurance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('حصة صاحب العمل') }} {{ format_number($payrollRates['employer']) }}%</span><strong>{{ format_money($s->employer_insurance) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('أساس التأمين التلقائي') }}</span><strong>{{ __('الأجر الأساسي') }}</strong></div></div></div>
                         <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-receipt"></i><span>{{ __('الضرائب والاستقطاعات') }}</span></div><div class="salary-detail-grid"><div><span>{{ __('الإعفاء الشخصي الشهري') }}</span><strong>{{ format_money($s->personal_exemption) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('الوعاء الضريبي السنوي') }}</span><strong>{{ format_money($s->taxable_annual) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('ضريبة الدخل (شهرياً)') }}</span><strong>{{ format_money($s->income_tax) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('صندوق الشهداء') }}</span><strong>{{ format_money($s->martyrs_fund) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('استقطاعات ثابتة') }}</span><strong>{{ format_money($s->fixed_deductions) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('إجمالي الاستقطاعات') }}</span><strong>{{ format_money($s->total_deductions) }} {{ __('ج.م') }}</strong></div><div><span>{{ __('صافي الراتب النهائي') }}</span><strong class="text-success">{{ format_money($s->net_salary) }} {{ __('ج.م') }}</strong></div></div></div>
                     </div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إغلاق') }}</button></div>
                 </div></div>
@@ -304,7 +304,7 @@
 @elseif($activeTab === 'leaves')
     <div class="panel profile-panel">
         <div class="panel-head">
-            <div><h3>{{ __('سجل الإجازات') }}</h3><span>{{ __('الرصيد المستخدم:') }} {{ $leaveUsed }} {{ __('يوم · المتاح:') }} {{ $leaveBalance === null ? 'غير محدد' : max(0, $leaveBalance - $leaveUsed).' يوم' }}</span></div>
+            <div><h3>{{ __('سجل الإجازات') }}</h3><span>{{ __('الرصيد المستخدم:') }} {{ $leaveUsed }} {{ __('يوم · المتاح:') }} {{ $leaveBalance === null ? __('غير محدد') : max(0, $leaveBalance - $leaveUsed).' '.__('يوم') }}</span></div>
         </div>
         <div class="table-responsive">
             <table class="table align-middle">
@@ -348,7 +348,7 @@
                 </div>
                 <div class="doc-status"><span class="badge-soft danger">{{ __('مطلوب لكل موظف') }}</span></div>
                 <div class="doc-thumb"><div class="doc-thumb-placeholder"><i class="bi bi-cloud-arrow-up"></i><span>{{ __('لم يتم رفع المستند') }}</span></div></div>
-                <div class="doc-file">{{ ['basic'=>'مستند أساسي','job'=>'مستند خاص بالوظيفة','workplace'=>'مستند خاص بمكتب العمل'][$documentType->category] ?? 'مستند مطلوب' }}</div>
+                <div class="doc-file">{{ ['basic'=>__('مستند أساسي'),'job'=>__('مستند خاص بالوظيفة'),'workplace'=>__('مستند خاص بمكتب العمل')][$documentType->category] ?? __('مستند مطلوب') }}</div>
                 <div class="doc-meta">{{ __('ارفعه لإكمال ملف الموظف') }}</div>
                 <div class="doc-card-actions">
                     @if(auth()->user()?->hasPermission('documents.upload'))
@@ -373,7 +373,7 @@
                         <div class="doc-thumb-placeholder"><i class="bi bi-cloud-arrow-up"></i><span>{{ __('لم يتم رفع الملف') }}</span></div>
                     @endif
                 </div>
-                <div class="doc-file">{{ $d->file_name ?? 'لم يتم رفع ملف' }}</div>
+                <div class="doc-file">{{ $d->file_name ?? __('لم يتم رفع ملف') }}</div>
                 <div class="doc-meta">{{ $d->formatted_size }}</div>
                 <div class="doc-card-actions">
                     @if($d->file_path)
@@ -447,14 +447,14 @@
             <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ route('employees.forms.s6.editable', $employee) }}"><i class="bi bi-printer"></i> {{ __('طباعة س6') }}</a>
         </div>
         <div class="details-grid">
-            <div><label>{{ __('الحالة') }}</label><b>{{ $ins?->status ?? 'غير مسجل' }}</b></div>
+            <div><label>{{ __('الحالة') }}</label><b>{{ $ins?->status ?? __('غير مسجل') }}</b></div>
             <div><label>{{ __('الرقم التأميني') }}</label><b>{{ $ins?->insurance_number ?? '—' }}</b></div>
             <div><label>{{ __('كود المهنة') }}</label><b>{{ $ins?->job_code ?? '—' }}</b></div>
             <div><label>{{ __('تاريخ بدء التأمين') }}</label><b>{{ $ins?->insurance_start_date?->format('d/m/Y') ?? '—' }}</b></div>
             <div><label>{{ __('مكتب التأمينات') }}</label><b>{{ $ins?->insurance_office ?? '—' }}</b></div>
             <div><label>{{ __('فئة التأمين') }}</label><b>{{ $ins?->insurance_category ?? '—' }}</b></div>
             <div><label>{{ __('مهلة التسجيل') }}</label><b>{{ $ins?->registration_deadline?->format('d/m/Y') ?? '—' }}</b></div>
-            <div><label>{{ __('الأجر التأميني') }}</label><b>{{ $employee->currentSalary && !$employee->currentSalary->no_insurance ? format_money($employee->currentSalary->applied_insurance_wage) . ' ج.م' : '—' }}</b></div>
+            <div><label>{{ __('الأجر التأميني') }}</label><b>{{ $employee->currentSalary && !$employee->currentSalary->no_insurance ? format_money($employee->currentSalary->applied_insurance_wage) . ' '.__('ج.م') : '—' }}</b></div>
         </div>
     </div>
 
@@ -500,8 +500,8 @@
                 }) as $m)
                     <tr data-movement-row>
                         <td data-sort-value="{{ $m->movement_date?->format('Y-m-d') ?? '' }}">{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td>
-                        <td data-sort-value="{{ $m->movementType?->name ?? '' }}">{{ match($m->movementType?->name) { 'Status Change' => 'تغيير الحالة', 'Profile Update' => 'تحديث بيانات وظيفية', default => $m->movementType?->name ?? '—' } }}</td>
-                        <td data-sort-value="{{ data_get($m->new_values, 'reactivated') ? 'عودة إلى العمل' : ($m->reason ?? $m->notes ?? '') }}">{{ data_get($m->new_values, 'reactivated') ? 'عودة إلى العمل' : ($m->reason ?? $m->notes ?? '—') }}</td>
+                        <td data-sort-value="{{ $m->movementType?->name ?? '' }}">{{ match($m->movementType?->name) { 'Status Change' => __('تغيير الحالة'), 'Profile Update' => __('تحديث بيانات وظيفية'), default => $m->movementType?->name ?? '—' } }}</td>
+                        <td data-sort-value="{{ data_get($m->new_values, 'reactivated') ? __('عودة إلى العمل') : ($m->reason ?? $m->notes ?? '') }}">{{ data_get($m->new_values, 'reactivated') ? __('عودة إلى العمل') : ($m->reason ?? $m->notes ?? '—') }}</td>
                         <td data-sort-value="{{ $m->oldDepartment?->name ?? '' }}">{{ $m->oldDepartment?->name ?? '—' }}</td>
                         <td data-sort-value="{{ $m->newDepartment?->name ?? '' }}">{{ $m->newDepartment?->name ?? '—' }}</td>
                         <td data-sort-value="{{ $m->oldJob?->title ?? '' }}">{{ $m->oldJob?->title ?? '—' }}</td>
@@ -569,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!row) return;
     const block = document.createElement('div');
     block.className = 'row g-3 employee-termination-fallback';
-    block.innerHTML = '<div class="col-md-3"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation">استقالة</option><option value="contract_end">إنهاء عقد</option><option value="dismissal">فصل</option></select></div><div class="col-md-3"><label class="form-label">تاريخ انتهاء الخدمة</label><input type="date" name="termination_date" class="form-control"></div>';
+    block.innerHTML = window.masarStaticHtml('<div class="col-md-3"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation">استقالة</option><option value="contract_end">إنهاء عقد</option><option value="dismissal">فصل</option></select></div><div class="col-md-3"><label class="form-label">تاريخ انتهاء الخدمة</label><input type="date" name="termination_date" class="form-control"></div>');
     row.appendChild(block);
     type = block.querySelector('[name="termination_type"]');
     date = block.querySelector('[name="termination_date"]');
@@ -579,12 +579,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const warning = document.createElement('div');
   warning.className = 'alert alert-warning d-none mt-2 mb-0 py-2';
-  warning.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> عند حفظ الحالة «نشط»، سيُلغي النظام نوع وتاريخ انتهاء الخدمة السابقين.';
+  warning.innerHTML = window.masarStaticHtml('<i class="bi bi-exclamation-triangle-fill"></i> عند حفظ الحالة «نشط»، سيُلغي النظام نوع وتاريخ انتهاء الخدمة السابقين.');
   const fieldsRow = type.closest('.col-md-3')?.parentElement;
   if (fieldsRow) {
     const heading = document.createElement('div');
     heading.className = 'col-12 employee-termination-heading';
-    heading.innerHTML = '<strong><i class="bi bi-person-x"></i> بيانات انتهاء الخدمة</strong><small>تُستخدم فقط عند الاستقالة أو الفصل، وتُلغى تلقائيًا عند إعادة الحالة إلى نشط.</small>';
+    heading.innerHTML = window.masarStaticHtml('<strong><i class="bi bi-person-x"></i> بيانات انتهاء الخدمة</strong><small>تُستخدم فقط عند الاستقالة أو الفصل، وتُلغى تلقائيًا عند إعادة الحالة إلى نشط.</small>');
     fieldsRow.insertBefore(heading, type.closest('.col-md-3'));
     fieldsRow.appendChild(warning);
   }
@@ -633,7 +633,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <div class="modal-header"><h5 class="modal-title">{{ __('تغيير حالة الموظف') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body"><input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_action" value="1">
         <label class="form-label">{{ __('الحالة') }}</label>
-        <select name="status_id" id="profile_status_id" class="form-select mb-3" required>@foreach($statuses as $item)<option value="{{ $item->id }}" data-status-name="{{ $item->name }}" @selected($employee->status_id == $item->id)>{{ match($item->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $item->name } }}</option>@endforeach</select>
+        <select name="status_id" id="profile_status_id" class="form-select mb-3" required>@foreach($statuses as $item)<option value="{{ $item->id }}" data-status-name="{{ $item->name }}" @selected($employee->status_id == $item->id)>{{ match($item->name) { 'Active' => __('نشط'), 'Leave' => __('إجازة'), 'Suspended' => __('موقوف'), 'Terminated' => __('منتهي الخدمة'), 'Pending' => __('قيد التعيين'), default => $item->name } }}</option>@endforeach</select>
         <div id="profileTerminationFields" class="row g-3"><div class="col-6"><label class="form-label">{{ __('نوع انتهاء الخدمة') }}</label><select name="termination_type" class="form-select"><option value="">—</option><option value="resignation" @selected($employee->termination_type === 'resignation')>{{ __('استقالة') }}</option><option value="contract_end" @selected($employee->termination_type === 'contract_end')>{{ __('إنهاء عقد') }}</option><option value="dismissal" @selected($employee->termination_type === 'dismissal')>{{ __('فصل') }}</option></select></div><div class="col-6"><label class="form-label">{{ __('تاريخ الحالة') }}</label><input type="date" name="termination_date" class="form-control" value="{{ $employee->termination_date?->format('Y-m-d') ?? now()->toDateString() }}"></div></div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ الحالة') }}</button></div>
@@ -646,7 +646,7 @@ document.addEventListener('DOMContentLoaded', function () { const select=documen
 @endif
 
 @push('scripts')
-<div class="modal fade" id="profilePhotoModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">@if($employee->profile_photo_url)<div class="modal-body text-center"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"></div>@endif @if(auth()->user()?->hasPermission('employees.edit'))<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data">@csrf @method('PATCH')<div class="modal-body pt-0"><label class="form-label">{{ $employee->profile_photo_url ? 'تغيير الصورة' : 'إضافة صورة شخصية' }}</label><input type="file" name="profile_photo" class="form-control" accept="image/jpeg,image/png,image/webp"><small class="text-muted">{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</small></div><div class="modal-footer justify-content-center gap-2"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger">{{ __('حذف الصورة') }}</button>@endif<button class="btn btn-primary">{{ __('حفظ الصورة') }}</button></div></form>@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif @endif</div></div></div>
+<div class="modal fade" id="profilePhotoModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">@if($employee->profile_photo_url)<div class="modal-body text-center"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"></div>@endif @if(auth()->user()?->hasPermission('employees.edit'))<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data">@csrf @method('PATCH')<div class="modal-body pt-0"><label class="form-label">{{ $employee->profile_photo_url ? __('تغيير الصورة') : __('إضافة صورة شخصية') }}</label><input type="file" name="profile_photo" class="form-control" accept="image/jpeg,image/png,image/webp"><small class="text-muted">{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</small></div><div class="modal-footer justify-content-center gap-2"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger">{{ __('حذف الصورة') }}</button>@endif<button class="btn btn-primary">{{ __('حفظ الصورة') }}</button></div></form>@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif @endif</div></div></div>
 <script>
 (function(){
     const contractStart=document.getElementById('employee_contract_start_date');
@@ -746,8 +746,8 @@ const bindDocumentAjax = (root = document) => {
         const isDelete = path.includes('/documents/') && !isReplace;
         if (!isUpload && !isReplace && !isDelete) return;
         form.dataset.ajax = 'true';
-        form.dataset.ajaxLabel = isDelete ? 'جارٍ الحذف' : 'جارٍ الحفظ';
-        if (isDelete) form.dataset.ajaxConfirm = 'هل تريد حذف هذا المستند؟';
+        form.dataset.ajaxLabel = isDelete ? window.masarT('جارٍ الحذف') : window.masarT('جارٍ الحفظ');
+        if (isDelete) form.dataset.ajaxConfirm = window.masarT('هل تريد حذف هذا المستند؟');
     });
 };
 const refreshDocumentsSection = async () => {
@@ -786,7 +786,7 @@ document.addEventListener('masar:success', async (event) => {
 document.addEventListener('DOMContentLoaded', () => {
   const annual = document.querySelector('input[name="profile[annual_leave_days]"]');
   if (!annual || document.querySelector('[name="leave_entitlement_category"]')) return;
-  annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', '<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option><option value="disabled_hazardous">ذوو الإعاقة والأقزام + عمل خطر / نائي (45 + 7 أيام)</option></select></div>');
+  annual.closest('.col-md-3')?.insertAdjacentHTML('afterend', window.masarStaticHtml('<div class="col-md-3"><label class="form-label">فئة استحقاق الإجازة</label><select name="leave_entitlement_category" class="form-select"><option value="normal">عادي</option><option value="disabled">ذوو الإعاقة والأقزام (45 يومًا)</option><option value="hazardous">عمل خطر / منطقة نائية (+7 أيام)</option><option value="disabled_hazardous">ذوو الإعاقة والأقزام + عمل خطر / نائي (45 + 7 أيام)</option></select></div>'));
   const category = document.querySelector('[name="leave_entitlement_category"]'); if (category) category.value = @json(old('leave_entitlement_category', $employee->leave_entitlement_category ?? 'normal'));
 });
 </script>
@@ -851,16 +851,16 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 @endpush
 <script>
-(function(){const cards=document.querySelectorAll('.profile-summary>div');if(cards[3]){const label=cards[3].querySelector('span');if(label)label.textContent='الراتب الصافي';}})();
-(function(){document.querySelectorAll('.table thead tr').forEach(tr=>{const text=tr.innerText;if(text.includes('المبلغ')&&!text.includes('الأيام')){const th=document.createElement('th');th.textContent='الأيام';const amount=[...tr.children].find(x=>x.innerText.includes('المبلغ'));tr.insertBefore(th,amount||tr.lastElementChild);}})})();
-(function(){document.querySelectorAll('.table tbody tr').forEach(row=>{const cells=row.children;if(cells.length===5&&row.closest('.profile-panel')?.innerText.includes('الإجازات')){const paid=document.createElement('td');paid.textContent='{{ $employee->leaves->first()?->leaveType?->is_paid ? "بأجر" : "بدون أجر" }}';row.insertBefore(paid,cells[1]);const deduction=document.createElement('td');deduction.textContent='0';row.insertBefore(deduction,row.lastElementChild);}})})();
-(function(){document.querySelectorAll('.profile-tabs a[href*="tab=job"]').forEach(el=>el.remove());const tabs=document.querySelector('.profile-tabs');if(tabs&&!tabs.querySelector('[href*="tab=requests"]')){const a=document.createElement('a');a.className='profile-tab';a.href='{{ route('employees.show',[$employee,'tab'=>'requests']) }}';a.innerHTML='<i class="bi bi-inbox"></i> الطلبات';tabs.appendChild(a);}})();
+(function(){const cards=document.querySelectorAll('.profile-summary>div');if(cards[3]){const label=cards[3].querySelector('span');if(label)label.textContent=window.masarT('الراتب الصافي');}})();
+(function(){document.querySelectorAll('.table thead tr').forEach(tr=>{const text=tr.innerText;if(text.includes('المبلغ')&&!text.includes('الأيام')){const th=document.createElement('th');th.textContent=window.masarT('الأيام');const amount=[...tr.children].find(x=>x.innerText.includes('المبلغ'));tr.insertBefore(th,amount||tr.lastElementChild);}})})();
+(function(){document.querySelectorAll('.table tbody tr').forEach(row=>{const cells=row.children;if(cells.length===5&&row.closest('.profile-panel')?.innerText.includes('الإجازات')){const paid=document.createElement('td');paid.textContent='{{ $employee->leaves->first()?->leaveType?->is_paid ? __('بأجر') : __('بدون أجر') }}';row.insertBefore(paid,cells[1]);const deduction=document.createElement('td');deduction.textContent='0';row.insertBefore(deduction,row.lastElementChild);}})})();
+(function(){document.querySelectorAll('.profile-tabs a[href*="tab=job"]').forEach(el=>el.remove());const tabs=document.querySelector('.profile-tabs');if(tabs&&!tabs.querySelector('[href*="tab=requests"]')){const a=document.createElement('a');a.className='profile-tab';a.href='{{ route('employees.show',[$employee,'tab'=>'requests']) }}';a.innerHTML=window.masarStaticHtml('<i class="bi bi-inbox"></i> الطلبات');tabs.appendChild(a);}})();
 (function(){const form=document.querySelector('#employeeMasterModal form');if(!form)return;const id=form.querySelector('[name="national_id"]'),birth=form.querySelector('[name="birth_date"]'),gender=form.querySelector('[name="gender"]');if(!id)return;id.addEventListener('input',()=>{const n=id.value.replace(/\D/g,'');if(n.length!==14||!birth||!gender)return;const year=n[0]==='3'?2000+Number(n.slice(1,3)):1900+Number(n.slice(1,3));const month=n.slice(3,5),day=n.slice(5,7);const d=new Date(year,Number(month)-1,Number(day));if(d.getFullYear()!==year||d.getMonth()+1!==Number(month)||d.getDate()!==Number(day))return;birth.value=year+'-'+month+'-'+day;gender.value=Number(n[12])%2?'ذكر':'أنثى';});})();
 </script>
 <script>
 (function(){
  const leavesTable=document.querySelector('.profile-tabs .active[href*="tab=leaves"]')?document.querySelector('.profile-content .table'):null;
- if(leavesTable){const rows=leavesTable.querySelectorAll('tbody tr');const leaveData=@json($employee->leaves->map(fn($leave)=>['paid'=>(bool)$leave->leaveType?->is_paid]));const head=leavesTable.querySelector('thead tr');if(head&&head.children.length===5){const paidHead=document.createElement('th');paidHead.textContent='الأجر';head.insertBefore(paidHead,head.children[1]);const deductionHead=document.createElement('th');deductionHead.textContent='قيمة الخصم';head.insertBefore(deductionHead,head.lastElementChild);rows.forEach((row,i)=>{if(row.children.length!==5)return;const paid=document.createElement('td');paid.textContent=leaveData[i]?.paid?'بأجر':'بدون أجر';row.insertBefore(paid,row.children[1]);const deduction=document.createElement('td');deduction.textContent=leaveData[i]?.paid?'0':'يحسب في المسير';row.insertBefore(deduction,row.lastElementChild);});}}
+ if(leavesTable){const rows=leavesTable.querySelectorAll('tbody tr');const leaveData=@json($employee->leaves->map(fn($leave)=>['paid'=>(bool)$leave->leaveType?->is_paid]));const head=leavesTable.querySelector('thead tr');if(head&&head.children.length===5){const paidHead=document.createElement('th');paidHead.textContent=window.masarT('الأجر');head.insertBefore(paidHead,head.children[1]);const deductionHead=document.createElement('th');deductionHead.textContent=window.masarT('قيمة الخصم');head.insertBefore(deductionHead,head.lastElementChild);rows.forEach((row,i)=>{if(row.children.length!==5)return;const paid=document.createElement('td');paid.textContent=leaveData[i]?.paid?window.masarT('بأجر'):window.masarT('بدون أجر');row.insertBefore(paid,row.children[1]);const deduction=document.createElement('td');deduction.textContent=leaveData[i]?.paid?'0':window.masarT('يحسب في المسير');row.insertBefore(deduction,row.lastElementChild);});}}
 })();
 </script>
 @push('scripts')
@@ -871,7 +871,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     forms.forEach(form => {
         form.dataset.ajax = 'true';
-        form.dataset.ajaxLabel = 'جارٍ الحفظ';
+        form.dataset.ajaxLabel = window.masarT('جارٍ الحفظ');
     });
 
     const refreshPanel = async (id) => {
@@ -898,7 +898,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const replacement = document.getElementById(panelId)?.querySelector('.employee-contact-form');
             if (replacement) {
                 replacement.dataset.ajax = 'true';
-                replacement.dataset.ajaxLabel = 'جارٍ الحفظ';
+                replacement.dataset.ajaxLabel = window.masarT('جارٍ الحفظ');
             }
         } catch (error) {
             console.error('Employee contact section refresh failed', error);
