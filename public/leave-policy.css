@@ -1,10 +1,9 @@
-/* إعدادات الإجازات — نمط البطاقات بخط IBM Plex Sans Arabic (هذا القسم فقط) */
-#leavePolicy{font-family:'IBM Plex Sans Arabic','Cairo',system-ui,sans-serif}
+/* إعدادات الإجازات — نمط البطاقات بخط التطبيق الافتراضي Cairo (هذا القسم فقط) */
 #leavePolicy .lv-group{margin-top:26px}
 #leavePolicy .lv-group-title{font-size:17.6px;font-weight:600;color:var(--color-primary-dark,#0B1F55);margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--color-primary-dark,#0B1F55)}
 #leavePolicy .lv-group-note{font-size:13px;color:var(--color-text-secondary,#6479A5);margin:-4px 0 12px}
 #leavePolicy .lv-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-#leavePolicy .lv-card{background:#fff;border:1px solid var(--color-border,#E5ECF5);border-inline-start:5px solid var(--color-primary,#1677FF);border-radius:8px;padding:16px 18px;height:100%}
+#leavePolicy .lv-card{background:#fff;border:1px solid var(--color-border,#E5ECF5);border-inline-start:5px solid var(--color-primary,#1677FF);border-radius:6px;padding:16px 18px;height:100%}
 #leavePolicy .lv-card.lv-wide{grid-column:1/-1}
 #leavePolicy .lv-card.lv-st-ok{border-inline-start-color:#16a34a}
 #leavePolicy .lv-card.lv-st-review{border-inline-start-color:#d97706}
@@ -14,9 +13,12 @@
 #leavePolicy .lv-card-head h4{font-size:16px;font-weight:600;color:var(--color-primary-dark,#0B1F55);margin:0;flex:1;min-width:140px}
 #leavePolicy .lv-art{font-size:12px;font-weight:500;background:var(--color-primary-soft,#EAF2FF);color:var(--color-primary,#1677FF);padding:2px 8px;border-radius:4px;white-space:nowrap}
 #leavePolicy .lv-card-desc{font-size:13px;color:var(--color-text-secondary,#6479A5);margin:0 0 12px}
-#leavePolicy .lv-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px 14px}
+#leavePolicy .lv-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
 #leavePolicy .lv-field .lv-lbl{display:block;font-size:13px;font-weight:500;color:#44536b;margin-bottom:4px}
-#leavePolicy .lv-hint{display:block;font-size:13px;color:var(--color-text-secondary,#6479A5);margin-top:4px}
+#leavePolicy .lv-hint{display:block;font-size:13px;min-height:1.1rem;color:var(--color-text-secondary,#6479A5);margin-top:4px}
+#leavePolicy .lv-hint-review{color:#d97706}
+#leavePolicy .lv-hint-below{color:#dc2626}
+#leavePolicy .lv-hint-outside{color:#94a3b8}
 #leavePolicy .lv-static{font-size:13px;color:var(--color-text-secondary,#6479A5);padding:7px 0}
 #leavePolicy .lv-badge{align-self:flex-start;margin-top:4px;white-space:normal;font-weight:500}
 #leavePolicy .lv-sub-title{grid-column:1/-1;font-size:14px;font-weight:600;color:var(--color-primary,#1677FF);border-bottom:1px solid var(--color-border,#E5ECF5);padding-bottom:6px;margin:16px 0 10px}
@@ -37,7 +39,7 @@
 #leavePolicy .form-control:focus,#leavePolicy .form-select:focus{border-color:var(--color-primary,#1677FF);box-shadow:0 0 0 .2rem rgba(22,119,255,.18)}
 #leavePolicy .form-check-input:checked{background-color:var(--color-primary,#1677FF);border-color:var(--color-primary,#1677FF)}
 #leavePolicy .form-check-input:focus{box-shadow:0 0 0 .2rem rgba(22,119,255,.18);border-color:var(--color-primary,#1677FF)}
-@media(max-width:900px){#leavePolicy .lv-cards{grid-template-columns:1fr}#leavePolicy .lv-fields{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}}
+@media(max-width:900px){#leavePolicy .lv-cards{grid-template-columns:1fr}#leavePolicy .lv-fields{grid-template-columns:1fr}}
 
 /* الوضع الداكن */
 body.preview-dark #leavePolicy .lv-card{background:var(--dm-surface);border-color:var(--dm-border);box-shadow:0 3px 12px rgba(0,0,0,.25)}
@@ -47,6 +49,9 @@ body.preview-dark #leavePolicy .lv-card-head{border-bottom-color:var(--dm-border
 body.preview-dark #leavePolicy .lv-card-head h4,body.preview-dark #leavePolicy .lv-sect-head h5{color:var(--dm-text)}
 body.preview-dark #leavePolicy .lv-art{background:var(--dm-primary-soft);color:#9ec2ff}
 body.preview-dark #leavePolicy .lv-card-desc,body.preview-dark #leavePolicy .lv-hint,body.preview-dark #leavePolicy .lv-static,body.preview-dark #leavePolicy .lv-note{color:var(--dm-muted)}
+body.preview-dark #leavePolicy .lv-hint-review{color:#f0b35c}
+body.preview-dark #leavePolicy .lv-hint-below{color:#ff8a80}
+body.preview-dark #leavePolicy .lv-hint-outside{color:#9aa7b5}
 body.preview-dark #leavePolicy .lv-field .lv-lbl,body.preview-dark #leavePolicy .lv-check label{color:var(--dm-text-2)}
 body.preview-dark #leavePolicy .lv-sub-title{color:#9ec2ff;border-bottom-color:var(--dm-border)}
 body.preview-dark #leavePolicy .lv-sect{border-top-color:var(--dm-border)}
