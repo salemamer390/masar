@@ -91,6 +91,9 @@ class LeaveTypeActivationPerCompanyTest extends TestCase
 
     public function test_deactivated_type_is_blocked_from_approval_for_that_company_only(): void
     {
+        // This test targets the activation check, not the document rule (a seeded
+        // sick type may require a medical report for multi-day leaves).
+        $this->sickType->forceFill(['requires_document' => false])->save();
         $this->deactivateSick();
 
         $leave = new Leave([
@@ -145,6 +148,51 @@ class LeaveTypeActivationPerCompanyTest extends TestCase
         ])->assertSessionDoesntHaveErrors();
         $this->assertSame('none', $basis($this->company->id));
         $this->assertSame(1, DB::table('leave_policy_settings')->where('company_id', $this->company->id)->where('setting_key', 'sick_pay_basis')->count(), 'update must not duplicate the row');
+    }
+
+    public function test_sick_pay_basis_none_makes_sick_leave_deductible_in_payroll_for_that_company_only(): void
+    {
+        $this->put(route('payroll.settings.leaves.update'), [
+            'policies' => ['annual_first_year' => 15],
+            'sick_pay_basis' => 'none',
+        ])->assertSessionDoesntHaveErrors();
+
+        $unpaid = fn ($companyId) => $this->invokeIsUnpaidLeave($companyId);
+        $this->assertTrue($unpaid($this->company->id), 'basis none must deduct sick leave like unpaid');
+        $this->assertFalse($unpaid($this->otherCompany->id), 'other company keeps the shared paid behavior');
+    }
+
+    public function test_sick_pay_basis_full_keeps_sick_leave_paid_and_ins_falls_back_to_shared_flag(): void
+    {
+        $this->put(route('payroll.settings.leaves.update'), [
+            'policies' => ['annual_first_year' => 15],
+            'sick_pay_basis' => 'full',
+        ])->assertSessionDoesntHaveErrors();
+        $this->assertFalse($this->invokeIsUnpaidLeave($this->company->id));
+
+        $this->put(route('payroll.settings.leaves.update'), [
+            'policies' => ['annual_first_year' => 15],
+            'sick_pay_basis' => 'ins',
+        ])->assertSessionDoesntHaveErrors();
+        // «حسب قانون التأمينات» has no payroll computation yet: current behavior (shared paid flag) is preserved.
+        $this->assertFalse($this->invokeIsUnpaidLeave($this->company->id));
+    }
+
+    private function invokeIsUnpaidLeave(int $companyId): bool
+    {
+        static $n = 100;
+        $n++;
+        DB::table('employees')->insert([
+            'employee_code' => 'PRB'.$n, 'first_name' => 'P'.$n, 'full_name' => 'Probe '.$n,
+            'company_id' => $companyId, 'status_id' => $this->status->id, 'hire_date' => '2020-01-01',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $employeeId = DB::getPdo()->lastInsertId();
+        $leave = new Leave(['employee_id' => $employeeId, 'leave_type_id' => $this->sickType->id, 'days' => 1]);
+        $leave->setRelation('leaveType', $this->sickType);
+        $service = (new \ReflectionClass(\App\Services\PayrollRunService::class))->newInstanceWithoutConstructor();
+        $method = new \ReflectionMethod(\App\Services\PayrollRunService::class, 'isUnpaidLeave');
+        return $method->invoke($service, $leave);
     }
 
     public function test_sick_pay_basis_rejects_unknown_values(): void
