@@ -79,7 +79,7 @@ class LeaveBalanceService
                 ? (float) $employee->manual_annual_balance
                 : $this->entitlement($employee, $cycle['start']);
             $employeeLeaves = $leaves->get($employee->id, collect());
-            $deducting = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && (bool) $leave->leaveType->deducts_annual_balance);
+            $deducting = $employeeLeaves->filter(fn (Leave $leave) => $leave->leaveType && $this->payFlags($leave->leaveType, $employee->company_id ? (int) $employee->company_id : null)['deducts_annual_balance']);
             // «Used» stops at the reference date: future approved leave inside
             // the cycle is not consumed yet, and the unused balance of every
             // earlier cycle carries forward without expiring.
@@ -154,7 +154,7 @@ class LeaveBalanceService
         $leaves = Leave::with('leaveType')->where('employee_id', $employee->id)->effective()
             ->whereDate('start_date', '<=', $cycle['end'])
             ->whereDate('end_date', '>=', $this->firstCycleStart($employee, $referenceDate))->get();
-        $deducting = $leaves->filter(fn (Leave $leave) => $leave->leaveType && (bool) $leave->leaveType->deducts_annual_balance);
+        $deducting = $leaves->filter(fn (Leave $leave) => $leave->leaveType && $this->payFlags($leave->leaveType, $employee->company_id ? (int) $employee->company_id : null)['deducts_annual_balance']);
         $upper = $referenceDate->lessThan($cycle['end']) ? $referenceDate : $cycle['end'];
         $used = (float) $deducting->sum(fn (Leave $leave) => $this->daysWithinRange($leave, $cycle['start'], $upper));
         $allocation = $this->allocate($employee, $deducting, $cycle, $used, $this->openingEntriesFor($employee));
@@ -183,6 +183,10 @@ class LeaveBalanceService
         $src = $row ?? $type;
         $requiresDocument = (bool) $type->requires_document;
         if ($row && property_exists($row, 'requires_document') && $row->requires_document !== null) $requiresDocument = (bool) $row->requires_document;
+        $isPaid = (bool) $type->is_paid;
+        if ($row && property_exists($row, 'is_paid') && $row->is_paid !== null) $isPaid = (bool) $row->is_paid;
+        $deducts = (bool) $type->deducts_annual_balance;
+        if ($row && property_exists($row, 'deducts_annual_balance') && $row->deducts_annual_balance !== null) $deducts = (bool) $row->deducts_annual_balance;
         return [
             'requires_document' => $requiresDocument,
             'max_days_per_request' => $src->max_days_per_request !== null ? (float) $src->max_days_per_request : null,
@@ -190,8 +194,28 @@ class LeaveBalanceService
             'min_service_months' => $src->min_service_months !== null ? (int) $src->min_service_months : null,
             'max_occurrences_service' => $src->max_occurrences_service !== null ? (int) $src->max_occurrences_service : null,
             'is_active' => $row && property_exists($row, 'is_active') && $row->is_active !== null ? (bool) $row->is_active : (bool) $type->is_active,
+            'is_paid' => $isPaid,
+            'deducts_annual_balance' => $deducts,
         ];
     }
+
+    /**
+     * Effective pay flags of a type for one company (shared type + company
+     * override), cached per call chain so balance loops stay cheap.
+     *
+     * @return array{is_paid:bool,deducts_annual_balance:bool}
+     */
+    public function payFlags(LeaveType $type, ?int $companyId): array
+    {
+        $key = $type->id.':'.($companyId ?? 0);
+        if (!array_key_exists($key, $this->payFlagsCache)) {
+            $limits = $this->limitsFor($type, $companyId);
+            $this->payFlagsCache[$key] = ['is_paid' => (bool) $limits['is_paid'], 'deducts_annual_balance' => (bool) $limits['deducts_annual_balance']];
+        }
+        return $this->payFlagsCache[$key];
+    }
+
+    private array $payFlagsCache = [];
 
     public function validateForApproval(Leave $leave, ?int $excludeId = null): void
     {
@@ -279,7 +303,7 @@ class LeaveBalanceService
             $cap = (float) $this->policy('casual_max_days_year', '7');
             if ($used + $days > $cap) $this->fail('days', "لا يمكن اعتماد الإجازة العارضة: الحد السنوي {$this->number($cap)} أيام، استُخدم {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $cap - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
         }
-        if ($type->deducts_annual_balance) {
+        if ($limits['deducts_annual_balance'] ?? $type->deducts_annual_balance) {
             $cycle = $this->leaveCycle($employee, $start);
             $balance = $this->balance($employee, $start);
             // Reserved availability: every approved leave in the cycle, past
@@ -289,7 +313,7 @@ class LeaveBalanceService
             // Capacity, not the as-of remainder: allocation order never
             // changes the total, so this is stable for reservation checks.
             $usable = $balance['usable_capacity'];
-            $used = $this->approvedDaysWithinCycle($employee, $cycle, fn (LeaveType $item) => (bool) $item->deducts_annual_balance, $excludeId);
+            $used = $this->approvedDaysWithinCycle($employee, $cycle, fn (LeaveType $item) => $this->payFlags($item, $employee->company_id ? (int) $employee->company_id : null)['deducts_annual_balance'], $excludeId);
             if ($used + $days > $usable && (!$leave->is_early_grant || $this->enforceBalanceOnEarlyGrant)) $this->fail('days', "لا يمكن اعتماد {$type->name}: الرصيد السنوي المتاح {$this->number($usable)} يوم، محجوز {$this->number($used)} أيام، والمتبقي {$this->number(max(0, $usable - $used))} يوم، بينما الطلب {$this->number($days)} أيام.");
         }
         // Proof is enforced on every entry point, including imports. No request-level bypass.
