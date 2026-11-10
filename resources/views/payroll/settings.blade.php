@@ -22,7 +22,7 @@
 ['key'=>'overtime.hours_divisor','label'=>'أساس ساعة الإضافي','unit'=>'ساعة','hint'=>'عدد ساعات الشهر المستخدمة لحساب أجر الساعة'],
 ['key'=>'overtime.day_multiplier','label'=>'معامل الإضافي النهاري','unit'=>'×'],
 ['key'=>'overtime.night_multiplier','label'=>'معامل الإضافي الليلي','unit'=>'×','hint'=>'يُضرب في أجر الساعة'],
-['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين'],
+['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين إجمالًا — يُضاف الفرق فوق المرتب'],
 ['key'=>'overtime.weekly_rest_multiplier','label'=>'معامل الراحة الأسبوعية','unit'=>'×','hint'=>'1 = بنفس سعر اليوم'],
 ['key'=>'overtime.days_divisor','label'=>'أيام الشهر لأجر يوم الراحة والعطلات','unit'=>'يوم']]],
 ['title'=>'الغياب والجزاءات','subtitle'=>'مقسوم الخصم وحدود الجزاءات','fields'=>[
@@ -171,12 +171,24 @@
       $h = '<div class="leave-head"><h3>'.e($name).'</h3><span class="art">'.e($art).'</span>';
       if ($toggleName !== null) {
           $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
-              .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle></div>';
+              .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
       } else {
-          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون"><input class="form-check-input" type="checkbox" checked disabled></div>';
+          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون — لا يمكن تعطيله"><input class="form-check-input" type="checkbox" checked disabled></div>';
       }
       $h .= '<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset="'.e($card).'">القانون</button></div>';
       return $h;
+  };
+  // رأس قسم فرعي داخل بطاقة (العارضة داخل السنوية، المخالطة داخل المرضية): نفس ترميز التصميم بمستوى أصغر.
+  $lvSubHead = function (string $card, string $name, string $art, ?string $note = null, ?string $toggleName = null, ?bool $active = null) {
+      $h = '<div class="leave-sub-head"><h4>'.e($name).'</h4><span class="art">'.e($art).'</span>';
+      if ($note) $h .= '<span class="leave-sub-note">'.e($note).'</span>';
+      if ($toggleName !== null) {
+          $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
+              .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
+      } else {
+          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون — لا يمكن تعطيله"><input class="form-check-input" type="checkbox" checked disabled></div>';
+      }
+      return $h.'</div>';
   };
   $lvCardOpen = function (string $card, bool $off = false, bool $mandated = false) {
       return '<div class="col-lg-6" data-card-wrap="'.e($card).'"><div class="leave'.($off ? ' is-off' : '').'" id="c-'.e($card).'"'.($mandated ? ' data-mandated="1"' : '').'>';
@@ -188,7 +200,8 @@
   $examsType = $lvType('exams'); $newbornType = $lvType('newborn'); $pilgrimageType = $lvType('pilgrimage');
   $maternityType = $lvType('maternity'); $childcareType = $lvType('childcare');
   $sickBasis = $policyValues['sick_pay_basis'] ?? ($sickType?->is_paid ? 'full' : 'none');
-  $knownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare'];
+  // «بدون أجر» ليس له بطاقة إعدادات: يبقى نوعًا متاحًا للطلبات ويُخصم في المسير مباشرة.
+  $knownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare', 'unpaid'];
   $extraTypes = $leaveTypes->reject(fn ($t) => in_array($t->policy_code, $knownCodes, true));
   $constNote = 'ثابت قانوني — غير قابل للتعديل';
 ?>
@@ -221,22 +234,16 @@
 {!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
 {!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'مرجع قانوني — الرصيد المرحّل لا تنتهي صلاحيته آليًا في النظام حاليًا') !!}
 {!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
-</div>{!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
-{!! $lvCardOpen('casual', !$lvActive($casualType)) !!}
-{!! $lvHead('casual', 'الإجازة العارضة', 'م128', $casualType ? 'types['.$casualType->id.'][is_active]' : null, $lvActive($casualType)) !!}
-<div class="leave-body"><div class="row g-3">
+</div>
+<div class="leave-sub{{ !$lvActive($casualType) ? ' is-off' : '' }}" data-lp-sub="casual" data-mandated="1">
+{!! $lvSubHead('casual', 'الإجازة العارضة', 'م128', 'ضمن الإجازات السنوية — تُخصم من رصيدها', $casualType ? 'types['.$casualType->id.'][is_active]' : null, $lvActive($casualType)) !!}
+<div class="row g-3">
 {!! $lvN('casual', 'days', 'الحد السنوي', 7, 'min', 'يوم', 'policies[casual_max_days_year]', $pol('casual_max_days_year', 7)) !!}
 {!! $lvN('casual', 'perTime', 'الحد الأقصى في المرة', 2, 'min', 'يوم', 'policies[casual_max_days_request]', $pol('casual_max_days_request', 2)) !!}
 {!! $lvS('casual', 'deduct', 'تُخصم من السنوية', true, false, $casualType ? 'types['.$casualType->id.'][deducts_annual_balance]' : null, $casualType ? (bool) ($casualType->limits['deducts_annual_balance'] ?? $casualType->deducts_annual_balance) : true, $casualType ? null : $constNote) !!}
 {!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
-</div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div></div></div>
-{!! $lvCardOpen('holidays') !!}
-{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
-<div class="leave-body"><div class="row g-3">
-{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
-{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
-{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
-</div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
+</div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div>
+{!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
 {!! $lvCardOpen('weekly') !!}
 {!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120') !!}
 <div class="leave-body"><div class="row g-3">
@@ -262,17 +269,25 @@
 {!! $lvN('sick', 's3p', 'نسبة الأجر في المرحلة 3', 75, 'min', '%', 'policies[sick_phase3_pct]', $pol('sick_phase3_pct', 75)) !!}
 {!! $lvN('sick', 'per', 'تتكرر المراحل عن كل', 3, 'max', 'سنوات خدمة', 'policies[sick_cycle_years]', $pol('sick_cycle_years', 3)) !!}
 {!! $lvN('sick', 'notice', 'إخطار قبل إنهاء العقد بسبب المرض', 15, 'min', 'يوم', 'policies[sick_termination_notice_days]', $pol('sick_termination_notice_days', 15)) !!}
-</div><div class="note-op-block">مراحل الأجر للمنشآت الصناعية تُحفظ لشركتك ولا تُحتسب في المسير بعد — تُربط بالحساب فور تحديد أساس الأجر وآلية الصرف.</div>{!! $lvOffSlot('sick', !$lvActive($sickType)) !!}</div></div></div>
-{!! $lvCardOpen('contact', !(bool) ($companyContact?->is_active)) !!}
-{!! $lvHead('contact', 'المنع بسبب مخالطة مرض معدٍ', 'م132', 'contact_active', (bool) ($companyContact?->is_active)) !!}
-<div class="leave-body"><div class="row g-3">
+</div><div class="note-op-block">مراحل الأجر للمنشآت الصناعية تُحفظ لشركتك ولا تُحتسب في المسير بعد — تُربط بالحساب فور تحديد أساس الأجر وآلية الصرف.</div>
+<div class="leave-sub{{ !(bool) ($companyContact?->is_active) ? ' is-off' : '' }}" data-lp-sub="contact">
+{!! $lvSubHead('contact', 'المنع بسبب مخالطة مرض معدٍ', 'م132', 'تفعيل وسياسة أجر باختيار الشركة', 'contact_active', (bool) ($companyContact?->is_active)) !!}
+<div class="row g-3">
 {!! $lvN('contact', 'months', 'أقصى مدة منع', 3, 'max', 'شهر', 'policies[contagious_max_months]', $pol('contagious_max_months', 3)) !!}
 {!! $lvSel('contact', 'pay', 'سياسة أجر المخالطة', '', ['' => 'لم تحدد بعد', 'paid' => 'مدفوعة الأجر (اختيار الشركة)', 'unpaid' => 'بدون أجر (اختيار الشركة)'], 'contact_pay', $companyContact ? ($companyContact->is_paid ? 'paid' : 'unpaid') : '', 'المادة لا تحدد الأجر — اختر سياسة الشركة قبل التفعيل. الاختيار يخص شركتك فقط.') !!}
-</div><div class="note-op-block">النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله.</div></div></div></div>
+</div><div class="note-op-block">النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله.</div></div>
+{!! $lvOffSlot('sick', !$lvActive($sickType)) !!}</div></div></div>
 </div>
 
 <h2 class="group-title">ظروف خاصة</h2>
 <div class="row g-3" data-lp-group>
+{!! $lvCardOpen('holidays') !!}
+{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
+{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
+</div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 {!! $lvCardOpen('exam', !$lvActive($examsType)) !!}
 {!! $lvHead('exam', 'إجازة الامتحانات', 'م126', $examsType ? 'types['.$examsType->id.'][is_active]' : null, $lvActive($examsType)) !!}
 <div class="leave-body"><div class="row g-3">
@@ -343,8 +358,8 @@
 </div><div class="note-op-block">مطبّقة في الحساب: التخفيض وسماح الرضاعة يعوّضان التأخير والانصراف المبكر، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع.</div></div></div></div>
 </div>
 
+<h2 class="group-title">أنواع إضافية خاصة بالشركة <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addLeaveTypeModal"><i class="bi bi-plus-lg"></i> إضافة نوع إجازة</button></h2>
 @if($extraTypes->isNotEmpty())
-<h2 class="group-title">أنواع إضافية خاصة بالشركة</h2>
 <div class="row g-3" data-lp-group>
 @foreach($extraTypes as $extraType)
 {!! $lvCardOpen('x'.$extraType->id, !$lvActive($extraType)) !!}
@@ -354,15 +369,40 @@
 {!! $lvN('x'.$extraType->id, 'year', 'الحد السنوي (يوم)', $extraType->limits['max_days_per_year'] ?? 0, 'min', 'يوم', 'types['.$extraType->id.'][max_days_per_year]', $extraType->limits['max_days_per_year']) !!}
 {!! $lvN('x'.$extraType->id, 'service', 'الحد الأدنى للخدمة (شهر)', $extraType->limits['min_service_months'] ?? 0, 'max', 'شهر', 'types['.$extraType->id.'][min_service_months]', $extraType->limits['min_service_months']) !!}
 {!! $lvN('x'.$extraType->id, 'times', 'مرات طوال الخدمة', $extraType->limits['max_occurrences_service'] ?? 0, 'min', 'مرة', 'types['.$extraType->id.'][max_occurrences_service]', $extraType->limits['max_occurrences_service']) !!}
-{!! $lvS('x'.$extraType->id, 'doc', 'مستند مطلوب', false, false, 'types['.$extraType->id.'][requires_document]', (bool) $extraType->limits['requires_document']) !!}
+{!! $lvS('x'.$extraType->id, 'doc', 'مستند مطلوب', (bool) $extraType->limits['requires_document'], false, 'types['.$extraType->id.'][requires_document]', (bool) $extraType->limits['requires_document']) !!}
+{!! $lvS('x'.$extraType->id, 'paid', 'مدفوعة الأجر', (bool) ($extraType->limits['is_paid'] ?? $extraType->is_paid), false, 'types['.$extraType->id.'][is_paid]', (bool) ($extraType->limits['is_paid'] ?? $extraType->is_paid)) !!}
+{!! $lvS('x'.$extraType->id, 'deduct', 'تُخصم من السنوية', (bool) ($extraType->limits['deducts_annual_balance'] ?? $extraType->deducts_annual_balance), false, 'types['.$extraType->id.'][deducts_annual_balance]', (bool) ($extraType->limits['deducts_annual_balance'] ?? $extraType->deducts_annual_balance)) !!}
 </div>{!! $lvOffSlot('x'.$extraType->id, false) !!}</div></div></div>
 @endforeach
 </div>
+@else
+<p class="note-op-block">لا توجد أنواع خاصة بشركتك بعد — استخدم «إضافة نوع إجازة» لإنشاء أول نوع.</p>
 @endif
 
 <p class="note mt-4">هذه الإعدادات إرشادية وتُبنى على نص القانون. راجع القرارات التنفيذية السارية قبل اعتمادها في لائحة داخلية أو في احتساب الأجور.</p>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ التعديلات</button></span></div>
 </form>
+
+<div class="modal fade" id="addLeaveTypeModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h5 class="modal-title">إضافة نوع إجازة</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
+<form method="POST" action="{{ route('payroll.settings.leave-types.store') }}">@csrf
+<div class="modal-body">
+<div class="mb-3"><label class="form-label fw-bold">اسم النوع</label><input type="text" name="name" class="form-control" maxlength="150" placeholder="مثال: إجازة زواج" required></div>
+<div class="row g-3">
+<div class="col-md-6"><label class="form-label fw-bold">الحد في الطلب (يوم)</label><input type="number" name="max_days_per_request" class="form-control" min="0" step="any" placeholder="بدون حد"></div>
+<div class="col-md-6"><label class="form-label fw-bold">الحد السنوي (يوم)</label><input type="number" name="max_days_per_year" class="form-control" min="0" step="any" placeholder="بدون حد"></div>
+<div class="col-md-6"><label class="form-label fw-bold">الحد الأدنى للخدمة (شهر)</label><input type="number" name="min_service_months" class="form-control" min="0" step="1" placeholder="بدون شرط"></div>
+<div class="col-md-6"><label class="form-label fw-bold">مرات طوال الخدمة</label><input type="number" name="max_occurrences_service" class="form-control" min="0" step="1" placeholder="بدون حد"></div>
+</div>
+<div class="row g-3 mt-1">
+<div class="col-md-4"><div class="form-check form-switch"><input type="hidden" name="is_paid" value="0"><input class="form-check-input" type="checkbox" name="is_paid" value="1" checked id="newTypePaid"><label class="form-check-label fw-bold" for="newTypePaid">مدفوعة الأجر</label></div></div>
+<div class="col-md-4"><div class="form-check form-switch"><input type="hidden" name="deducts_annual_balance" value="0"><input class="form-check-input" type="checkbox" name="deducts_annual_balance" value="1" id="newTypeDeduct"><label class="form-check-label fw-bold" for="newTypeDeduct">تُخصم من السنوية</label></div></div>
+<div class="col-md-4"><div class="form-check form-switch"><input type="hidden" name="requires_document" value="0"><input class="form-check-input" type="checkbox" name="requires_document" value="1" id="newTypeDoc"><label class="form-check-label fw-bold" for="newTypeDoc">مستند مطلوب</label></div></div>
+</div>
+<div class="note-op-block mt-3">النوع الجديد يخص شركتك فقط: يظهر في طلبات الإجازة فورًا، وتُطبَّق حدوده عند الاعتماد، ويؤثر في المسير (النوع غير المدفوع يُخصم عند تفعيل خصم إجازة بدون أجر). لا يُعاد حساب مسيرات مقفولة.</div>
+</div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">إضافة النوع</button></div>
+</form></div></div></div>
 </div>
 <script>
 (function () {
@@ -406,15 +446,25 @@
     slot.innerHTML = st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '';
   }
   function cardState(card) {
-    const t = card.querySelector('[data-lp-toggle]');
-    if (t && !t.checked) return 'bad';
+    // Only the card's own toggle and statutory subsections count toward the violation
+    // state; an optional subsection left off (e.g. مخالطة مرض معدٍ) is not a violation.
+    const toggles = $$('[data-lp-toggle]', card).filter(t => {
+      const sub = t.closest('[data-lp-sub]');
+      return !sub || sub.dataset.mandated === '1';
+    });
+    if (toggles.some(t => !t.checked)) return 'bad';
     const sts = $$('[data-lp-ctl]', card).filter(c => !c.disabled).map(statusOf);
     if (sts.includes('bad')) return 'bad';
     return sts.includes('mod') ? 'mod' : '';
   }
   function paintCard(card) {
     const st = cardState(card);
-    card.className = 'leave' + (st ? ' is-' + st : '') + (card.querySelector('[data-lp-toggle]') && !card.querySelector('[data-lp-toggle]').checked ? ' is-off' : '');
+    const toggles = $$('[data-lp-toggle]', card);
+    card.className = 'leave' + (st ? ' is-' + st : '') + (toggles.length && toggles.every(t => !t.checked) ? ' is-off' : '');
+    $$('[data-lp-sub]', card).forEach(sub => {
+      const t = toggles.find(x => x.dataset.lpToggle === sub.dataset.lpSub);
+      sub.classList.toggle('is-off', !!t && !t.checked);
+    });
   }
   function summary() {
     const c = { '': 0, mod: 0, bad: 0 };
@@ -437,7 +487,7 @@
     const t = e.target.closest('[data-lp-toggle]');
     if (t) {
       const card = t.closest('.leave');
-      const slot = document.getElementById('h-' + card.id.slice(2) + '-on');
+      const slot = document.getElementById('h-' + t.dataset.lpToggle + '-on');
       if (slot) slot.innerHTML = !t.checked && card.dataset.mandated === '1' ? '<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>' : '';
       paintCard(card);
     }

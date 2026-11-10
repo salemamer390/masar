@@ -21,18 +21,25 @@
 #leavePolicy .group-title{font-size:1.1rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:2px solid var(--lp-ink)}
 #leavePolicy > .group-title:first-of-type{margin-top:0}
 
-/* البطاقة — نفس إطار التصميم: حد يمين 5px بلون الحالة */
-#leavePolicy .leave{background:#fff;border:1px solid var(--lp-border);border-inline-start:5px solid var(--lp-law);border-radius:6px;height:100%}
-#leavePolicy .leave.is-mod{border-inline-start-color:var(--lp-mod)}
-#leavePolicy .leave.is-bad{border-inline-start-color:var(--lp-bad)}
+/* البطاقة — إطار كامل بحد خفيف وظل بدل الشريط الجانبي */
+#leavePolicy .leave{background:#fff;border:1px solid var(--lp-border);border-radius:8px;height:100%;box-shadow:0 1px 3px rgba(11,31,85,.08)}
+#leavePolicy .leave.is-mod{border-color:var(--lp-mod)}
+#leavePolicy .leave.is-bad{border-color:var(--lp-bad)}
 #leavePolicy .leave.is-off{opacity:.6}
 #leavePolicy .leave-head{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-bottom:1px solid #eef1f4}
 #leavePolicy .leave-head h3{font-size:1rem;margin:0;flex:1}
 #leavePolicy .art{font-size:.75rem;background:var(--lp-soft);color:var(--lp-law);padding:.15rem .5rem;border-radius:4px;white-space:nowrap}
 #leavePolicy .leave-body{padding:1rem}
 
+/* قسم فرعي داخل بطاقة (العارضة داخل السنوية، المخالطة داخل المرضية) */
+#leavePolicy .leave-sub{margin-top:1rem;padding-top:.75rem;border-top:1px dashed var(--lp-border)}
+#leavePolicy .leave-sub.is-off{opacity:.6}
+#leavePolicy .leave-sub-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem}
+#leavePolicy .leave-sub-head h4{font-size:.9rem;margin:0;flex:1}
+#leavePolicy .leave-sub-note{font-size:.72rem;color:var(--lp-muted);white-space:nowrap}
+
 /* الحقول — نفس تسميات وتلميحات التصميم */
-#leavePolicy .lbl{font-size:.82rem;color:var(--lp-muted);margin-bottom:.2rem}
+#leavePolicy .lbl{font-size:.82rem;font-weight:700;color:var(--lp-muted);margin-bottom:.2rem}
 #leavePolicy .hint-wrap .hint,#leavePolicy .hint{font-size:.74rem;min-height:1.1rem;margin-top:.2rem;color:var(--lp-hint);display:block}
 #leavePolicy .hint.mod{color:var(--lp-mod)}
 #leavePolicy .hint.bad{color:var(--lp-bad)}

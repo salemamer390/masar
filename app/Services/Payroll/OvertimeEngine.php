@@ -23,7 +23,10 @@ class OvertimeEngine
 
         $day = $hourly * $dayHours * $this->settings->dayOvertimeMultiplier();
         $night = $hourly * $nightHours * $this->settings->nightOvertimeMultiplier();
-        $official = $daily * $officialHolidayDays * $this->settings->officialHolidayMultiplier();
+        // The multiplier is the TOTAL days' wage for a worked official holiday
+        // (2 = يومين إجمالًا). The month's salary already covers that day, so only
+        // the difference above one day is added as an earning.
+        $official = $daily * $officialHolidayDays * max(0.0, $this->settings->officialHolidayMultiplier() - 1);
         $weekly = $daily * $weeklyRestDays * $this->settings->weeklyRestMultiplier();
 
         return [
