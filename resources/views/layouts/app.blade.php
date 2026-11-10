@@ -1,5 +1,7 @@
 <!doctype html>
-@php($isRtlInterface = \App\Http\Middleware\SetLocale::isRtl())
+@php
+  $isRtlInterface = \App\Http\Middleware\SetLocale::isRtl();
+@endphp
 <html lang="{{ app()->getLocale() }}" dir="{{ $isRtlInterface ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">

@@ -51,7 +51,7 @@
 
 <div class="salary-layout">
 @forelse($salaries as $s)
-  <div class="salary-card salary-card-compact" data-salary-id="{{ $s->id }}" data-bs-toggle="modal" data-bs-target="#salaryDetails{{ $s->id }}" role="button" tabindex="0" aria-label="{{ __('عرض تفاصيل راتب {{ $s->employee?->full_name }}') }}">
+  <div class="salary-card salary-card-compact" data-salary-id="{{ $s->id }}" data-bs-toggle="modal" data-bs-target="#salaryDetails{{ $s->id }}" role="button" tabindex="0" aria-label="{{ __('عرض تفاصيل راتب') }} {{ $s->employee?->full_name }}">
     <div class="salary-card-head">
       <div class="salary-employee">
         <div class="salary-avatar">@if($s->employee?->profile_photo_url)<img src="{{ $s->employee->profile_photo_url }}" alt="{{ $s->employee->full_name }}">@else{{ $s->employee?->initials }}@endif</div>
