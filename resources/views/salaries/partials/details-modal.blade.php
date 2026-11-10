@@ -17,7 +17,7 @@
         <div><span>{{ __('المتبقي من البدلات') }}</span><strong>{{ format_money($s->allowance_remaining) }} {{ __('ج.م') }}</strong></div>
       </div></div>
       <div class="salary-detail-section"><div class="salary-detail-title"><i class="bi bi-shield-check"></i><span>{{ __('التأمينات') }}</span></div><div class="salary-detail-grid">
-        <div><span>{{ __('الأجر التأميني') }}</span><strong>{{ $s->no_insurance ? 'بدون تأمينات' : format_money($s->applied_insurance_wage).' ج.م' }}</strong></div>
+        <div><span>{{ __('الأجر التأميني') }}</span><strong>{{ $s->no_insurance ? __('بدون تأمينات') : format_money($s->applied_insurance_wage).' '.__('ج.م') }}</strong></div>
         <div><span>{{ __('حصة العامل') }} {{ format_number($payrollSettings['employee_insurance_rate']) }}%</span><strong>{{ format_money($s->employee_insurance) }} {{ __('ج.م') }}</strong></div>
         <div><span>{{ __('حصة صاحب العمل') }} {{ format_number($payrollSettings['employer_insurance_rate']) }}%</span><strong>{{ format_money($s->employer_insurance) }} {{ __('ج.م') }}</strong></div>
         <div><span>{{ __('أساس التأمين التلقائي') }}</span><strong>{{ __('الأجر الأساسي') }}</strong></div>
