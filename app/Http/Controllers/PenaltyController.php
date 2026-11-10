@@ -48,9 +48,9 @@ class PenaltyController extends Controller
             'amount' => ['nullable', 'numeric', 'min:0'],
             'deduction_days' => ['nullable', 'numeric', 'min:0'],
         ], [
-            'employee_id.required' => 'الموظف مطلوب.',
-            'penalty_date.required' => 'تاريخ الجزاء مطلوب.',
-            'reason.required' => 'سبب المخالفة مطلوب.',
+            'employee_id.required' => __('الموظف مطلوب.'),
+            'penalty_date.required' => __('تاريخ الجزاء مطلوب.'),
+            'reason.required' => __('سبب المخالفة مطلوب.'),
         ]);
         $periodGuard->ensureOpen($validated['penalty_date']);
         $employee = Employee::findOrFail($validated['employee_id']);
@@ -61,7 +61,7 @@ class PenaltyController extends Controller
             if (!$type) {
                 // No usable penalty type: report it clearly instead of falling back
                 // to a hard-coded id that may not exist (foreign-key failure).
-                $message = 'لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.';
+                $message = __('لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.');
                 return $request->wantsJson()
                     ? response()->json(['message' => $message, 'errors' => ['penalty_type_id' => [$message]]], 422)
                     : back()->withErrors(['penalty_type_id' => $message])->withInput();
@@ -105,7 +105,7 @@ class PenaltyController extends Controller
     public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
-        abort_if(in_array($penalty->status, Penalty::inactiveStatuses(), true), 422, 'الجزاء ملغى.');
+        abort_if(in_array($penalty->status, Penalty::inactiveStatuses(), true), 422, __('الجزاء ملغى.'));
         $penalty->update([
             'status' => 'Approved',
             'closed_at' => now(),
