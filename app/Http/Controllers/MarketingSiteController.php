@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\ContactMessage;
+use App\Support\MarketingLocalizer;
 
 class MarketingSiteController extends Controller
 {
@@ -116,10 +117,12 @@ JS);
         }
 
         if (isset($hidden['token'])) {
-            $html = preg_replace('~<h1>.*?</h1>~s', '<h1>تعيين كلمة مرور جديدة</h1>', $html, 1);
+            $html = preg_replace('~<h1>.*?</h1>~s', '<h1>'.e(__('تعيين كلمة مرور جديدة')).'</h1>', $html, 1);
             $html = preg_replace('~<p class="sub">.*?</p>~s', '<p class="sub">أدخل بريدك وكلمة المرور الجديدة لإتمام إعادة التعيين بأمان.</p>', $html, 1);
             $html = preg_replace('~<button class="btn primary full">.*?</button>~s', '<div class="field"><label>كلمة المرور الجديدة</label><input name="password" type="password" required minlength="8" autocomplete="new-password"></div><div class="field"><label>تأكيد كلمة المرور</label><input name="password_confirmation" type="password" required minlength="8" autocomplete="new-password"></div><button class="btn primary full">حفظ كلمة المرور</button>', $html, 1);
         }
+
+        $html = MarketingLocalizer::translate($html);
 
         return response($html)
             ->header('Content-Type', 'text/html; charset=UTF-8')

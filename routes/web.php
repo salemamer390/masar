@@ -52,6 +52,7 @@ $sitePage = static function (string $page) {
     }
     $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\.html"[^>]*>.*?</a>~u', '', $html);
     $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
+    $html = \App\Support\MarketingLocalizer::translate($html);
 
     return response($html)
         ->header('Content-Type', 'text/html; charset=UTF-8')
