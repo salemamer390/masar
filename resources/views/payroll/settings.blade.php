@@ -804,7 +804,7 @@ if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مف�
   const holidayBaseUrl = @json(url('/payroll/settings/holidays'));
   const holidaysList = document.getElementById('holidaysList');
   const escapeHolidayHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
-  const holidayDate = (value) => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
+  const holidayDate = (value) => { const parts = window.masarYmd(value).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
   const holidayRow = (holiday) => `<div class="holiday-row" data-holiday-id="${holiday.id}"><div><strong>${escapeHolidayHtml(holiday.name)}</strong><small class="text-muted d-block">${holidayDate(holiday.holiday_date)}</small></div><div class="holiday-actions"><button type="button" class="btn btn-sm btn-outline-primary holiday-edit-ajax"><i class="bi bi-pencil-square"></i> تعديل</button><form method="POST" action="${holidayBaseUrl}/${holiday.id}"><input type="hidden" name="_token" value="${escapeHolidayHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف</button></form></div></div>`;
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('.lp-delete-type');
