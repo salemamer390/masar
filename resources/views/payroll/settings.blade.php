@@ -118,49 +118,162 @@
 <form method="POST" action="{{ route('payroll.settings.leaves.update') }}" data-ajax="true" data-track-dirty="true">
 @csrf @method('PUT')
 <div class="alert alert-info">المرجع: قانون العمل 14 لسنة 2025. الوسم يقارن القيم المعروفة فقط، وليس شهادة مطابقة قانونية كاملة. أي تعديل يقلل حقًا يظهر بتحذير وتأكيد وسجل، والتأكيد لا يجعله قانونيًا. الإعدادات تخص شركتك فقط. رصيد أول سنة يظل كاملًا بعد الانتظار بدون تناسب وفق قرار الشركة، ويحتاج مراجعة مع القواعد المرتبطة.</div>
-<details class="settings-card mb-3"><summary>المرجع القانوني (للقراءة فقط)</summary><div class="p-3">@foreach(\App\Support\LeaveLegalReference::typeRules() as $code => $reference)<p><strong>{{ $leaveTypes->firstWhere('policy_code', $code)?->name ?? $code }} @if($reference['article'])(م{{ $reference['article'] }})@endif</strong>: {{ $reference['text'] }}</p>@endforeach<a href="https://eta.gov.eg/sites/default/files/2026-03/law.no_.14.of_.2025.pdf" target="_blank" rel="noopener">نص القانون</a></div></details>
-<div class="settings-cards">
+<details class="lv-card lv-wide lv-law-ref"><summary>المرجع القانوني (للقراءة فقط)</summary><div class="lv-law-body">@foreach(\App\Support\LeaveLegalReference::typeRules() as $code => $reference)<p><strong>{{ $leaveTypes->firstWhere('policy_code', $code)?->name ?? $code }} @if($reference['article'])(م{{ $reference['article'] }})@endif</strong>: {{ $reference['text'] }}</p>@endforeach<a href="https://eta.gov.eg/sites/default/files/2026-03/law.no_.14.of_.2025.pdf" target="_blank" rel="noopener">نص القانون</a></div></details>
 <?php
+  $ref = \App\Support\LeaveLegalReference::class;
   $lvNum = fn ($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.');
-  $lvField = function (string $key, bool $readonly = false) use ($leavePolicies, $leavePolicyLabels, $lvNum) {
+  $policyValues = $leavePolicies->pluck('setting_value', 'setting_key')->all();
+  $lvField = function (string $key, bool $readonly = false) use ($leavePolicies, $leavePolicyLabels, $lvNum, $ref) {
       if (!isset($leavePolicies[$key])) return '';
-      $ref = \App\Support\LeaveLegalReference::class;
       $status = $key === 'annual_first_year' ? 'review' : $ref::policyStatus($key, $leavePolicies[$key]->setting_value);
-      $implBadge = $readonly ? '<span class="badge text-bg-secondary">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
-      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small>'.e($ref::policyHint($key)).'</small><span class="badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span>'.$implBadge.'</div>';
+      $implBadge = $readonly ? '<span class="lv-impl">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
+      return '<div class="lv-field"><label class="lv-lbl">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small class="lv-hint">'.e($ref::policyHint($key)).'</small><span class="badge lv-badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span>'.$implBadge.'</div>';
   };
+  $lvTypeLimits = function ($type) use ($lvNum) {
+      $lim = $type->limits; $code = $type->policy_code;
+      $isAnnual = $code === 'annual'; $isCasual = $code === 'casual';
+      $isCalendar = isset(\App\Services\LeaveBalanceService::CALENDAR_TYPES[$code]);
+      $h = '<div class="lv-field"><label class="lv-lbl">الحد في الطلب (يوم)</label>';
+      if ($isAnnual) {
+          $h .= '<div class="lv-static">حسب الرصيد المتاح</div>';
+      } elseif ($isCalendar && in_array((float) ($lim['max_days_per_request'] ?? 0), [0.0, $code === 'maternity' ? 120.0 : ($code === 'childcare' ? 730.0 : 0.0)], true)) {
+          $h .= '<div class="lv-static">بالتقويم من إعداد المدة في هذه البطاقة</div>';
+      } else {
+          $h .= '<input type="number" min="0" step="0.5" name="types['.$type->id.'][max_days_per_request]" value="'.e($lvNum($lim['max_days_per_request'])).'" class="form-control">';
+          if ($isCalendar) $h .= '<small class="lv-hint">حد قديم مخصص بالأيام، محفوظ دون تقليل ميزته. امسحه لتطبيق مدة التقويم. يحتاج مراجعة.</small>';
+      }
+      $h .= '</div>';
+      $h .= '<div class="lv-field"><label class="lv-lbl">الحد السنوي (يوم)</label><input type="number" min="0" step="0.5" name="types['.$type->id.'][max_days_per_year]" value="'.e($lvNum($lim['max_days_per_year'])).'" class="form-control"></div>';
+      $h .= '<div class="lv-field"><label class="lv-lbl">الحد الأدنى للخدمة (شهر)</label>';
+      if ($isAnnual) $h .= '<div class="lv-static">من «مدة الانتظار»</div>';
+      elseif ($isCasual) $h .= '<div class="lv-static">بدون انتظار</div>';
+      else $h .= '<input type="number" min="0" name="types['.$type->id.'][min_service_months]" value="'.e($lvNum($lim['min_service_months'])).'" class="form-control">';
+      $h .= '</div>';
+      $h .= '<div class="lv-field"><label class="lv-lbl">مرات طوال الخدمة</label><input type="number" min="0" name="types['.$type->id.'][max_occurrences_service]" value="'.e($lvNum($lim['max_occurrences_service'])).'" class="form-control"></div>';
+      $h .= '<div class="lv-field lv-check"><label><input type="hidden" name="types['.$type->id.'][requires_document]" value="0"><input type="checkbox" class="form-check-input" name="types['.$type->id.'][requires_document]" value="1"'.($lim['requires_document'] ? ' checked' : '').'> مستند مطلوب</label></div>';
+      return $h;
+  };
+  $lvStatus = fn ($type) => $ref::typeStatus($type->policy_code, $type->limits, $type->is_paid, $type->limits['requires_document'], $policyValues);
+  $lvNotes = function (array $cmp) {
+      $h = '';
+      foreach ($cmp['notes'] as $note) $h .= '<small class="lv-hint d-block">'.e($note).'</small>';
+      return $h;
+  };
+  $lvTypeCard = function (string $code, array $policyKeys = [], string $extraDesc = '') use ($leaveTypes, $lvStatus, $lvTypeLimits, $lvField, $lvNotes, $ref) {
+      $type = $leaveTypes->firstWhere('policy_code', $code);
+      if (!$type) return '';
+      $rules = $ref::typeRules()[$code] ?? null;
+      $cmp = $lvStatus($type);
+      $h = '<div class="lv-card lv-st-'.$cmp['status'].'"><div class="lv-card-head"><h4>'.e($type->name).'</h4>';
+      if ($rules && $rules['article']) $h .= '<span class="lv-art">م'.$rules['article'].'</span>';
+      $h .= '<span class="badge text-bg-'.$ref::CLASSES[$cmp['status']].'">'.$ref::LABELS[$cmp['status']].'</span></div>';
+      if ($rules && $rules['text']) $h .= '<p class="lv-card-desc">'.e($rules['text']).($extraDesc ? ' '.e($extraDesc) : '').'</p>';
+      $h .= '<div class="lv-fields">'.$lvTypeLimits($type);
+      foreach ($policyKeys as $k) $h .= $lvField($k);
+      $h .= '</div>'.$lvNotes($cmp).'</div>';
+      return $h;
+  };
+  $companyContact = $leaveTypes->first(fn($t) => $t->policy_code === 'contagious_contact' && $t->company_id);
+  $contactType = $companyContact ?? $leaveTypes->first(fn($t) => $t->policy_code === 'contagious_contact' && !$t->company_id);
+  $lvKnownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'unpaid', 'maternity', 'childcare'];
+  $annualType = $leaveTypes->firstWhere('policy_code', 'annual');
+  $casualType = $leaveTypes->firstWhere('policy_code', 'casual');
+  $sickType = $leaveTypes->firstWhere('policy_code', 'sick');
 ?>
-<div class="settings-card lv-wide"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</span></div><div class="settings-card-grid lv-grid4">
-<div class="lv-sub">الاستحقاق (يوم)</div>
-{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}
-<div class="lv-sub">شروط الأرصدة الأعلى</div>
-{!! $lvField('annual_long_service_years') !!}{!! $lvField('annual_age_threshold') !!}{!! $lvField('annual_hazardous_extra_days') !!}
-<div class="lv-sub">الانتظار والاستثناء</div>
-{!! $lvField('annual_wait_months') !!}{!! $lvField('allow_early_leave') !!}
-<p class="lv-note span-all">لو الموظف لم يكمل مدة الانتظار، تظهر رسالة بسبب المنع وزر «موافق» لمن يملك صلاحية الاعتماد، وتُسجَّل الإجازة كمنح استثنائي. تظهر الرسالة فقط لو «السماح بمنح استثنائي» = 1.</p>
-</div></div>
-@php($companyContact = $leaveTypes->first(fn($t) => $t->policy_code === 'contagious_contact' && $t->company_id))
-<div class="settings-card lv-wide"><div class="settings-card-head"><h3>إجازة مخالطة مريض بمرض معد (م132)</h3><span>المادة لا تحدد الأجر. النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله. الاختيار يخص شركتك فقط.</span></div><div class="settings-card-grid">
-<div class="settings-field"><label class="form-label" for="contactPay">سياسة أجر المخالطة</label><select id="contactPay" name="contact_pay" class="form-select"><option value="">لم تحدد بعد</option><option value="paid" @selected($companyContact && $companyContact->is_paid)>مدفوعة الأجر (اختيار الشركة)</option><option value="unpaid" @selected($companyContact && !$companyContact->is_paid)>بدون أجر (اختيار الشركة، يحتاج مراجعة)</option></select><span class="badge text-bg-warning">يحتاج مراجعة</span></div>
-<div class="settings-field"><label><input type="hidden" name="contact_active" value="0"><input type="checkbox" name="contact_active" value="1" @checked($companyContact?->is_active)> تفعيل النوع لشركتي بعد تحديد الأجر</label></div>
-</div></div>
-<div class="settings-card lv-wide"><div class="settings-card-head"><h3>حدود أنواع الإجازات</h3><span>كل قاعدة تُضبط هنا في مكان واحد. التعديل يخص شركتك فقط.</span></div><div class="table-responsive"><table class="table align-middle lv-table"><thead><tr><th>النوع</th><th>الحد في الطلب (يوم)</th><th>الحد السنوي (يوم)</th><th>الحد الأدنى للخدمة (شهر)</th><th>مرات طوال الخدمة</th><th>مستند مطلوب</th><th>المقارنة بالمرجع</th></tr></thead><tbody>
-@foreach($leaveTypes->reject(fn($t) => $companyContact && !$t->company_id && $t->policy_code === 'contagious_contact') as $type)<?php $lim = $type->limits; $isAnnual = $type->policy_code === 'annual'; $isCasual = $type->policy_code === 'casual'; $isCalendar = isset(\App\Services\LeaveBalanceService::CALENDAR_TYPES[$type->policy_code]); $cmp = \App\Support\LeaveLegalReference::typeStatus($type->policy_code, $lim, $type->is_paid, $lim['requires_document'], $leavePolicies->pluck('setting_value','setting_key')->all()); ?><tr><td class="lv-type">{{ $type->name }}</td>
-<td>@if($isAnnual)<span class="lv-auto">حسب الرصيد المتاح</span>@elseif($isCalendar && in_array((float) ($lim['max_days_per_request'] ?? 0), [0.0, $type->policy_code === 'maternity' ? 120.0 : ($type->policy_code === 'childcare' ? 730.0 : 0.0)], true))<span class="lv-auto">بالتقويم من الإعداد أدناه</span>@else<input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_request]" value="{{ $lvNum($lim['max_days_per_request']) }}" class="form-control">@if($isCalendar)<small class="d-block">حد قديم مخصص بالأيام، محفوظ دون تقليل ميزته. امسحه لتطبيق مدة التقويم أدناه. يحتاج مراجعة.</small>@endif @endif</td>
-<td><input type="number" min="0" step="0.5" name="types[{{ $type->id }}][max_days_per_year]" value="{{ $lvNum($lim['max_days_per_year']) }}" class="form-control"></td>
-<td>@if($isAnnual || $isCasual)<span class="lv-auto">{{ $isAnnual ? 'من «مدة الانتظار»' : 'بدون انتظار' }}</span>@else<input type="number" min="0" name="types[{{ $type->id }}][min_service_months]" value="{{ $lvNum($lim['min_service_months']) }}" class="form-control">@endif</td>
-<td><input type="number" min="0" name="types[{{ $type->id }}][max_occurrences_service]" value="{{ $lvNum($lim['max_occurrences_service']) }}" class="form-control"></td><td><input type="hidden" name="types[{{ $type->id }}][requires_document]" value="0"><label><input type="checkbox" name="types[{{ $type->id }}][requires_document]" value="1" @checked($lim['requires_document'])> مطلوب</label></td><td><span class="badge text-bg-{{ \App\Support\LeaveLegalReference::CLASSES[$cmp['status']] }}">{{ \App\Support\LeaveLegalReference::LABELS[$cmp['status']] }}</span>@foreach($cmp['notes'] as $note)<small class="d-block">{{ $note }}</small>@endforeach @if($type->policy_code === 'contagious_contact')<small class="d-block">تحديد الأجر والتفعيل من البطاقة أعلاه. اختيار الأجر هو سياسة الشركة، وليس حكمًا بالمطابقة القانونية.</small>@endif</td></tr>@endforeach
-</tbody></table></div><p class="lv-scroll-hint">اسحب الجدول يمينًا ويسارًا لعرض كل الأعمدة.</p></div>
-<div class="settings-card lv-wide"><div class="settings-card-head"><h3>المدد التقويمية والمستندات</h3><span>الوضع بالشهور ورعاية الطفل بالسنوات. رفع المستند مطلوب فعليًا عند تفعيل «مستند مطلوب». إجازة الامتحانات بأجر: 10 أيام إخطار، بخلاف 15 يومًا لاختيار توقيت السنوية للامتحان.</span></div><div class="settings-card-grid lv-grid4">
-{!! $lvField('maternity_months') !!}{!! $lvField('maternity_min_postpartum_days') !!}{!! $lvField('childcare_max_years_per_request') !!}{!! $lvField('childcare_min_gap_years') !!}{!! $lvField('exam_notice_days') !!}{!! $lvField('contagious_max_months') !!}
-</div></div>
-<div class="settings-card lv-wide"><div class="settings-card-head"><h3>حقوق الحمل والرضاعة (م54–م56)</h3><span>مطبّقة في الحساب: تخفيض ساعات الحامل وسماح الرضاعة يعوّضان التأخير والانصراف المبكر بحد اليومية أدناه، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع. الأساس: التاريخ المتوقع للولادة وتاريخ الولادة الفعلي المسجَّلان على إجازة الوضع، ولا يبدأ تخفيض ساعات الحامل إلا بتاريخ موثّق من الشهادة الطبية على الإجازة. إعداد «بدء تخفيض ساعات الحامل (الشهر)» مرجع قانوني فقط حاليًا ولا يؤثر على الحساب.</span></div><div class="settings-card-grid">
-{!! $lvField('pregnancy_reduced_hours_per_day') !!}{!! $lvField('pregnancy_overtime_protection_months') !!}{!! $lvField('nursing_sessions_per_day') !!}{!! $lvField('nursing_minutes_per_session') !!}
-</div></div>
-<details class="settings-card wide lv-ref"><summary>إعداد محفوظ للعرض فقط <small>لا يؤثر على الحساب حاليًا</small></summary><div class="settings-card-grid">
-{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('annual_prorate_first_year', true) !!}
-</div></details>
+<div class="lv-group">
+  <h3 class="lv-group-title">الإجازات العامة</h3>
+  <div class="lv-cards">
+@php($annualCmp = $annualType ? $lvStatus($annualType) : ['status' => 'review', 'notes' => []])
+    <div class="lv-card lv-wide lv-st-{{ $annualCmp['status'] }}">
+      <div class="lv-card-head"><h4>الإجازة السنوية@if($annualType && $annualType->name !== 'الإجازة السنوية') ({{ $annualType->name }})@endif</h4><span class="lv-art">م124</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}">{{ $ref::LABELS[$annualCmp['status']] }}</span></div>
+      <p class="lv-card-desc">{{ $ref::typeRules()['annual']['text'] }}. الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</p>
+      <div class="lv-sub-title">الاستحقاق (يوم)</div>
+      <div class="lv-fields">{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}</div>
+      <div class="lv-sub-title">شروط الأرصدة الأعلى</div>
+      <div class="lv-fields">{!! $lvField('annual_long_service_years') !!}{!! $lvField('annual_age_threshold') !!}{!! $lvField('annual_hazardous_extra_days') !!}</div>
+      <div class="lv-sub-title">الانتظار والاستثناء</div>
+      <div class="lv-fields">{!! $lvField('annual_wait_months') !!}{!! $lvField('allow_early_leave') !!}<p class="lv-note">لو الموظف لم يكمل مدة الانتظار، تظهر رسالة بسبب المنع وزر «موافق» لمن يملك صلاحية الاعتماد، وتُسجَّل الإجازة كمنح استثنائي. تظهر الرسالة فقط لو «السماح بمنح استثنائي» = 1.</p></div>
+      @if($annualType)
+      <div class="lv-sub-title">الحدود</div>
+      <div class="lv-fields">{!! $lvTypeLimits($annualType) !!}</div>
+      @endif
+      {!! $lvNotes($annualCmp) !!}
+@if($casualType)@php($casualCmp = $lvStatus($casualType))
+      <div class="lv-sect">
+        <div class="lv-sect-head"><h5>{{ $casualType->name }}</h5><span class="lv-art">م128</span><span class="badge text-bg-{{ $ref::CLASSES[$casualCmp['status']] }}">{{ $ref::LABELS[$casualCmp['status']] }}</span></div>
+        <p class="lv-card-desc">{{ $ref::typeRules()['casual']['text'] }}</p>
+        <div class="lv-fields">{!! $lvTypeLimits($casualType) !!}</div>
+        {!! $lvNotes($casualCmp) !!}
+      </div>
+@endif
+    </div>
+  </div>
 </div>
+@if($sickType || $contactType)
+<div class="lv-group">
+  <h3 class="lv-group-title">المرض</h3>
+  <div class="lv-cards">
+@php($sickCmp = $sickType ? $lvStatus($sickType) : ['status' => 'review', 'notes' => []])
+    <div class="lv-card lv-wide lv-st-{{ $sickCmp['status'] }}">
+      <div class="lv-card-head"><h4>{{ $sickType?->name ?? 'الإجازة المرضية' }}</h4><span class="lv-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}">{{ $ref::LABELS[$sickCmp['status']] }}</span></div>
+      <p class="lv-card-desc">{{ $ref::typeRules()['sick']['text'] }}</p>
+      @if($sickType)<div class="lv-fields">{!! $lvTypeLimits($sickType) !!}</div>@endif
+      {!! $lvNotes($sickCmp) !!}
+@if($contactType)@php($contactCmp = $lvStatus($contactType))
+      <div class="lv-sect">
+        <div class="lv-sect-head"><h5>{{ $contactType->name }}</h5><span class="lv-art">م132</span><span class="badge text-bg-{{ $ref::CLASSES[$contactCmp['status']] }}">{{ $ref::LABELS[$contactCmp['status']] }}</span></div>
+        <p class="lv-card-desc">{{ $ref::typeRules()['contagious_contact']['text'] }} المادة لا تحدد الأجر. النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله. الاختيار يخص شركتك فقط.</p>
+        <div class="lv-fields">
+          <div class="lv-field"><label class="lv-lbl" for="contactPay">سياسة أجر المخالطة</label><select id="contactPay" name="contact_pay" class="form-select"><option value="">لم تحدد بعد</option><option value="paid" @selected($companyContact && $companyContact->is_paid)>مدفوعة الأجر (اختيار الشركة)</option><option value="unpaid" @selected($companyContact && !$companyContact->is_paid)>بدون أجر (اختيار الشركة، يحتاج مراجعة)</option></select><small class="lv-hint">اختيار الأجر هو سياسة الشركة، وليس حكمًا بالمطابقة القانونية.</small><span class="badge lv-badge text-bg-warning">يحتاج مراجعة</span></div>
+          <div class="lv-field lv-check"><label><input type="hidden" name="contact_active" value="0"><input type="checkbox" class="form-check-input" name="contact_active" value="1" @checked($companyContact?->is_active)> تفعيل النوع لشركتي بعد تحديد الأجر</label></div>
+          {!! $lvField('contagious_max_months') !!}
+          {!! $lvTypeLimits($contactType) !!}
+        </div>
+        {!! $lvNotes($contactCmp) !!}
+      </div>
+@endif
+    </div>
+  </div>
+</div>
+@endif
+<div class="lv-group">
+  <h3 class="lv-group-title">ظروف خاصة</h3>
+  <div class="lv-cards">
+{!! $lvTypeCard('exams', ['exam_notice_days'], 'بخلاف 15 يومًا لاختيار توقيت السنوية للامتحان.') !!}
+{!! $lvTypeCard('newborn') !!}
+{!! $lvTypeCard('pilgrimage') !!}
+{!! $lvTypeCard('unpaid') !!}
+  </div>
+</div>
+<div class="lv-group">
+  <h3 class="lv-group-title">المرأة العاملة</h3>
+  <p class="lv-group-note">الوضع بالشهور التقويمية ورعاية الطفل بالسنوات. رفع المستند مطلوب فعليًا عند تفعيل «مستند مطلوب».</p>
+  <div class="lv-cards">
+{!! $lvTypeCard('maternity', ['maternity_months', 'maternity_min_postpartum_days']) !!}
+{!! $lvTypeCard('childcare', ['childcare_max_years_per_request', 'childcare_min_gap_years']) !!}
+    <div class="lv-card lv-wide">
+      <div class="lv-card-head"><h4>حقوق الحمل والرضاعة</h4><span class="lv-art">م54–م56</span></div>
+      <p class="lv-card-desc">مطبّقة في الحساب: تخفيض ساعات الحامل وسماح الرضاعة يعوّضان التأخير والانصراف المبكر بحد اليومية أدناه، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع. الأساس: التاريخ المتوقع للولادة وتاريخ الولادة الفعلي المسجَّلان على إجازة الوضع، ولا يبدأ تخفيض ساعات الحامل إلا بتاريخ موثّق من الشهادة الطبية على الإجازة. إعداد «بدء تخفيض ساعات الحامل (الشهر)» مرجع قانوني فقط حاليًا ولا يؤثر على الحساب.</p>
+      <div class="lv-fields">{!! $lvField('pregnancy_reduced_hours_per_day') !!}{!! $lvField('pregnancy_overtime_protection_months') !!}{!! $lvField('nursing_sessions_per_day') !!}{!! $lvField('nursing_minutes_per_session') !!}</div>
+    </div>
+  </div>
+</div>
+@php($extraTypes = $leaveTypes->reject(fn($t) => in_array($t->policy_code, $lvKnownCodes, true) || $t->policy_code === 'contagious_contact'))
+@if($extraTypes->isNotEmpty())
+<div class="lv-group">
+  <h3 class="lv-group-title">أنواع إضافية خاصة بالشركة</h3>
+  <div class="lv-cards">
+@foreach($extraTypes as $extraType)@php($extraCmp = $lvStatus($extraType))
+    <div class="lv-card lv-st-{{ $extraCmp['status'] }}">
+      <div class="lv-card-head"><h4>{{ $extraType->name }}</h4><span class="badge text-bg-{{ $ref::CLASSES[$extraCmp['status']] }}">{{ $ref::LABELS[$extraCmp['status']] }}</span></div>
+      <div class="lv-fields">{!! $lvTypeLimits($extraType) !!}</div>
+      {!! $lvNotes($extraCmp) !!}
+    </div>
+@endforeach
+  </div>
+</div>
+@endif
+<details class="lv-card lv-wide lv-ref"><summary>إعداد محفوظ للعرض فقط <small>لا يؤثر على الحساب حاليًا</small></summary><div class="lv-fields">{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('annual_prorate_first_year', true) !!}</div></details>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ التعديلات</button></span></div>
 </form>
 </div>
@@ -441,5 +554,6 @@ document.addEventListener('masar:error', (event) => {
 </script>
 @endpush
 @push('styles')
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="{{ asset('leave-policy.css') }}?v={{ @filemtime(public_path('leave-policy.css')) }}" rel="stylesheet">
 @endpush
