@@ -344,7 +344,7 @@ class PayrollController extends Controller
 
                 return [
                     'month' => $date->format('Y-m-01'),
-                    'label' => $arabicMonths[$date->month - 1] . ' ' . $date->year,
+                    'label' => $date->locale(app()->getLocale())->translatedFormat('F Y'),
                     'status' => $status,
                     'status_label' => $status ? ($statusLabels[$status] ?? $status) : '—',
                     'employees' => (int) $row->employees,
