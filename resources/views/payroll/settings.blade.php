@@ -135,7 +135,7 @@
       $v = $lvNum($value ?? $law);
       if ($disabled) {
           return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
               .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
       }
       $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><div class="input-group input-group-sm">'
@@ -156,7 +156,7 @@
       $on = $value ?? $law;
       if ($disabled) {
           return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
               .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
       }
       return '<div class="col-md-6"><div class="form-check form-switch">'
@@ -255,8 +255,9 @@
 {!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div>
 {!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
-{!! $lvCardOpen('weekly') !!}
-{!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120') !!}
+{!! $lvCardOpen('weekly', !(bool) (int) $pol('weekly_enabled', 1)) !!}
+{!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120', 'policies[weekly_enabled]', (bool) (int) $pol('weekly_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('weekly', 'hours', 'مدة الراحة', 24, 'min', 'ساعة', null, 24, 'تُدار من تبويب «أوقات الدوام» — مصدر واحد لكل قاعدة') !!}
 {!! $lvN('weekly', 'afterDays', 'بعد أيام عمل متصلة لا تزيد على', 6, 'max', 'يوم', null, 6, 'تُدار من تبويب «أوقات الدوام» (نمط الراحة الأسبوعية)') !!}
@@ -292,8 +293,9 @@
 
 <h2 class="group-title">ظروف خاصة</h2>
 <div class="row g-3" data-lp-group>
-{!! $lvCardOpen('holidays') !!}
-{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
+{!! $lvCardOpen('holidays', !(bool) (int) $pol('holidays_enabled', 1)) !!}
+{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129', 'policies[holidays_enabled]', (bool) (int) $pol('holidays_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, false, 'policies[holidays_paid]', (bool) (int) $pol('holidays_paid', '1'), 'إعداد محفوظ — غير مربوط بحساب حاليًا') !!}
 {!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
@@ -323,8 +325,9 @@
 {!! $lvS('paternity', 'paid', 'مدفوعة الأجر', true, false, $newbornType ? 'types['.$newbornType->id.'][is_paid]' : null, $newbornType ? (bool) ($newbornType->limits['is_paid'] ?? $newbornType->is_paid) : true, $newbornType ? null : $constNote) !!}
 {!! $lvS('paternity', 'deduct', 'تُخصم من السنوية', false, false, $newbornType ? 'types['.$newbornType->id.'][deducts_annual_balance]' : null, $newbornType ? (bool) ($newbornType->limits['deducts_annual_balance'] ?? $newbornType->deducts_annual_balance) : false, $newbornType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('paternity', !$lvActive($newbornType)) !!}</div></div></div>
-{!! $lvCardOpen('jobsearch') !!}
-{!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162') !!}
+{!! $lvCardOpen('jobsearch', !(bool) (int) $pol('jobsearch_enabled', 1)) !!}
+{!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162', 'policies[jobsearch_enabled]', (bool) (int) $pol('jobsearch_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('jobsearch', 'hours', 'الساعات أسبوعيًا خلال مهلة الإخطار', 8, 'min', 'ساعة', 'policies[jobsearch_weekly_hours]', $pol('jobsearch_weekly_hours', 8), 'محفوظ لشركتك — لا يوجد تتبع لمهلة إخطار في النظام حاليًا') !!}
 {!! $lvS('jobsearch', 'paid', 'مدفوعة الأجر', true, false, 'policies[jobsearch_paid]', (bool) (int) $pol('jobsearch_paid', '1'), 'إعداد محفوظ — غير مربوط بحساب حاليًا') !!}
@@ -352,16 +355,18 @@
 {!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
 {!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('childcare', !$lvActive($childcareType)) !!}</div></div></div>
-{!! $lvCardOpen('nursing') !!}
-{!! $lvHead('nursing', 'فترتا الرضاعة', 'م56') !!}
+{!! $lvCardOpen('nursing', !(bool) (int) $pol('nursing_enabled', 1)) !!}
+{!! $lvHead('nursing', 'فترتا الرضاعة', 'م56', 'policies[nursing_enabled]', (bool) (int) $pol('nursing_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('nursing', 'sessions', 'عدد الفترات يوميًا', 2, 'min', 'فترة', 'policies[nursing_sessions_per_day]', $pol('nursing_sessions_per_day', 2)) !!}
 {!! $lvN('nursing', 'minutes', 'مدة كل فترة', 30, 'min', 'دقيقة', 'policies[nursing_minutes_per_session]', $pol('nursing_minutes_per_session', 30)) !!}
 {!! $lvN('nursing', 'months', 'خلال', 24, 'min', 'شهر من الوضع', 'policies[nursing_window_months]', $pol('nursing_window_months', 24)) !!}
 {!! $lvS('nursing', 'paid', 'تُحسب من ساعات العمل بدون خفض الأجر', true, false, 'policies[nursing_paid_full]', (bool) (int) $pol('nursing_paid_full', '1'), 'إعداد محفوظ — تُحسب فترات الرضاعة مدفوعة في الحساب حاليًا') !!}
 </div></div></div></div>
-{!! $lvCardOpen('pregnant') !!}
-{!! $lvHead('pregnant', 'تخفيف عمل الحامل', 'م54') !!}
+{!! $lvCardOpen('pregnant', !(bool) (int) $pol('pregnant_enabled', 1)) !!}
+{!! $lvHead('pregnant', 'تخفيف عمل الحامل', 'م54', 'policies[pregnant_enabled]', (bool) (int) $pol('pregnant_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('pregnant', 'hours', 'تخفيض ساعات العمل اليومية', 1, 'min', 'ساعة', 'policies[pregnancy_reduced_hours_per_day]', $pol('pregnancy_reduced_hours_per_day', 1)) !!}
 {!! $lvN('pregnant', 'fromMonth', 'اعتبارًا من الشهر', 6, 'max', 'من الحمل', 'policies[pregnancy_reduced_hours_from_month]', $pol('pregnancy_reduced_hours_from_month', 6), 'محفوظ لشركتك — البدء الفعلي يتبع التاريخ الموثق في الشهادة الطبية حاليًا') !!}
@@ -454,7 +459,8 @@
     if (!slot) return;
     if (ctl.disabled) return; // الحقول المعطلة تحمل ملاحظتها التشغيلية الثابتة
     const st = statusOf(ctl);
-    slot.innerHTML = st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '';
+    if (slot._opNote === undefined) slot._opNote = slot.querySelector('.note-op')?.outerHTML || '';
+    slot.innerHTML = slot._opNote + (st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '');
   }
   function cardState(card) {
     // Only the card's own toggle and statutory subsections count toward the violation
