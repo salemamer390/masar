@@ -298,6 +298,18 @@ class ImmediateHrIntegrationTest extends TestCase
         $this->postJson(route('requests.store'),$base+['request_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'11:00'])->assertOk();
     }
 
+    public function test_validation_messages_are_arabic_on_create_and_update(): void
+    {
+        $this->postJson(route('requests.store'), [])->assertUnprocessable()
+            ->assertJsonPath('errors.employee_id.0', 'حقل الموظف مطلوب.')
+            ->assertJsonPath('errors.title.0', 'حقل عنوان الطلب مطلوب.');
+        $type = RequestType::where('code', 'permission')->value('id');
+        $created = $this->postJson(route('requests.store'), ['employee_id'=>$this->employee->id,'request_type_id'=>$type,'title'=>'Permission','details'=>'Test','request_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'10:00'])->assertOk();
+        $request = HrRequest::latest('id')->first();
+        $this->putJson(route('requests.update', $request), ['title'=>'','details'=>'Test','request_date'=>'2026-11-01','permission_from_time'=>'09:00','permission_to_time'=>'10:00'])
+            ->assertUnprocessable()->assertJsonPath('errors.title.0', 'حقل عنوان الطلب مطلوب.');
+    }
+
     public function test_summary_and_payroll_share_missing_days_and_excuses(): void
     {
         $this->request('permission', ['request_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'13:00']);
