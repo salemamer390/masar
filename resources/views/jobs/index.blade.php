@@ -37,8 +37,8 @@ document.querySelectorAll('.summary-history-open').forEach(button => button.addE
     const data = await response.json();
     // Labels are declared before use and aligned 1:1 with the stored row keys.
     const keys = ['employee_code','employee_name','department','attendance_days','late_days','late_minutes','absence_days','early_leave_minutes','day_overtime_minutes','night_overtime_minutes','annual_leave_days','casual_leave_days','sick_leave_days','unpaid_leave_days','maternity_leave_days','other_leave_days','total_leave_days','annual_balance_remaining','penalty_count','penalty_days','advance_request_count','permission_request_count','mission_request_count'];
-    const labels = ['الكود','الموظف','القسم','الحضور','حضور متأخر','دقائق التأخير','الغياب','انصراف مبكر (دقيقة)','إضافي نهاري (دقيقة)','إضافي ليلي (دقيقة)','سنوية','عارضة','مرضية','بدون أجر','أمومة','أخرى','إجمالي الإجازات','الرصيد المتبقي','الجزاءات','أيام الخصم','سلفة','إذن','مأمورية'];
-    document.getElementById('summaryHistoryBody').innerHTML = '<p class="text-muted">رقم الشهر: '+data.month+'</p><div class="table-responsive"><table class="table table-sm monthly-summary-table"><thead><tr>'+labels.map(label => '<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+data.rows.map(row => '<tr>'+keys.map(key => '<td>'+String(row[key] ?? '—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+    const labels = [window.masarT('الكود'),window.masarT('الموظف'),window.masarT('القسم'),window.masarT('الحضور'),window.masarT('حضور متأخر'),window.masarT('دقائق التأخير'),window.masarT('الغياب'),window.masarT('انصراف مبكر (دقيقة)'),window.masarT('إضافي نهاري (دقيقة)'),window.masarT('إضافي ليلي (دقيقة)'),window.masarT('سنوية'),window.masarT('عارضة'),window.masarT('مرضية'),window.masarT('بدون أجر'),window.masarT('أمومة'),window.masarT('أخرى'),window.masarT('إجمالي الإجازات'),window.masarT('الرصيد المتبقي'),window.masarT('الجزاءات'),window.masarT('أيام الخصم'),window.masarT('سلفة'),window.masarT('إذن'),window.masarT('مأمورية')];
+    document.getElementById('summaryHistoryBody').innerHTML = window.masarStaticHtml('<p class="text-muted">رقم الشهر: ')+data.month+'</p><div class="table-responsive"><table class="table table-sm monthly-summary-table"><thead><tr>'+labels.map(label => '<th>'+label+'</th>').join('')+'</tr></thead><tbody>'+data.rows.map(row => '<tr>'+keys.map(key => '<td>'+String(row[key] ?? '—')+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     document.getElementById('summaryHistoryExport').href = data.export_url;
     bootstrap.Modal.getOrCreateInstance(document.getElementById('summaryHistoryModal')).show();
 }));
@@ -49,8 +49,8 @@ if (summaryTable) {
     const headRows = summaryTable.tHead?.rows;
     const summaryData = @json($summaryRowData);
     if (headRows?.length >= 2) {
-        headRows[0].innerHTML = '<th colspan="3">الموظف</th><th colspan="7">الحضور والغياب</th><th colspan="8">الإجازات المؤكدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th colspan="3">الطلبات المؤكدة</th>';
-        headRows[1].innerHTML = ['الكود','اسم الموظف','القسم','أيام الحضور','منها حضور متأخر','دقائق التأخير','أيام الغياب','دقائق الانصراف المبكر','إضافي نهاري','إضافي ليلي','سنوية','عارضة','مرضية','بدون أجر','أمومة','أنواع أخرى','إجمالي الإجازات','رصيد الإجازة السنوية المتبقي','عدد الجزاءات','أيام خصم الجزاءات','سلفة','إذن','مأمورية'].map(label => `<th>${label}</th>`).join('');
+        headRows[0].innerHTML = window.masarStaticHtml('<th colspan="3">الموظف</th><th colspan="7">الحضور والغياب</th><th colspan="8">الإجازات المؤكدة داخل الفترة (أيام)</th><th colspan="2">الجزاءات</th><th colspan="3">الطلبات المؤكدة</th>');
+        headRows[1].innerHTML = [window.masarT('الكود'),window.masarT('اسم الموظف'),window.masarT('القسم'),window.masarT('أيام الحضور'),window.masarT('منها حضور متأخر'),window.masarT('دقائق التأخير'),window.masarT('أيام الغياب'),window.masarT('دقائق الانصراف المبكر'),window.masarT('إضافي نهاري'),window.masarT('إضافي ليلي'),window.masarT('سنوية'),window.masarT('عارضة'),window.masarT('مرضية'),window.masarT('بدون أجر'),window.masarT('أمومة'),window.masarT('أنواع أخرى'),window.masarT('إجمالي الإجازات'),window.masarT('رصيد الإجازة السنوية المتبقي'),window.masarT('عدد الجزاءات'),window.masarT('أيام خصم الجزاءات'),window.masarT('سلفة'),window.masarT('إذن'),window.masarT('مأمورية')].map(label => `<th>${label}</th>`).join('');
         summaryTable.tBodies?.[0]?.querySelectorAll('tr').forEach(row => {
             if (row.cells.length < 23) return;
             const code = row.cells[0]?.textContent?.trim() || '';
@@ -68,10 +68,10 @@ if (summaryTable) {
     }
     // The leave section contains seven detail columns; keep its group header aligned.
     if (headRows?.length >= 1 && headRows[0].cells.length >= 3) headRows[0].cells[2].colSpan = 8;
-    const requestLabels = ['عدد الطلبات','أيام الطلبات','ساعات الطلبات','إضافات','خصومات','أنواع الطلبات'];
+    const requestLabels = [window.masarT('عدد الطلبات'),window.masarT('أيام الطلبات'),window.masarT('ساعات الطلبات'),window.masarT('إضافات'),window.masarT('خصومات'),window.masarT('أنواع الطلبات')];
     if (headRows?.length >= 2 && headRows[1].cells.length < 23) {
         requestLabels.forEach(label => { const cell = document.createElement('th'); cell.textContent = label; headRows[1].append(cell); });
-        const group = document.createElement('th'); group.colSpan = requestLabels.length; group.textContent = 'الطلبات المؤكدة';
+        const group = document.createElement('th'); group.colSpan = requestLabels.length; group.textContent = window.masarT('الطلبات المؤكدة');
         headRows[0].append(group);
     }
 }
