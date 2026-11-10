@@ -244,13 +244,6 @@
 {!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div>
 {!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
-{!! $lvCardOpen('holidays') !!}
-{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
-<div class="leave-body"><div class="row g-3">
-{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
-{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
-{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
-</div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 {!! $lvCardOpen('weekly') !!}
 {!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120') !!}
 <div class="leave-body"><div class="row g-3">
@@ -288,6 +281,13 @@
 
 <h2 class="group-title">ظروف خاصة</h2>
 <div class="row g-3" data-lp-group>
+{!! $lvCardOpen('holidays') !!}
+{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
+{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
+</div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 {!! $lvCardOpen('exam', !$lvActive($examsType)) !!}
 {!! $lvHead('exam', 'إجازة الامتحانات', 'م126', $examsType ? 'types['.$examsType->id.'][is_active]' : null, $lvActive($examsType)) !!}
 <div class="leave-body"><div class="row g-3">
@@ -384,7 +384,7 @@
 </form>
 
 <div class="modal fade" id="addLeaveTypeModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
-<div class="modal-header"><h5 class="modal-title">إضافة نوع إجازة خاص بشركتك</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
+<div class="modal-header"><h5 class="modal-title">إضافة نوع إجازة</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
 <form method="POST" action="{{ route('payroll.settings.leave-types.store') }}">@csrf
 <div class="modal-body">
 <div class="mb-3"><label class="form-label fw-bold">اسم النوع</label><input type="text" name="name" class="form-control" maxlength="150" placeholder="مثال: إجازة زواج" required></div>
