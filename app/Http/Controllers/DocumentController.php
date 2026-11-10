@@ -41,9 +41,9 @@ class DocumentController extends Controller
             'expiry_date' => ['nullable', 'date'],
             'document_file' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ], [
-            'document_name.required' => 'اسم المسوغ مطلوب.',
-            'document_file.max' => 'الحد الأقصى لحجم الملف هو 10 ميجابايت.',
-            'document_file.mimes' => 'الملفات المدعومة هي الصور وملفات PDF ومستندات Word.',
+            'document_name.required' => __('اسم المسوغ مطلوب.'),
+            'document_file.max' => __('الحد الأقصى لحجم الملف هو 10 ميجابايت.'),
+            'document_file.mimes' => __('الملفات المدعومة هي الصور وملفات PDF ومستندات Word.'),
         ]);
 
         $docId = $request->input('document_id');
