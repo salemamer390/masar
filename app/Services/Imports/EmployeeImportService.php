@@ -49,9 +49,9 @@ class EmployeeImportService
      * key => [Arabic label (also the template header), accepted header aliases]
      */
     public const COLUMNS = [
-        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code']],
-        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name']],
-        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'national id', 'national_id', 'nid']],
+        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code']],
+        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'staff name', 'worker name', 'employee full name']],
+        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'رقم الهوية', 'الرقم القومي للموظف', 'رقم البطاقة الشخصية', 'national id', 'national_id', 'nid', 'national number', 'national no', 'id number']],
         'insurance_number' => ['الرقم التأميني', [
             // Arabic variants used by personnel/insurance spreadsheets.
             'رقم التأمين', 'الرقم التامينى', 'رقم التأمين الاجتماعي', 'رقم التأمينات',
@@ -62,8 +62,8 @@ class EmployeeImportService
             'social security number', 'social security id', 'insurance registration number',
             'ins no', 'ins number', 'ins id',
         ]],
-        'phone' => ['رقم الهاتف', ['الهاتف', 'الموبايل', 'رقم الموبايل', 'التليفون', 'رقم التليفون', 'phone', 'mobile']],
-        'email' => ['البريد الإلكتروني', ['البريد', 'الايميل', 'الإيميل', 'email', 'e-mail']],
+        'phone' => ['رقم الهاتف', ['الهاتف', 'الموبايل', 'رقم الموبايل', 'التليفون', 'رقم التليفون', 'phone', 'mobile', 'رقم الجوال', 'الجوال', 'تليفون', 'رقم التلفون', 'التلفون', 'mobile number', 'phone number', 'tel', 'telephone']],
+        'email' => ['البريد الإلكتروني', ['البريد', 'الايميل', 'الإيميل', 'email', 'e-mail', 'الايميل الشخصي', 'البريد الالكتروني', 'email address']],
         'birth_date' => ['تاريخ الميلاد', ['الميلاد', 'birth date', 'birth_date', 'date of birth', 'dob']],
         'gender' => ['النوع', ['الجنس', 'gender', 'sex']],
         'marital_status' => ['الحالة الاجتماعية', ['الحاله الاجتماعيه', 'marital status', 'marital_status']],
@@ -71,11 +71,11 @@ class EmployeeImportService
         'address' => ['العنوان', ['address']],
         'nationality' => ['الجنسية', ['nationality']],
         'department' => ['القسم', ['الإدارة', 'الادارة', 'department']],
-        'job' => ['الوظيفة', ['المسمى الوظيفي', 'المسمى', 'job', 'job title', 'title', 'position']],
+        'job' => ['الوظيفة', ['المسمى الوظيفي', 'المسمى', 'job', 'job title', 'title', 'position', 'الوظيفه', 'المسمي الوظيفي', 'job position']],
         'branch' => ['الفرع', ['مكان العمل', 'branch', 'work location']],
         'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'نوع الموظف', 'employment type', 'employment_type']],
         'status' => ['الحالة الوظيفية', ['حالة الموظف', 'حالة العمل', 'employee status', 'status']],
-        'hire_date' => ['بداية العقد (عمود قديم)', ['تاريخ التعيين', 'تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date']],
+        'hire_date' => ['بداية العقد (عمود قديم)', ['تاريخ التعيين', 'تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date', 'joining date', 'date of joining', 'تاريخ التوظيف', 'تاريخ بداية العمل', 'تاريخ الانضمام']],
         'contract_start_date' => ['بداية العقد', ['تاريخ بداية العقد', 'contract start', 'contract_start_date']],
         'contract_end_date' => ['نهاية العقد', ['تاريخ نهاية العقد', 'contract end', 'contract_end_date']],
         'contract_duration' => ['مدة العقد', ['contract duration', 'contract_duration']],
@@ -405,7 +405,32 @@ class EmployeeImportService
             && !$has(['الرقم القومي', 'تاريخ التعيين', 'بداية العقد', 'تاريخ الميلاد', 'national id', 'hire date', 'contract start', 'birth date'])) return 'insurance';
         if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
-        return 'unknown';
+        // Last resort: common sheet names are only a hint for a sheet the columns could not
+        // classify. The user still reviews and can change the type on the sheets step.
+        return $this->kindFromSheetName($name) ?? 'unknown';
+    }
+
+    /** Common Arabic/English sheet names, used only as a hint when columns are inconclusive. */
+    private const SHEET_NAME_HINTS = [
+        'employees' => ['الموظفين', 'موظفين', 'بيانات الموظفين', 'بيانات العاملين', 'العاملين', 'شئون العاملين', 'شؤون العاملين', 'employees', 'employee', 'employee data', 'staff', 'personnel', 'workers'],
+        'attendance' => ['الحضور', 'الحضور والانصراف', 'سجل الحضور', 'الحضور والإنصراف', 'البصمات', 'بصمات', 'attendance', 'punches', 'time attendance', 'attendance log', 'timesheet'],
+        'leaves' => ['الإجازات', 'الاجازات', 'إجازات', 'اجازات', 'leaves', 'leave', 'vacations'],
+        'penalties' => ['الجزاءات', 'جزاءات', 'المخالفات', 'penalties', 'disciplinary'],
+        'advances' => ['السلف', 'سلف', 'advances', 'advance'],
+        'requests' => ['الطلبات', 'طلبات', 'requests'],
+        'insurance' => ['التأمينات', 'التأمين', 'التامينات', 'insurance', 'social insurance'],
+    ];
+
+    private function kindFromSheetName(string $name): ?string
+    {
+        $key = $this->key($name);
+        if ($key === '') return null;
+        foreach (self::SHEET_NAME_HINTS as $kind => $names) {
+            foreach ($names as $candidate) {
+                if ($key === $this->key($candidate)) return $kind;
+            }
+        }
+        return null;
     }
 
     /** Confirmed per-sheet kinds from the user, keyed by sheet index or name; values limited to known kinds + ignore. */
