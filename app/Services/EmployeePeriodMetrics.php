@@ -46,9 +46,12 @@ class EmployeePeriodMetrics
                 $start = $p['start_date'] ?? $p['request_date'] ?? $p['date'] ?? $request->created_at?->toDateString();
                 $end = $p['end_date'] ?? $start;
                 if (!$start || $key < substr($start, 0, 10) || $key > substr($end, 0, 10)) continue;
-                if ($source === 'mission') { $mission = true; continue; }
+                $timed = !empty($p['from_time']) && !empty($p['to_time']);
+                // A dated, timed mission covers only its interval, exactly like a permission.
+                // An untimed legacy mission keeps covering the whole day.
+                if ($source === 'mission' && !$timed) { $mission = true; continue; }
                 // Untimed legacy permissions have no safe position within the shift.
-                if (empty($p['from_time']) || empty($p['to_time'])) continue;
+                if (!$timed) continue;
                 $a = Carbon::parse($key.' '.$p['from_time']);
                 $b = Carbon::parse($key.' '.$p['to_time']);
                 if ($b->lte($a)) $b->addDay();
