@@ -145,12 +145,13 @@ class PayrollSettingsController extends Controller
             'types.*.is_active' => ['nullable', 'boolean'],
             'types.*.is_paid' => ['nullable', 'boolean'],
             'types.*.deducts_annual_balance' => ['nullable', 'boolean'],
+            'types.*.min_employees' => ['nullable', 'integer', 'min:0'],
             'sick_pay_basis' => ['nullable', 'in:ins,full,none'],
             'confirm_below_reference' => ['sometimes', 'accepted'],
             'contact_pay' => ['nullable', 'in:paid,unpaid'],
             'contact_active' => ['nullable', 'boolean'],
         ]);
-        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance')) {
+        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance') || !Schema::hasColumn('leave_type_company_limits', 'min_employees')) {
             $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
@@ -188,7 +189,7 @@ class PayrollSettingsController extends Controller
         if ($warnings && !$request->boolean('confirm_below_reference')) throw \Illuminate\Validation\ValidationException::withMessages(['below_reference' => array_values(array_unique($warnings))]);
         $before = ['policies' => $currentPolicies, 'types' => []];
         foreach (($data['types'] ?? []) as $id => $values) { $type = LeaveType::find($id); if ($type) $before['types'][$id] = $balances->limitsFor($type, $companyId); }
-        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document', 'is_active', 'is_paid', 'deducts_annual_balance'];
+        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'min_employees', 'requires_document', 'is_active', 'is_paid', 'deducts_annual_balance'];
         $balances = app(\App\Services\LeaveBalanceService::class);
         DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
             if (!empty($data['sick_pay_basis'])) {
@@ -400,6 +401,34 @@ class PayrollSettingsController extends Controller
         ]);
         ActivityLog::record('leave_type_create', 'Custom leave type created.', null, null, $type->toArray(), 'leaves');
         return back()->with('toast', 'تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.');
+    }
+
+    /**
+     * Delete a company-owned custom leave type. Shared (statutory) types are never
+     * touched. A type that already has requests is archived instead: it leaves the
+     * request choices but its records, balances and payroll history stay intact.
+     */
+    public function destroyLeaveType(int $leaveType, Request $request)
+    {
+        $companyId = $this->companyIdOrFail();
+        $type = LeaveType::where('id', $leaveType)->where('company_id', $companyId)->first();
+        if (!$type) {
+            $message = 'نوع الإجازة غير موجود ضمن أنواع شركتك الخاصة.';
+            return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 404) : back()->withErrors(['leave' => $message]);
+        }
+        if ($type->leaves()->exists()) {
+            $type->is_active = false;
+            $type->save();
+            ActivityLog::record('leave_type_archive', 'Custom leave type archived.', null, null, $type->toArray(), 'leaves');
+            $message = 'للنوع طلبات سابقة — أُزيل من الاختيارات الجديدة مع حفظ سجلاته كاملة.';
+            return $request->wantsJson() ? response()->json(['success' => true, 'archived' => true, 'message' => $message]) : back()->with('toast', $message);
+        }
+        $snapshot = $type->toArray();
+        DB::table('leave_type_company_limits')->where('leave_type_id', $type->id)->delete();
+        $type->delete();
+        ActivityLog::record('leave_type_delete', 'Custom leave type deleted.', null, null, $snapshot, 'leaves');
+        $message = 'تم حذف نوع الإجازة نهائيًا — لم تكن له أي طلبات.';
+        return $request->wantsJson() ? response()->json(['success' => true, 'archived' => false, 'message' => $message]) : back()->with('toast', $message);
     }
 
     public function destroyHoliday(int $holiday, Request $request)
