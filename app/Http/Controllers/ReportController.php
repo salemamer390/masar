@@ -116,8 +116,8 @@ class ReportController extends Controller
                     ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))->get();
                 return [
                     'title' => 'تقرير الرواتب',
-                    'subtitle' => 'الصافي المتفق عليه وGross والتأمينات والضريبة وتكلفة الموظف',
-                    'columns' => ['الموظف', 'الوظيفة', 'القسم', 'Net المتفق عليه', 'الأجر الأساسي', 'البدلات', 'Gross', 'تأمين الموظف', 'الضريبة', 'Net النهائي', 'تكلفة الموظف'],
+                    'subtitle' => 'الصافي المتفق عليه والإجمالي والتأمينات والضريبة وتكلفة الموظف',
+                    'columns' => ['الموظف', 'الوظيفة', 'القسم', 'الصافي المتفق عليه', 'الأجر الأساسي', 'البدلات', 'الإجمالي', 'تأمين الموظف', 'الضريبة', 'الصافي النهائي', 'تكلفة الموظف'],
                     'rows' => $items->map(fn($s) => [
                         $s->employee?->full_name ?? '—',
                         $s->employee?->job?->title ?? '—',
@@ -187,9 +187,9 @@ class ReportController extends Controller
                     ->whereDate('payroll_month', $reportMonth->toDateString())
                     ->latest('payroll_month')->get();
                 return [
-                    'title' => 'Monthly Payroll Report',
-                    'subtitle' => 'Approved and locked payroll records only.',
-                    'columns' => ['Month', 'Employee', 'Department', 'Gross', 'Net', 'Employer Cost', 'Status'],
+                    'title' => 'تقرير مسير الرواتب الشهري',
+                    'subtitle' => 'سجلات المسير المعتمدة والمقفلة فقط.',
+                    'columns' => ['الشهر', 'الموظف', 'القسم', 'الإجمالي', 'الصافي', 'تكلفة الشركة', 'الحالة'],
                     'rows' => $items->map(fn ($record) => [
                         $record->payroll_month?->format('Y-m'), $record->employee?->full_name ?? '—',
                         $record->employee?->department?->name ?? '—', format_money($record->gross_salary),
