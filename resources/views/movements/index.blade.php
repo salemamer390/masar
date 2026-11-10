@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function () { (function () {
     if (!form) return;
     form.dataset.ajax = 'true';
     form.dataset.ajaxLabel = 'جارٍ الحفظ';
-    const dateLabel = value => { const parts = String(value || '').slice(0, 10).split('-'); return parts.length === 3 ? [parts[2], parts[1], parts[0]].join('/') : '—'; };
+    const dateLabel = value => { const parts = window.masarYmd(value).split('-'); return parts.length === 3 ? [parts[2], parts[1], parts[0]].join('/') : '—'; };
     document.addEventListener('masar:success', event => {
         if (event.target !== form || !tbody || !event.detail?.movement) return;
         const movement = event.detail.movement;
