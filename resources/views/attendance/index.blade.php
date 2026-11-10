@@ -103,7 +103,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const attendanceTableBody = document.querySelector('.table-panel table tbody');
   const escapeAttendanceHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const attendanceStatus = (status) => ({
-    Present: ['حاضر', 'success'], Late: ['متأخر', 'warning'], Absent: ['غائب', 'danger'], Leave: ['إجازة', 'info'],
+    Present: [window.masarT('حاضر'), 'success'], Late: [window.masarT('متأخر'), 'warning'], Absent: [window.masarT('غائب'), 'danger'], Leave: [window.masarT('إجازة'), 'info'],
   }[status] || [status || '—', 'secondary']);
   const attendanceDate = (value) => {
     const parts = window.masarYmd(value).split('-');
@@ -127,14 +127,14 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const wireAttendanceAjaxForms = (root = document) => {
     root.querySelectorAll('#attendanceModal form, #editAttendanceForm').forEach((form) => {
       form.dataset.ajax = 'true';
-      form.dataset.ajaxLabel = 'جارٍ الحفظ';
+      form.dataset.ajaxLabel = window.masarT('جارٍ الحفظ');
     });
     root.querySelectorAll('form[action*="/attendance/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
       const form = methodInput.form;
       if (!form) return;
       form.dataset.ajax = 'true';
-      form.dataset.ajaxLabel = 'جارٍ الحذف';
-      form.dataset.ajaxConfirm = 'هل تريد حذف سجل الحضور؟';
+      form.dataset.ajaxLabel = window.masarT('جارٍ الحذف');
+      form.dataset.ajaxConfirm = window.masarT('هل تريد حذف سجل الحضور؟');
       form.removeAttribute('onsubmit');
     });
   };
@@ -214,8 +214,8 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     const byId = new Map(employees.map((employee) => [String(employee.id), employee]));
     const employeeSearch = document.createElement('input');
     employeeSearch.type = 'search'; employeeSearch.className = 'attendance-employee-search';
-    employeeSearch.placeholder = 'ابحث باسم الموظف أو الكود';
-    employeeSearch.setAttribute('aria-label', 'البحث عن الموظف بالاسم أو الكود');
+    employeeSearch.placeholder = window.masarT('ابحث باسم الموظف أو الكود');
+    employeeSearch.setAttribute('aria-label', window.masarT('البحث عن الموظف بالاسم أو الكود'));
     const employeeSearchBox = document.createElement('div');
     employeeSearchBox.className = 'search-table attendance-employee-search-box mb-2';
     employeeSearchBox.innerHTML = '<i class="bi bi-search"></i>';
@@ -253,7 +253,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     document.addEventListener('click', (event) => {
       if (!employeeSearchBox.contains(event.target) && !suggestions.contains(event.target)) suggestions.hidden = true;
     });
-    employeeSelect.title = 'يمكنك البحث بالاسم أو كود الموظف';
+    employeeSelect.title = window.masarT('يمكنك البحث بالاسم أو كود الموظف');
   }
   if (lateMinutes) lateMinutes.closest('.col-6')?.remove();
   const resetDefaults = () => {
@@ -336,7 +336,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 @push('scripts')
 <script>
 (() => {
-  document.querySelector('#attendanceModal button.btn-primary')?.replaceChildren(document.createTextNode('حفظ السجل'));
+  document.querySelector('#attendanceModal button.btn-primary')?.replaceChildren(document.createTextNode(window.masarT('حفظ السجل')));
 })();
 </script>
 @endpush
@@ -453,7 +453,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     })->all();
   @endphp
   const details = @json($attendanceDetails);
-  const labels = {employee:'الموظف', code:'كود الموظف', department:'القسم', date:'التاريخ', check_in:'الحضور', check_out:'الانصراف', late:'التأخير', early:'الانصراف المبكر', worked:'ساعات العمل', day_overtime:'الإضافي النهاري', night_overtime:'الإضافي الليلي', status:'الحالة', source:'المصدر'};
+  const labels = {employee:window.masarT('الموظف'), code:window.masarT('كود الموظف'), department:window.masarT('القسم'), date:window.masarT('التاريخ'), check_in:window.masarT('الحضور'), check_out:window.masarT('الانصراف'), late:window.masarT('التأخير'), early:window.masarT('الانصراف المبكر'), worked:window.masarT('ساعات العمل'), day_overtime:window.masarT('الإضافي النهاري'), night_overtime:window.masarT('الإضافي الليلي'), status:window.masarT('الحالة'), source:window.masarT('المصدر')};
   const esc = (value) => String(value ?? '—').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
   document.body.insertAdjacentHTML('beforeend', `<div class="offcanvas offcanvas-end" tabindex="-1" id="attendanceDetailsPanel" aria-labelledby="attendanceDetailsTitle"><div class="offcanvas-header"><h5 id="attendanceDetailsTitle">تفاصيل سجل الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body"><div class="attendance-detail-list" id="attendanceDetailList"></div></div></div>`);
   const panel = document.getElementById('attendanceDetailsPanel');
@@ -465,9 +465,9 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     row.addEventListener('click', (event) => {
       if (event.target.closest('a,button,form,input,select,textarea')) return;
       const groups = [
-        {title:'أوقات الدوام', icon:'bi-clock', keys:['date','check_in','check_out','worked']},
-        {title:'التأخير والانصراف المبكر', icon:'bi-exclamation-triangle', className:'attendance-detail-group--late', keys:['late','early']},
-        {title:'الساعات الإضافية', icon:'bi-plus-circle', className:'attendance-detail-group--overtime', keys:['day_overtime','night_overtime']},
+        {title:window.masarT('أوقات الدوام'), icon:'bi-clock', keys:['date','check_in','check_out','worked']},
+        {title:window.masarT('التأخير والانصراف المبكر'), icon:'bi-exclamation-triangle', className:'attendance-detail-group--late', keys:['late','early']},
+        {title:window.masarT('الساعات الإضافية'), icon:'bi-plus-circle', className:'attendance-detail-group--overtime', keys:['day_overtime','night_overtime']},
       ];
       list.innerHTML = groups.map((group) => `<section class="attendance-detail-group ${group.className || ''}"><h6 class="attendance-detail-group-title"><i class="bi ${group.icon}"></i>${group.title}</h6><div class="attendance-detail-list">${group.keys.filter((key) => Object.prototype.hasOwnProperty.call(details[id], key)).map((key) => { const value = details[id][key]; const zero = ['00:00','0','0.00',0,null,'—'].includes(value); return `<div class="attendance-detail-item attendance-detail-item--${key} ${zero ? 'is-zero' : ''}"><small>${labels[key] || key}</small><strong>${esc(value)}</strong></div>`; }).join('')}</div></section>`).join('');
       bootstrap.Offcanvas.getOrCreateInstance(panel).show();
@@ -480,4 +480,3 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 <link rel="stylesheet" href="{{ asset('css/pages/attendance-index-07.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-07.css')) }}">
 @endpush
 @endsection
-
