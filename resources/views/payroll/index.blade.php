@@ -209,7 +209,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         <input type="hidden" name="{{ $key }}" value="{{ $value }}">
       @endif
     @endforeach
-    <label for="payrollPerPage" class="small mb-0">&#1593;&#1583;&#1583; &#1575;&#1604;&#1589;&#1601;&#1608;&#1601;</label>
+    <label for="payrollPerPage" class="small mb-0">{{ __('عدد الصفوف') }}</label>
     <select id="payrollPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
       @foreach([10, 25, 50, 100] as $size)
         <option value="{{ $size }}" @selected((int) $records->perPage() === $size)>{{ $size }}</option>
