@@ -218,9 +218,9 @@ class EmployeeController extends Controller
             'contract_end_date' => ['nullable', 'date', 'after_or_equal:contract_start_date'],
             'leave_entitlement_category' => ['nullable', 'in:normal,disabled,hazardous,disabled_hazardous'],
         ], [
-            'full_name.required' => 'اسم الموظف الكامل مطلوب.',
-            'employee_code.unique' => 'كود الموظف مستخدم بالفعل.',
-            'national_id.unique' => 'الرقم القومي مسجل لموظف آخر.',
+            'full_name.required' => __('اسم الموظف الكامل مطلوب.'),
+            'employee_code.unique' => __('كود الموظف مستخدم بالفعل.'),
+            'national_id.unique' => __('الرقم القومي مسجل لموظف آخر.'),
         ]);
 
         $validated = $this->applyNationalIdData($validated);
@@ -355,7 +355,7 @@ class EmployeeController extends Controller
             // The maternity status always comes with a leave and an expected
             // delivery date; a bare status edit would create neither.
             throw ValidationException::withMessages([
-                'status_id' => 'حالة «اجازة وضع» تُسجَّل من إجراء «تسجيل إجازة وضع» في قائمة الموظفين، حتى تُنشأ الإجازة ويُحفظ التاريخ المتوقع للولادة معها.',
+                'status_id' => __('حالة «اجازة وضع» تُسجَّل من إجراء «تسجيل إجازة وضع» في قائمة الموظفين، حتى تُنشأ الإجازة ويُحفظ التاريخ المتوقع للولادة معها.'),
             ]);
         }
         if ($this->isTerminalEmployeeStatus($oldStatusName) && ! $this->isInactiveEmployeeStatus($newStatusName)) {
@@ -364,7 +364,7 @@ class EmployeeController extends Controller
             // form instead of silently defaulting one.
             if (blank($request->input('return_date'))) {
                 throw ValidationException::withMessages([
-                    'return_date' => 'حدد تاريخ الرجوع الفعلي من نموذج بيانات الموظف قبل إعادة الموظف إلى نشط.',
+                    'return_date' => __('حدد تاريخ الرجوع الفعلي من نموذج بيانات الموظف قبل إعادة الموظف إلى نشط.'),
                 ]);
             }
             $this->ensureReactivationCapacity($employee);
@@ -526,9 +526,9 @@ class EmployeeController extends Controller
      */
     public function maternityLeave(Request $request, Employee $employee, \App\Services\PayrollPeriodGuard $periodGuard, \App\Services\PayrollRunService $payrollRuns)
     {
-        abort_unless($request->user()?->hasPermission('employees.edit'), 403, 'لا تملك صلاحية تعديل الموظفين.');
+        abort_unless($request->user()?->hasPermission('employees.edit'), 403, __('لا تملك صلاحية تعديل الموظفين.'));
         if (!\Illuminate\Support\Facades\Schema::hasColumn('leaves', 'expected_delivery_date')) {
-            $message = 'لازم تشغّل php artisan migrate قبل تسجيل إجازة الوضع.';
+            $message = __('لازم تشغّل php artisan migrate قبل تسجيل إجازة الوضع.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
         }
         $data = $request->validate([
@@ -540,7 +540,7 @@ class EmployeeController extends Controller
         ]);
         $data['expected_delivery_date'] = $data['expected_delivery_date'] ?? $employee->expected_delivery_date?->toDateString();
         if (empty($data['expected_delivery_date'])) {
-            $message = 'سجّل التاريخ المتوقع للولادة أولًا (من الشهادة الطبية) في بيانات الموظفة أو في هذا النموذج.';
+            $message = __('سجّل التاريخ المتوقع للولادة أولًا (من الشهادة الطبية) في بيانات الموظفة أو في هذا النموذج.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
         }
         $status = EmployeeStatus::where('name', 'اجازة وضع')->first();
@@ -548,11 +548,11 @@ class EmployeeController extends Controller
             ->where(fn ($query) => $query->whereNull('company_id')->orWhere('company_id', $employee->company_id))
             ->orderByRaw('company_id is null')->first();
         if (!$status || !$type) {
-            $message = 'حالة «اجازة وضع» أو نوع إجازة الوضع غير موجود. شغّل php artisan migrate ثم أعد المحاولة.';
+            $message = __('حالة «اجازة وضع» أو نوع إجازة الوضع غير موجود. شغّل php artisan migrate ثم أعد المحاولة.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
         }
         if ((int) $employee->status_id === (int) $status->id) {
-            $message = 'الموظفة مسجلة بالفعل في حالة «اجازة وضع».';
+            $message = __('الموظفة مسجلة بالفعل في حالة «اجازة وضع».');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
         }
 
@@ -587,7 +587,7 @@ class EmployeeController extends Controller
             }
         }
         if ($days < 1) {
-            $message = 'المدة المحسوبة لإجازة الوضع لا تحتوي أيام عمل وفق تقويم الشركة.';
+            $message = __('المدة المحسوبة لإجازة الوضع لا تحتوي أيام عمل وفق تقويم الشركة.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['employee' => $message]);
         }
 
@@ -746,7 +746,7 @@ class EmployeeController extends Controller
 
         if (blank($validated['termination_type'] ?? null)) {
             throw ValidationException::withMessages([
-                'termination_type' => 'يرجى تحديد هل انتهاء الخدمة استقالة أم فصل.',
+                'termination_type' => __('يرجى تحديد هل انتهاء الخدمة استقالة أم فصل.'),
             ]);
         }
 
@@ -761,7 +761,7 @@ class EmployeeController extends Controller
             if (!empty($data[$key])) $model::findOrFail($data[$key]);
         }
         if (!empty($data['manager_employee_id'])) {
-            abort_if($employee && (int) $data['manager_employee_id'] === (int) $employee->id, 422, 'لا يمكن اختيار الموظف مديرًا لنفسه.');
+            abort_if($employee && (int) $data['manager_employee_id'] === (int) $employee->id, 422, __('لا يمكن اختيار الموظف مديرًا لنفسه.'));
             Employee::findOrFail($data['manager_employee_id']);
         }
     }
@@ -799,13 +799,13 @@ class EmployeeController extends Controller
         $nationalId = preg_replace('/\D+/', '', (string) ($validated['national_id'] ?? ''));
         if ($nationalId === '') return $validated;
         if (strlen($nationalId) !== 14 || !in_array($nationalId[0], ['2', '3'], true)) {
-            throw ValidationException::withMessages(['national_id' => 'الرقم القومي يجب أن يكون صحيحًا ومكونًا من 14 رقمًا.']);
+            throw ValidationException::withMessages(['national_id' => __('الرقم القومي يجب أن يكون صحيحًا ومكونًا من 14 رقمًا.')]);
         }
         $month = (int) substr($nationalId, 3, 2);
         $day = (int) substr($nationalId, 5, 2);
         $year = (int) substr($nationalId, 1, 2) + ($nationalId[0] === '3' ? 2000 : 1900);
         if (!checkdate($month, $day, $year)) {
-            throw ValidationException::withMessages(['national_id' => 'تاريخ الميلاد داخل الرقم القومي غير صحيح.']);
+            throw ValidationException::withMessages(['national_id' => __('تاريخ الميلاد داخل الرقم القومي غير صحيح.')]);
         }
         $validated['national_id'] = $nationalId;
         $validated['birth_date'] = sprintf('%04d-%02d-%02d', $year, $month, $day);
@@ -830,7 +830,7 @@ class EmployeeController extends Controller
 
         if ($required && !$hasValue && !$hasGross) {
             throw ValidationException::withMessages([
-                'gross_salary' => 'يجب إدخال الراتب الإجمالي أو الراتب الصافي.',
+                'gross_salary' => __('يجب إدخال الراتب الإجمالي أو الراتب الصافي.'),
             ]);
         }
 
@@ -840,13 +840,13 @@ class EmployeeController extends Controller
                 $mode = 'gross';
             } else {
                 throw ValidationException::withMessages([
-                    'gross_salary' => 'يجب إدخال الراتب الإجمالي أو الراتب الصافي.',
+                    'gross_salary' => __('يجب إدخال الراتب الإجمالي أو الراتب الصافي.'),
                 ]);
             }
         }
 
         if (!in_array($mode, ['gross', 'net'], true)) {
-            throw ValidationException::withMessages(['salary_source' => 'مصدر الراتب غير صالح.']);
+            throw ValidationException::withMessages(['salary_source' => __('مصدر الراتب غير صالح.')]);
         }
 
         if ($hasValue) {
@@ -858,7 +858,7 @@ class EmployeeController extends Controller
         }
 
         throw ValidationException::withMessages([
-            $mode === 'net' ? 'salary_value' : 'gross_salary' => 'قيمة الراتب المطلوبة غير موجودة.',
+            $mode === 'net' ? 'salary_value' : 'gross_salary' => __('قيمة الراتب المطلوبة غير موجودة.'),
         ]);
     }
 
