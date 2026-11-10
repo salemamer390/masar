@@ -38,7 +38,7 @@
 
 <div class="modal fade" id="payrollCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="payrollCardTitle">{{ __('تفاصيل البطاقة') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="payrollCardBody" class="details-grid"></div></div></div></div></div>
 <script>
-document.querySelectorAll('.stat-grid .stat-card').forEach((card,index)=>{card.classList.add('clickable-card');card.setAttribute('role','button');card.addEventListener('click',()=>{const data=@json($cardDetails);const keys=['employees','reviewed','drafts','net','cost'];const labels=['الموظفون','السجلات المعتمدة أو المصروفة','المسودات','تفاصيل صافي المسير','تفاصيل إجمالي التكلفة'];const list=data[keys[index]]||[];document.getElementById('payrollCardTitle').textContent=labels[index]||'تفاصيل البطاقة';document.getElementById('payrollCardBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.employee?.full_name||'—';const value=item.net_salary!==undefined?Number(item.net_salary).toLocaleString('en-US')+' ج.م':(item.employee_cost!==undefined?Number(item.employee_cost).toLocaleString('en-US')+' ج.م':(item.status||item.employee_code||''));return '<div><label>'+name+'</label><b>'+value+'</b></div>'}).join(''):'<div class="text-muted">لا توجد بيانات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('payrollCardDetails')).show()})});
+document.querySelectorAll('.stat-grid .stat-card').forEach((card,index)=>{card.classList.add('clickable-card');card.setAttribute('role','button');card.addEventListener('click',()=>{const data=@json($cardDetails);const keys=['employees','reviewed','drafts','net','cost'];const labels=[window.masarT('الموظفون'),window.masarT('السجلات المعتمدة أو المصروفة'),window.masarT('المسودات'),window.masarT('تفاصيل صافي المسير'),window.masarT('تفاصيل إجمالي التكلفة')];const list=data[keys[index]]||[];document.getElementById('payrollCardTitle').textContent=labels[index]||window.masarT('تفاصيل البطاقة');document.getElementById('payrollCardBody').innerHTML=list.length?list.map(item=>{const name=item.full_name||item.employee?.full_name||'—';const value=item.net_salary!==undefined?Number(item.net_salary).toLocaleString('en-US')+window.masarT(' ج.م'):(item.employee_cost!==undefined?Number(item.employee_cost).toLocaleString('en-US')+window.masarT(' ج.م'):(item.status||item.employee_code||''));return '<div><label>'+name+'</label><b>'+value+'</b></div>'}).join(''):window.masarStaticHtml('<div class="text-muted">لا توجد بيانات.</div>');bootstrap.Modal.getOrCreateInstance(document.getElementById('payrollCardDetails')).show()})});
 </script>
 <script>
 document.querySelectorAll('.stat-grid .stat-card').forEach(card=>card.classList.add('payroll-kpi-card'));
@@ -80,7 +80,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const modal = form.closest('.modal');
   if (!modal) return;
   const note = modal.querySelector('.alert');
-  if (note) note.innerHTML += ' <br><strong>وحدة القياس:</strong> الإضافي بالساعات، والغياب والجزاءات بالأيام. القيم المعروضة مأخوذة من السجلات المعتمدة ولا تُكتب يدويًا من هنا.';
+  if (note) note.innerHTML += window.masarStaticHtml(' <br><strong>وحدة القياس:</strong> الإضافي بالساعات، والغياب والجزاءات بالأيام. القيم المعروضة مأخوذة من السجلات المعتمدة ولا تُكتب يدويًا من هنا.');
 });
 </script>
 @endpush
@@ -106,7 +106,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const requestJson = async (url, body) => {
     const response = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf }, body: JSON.stringify(body) });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || 'تعذر إنشاء المسير.');
+    if (!response.ok) throw new Error(data.message || window.masarT('تعذر إنشاء المسير.'));
     return data;
   };
   form.addEventListener('submit', async (event) => {
@@ -115,7 +115,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     if (button) button.disabled = true;
     modalElement.querySelector('.modal-content').classList.remove('border-danger');
     icon.className = 'bi bi-arrow-repeat fs-1 text-primary';
-    setProgress(0, 'جاري تجهيز قائمة الموظفين...');
+    setProgress(0, window.masarT('جاري تجهيز قائمة الموظفين...'));
     modal.show();
     try {
       const month = form.querySelector('[name="month"]')?.value;
@@ -123,15 +123,15 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       const total = Number(started.total || 0);
       let offset = 0;
       if (!total) {
-        setProgress(100, 'لا توجد سجلات موظفين لإنشائها.');
+        setProgress(100, window.masarT('لا توجد سجلات موظفين لإنشائها.'));
       }
       while (offset < total || total === 0) {
         const result = await requestJson('{{ route('payroll.runs.generate.batch') }}', { month: started.month, offset, batch_size: started.batch_size || 25 });
         offset = Number(result.processed || total);
-        setProgress(result.percent, `تمت معالجة ${offset} من ${total} موظف`);
+        setProgress(result.percent, `${window.masarT("تمت معالجة")} ${offset} ${window.masarT("من")} ${total} ${window.masarT("موظف")}`);
         if (result.complete || total === 0) break;
       }
-      setProgress(100, 'اكتمل إنشاء مسودة المسير بنجاح.');
+      setProgress(100, window.masarT('اكتمل إنشاء مسودة المسير بنجاح.'));
       icon.className = 'bi bi-check-circle-fill fs-1 text-success';
       setTimeout(() => window.location.reload(), 700);
     } catch (error) {
@@ -155,10 +155,10 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const loans = form.querySelector('[name="loans"]');
     if (!loans) return;
     const recordId = form.action.match(/\/payroll\/(\d+)\/?$/)?.[1];
-    if ((advanceSchedules[recordId] || []).length) { loans.readOnly = true; loans.title = 'يتم تحديد السلفة من نسبة الخصم اليدوية أو الحساب التلقائي'; }
+    if ((advanceSchedules[recordId] || []).length) { loans.readOnly = true; loans.title = window.masarT('يتم تحديد السلفة من نسبة الخصم اليدوية أو الحساب التلقائي'); }
     const wrapper = document.createElement('div');
     wrapper.className = 'col-6';
-    wrapper.innerHTML = '<label class="form-label">نسبة خصم السلفة (%)</label><input type="number" name="advance_rate" min="0" max="100" step="0.01" class="form-control" placeholder="تلقائي حسب 10%"><small class="text-muted">يُحسب المبلغ من الراتب الإجمالي ولا يتجاوز الرصيد.</small>';
+    wrapper.innerHTML = window.masarStaticHtml('<label class="form-label">نسبة خصم السلفة (%)</label><input type="number" name="advance_rate" min="0" max="100" step="0.01" class="form-control" placeholder="تلقائي حسب 10%"><small class="text-muted">يُحسب المبلغ من الراتب الإجمالي ولا يتجاوز الرصيد.</small>');
     wrapper.querySelector('input').value = advanceRates[recordId] ?? '';
     loans.closest('.col-6')?.after(wrapper);
   });
@@ -178,7 +178,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       if (!grid || amount <= 0 || grid.querySelector('[data-advance-earned]')) return;
       const item = document.createElement('div');
       item.dataset.advanceEarned = 'true';
-      item.innerHTML = `<span>السلفة المصروفة</span><b>${amount.toLocaleString('en-US', {maximumFractionDigits: 0})} ج.م</b>`;
+      item.innerHTML = `<span>${window.masarT("السلفة المصروفة")}</span><b>${amount.toLocaleString('en-US', {maximumFractionDigits: 0})} ${window.masarT("ج.م")}</b>`;
       grid.insertBefore(item, grid.children[4] || null);
     });
   });
@@ -243,7 +243,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-serial-column]')) {
     const serialHeader = document.createElement('th');
     serialHeader.dataset.serialColumn = 'true';
-    serialHeader.textContent = 'م';
+    serialHeader.textContent = window.masarT('م');
     payrollDetailsTable.tHead?.rows[0]?.prepend(serialHeader);
     [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
       const serialCell = document.createElement('td');
@@ -256,11 +256,11 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const payrollDetailsData = window.payrollDetailsData;
   if (payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-monthly-total-column]')) {
     const headers = [...payrollDetailsTable.tHead.rows[0].cells];
-    const grossIndex = headers.findIndex((cell) => cell.textContent.trim() === 'الراتب الإجمالي');
+    const grossIndex = headers.findIndex((cell) => cell.textContent.trim() === window.masarT('الراتب الإجمالي'));
     if (grossIndex >= 0) {
       const monthlyHeader = document.createElement('th');
       monthlyHeader.dataset.monthlyTotalColumn = 'true';
-      monthlyHeader.textContent = 'الإجمالي الشهري';
+      monthlyHeader.textContent = window.masarT('الإجمالي الشهري');
       headers[grossIndex].after(monthlyHeader);
       [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => {
         const cell = document.createElement('td');
@@ -270,22 +270,22 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     }
   }
   if (false && payrollDetailsTable && !payrollDetailsTable.querySelector('th[data-advance-column]')) {
-    const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === 'إضافي');
+    const header = [...payrollDetailsTable.tHead.rows[0].cells].find((cell) => cell.textContent.trim() === window.masarT('إضافي'));
     const targetHeader = header || payrollDetailsTable.tHead.rows[0].cells[4];
     const index = targetHeader ? [...payrollDetailsTable.tHead.rows[0].cells].indexOf(targetHeader) : -1;
     if (index >= 0) {
-      const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = 'السلف'; targetHeader.after(advanceHeader);
+      const advanceHeader = document.createElement('th'); advanceHeader.dataset.advanceColumn = 'true'; advanceHeader.textContent = window.masarT('السلف'); targetHeader.after(advanceHeader);
       [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, rowIndex) => { const cell = document.createElement('td'); cell.textContent = payrollDetailsData[rowIndex] ? Number(payrollDetailsData[rowIndex].loans || 0).toLocaleString('en-US', {maximumFractionDigits: 0}) : '0'; row.cells[index]?.after(cell); });
     }
   }
-  const payrollMoney = (value) => Number(value || 0).toLocaleString('en-US', {maximumFractionDigits: 0}) + ' ج.م';
-  const payrollMoneyDecimal = (value) => Number(value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ج.م';
+  const payrollMoney = (value) => Number(value || 0).toLocaleString('en-US', {maximumFractionDigits: 0}) + window.masarT(' ج.م');
+  const payrollMoneyDecimal = (value) => Number(value || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + window.masarT(' ج.م');
   const payrollDetailsRows = payrollDetailsTable ? [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]) : [];
   const detailPanel = document.createElement('div');
   detailPanel.className = 'offcanvas offcanvas-end payroll-detail-panel';
   detailPanel.tabIndex = -1;
   detailPanel.id = 'payrollDetailPanel';
-  detailPanel.innerHTML = '<div class="offcanvas-header"><div><h5 class="offcanvas-title">تفاصيل مسير الموظف</h5><small class="text-muted" data-payroll-detail-subtitle></small></div><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body" data-payroll-detail-body></div>';
+  detailPanel.innerHTML = window.masarStaticHtml('<div class="offcanvas-header"><div><h5 class="offcanvas-title">تفاصيل مسير الموظف</h5><small class="text-muted" data-payroll-detail-subtitle></small></div><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body" data-payroll-detail-body></div>');
   document.body.append(detailPanel);
   const detailBody = detailPanel.querySelector('[data-payroll-detail-body]');
   const payrollUiStyle = document.createElement('style');
@@ -296,10 +296,10 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   const detailValue = (label, value) => `<div class="payroll-detail-item"><span>${label}</span><b>${value}</b></div>`;
   const openPayrollDetails = (record) => {
     if (!record || !detailBody) return;
-    detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · كود ${record.code || '—'}`;
-    detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> بيانات الموظف</h6>${detailValue('القسم', record.department || '—')}${detailValue('الحالة', record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> الاستحقاقات</h6>${detailValue('الراتب الأساسي', payrollMoney(record.basic_salary))}${detailValue('البدلات', payrollMoney(record.allowances))}${detailValue('بدل السكن', payrollMoney(record.housing_allowance))}${detailValue('بدل الانتقال', payrollMoney(record.transportation_allowance))}${detailValue('بدل الطعام', payrollMoney(record.meal_allowance))}${detailValue('بدل الملابس', payrollMoney(record.clothing_allowance))}${detailValue('الإضافي', payrollMoney(record.overtime_amount))}${detailValue('الإجمالي', payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> الخصومات</h6>${detailValue('السلفة', payrollMoney(record.loans))}${detailValue('خصم الغياب', payrollMoney(record.absence_deduction))}${detailValue('الجزاءات', payrollMoney(record.penalties))}${detailValue('تأمين الموظف', payrollMoney(record.employee_insurance))}${detailValue('الضريبة', payrollMoney(record.income_tax))}${detailValue('صندوق الشهداء', payrollMoneyDecimal(record.martyrs_fund))}${detailValue('استقطاعات ثابتة', payrollMoney(record.fixed_deductions))}${detailValue('استقطاعات أخرى', payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>الراتب الصافي</span><strong>${payrollMoney(record.net_salary)}</strong><small>تكلفة الشركة: ${payrollMoney(record.employee_cost)}</small></div>`;
-    const deductionsHeading = [...detailBody.querySelectorAll('h6')].find((heading) => heading.textContent.trim() === 'الخصومات');
-    if (deductionsHeading) deductionsHeading.childNodes[deductionsHeading.childNodes.length - 1].textContent = ' الاستقطاعات';
+    detailPanel.querySelector('[data-payroll-detail-subtitle]').textContent = `${record.name || '—'} · ${window.masarT("كود")} ${record.code || '—'}`;
+    detailBody.innerHTML = `<div class="payroll-detail-section"><h6><i class="bi bi-person"></i> ${window.masarT("بيانات الموظف")}</h6>${detailValue(window.masarT('القسم'), record.department || '—')}${detailValue(window.masarT('الحالة'), record.status || '—')}</div><div class="payroll-detail-section"><h6><i class="bi bi-plus-circle"></i> ${window.masarT("الاستحقاقات")}</h6>${detailValue(window.masarT('الراتب الأساسي'), payrollMoney(record.basic_salary))}${detailValue(window.masarT('البدلات'), payrollMoney(record.allowances))}${detailValue(window.masarT('بدل السكن'), payrollMoney(record.housing_allowance))}${detailValue(window.masarT('بدل الانتقال'), payrollMoney(record.transportation_allowance))}${detailValue(window.masarT('بدل الطعام'), payrollMoney(record.meal_allowance))}${detailValue(window.masarT('بدل الملابس'), payrollMoney(record.clothing_allowance))}${detailValue(window.masarT('الإضافي'), payrollMoney(record.overtime_amount))}${detailValue(window.masarT('الإجمالي'), payrollMoney(record.gross_salary))}</div><div class="payroll-detail-section"><h6><i class="bi bi-dash-circle"></i> ${window.masarT("الخصومات")}</h6>${detailValue(window.masarT('السلفة'), payrollMoney(record.loans))}${detailValue(window.masarT('خصم الغياب'), payrollMoney(record.absence_deduction))}${detailValue(window.masarT('الجزاءات'), payrollMoney(record.penalties))}${detailValue(window.masarT('تأمين الموظف'), payrollMoney(record.employee_insurance))}${detailValue(window.masarT('الضريبة'), payrollMoney(record.income_tax))}${detailValue(window.masarT('صندوق الشهداء'), payrollMoneyDecimal(record.martyrs_fund))}${detailValue(window.masarT('استقطاعات ثابتة'), payrollMoney(record.fixed_deductions))}${detailValue(window.masarT('استقطاعات أخرى'), payrollMoney(record.other_deductions))}</div><div class="payroll-detail-total"><span>${window.masarT("الراتب الصافي")}</span><strong>${payrollMoney(record.net_salary)}</strong><small>${window.masarT("تكلفة الشركة:")} ${payrollMoney(record.employee_cost)}</small></div>`;
+    const deductionsHeading = [...detailBody.querySelectorAll('h6')].find((heading) => heading.textContent.trim() === window.masarT('الخصومات'));
+    if (deductionsHeading) deductionsHeading.childNodes[deductionsHeading.childNodes.length - 1].textContent = window.masarT(' الاستقطاعات');
     const earningsSection = detailBody.querySelectorAll('.payroll-detail-section')[1];
     const grossTotalItem = earningsSection ? [...earningsSection.querySelectorAll('.payroll-detail-item')].reverse().find((item) => item.querySelector('b')?.textContent?.trim() === payrollMoney(record.gross_salary)) : null;
     grossTotalItem?.remove();
@@ -324,36 +324,36 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         });
       }
       earningsSection.querySelectorAll('.payroll-detail-item').forEach((item) => {
-        if (item.querySelector('span')?.textContent?.includes('الإضافي')) item.remove();
+        if (item.querySelector('span')?.textContent?.includes(window.masarT('الإضافي'))) item.remove();
         const amount = item.querySelector('b')?.textContent?.trim() || '';
         if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
       });
-      if (Number(record.day_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي النهاري', payrollMoney(record.day_overtime_amount)));
-      if (Number(record.night_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي الليلي', payrollMoney(record.night_overtime_amount)));
+      if (Number(record.day_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي النهاري'), payrollMoney(record.day_overtime_amount)));
+      if (Number(record.night_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي الليلي'), payrollMoney(record.night_overtime_amount)));
       const dayOvertime = Number(record.day_overtime_amount || 0);
       const nightOvertime = Number(record.night_overtime_amount || 0);
       const totalOvertime = Number(record.overtime_amount || 0);
       if (dayOvertime <= 0 && nightOvertime <= 0 && totalOvertime > 0) {
-        earningsSection.insertAdjacentHTML('beforeend', detailValue('الإضافي', payrollMoney(totalOvertime)));
+        earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي'), payrollMoney(totalOvertime)));
       }
       detailBody.querySelectorAll('.payroll-detail-section:nth-of-type(3) .payroll-detail-item').forEach((item) => {
         const amount = item.querySelector('b')?.textContent?.trim() || '';
         if (/^0(?:[.,]0+)?(?:\s|$)/.test(amount)) item.remove();
       });
       const addAdditional = (label, value) => { if (Number(value || 0) > 0) additionalItems.push([label, Number(value)]); };
-      addAdditional('المكافأة', record.bonus);
-      addAdditional('الحوافز', record.incentives);
-      addAdditional('العمولة', record.commission);
-      addAdditional('نصيب الأرباح', record.profit_share);
-      addAdditional('استحقاقات أخرى', record.other_earnings);
+      addAdditional(window.masarT('المكافأة'), record.bonus);
+      addAdditional(window.masarT('الحوافز'), record.incentives);
+      addAdditional(window.masarT('العمولة'), record.commission);
+      addAdditional(window.masarT('نصيب الأرباح'), record.profit_share);
+      addAdditional(window.masarT('استحقاقات أخرى'), record.other_earnings);
     }
     if (earningsSection) {
-      if (Number(record.advance_earnings || 0) > 0) additionalItems.push(['السلفة المصروفة', Number(record.advance_earnings)]);
+      if (Number(record.advance_earnings || 0) > 0) additionalItems.push([window.masarT('السلفة المصروفة'), Number(record.advance_earnings)]);
       if (additionalItems.length) {
         const additionalTotal = additionalItems.reduce((sum, [, value]) => sum + value, 0);
         const additionalGroup = document.createElement('div');
         additionalGroup.className = 'payroll-additional-group';
-        additionalGroup.innerHTML = `${detailValue('إضافي', payrollMoney(additionalTotal))}<div class="payroll-additional-items" hidden>${additionalItems.map(([label, value]) => detailValue(label, payrollMoney(value))).join('')}</div>`;
+        additionalGroup.innerHTML = `${detailValue(window.masarT('إضافي'), payrollMoney(additionalTotal))}<div class="payroll-additional-items" hidden>${additionalItems.map(([label, value]) => detailValue(label, payrollMoney(value))).join('')}</div>`;
         const toggle = additionalGroup.querySelector('.payroll-detail-item');
         const items = additionalGroup.querySelector('.payroll-additional-items');
         toggle.classList.add('payroll-collapse-toggle');
@@ -366,14 +366,14 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         earningsSection.append(additionalGroup);
       }
     }
-    if (earningsSection) earningsSection.insertAdjacentHTML('beforeend', detailValue('الإجمالي الشهري', payrollMoney(record.monthly_total ?? record.gross_salary)));
+    if (earningsSection) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإجمالي الشهري'), payrollMoney(record.monthly_total ?? record.gross_salary)));
     bootstrap.Offcanvas.getOrCreateInstance(detailPanel).show();
   };
   payrollDetailsRows.forEach((row, index) => {
     const record = payrollDetailsData[index];
     if (!record) return;
     const overtimeIndex = [...(payrollDetailsTable?.tHead?.rows[0]?.cells || [])]
-      .findIndex((cell) => cell.textContent.trim() === 'إضافي');
+      .findIndex((cell) => cell.textContent.trim() === window.masarT('إضافي'));
     const overtimeCell = overtimeIndex >= 0 ? row.cells[overtimeIndex] : null;
     if (overtimeCell) {
       const additional = Number(record.additional_amount || 0);
@@ -405,7 +405,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       document.body.appendChild(imported);
       bootstrap.Modal.getOrCreateInstance(imported).show();
     } catch (error) {
-      window.showToast?.('تعذر تحميل هيكل الراتب. أعد المحاولة أو افتح صفحة هياكل الرواتب.');
+      window.showToast?.(window.masarT('تعذر تحميل هيكل الراتب. أعد المحاولة أو افتح صفحة هياكل الرواتب.'));
       console.error('Salary structure modal load failed', error);
     }
   };
@@ -416,22 +416,22 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const headerTexts = [...payrollDetailsTable.tHead.rows[0].cells].map((cell) => cell.textContent.trim());
     const colIndex = (label) => headerTexts.indexOf(label);
     [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
-      const employeeCell = row.cells[colIndex('الموظف')];
+      const employeeCell = row.cells[colIndex(window.masarT('الموظف'))];
       if (employeeCell && employeeCodes[index] && !employeeCell.querySelector('[data-employee-code]')) {
         const code = document.createElement('small');
         code.dataset.employeeCode = 'true';
         code.className = 'd-block text-muted';
-        code.textContent = `كود الموظف: ${employeeCodes[index]}`;
+        code.textContent = `${window.masarT("كود الموظف:")} ${employeeCodes[index]}`;
         employeeCell.append(code);
       }
-      const salaryCell = row.cells[colIndex('الراتب الإجمالي')];
-      const netCell = row.cells[colIndex('الصافي')];
+      const salaryCell = row.cells[colIndex(window.masarT('الراتب الإجمالي'))];
+      const netCell = row.cells[colIndex(window.masarT('الصافي'))];
       if (salaryCell && netCell) {
         const net = salaryCell.querySelector('[data-net-salary]') || document.createElement('small');
         net.dataset.netSalary = 'true';
         net.className = 'd-block text-muted';
-        net.textContent = `الراتب الصافي: ${netCell.textContent.trim()}`;
-        const oldAgreed = [...salaryCell.querySelectorAll('small')].find((item) => item.textContent.includes('المتفق عليه'));
+        net.textContent = `${window.masarT("الراتب الصافي:")} ${netCell.textContent.trim()}`;
+        const oldAgreed = [...salaryCell.querySelectorAll('small')].find((item) => item.textContent.includes(window.masarT('المتفق عليه')));
         if (oldAgreed) oldAgreed.replaceWith(net); else if (!salaryCell.querySelector('[data-net-salary]')) salaryCell.append(net);
       }
     });
@@ -440,7 +440,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       if (title && employeeCodes[index] && !card.querySelector('[data-employee-code]')) {
         const code = document.createElement('small');
         code.dataset.employeeCode = 'true';
-        code.textContent = `كود الموظف: ${employeeCodes[index]}`;
+        code.textContent = `${window.masarT("كود الموظف:")} ${employeeCodes[index]}`;
         title.parentElement.append(code);
       }
     });
@@ -450,7 +450,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const filter = document.createElement('div');
     filter.className = 'payroll-record-filter d-flex align-items-center gap-2 mb-3';
     filter.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;';
-    filter.innerHTML = '<label class="form-label mb-0" for="payrollRecordSearch"><i class="bi bi-search"></i> بحث في الموظفين</label><input id="payrollRecordSearch" type="search" class="form-control" placeholder="اكتب اسم الموظف أو الكود أو القسم أو الحالة" autocomplete="off"><span class="text-muted small" data-payroll-filter-count></span>';
+    filter.innerHTML = window.masarStaticHtml('<label class="form-label mb-0" for="payrollRecordSearch"><i class="bi bi-search"></i> بحث في الموظفين</label><input id="payrollRecordSearch" type="search" class="form-control" placeholder="اكتب اسم الموظف أو الكود أو القسم أو الحالة" autocomplete="off"><span class="text-muted small" data-payroll-filter-count></span>');
     payrollDetailsWrap.prepend(filter);
     const input = filter.querySelector('input');
     input.value = @json(request('search', ''));
@@ -459,7 +459,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const rows = [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]);
     const empty = document.createElement('div');
     empty.className = 'text-center text-muted py-4 payroll-filter-empty';
-    empty.textContent = 'لا توجد نتائج مطابقة.';
+    empty.textContent = window.masarT('لا توجد نتائج مطابقة.');
     empty.hidden = true;
     payrollDetailsWrap.append(empty);
     const applyPayrollFilter = () => {
@@ -470,7 +470,7 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         row.hidden = !match;
         if (match) visible++;
       });
-      count.textContent = query ? `${visible} من ${rows.length}` : `${rows.length} موظف`;
+      count.textContent = query ? `${visible} ${window.masarT("من")} ${rows.length}` : `${rows.length} ${window.masarT("موظف")}`;
       empty.hidden = visible !== 0 || rows.length === 0;
     };
     let searchTimer;
@@ -490,13 +490,13 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   }
   // Payroll inputs are the only payroll action moved in this stage. Generate,
   // approve, lock, and pay remain full server transitions by design.
-  const money = (value) => Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' ج.م';
+  const money = (value) => Number(value || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) + window.masarT(' ج.م');
   document.querySelectorAll('[id^="inputs"]').forEach((modal) => {
     const trigger = document.querySelector(`[data-bs-target="#${modal.id}"]`);
     const match = modal.id.match(/^inputs(\d+)$/);
     if (trigger && match) trigger.closest('tr')?.setAttribute('data-payroll-record-id', match[1]);
   });
-  document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ إعادة الحساب'; });
+  document.querySelectorAll('form[action*="/payroll/"][action$="/inputs"]').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ إعادة الحساب'); });
   document.addEventListener('masar:success', (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || !form.action.endsWith('/inputs')) return;
@@ -519,8 +519,8 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       const additional = Number(record.additional_amount ?? (Number(record.overtime_amount || 0) + Number(record.advance_earnings || 0) + Number(record.bonus || 0) + Number(record.other_earnings || 0)));
       // Columns: 0 employee, 1 structure, 2 gross, 3 additional, 4 absence, 5 penalties, 6 insurance, 7 tax, 8 net, 9 company cost.
       row.children[3].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
-      row.children[4].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
-      row.children[5].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
+      row.children[4].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} ${window.masarT("يوم)")}</small>`;
+      row.children[5].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} ${window.masarT("يوم)")}</small>`;
       row.children[6].textContent = money(record.employee_insurance);
       row.children[7].textContent = money(record.income_tax);
       row.children[8].textContent = money(record.net_salary);
