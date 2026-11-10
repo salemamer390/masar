@@ -3,7 +3,7 @@
 @section('content')
 <a href="{{ route('attendance.exceptions.index') }}">{{ __('استثناءات البصمات') }}</a>
 <h3 class="my-3">{{ $day->employee->employee_code }} · {{ $day->employee->full_name }} · {{ $day->work_date->format('d/m/Y') }}</h3>
-<p>{{ __('الحالة:') }} {{ ['pending'=>'تحتاج مراجعة','resolved'=>'تمت المراجعة','deleted'=>'مستبعد مع الاحتفاظ بالأصل'][$day->resolution] }}</p>
+<p>{{ __('الحالة:') }} {{ ['pending'=>__('تحتاج مراجعة'),'resolved'=>__('تمت المراجعة'),'deleted'=>__('مستبعد مع الاحتفاظ بالأصل')][$day->resolution] }}</p>
 @if(auth()->user()->hasPermission('attendance.edit'))<a href="{{ route('attendance.exceptions.batch',$day->batch) }}">{{ __('فتح أعمدة الحضور الأصلية:') }} {{ $day->batch->file_name }}</a>@endif
 @if($errors->any())<div class="alert alert-danger">{{ implode(' ',$errors->all()) }}</div>@endif
 <div class="card p-3 my-3"><h5>{{ __('البصمات الأصلية (لا تتغير)') }}</h5>
@@ -37,7 +37,7 @@ if (is_array($punch) && ($punch['slot'] ?? null)==='out' && isset($day->current_
 @endif
 <h5 class="mt-4">{{ __('سجل التعديل') }}</h5>
 @forelse($day->revisions as $revision)
-<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? ($revision->user_id ? 'حساب سابق' : 'مزامنة جهاز البصمة') }} · {{ $revision->created_at->format('d/m/Y H:i') }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
+<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? ($revision->user_id ? __('حساب سابق') : __('مزامنة جهاز البصمة')) }} · {{ $revision->created_at->format('d/m/Y H:i') }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
 @empty
 <p class="text-muted">{{ __('لا توجد تعديلات.') }}</p>
 @endforelse
