@@ -1788,5 +1788,9 @@
   "مستندات أو عقود تنتهي قريبًا": "Documents or contracts expiring soon",
   "ملفات موظفين غير مكتملة": "Incomplete employee files",
   "ينقصها مستند مطلوب واحد أو أكثر.": "Missing one or more required documents.",
-  "لا توجد دورة لهذا الشهر": "No cycle for this month"
+  "لا توجد دورة لهذا الشهر": "No cycle for this month",
+  "الحاضرون اليوم": "Present today",
+  "الغائبون اليوم": "Absent today",
+  "المتأخرون اليوم": "Late today",
+  "إجمالي تكلفة الموظفين": "Total employee cost"
 }
