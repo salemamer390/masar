@@ -60,7 +60,9 @@ class PayrollSettingsController extends Controller
             // Statutory shared types stay listed even if deactivated wholesale, so a company can switch them back on.
             ->orWhere(fn ($q2) => $q2->whereNull('company_id')->whereIn('policy_code', ['annual', 'casual', 'sick', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare']))
             // The company's own types stay listed while inactive so they can be reactivated.
-            ->when($companyId, fn ($q2) => $q2->orWhere('company_id', $companyId)))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
+            // Types archived through the delete action stay gone: archiving is a deliberate
+            // removal that keeps history, not an ordinary off switch.
+            ->when($companyId, fn ($q2) => $q2->orWhere(fn ($q3) => $q3->where('company_id', $companyId)->whereNull('archived_at'))))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
             $limits = $leaveBalances->limitsFor($type, $companyId ? (int) $companyId : null);
             if ($type->policy_code === 'casual') {
                 $perRequest = $leavePolicies['casual_max_days_request']->setting_value ?? null;
@@ -212,6 +214,8 @@ class PayrollSettingsController extends Controller
             foreach (($data['types'] ?? []) as $id => $values) {
                 $type = LeaveType::find($id);
                 if (!$type) continue;
+                // Archived custom types are history-preserved removals: a settings save never resurrects them.
+                if ($type->archived_at) continue;
                 $values = array_intersect_key($values, array_flip($limitKeys));
                 // Single source per rule: casual per-request/per-year live in this table but are kept in the company policy.
                 if ($type->policy_code === 'casual') {
@@ -418,6 +422,7 @@ class PayrollSettingsController extends Controller
         }
         if ($type->leaves()->exists()) {
             $type->is_active = false;
+            $type->archived_at = now();
             $type->save();
             ActivityLog::record('leave_type_archive', 'Custom leave type archived.', null, null, $type->toArray(), 'leaves');
             $message = 'للنوع طلبات سابقة — أُزيل من الاختيارات الجديدة مع حفظ سجلاته كاملة.';
