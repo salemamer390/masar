@@ -6,12 +6,12 @@
     <aside class="master-sidebar">
         <div class="master-menu-title">{{ __('القوائم') }}</div>
         @foreach($meta as $key=>$m)
-            <a class="master-menu text-decoration-none {{$type===$key?'active':''}}" href="{{route('master.index',['type'=>$key])}}"><span>{{$m['title']}}</span><span>{{$counts[$key]??0}}</span></a>
+            <a class="master-menu text-decoration-none {{$type===$key?'active':''}}" href="{{route('master.index',['type'=>$key])}}"><span>{{__($m['title'])}}</span><span>{{$counts[$key]??0}}</span></a>
         @endforeach
     </aside>
     <section class="panel master-data-panel">
         <div class="panel-head">
-            <div><h3>{{$currentMeta['title']}}</h3><span>{{$currentMeta['desc']}}</span></div>
+            <div><h3>{{__($currentMeta['title'])}}</h3><span>{{__($currentMeta['desc'])}}</span></div>
             <div class="d-flex gap-2">
                 @if(auth()->user()?->hasPermission('roles.edit'))<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#masterModal"><i class="bi bi-plus-lg"></i> {{ __('إضافة') }}</button>@endif
             </div>
@@ -68,7 +68,7 @@
 <div class="modal fade" id="masterModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
         <form method="POST" action="{{route('master.store',$type)}}">@csrf
-            <div class="modal-header"><h5>{{ __('إضافة') }} {{$currentMeta['title']}}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5>{{ __('إضافة') }} {{__($currentMeta['title'])}}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <label class="form-label">{{ __('الاسم') }}</label><input name="name" class="form-control" required>
                 <label class="form-label mt-3">{{ __('الكود / البيان الإضافي') }}</label><input name="code" class="form-control">
