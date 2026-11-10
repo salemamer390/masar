@@ -42,13 +42,17 @@ class MarketingLocalizer
 
         // Whole text nodes between tags (scripts/styles have no Arabic copy here,
         // and a missing translation falls back to the Arabic source unchanged).
+        // Whitespace around the text is preserved so inline elements keep their spacing.
         $html = preg_replace_callback(
             '/>([^<>]*[؀-ۿ][^<>]*)</u',
             function ($m) {
                 $node = $m[1];
-                $translated = __(trim($node));
+                preg_match('/^[\\s\\p{Z}]+/u', $node, $lead);
+                preg_match('/[\\s\\p{Z}]+$/u', $node, $trail);
+                $core = preg_replace('/^[\\s\\p{Z}]+|[\\s\\p{Z}]+$/u', '', $node);
+                $translated = __($core);
 
-                return '>' . e($translated) . '<';
+                return '>' . ($lead[0] ?? '') . e($translated) . ($trail[0] ?? '') . '<';
             },
             $html
         ) ?? $html;
