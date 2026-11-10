@@ -26,4 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })
+    ->booted(function () {
+        // The interface and validation messages are Arabic; month and weekday names produced
+        // by translatedFormat() keep their existing English output.
+        \Illuminate\Support\Facades\Date::setLocale('en');
+    })
     ->create();

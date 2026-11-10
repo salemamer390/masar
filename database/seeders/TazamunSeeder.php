@@ -11,24 +11,24 @@ class TazamunSeeder extends Seeder
     public function run(): void
     {
         $now = now();
-        foreach (['Human Resources','Marketing','Design','Sales','Administration','Customer Service','Accounts','IT'] as $name) DB::table('departments')->insert(['name'=>$name]);
-        DB::table('hr_jobs')->insert([
+        foreach (['Human Resources','Marketing','Design','Sales','Administration','Customer Service','Accounts','IT'] as $name) $this->once('departments',['name'=>$name]);
+        foreach ([
             ['title'=>'HR Manager','job_code'=>null], ['title'=>'Senior Media Buyer','job_code'=>'243105'], ['title'=>'Content Creator','job_code'=>'264101'],
             ['title'=>'Graphic Designer','job_code'=>null], ['title'=>'Video Editor','job_code'=>null], ['title'=>'Marketing Specialist','job_code'=>null],
             ['title'=>'Social Media Specialist','job_code'=>null], ['title'=>'Account Manager','job_code'=>null],
-        ]);
-        foreach (['Head Office','Nasr City','New Cairo','Sheikh Zayed'] as $name) DB::table('branches')->insert(['name'=>$name]);
-        foreach (['Active','Leave','Suspended','Terminated','Pending'] as $name) DB::table('employee_statuses')->insert(['name'=>$name]);
-        foreach (['Full Time','Part Time','Fixed Contract','Internship','Freelance'] as $name) DB::table('employment_types')->insert(['name'=>$name]);
-        DB::table('leave_types')->insert([
+        ] as $row) $this->once('hr_jobs',['title'=>$row['title']],$row);
+        foreach (['Head Office','Nasr City','New Cairo','Sheikh Zayed'] as $name) $this->once('branches',['name'=>$name]);
+        foreach (['Active','Leave','Suspended','Terminated','Pending'] as $name) $this->once('employee_statuses',['name'=>$name]);
+        foreach (['Full Time','Part Time','Fixed Contract','Internship','Freelance'] as $name) $this->once('employment_types',['name'=>$name]);
+        foreach ([
             ['name'=>'Annual','default_days'=>21], ['name'=>'Casual','default_days'=>6], ['name'=>'Sick','default_days'=>null], ['name'=>'Unpaid','default_days'=>null],
             ['name'=>'Mission','default_days'=>null], ['name'=>'Maternity','default_days'=>null], ['name'=>'Bereavement','default_days'=>null],
-        ]);
-        foreach (['Verbal Warning','Written Warning','Day Deduction','Salary Deduction','Notice','Suspension'] as $name) DB::table('penalty_types')->insert(['name'=>$name]);
-        foreach (['Hire','Department Transfer','Promotion','Salary Adjustment','Branch Transfer','Job Title Change'] as $name) DB::table('movement_types')->insert(['name'=>$name]);
-        foreach (['Bank','Cash','Wallet'] as $name) DB::table('payment_methods')->insert(['name'=>$name]);
+        ] as $row) $this->once('leave_types',['name'=>$row['name']],$row);
+        foreach (['Verbal Warning','Written Warning','Day Deduction','Salary Deduction','Notice','Suspension'] as $name) $this->once('penalty_types',['name'=>$name]);
+        foreach (['Hire','Department Transfer','Promotion','Salary Adjustment','Branch Transfer','Job Title Change'] as $name) $this->once('movement_types',['name'=>$name]);
+        foreach (['Bank','Cash','Wallet'] as $name) $this->once('payment_methods',['name'=>$name]);
 
-        DB::table('roles')->insert([
+        foreach ([
             ['name'=>'super_admin','display_name'=>'Super Admin','description'=>'Full system access'],
             ['name'=>'hr_manager','display_name'=>'HR Manager','description'=>'HR management access'],
             ['name'=>'hr_specialist','display_name'=>'HR Specialist','description'=>'HR operational access'],
@@ -36,7 +36,7 @@ class TazamunSeeder extends Seeder
             ['name'=>'manager','display_name'=>'Manager','description'=>'Access to team data'],
             ['name'=>'employee','display_name'=>'Employee','description'=>'Personal employee access'],
             ['name'=>'viewer','display_name'=>'Viewer','description'=>'Read-only access to all system data'],
-        ]);
+        ] as $row) $this->once('roles',['name'=>$row['name']],$row);
         $permissions = [
             ['dashboard.view','View Dashboard','dashboard','view'],
             ['employees.view','View Employees','employees','view'],['employees.create','Create Employees','employees','create'],['employees.edit','Edit Employees','employees','edit'],['employees.import','Import Employees','employees','import'],
@@ -53,25 +53,26 @@ class TazamunSeeder extends Seeder
             ['users.view','View Users','users','view'],['users.create','Create Users','users','create'],['users.edit','Edit Users','users','edit'],
             ['roles.view','View Roles','roles','view'],['roles.create','Create Roles','roles','create'],['roles.edit','Edit Roles','roles','edit'],['roles.delete','Delete Roles','roles','delete'],
         ];
-        foreach ($permissions as [$name,$display,$module,$action]) DB::table('permissions')->insert(['name'=>$name,'display_name'=>$display,'module'=>$module,'action'=>$action]);
+        foreach ($permissions as [$name,$display,$module,$action]) $this->once('permissions',['name'=>$name],['display_name'=>$display,'module'=>$module,'action'=>$action]);
         $roleIds=DB::table('roles')->pluck('id','name');
         $all=DB::table('permissions')->get();
-        foreach ($all as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['super_admin'],'permission_id'=>$p->id]);
-        foreach ($all->whereIn('action',['view','print','export','export_excel']) as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['viewer'],'permission_id'=>$p->id]);
+        foreach ($all as $p) $this->once('role_permissions',['role_id'=>$roleIds['super_admin'],'permission_id'=>$p->id]);
+        foreach ($all->whereIn('action',['view','print','export','export_excel']) as $p) $this->once('role_permissions',['role_id'=>$roleIds['viewer'],'permission_id'=>$p->id]);
 
         $hrManager = DB::table('permissions')->where(function($q){
             $q->whereIn('module',['dashboard','employees','attendance','leaves','documents','insurance','penalties','movements','reports','requests'])
               ->orWhere(fn($q)=>$q->where('module','salary')->where('action','view'))
               ->orWhere(fn($q)=>$q->where('module','payroll')->whereIn('action',['view','export']));
         })->get();
-        foreach ($hrManager as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['hr_manager'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->whereIn('module',['dashboard','employees','attendance','leaves','documents','insurance','penalties','movements','reports','requests'])->where('action','<>','delete')->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['hr_specialist'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->whereIn('module',['dashboard','payroll','salary','reports'])->where('action','<>','delete')->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['payroll'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->whereIn('action',['view','print','export_excel'])->whereIn('module',['dashboard','employees','attendance','leaves','reports'])->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['manager'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->whereIn('name',['requests.view','requests.create','requests.approve'])->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['manager'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->where('action','view')->whereIn('module',['dashboard','employees','attendance','leaves','documents'])->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['employee'],'permission_id'=>$p->id]);
-        foreach (DB::table('permissions')->whereIn('name',['requests.view','requests.create'])->get() as $p) DB::table('role_permissions')->insert(['role_id'=>$roleIds['employee'],'permission_id'=>$p->id]);
+        foreach ($hrManager as $p) $this->once('role_permissions',['role_id'=>$roleIds['hr_manager'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->whereIn('module',['dashboard','employees','attendance','leaves','documents','insurance','penalties','movements','reports','requests'])->where('action','<>','delete')->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['hr_specialist'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->whereIn('module',['dashboard','payroll','salary','reports'])->where('action','<>','delete')->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['payroll'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->whereIn('action',['view','print','export_excel'])->whereIn('module',['dashboard','employees','attendance','leaves','reports'])->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['manager'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->whereIn('name',['requests.view','requests.create','requests.approve'])->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['manager'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->where('action','view')->whereIn('module',['dashboard','employees','attendance','leaves','documents'])->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['employee'],'permission_id'=>$p->id]);
+        foreach (DB::table('permissions')->whereIn('name',['requests.view','requests.create'])->get() as $p) $this->once('role_permissions',['role_id'=>$roleIds['employee'],'permission_id'=>$p->id]);
 
+        if (DB::table('employees')->where('employee_code','101')->exists() || DB::table('users')->where('email','amer.salem@tazamun.local')->exists()) return;
         $employeeId=DB::table('employees')->insertGetId([
             'employee_code'=>'101','first_name'=>'Amer','middle_name'=>'Salem','last_name'=>null,'full_name'=>'Amer Salem','email'=>'amer.salem@tazamun.local',
             'department_id'=>DB::table('departments')->where('name','Human Resources')->value('id'), 'job_id'=>DB::table('hr_jobs')->where('title','HR Manager')->value('id'),
@@ -85,5 +86,11 @@ class TazamunSeeder extends Seeder
             'employee_id'=>$employeeId,'effective_from'=>'2026-07-29','salary_type'=>'net','salary_input'=>20000,
             'deductions'=>0,'fixed_deductions'=>0,'status'=>'Active','created_at'=>$now,'updated_at'=>$now,
         ], $calculator->persistFields($structure)));
+    }
+
+    /** Insert a row only when no row with the same key exists, so the seeder can run twice. */
+    private function once(string $table, array $key, array $extra = []): void
+    {
+        if (!DB::table($table)->where($key)->exists()) DB::table($table)->insert($key + $extra);
     }
 }

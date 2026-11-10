@@ -601,22 +601,15 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   if (!form || !type) return;
   const sources = @json($requestTypes->mapWithKeys(fn ($item) => [$item->id => $item->source_key]));
   const card = document.createElement('div');
-  card.className = 'row g-2 mt-2';
+  card.className = 'row g-2 mt-3 excuse-request-fields';
   card.dataset.excuseCard = 'true';
-  card.innerHTML = '<div class="col-12 text-muted small">الإذن يغطي وقته المحدد فقط. المأمورية تغطي أيام العمل داخل الفترة.</div><div class="col-12"><label class="form-label">تاريخ الطلب</label><input type="date" name="request_date" class="form-control"></div><div class="col-6" data-mission><label class="form-label">من تاريخ</label><input type="date" name="start_date" class="form-control"></div><div class="col-6" data-mission><label class="form-label">إلى تاريخ</label><input type="date" name="end_date" class="form-control"></div><div class="col-6" data-permission><label class="form-label">من الساعة</label><input type="time" name="permission_from_time" class="form-control" dir="ltr"></div><div class="col-6" data-permission><label class="form-label">إلى الساعة</label><input type="time" name="permission_to_time" class="form-control" dir="ltr"></div>';
+  card.innerHTML = '<div class="col-12 text-muted small">الإذن والمأمورية يغطيان الفترة المحددة (من ساعة إلى ساعة) فقط.</div><div class="col-12"><label class="form-label">التاريخ</label><input type="date" name="request_date" class="form-control"></div><div class="col-6"><label class="form-label">من الساعة</label><input type="time" name="permission_from_time" class="form-control" dir="ltr"></div><div class="col-6"><label class="form-label">إلى الساعة</label><input type="time" name="permission_to_time" class="form-control" dir="ltr"></div>';
   form.querySelector('.modal-body').append(card);
   const sync = () => {
     const source = sources[type.value];
     const active = ['permission', 'mission'].includes(source);
     card.hidden = !active;
-    card.querySelectorAll('input').forEach(input => {
-      const forPermission = input.closest('[data-permission]');
-      const forMission = input.closest('[data-mission]');
-      const enabled = active && (!forPermission || source === 'permission') && (!forMission || source === 'mission');
-      input.disabled = !enabled;
-      input.required = enabled && !forMission;
-      if (forPermission || forMission) input.parentElement.hidden = !enabled;
-    });
+    card.querySelectorAll('input').forEach(input => { input.disabled = !active; input.required = active; });
     if (active && !card.querySelector('[name="request_date"]').value) card.querySelector('[name="request_date"]').value = @json(today()->toDateString());
   };
   type.addEventListener('change', sync);

@@ -5290,3 +5290,7 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
     font-size:11px;
   }
 }
+
+/* Wide tables scroll horizontally on small screens instead of being clipped. */
+.table-panel { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+.table-panel > table, .table-panel .table-responsive > table { min-width: 640px; }
