@@ -444,7 +444,7 @@ class LeaveLegalPhaseTwoTest extends TestCase
         app(\App\Services\LeaveBalanceService::class)->validateForApproval($short);
     }
 
-    public function test_wired_rights_settings_are_editable_and_reference_only_keys_stay_display_only(): void
+    public function test_rights_settings_are_all_editable_with_no_locked_reference_controls(): void
     {
         $response = $this->get(route('payroll.settings.index'));
         $response->assertOk();
@@ -453,11 +453,12 @@ class LeaveLegalPhaseTwoTest extends TestCase
         foreach (['pregnancy_reduced_hours_per_day', 'pregnancy_overtime_protection_months', 'nursing_sessions_per_day', 'nursing_minutes_per_session'] as $key) {
             $this->assertStringContainsString('name="policies['.$key.']"', $html, $key.' must be an editable policy input now');
         }
-        $this->assertStringContainsString('مرجع فقط', $html);
-        // Reference-only keys (proration, and the month convention pending the
-        // owner's decision) never render as editable inputs.
-        $this->assertStringNotContainsString('name="policies[annual_prorate_first_year]"', $html);
-        $this->assertStringNotContainsString('name="policies[pregnancy_reduced_hours_from_month]"', $html);
+        // Owner rule (2026-11-10): no field stays locked as a legal reference;
+        // every policy key renders as an editable per-company control, with an
+        // honest note when the value is stored-only for now.
+        $this->assertStringContainsString('name="policies[annual_prorate_first_year]"', $html);
+        $this->assertStringContainsString('name="policies[pregnancy_reduced_hours_from_month]"', $html);
+        $this->assertStringNotContainsString('مرجع فقط', $html);
     }
 
     public function test_future_scheduled_maternity_leave_carries_rights_before_start(): void

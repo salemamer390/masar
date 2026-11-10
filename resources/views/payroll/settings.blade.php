@@ -135,7 +135,7 @@
       $v = $lvNum($value ?? $law);
       if ($disabled) {
           return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
               .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
       }
       $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><div class="input-group input-group-sm">'
@@ -156,7 +156,7 @@
       $on = $value ?? $law;
       if ($disabled) {
           return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">مرجع قانوني</span></div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
               .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
       }
       return '<div class="col-md-6"><div class="form-check form-switch">'
@@ -235,14 +235,15 @@
 {!! $lvCardOpen('annual', !$lvActive($annualType), true) !!}
 {!! $lvHead('annual', 'الإجازة السنوية', 'م124–127', $annualType ? 'types['.$annualType->id.'][is_active]' : null, $lvActive($annualType)) !!}
 <div class="leave-body"><div class="row g-3">
-{!! $lvN('annual', 'd1', 'السنة الأولى', 15, 'min', 'يوم', 'policies[annual_first_year]', $pol('annual_first_year', 15), 'يُمنح الرصيد كاملًا بعد مدة الانتظار بدون تناسب — وفق قرار الشركة') !!}
+{!! $lvN('annual', 'd1', 'السنة الأولى', 15, 'min', 'يوم', 'policies[annual_first_year]', $pol('annual_first_year', 15), 'يُمنح الرصيد كاملًا بعد مدة الانتظار بدون تناسب') !!}
 {!! $lvN('annual', 'd2', 'من السنة الثانية', 21, 'min', 'يوم', 'policies[annual_second_year]', $pol('annual_second_year', 21)) !!}
 {!! $lvN('annual', 'd3', '10 سنوات خدمة أو تجاوز 50 سنة', 30, 'min', 'يوم', 'policies[annual_long_service]', $pol('annual_long_service', 30)) !!}
 {!! $lvN('annual', 'd4', 'ذوو الإعاقة والأقزام', 45, 'min', 'يوم', 'policies[annual_disability_days]', $pol('annual_disability_days', 45)) !!}
 {!! $lvN('annual', 'extra', 'إضافة للأعمال الخطرة والمناطق النائية', 7, 'min', 'يوم', 'policies[annual_hazardous_extra_days]', $pol('annual_hazardous_extra_days', 7)) !!}
 {!! $lvN('annual', 'minMonths', 'أقل خدمة لإجازة بنسبة المدة', 6, 'max', 'شهر', 'policies[annual_wait_months]', $pol('annual_wait_months', 6)) !!}
-{!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
-{!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'مرجع قانوني — الرصيد المرحّل لا تنتهي صلاحيته آليًا في النظام حاليًا') !!}
+{!! $lvS('annual', 'prorate', 'احتساب السنة الأولى نسبيًا بحسب مدة العمل', true, false, 'policies[annual_prorate_first_year]', (bool) $pol('annual_prorate_first_year', 0), 'قرار مسجّل حاليًا — منح السنة الأولى الفعلي يتبع خانة «السنة الأولى» أعلاه (كامل الرصيد بعد مدة الانتظار)') !!}
+{!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', 'policies[annual_min_consecutive_days]', $pol('annual_min_consecutive_days', 6), 'تضبط حساسية تنبيه التخطيط الذكي للإجازة المتصلة — ليست قيدًا على الاعتماد') !!}
+{!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', 'policies[leave_settlement_planning_years]', $pol('leave_settlement_planning_years', 3), 'موعد مراجعة داخلية للتنبيه التخطيطي للرصيد المرحّل — لا يُسقط الرصيد ولا ينهي صلاحيته') !!}
 {!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
 </div>
 <div class="leave-sub{{ !$lvActive($casualType) ? ' is-off' : '' }}" data-lp-sub="casual" data-mandated="1">
@@ -254,13 +255,14 @@
 {!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div>
 {!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
-{!! $lvCardOpen('weekly') !!}
-{!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120') !!}
+{!! $lvCardOpen('weekly', !(bool) (int) $pol('weekly_enabled', 1)) !!}
+{!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120', 'policies[weekly_enabled]', (bool) (int) $pol('weekly_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('weekly', 'hours', 'مدة الراحة', 24, 'min', 'ساعة', null, 24, 'تُدار من تبويب «أوقات الدوام» — مصدر واحد لكل قاعدة') !!}
 {!! $lvN('weekly', 'afterDays', 'بعد أيام عمل متصلة لا تزيد على', 6, 'max', 'يوم', null, 6, 'تُدار من تبويب «أوقات الدوام» (نمط الراحة الأسبوعية)') !!}
-{!! $lvN('weekly', 'accumulate', 'أقصى مدة تجميع (مواقع بعيدة)', 8, 'max', 'أسبوع', null, 8, 'مرجع قانوني — التجميع للمواقع البعيدة غير مربوط بالحساب حاليًا') !!}
-{!! $lvS('weekly', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvN('weekly', 'accumulate', 'أقصى مدة تجميع (مواقع بعيدة)', 8, 'max', 'أسبوع', 'policies[weekly_rest_accumulate_weeks]', $pol('weekly_rest_accumulate_weeks', 8), 'محفوظ لشركتك — تجميع المواقع البعيدة غير مربوط بحساب الحضور حاليًا') !!}
+{!! $lvS('weekly', 'paid', 'مدفوعة الأجر', true, false, 'policies[weekly_rest_paid]', (bool) (int) $pol('weekly_rest_paid', '1'), 'إعداد محفوظ — الراحة الأسبوعية تُحسب مدفوعة حاليًا ولا يُربط هذا الاختيار بالمسير بعد') !!}
 </div><div class="note-op-block">تُدار الراحة الأسبوعية من تبويب «أوقات الدوام» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 </div>
 
@@ -291,17 +293,18 @@
 
 <h2 class="group-title">ظروف خاصة</h2>
 <div class="row g-3" data-lp-group>
-{!! $lvCardOpen('holidays') !!}
-{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
+{!! $lvCardOpen('holidays', !(bool) (int) $pol('holidays_enabled', 1)) !!}
+{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129', 'policies[holidays_enabled]', (bool) (int) $pol('holidays_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
-{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, false, 'policies[holidays_paid]', (bool) (int) $pol('holidays_paid', '1'), 'إعداد محفوظ — غير مربوط بحساب حاليًا') !!}
 {!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
-{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
+{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, 'policies[holidays_alt_day_allowed]', (bool) (int) $pol('holidays_alt_day_allowed', '0'), 'محفوظ لشركتك — تُدار أيام العطلات نفسها من تبويب «العطلات الرسمية»') !!}
 </div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 {!! $lvCardOpen('exam', !$lvActive($examsType)) !!}
 {!! $lvHead('exam', 'إجازة الامتحانات', 'م126', $examsType ? 'types['.$examsType->id.'][is_active]' : null, $lvActive($examsType)) !!}
 <div class="leave-body"><div class="row g-3">
-{!! $lvN('exam', 'noticeAnnual', 'إخطار لتحديد موعد السنوية', 15, 'max', 'يوم', null, 15, 'مرجع قانوني — لا يُتحقق منه في الطلبات حاليًا') !!}
+{!! $lvN('exam', 'noticeAnnual', 'إخطار لتحديد موعد السنوية', 15, 'max', 'يوم', 'policies[exam_annual_leave_notice_days]', $pol('exam_annual_leave_notice_days', 15), 'محفوظ لشركتك — لا يُتحقق منه في الطلبات حاليًا') !!}
 {!! $lvN('exam', 'noticeStudy', 'إخطار للإجازة الدراسية', 10, 'max', 'يوم', 'policies[exam_notice_days]', $pol('exam_notice_days', 10)) !!}
 {!! $lvS('exam', 'paid', 'مدفوعة الأجر', true, false, $examsType ? 'types['.$examsType->id.'][is_paid]' : null, $examsType ? (bool) ($examsType->limits['is_paid'] ?? $examsType->is_paid) : true, $examsType ? null : $constNote) !!}
 {!! $lvS('exam', 'deduct', 'تُخصم من السنوية', false, false, $examsType ? 'types['.$examsType->id.'][deducts_annual_balance]' : null, $examsType ? (bool) ($examsType->limits['deducts_annual_balance'] ?? $examsType->deducts_annual_balance) : false, $examsType ? null : $constNote) !!}
@@ -322,11 +325,12 @@
 {!! $lvS('paternity', 'paid', 'مدفوعة الأجر', true, false, $newbornType ? 'types['.$newbornType->id.'][is_paid]' : null, $newbornType ? (bool) ($newbornType->limits['is_paid'] ?? $newbornType->is_paid) : true, $newbornType ? null : $constNote) !!}
 {!! $lvS('paternity', 'deduct', 'تُخصم من السنوية', false, false, $newbornType ? 'types['.$newbornType->id.'][deducts_annual_balance]' : null, $newbornType ? (bool) ($newbornType->limits['deducts_annual_balance'] ?? $newbornType->deducts_annual_balance) : false, $newbornType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('paternity', !$lvActive($newbornType)) !!}</div></div></div>
-{!! $lvCardOpen('jobsearch') !!}
-{!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162') !!}
+{!! $lvCardOpen('jobsearch', !(bool) (int) $pol('jobsearch_enabled', 1)) !!}
+{!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162', 'policies[jobsearch_enabled]', (bool) (int) $pol('jobsearch_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
-{!! $lvN('jobsearch', 'hours', 'الساعات أسبوعيًا خلال مهلة الإخطار', 8, 'min', 'ساعة', null, 8, 'مرجع قانوني — غير مُدار في النظام حاليًا') !!}
-{!! $lvS('jobsearch', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvN('jobsearch', 'hours', 'الساعات أسبوعيًا خلال مهلة الإخطار', 8, 'min', 'ساعة', 'policies[jobsearch_weekly_hours]', $pol('jobsearch_weekly_hours', 8), 'محفوظ لشركتك — لا يوجد تتبع لمهلة إخطار في النظام حاليًا') !!}
+{!! $lvS('jobsearch', 'paid', 'مدفوعة الأجر', true, false, 'policies[jobsearch_paid]', (bool) (int) $pol('jobsearch_paid', '1'), 'إعداد محفوظ — غير مربوط بحساب حاليًا') !!}
 </div></div></div></div>
 </div>
 
@@ -351,19 +355,21 @@
 {!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
 {!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('childcare', !$lvActive($childcareType)) !!}</div></div></div>
-{!! $lvCardOpen('nursing') !!}
-{!! $lvHead('nursing', 'فترتا الرضاعة', 'م56') !!}
+{!! $lvCardOpen('nursing', !(bool) (int) $pol('nursing_enabled', 1)) !!}
+{!! $lvHead('nursing', 'فترتا الرضاعة', 'م56', 'policies[nursing_enabled]', (bool) (int) $pol('nursing_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('nursing', 'sessions', 'عدد الفترات يوميًا', 2, 'min', 'فترة', 'policies[nursing_sessions_per_day]', $pol('nursing_sessions_per_day', 2)) !!}
 {!! $lvN('nursing', 'minutes', 'مدة كل فترة', 30, 'min', 'دقيقة', 'policies[nursing_minutes_per_session]', $pol('nursing_minutes_per_session', 30)) !!}
 {!! $lvN('nursing', 'months', 'خلال', 24, 'min', 'شهر من الوضع', 'policies[nursing_window_months]', $pol('nursing_window_months', 24)) !!}
-{!! $lvS('nursing', 'paid', 'تُحسب من ساعات العمل بدون خفض الأجر', true, true, null, true, $constNote) !!}
+{!! $lvS('nursing', 'paid', 'تُحسب من ساعات العمل بدون خفض الأجر', true, false, 'policies[nursing_paid_full]', (bool) (int) $pol('nursing_paid_full', '1'), 'إعداد محفوظ — تُحسب فترات الرضاعة مدفوعة في الحساب حاليًا') !!}
 </div></div></div></div>
-{!! $lvCardOpen('pregnant') !!}
-{!! $lvHead('pregnant', 'تخفيف عمل الحامل', 'م54') !!}
+{!! $lvCardOpen('pregnant', !(bool) (int) $pol('pregnant_enabled', 1)) !!}
+{!! $lvHead('pregnant', 'تخفيف عمل الحامل', 'م54', 'policies[pregnant_enabled]', (bool) (int) $pol('pregnant_enabled', 1)) !!}
+<div class="px-3 pt-2 note-op">التفعيل محفوظ لشركتك فقط حاليًا؛ لا يوقف الحساب أو الحقوق التشغيلية المرتبطة بهذه البطاقة.</div>
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('pregnant', 'hours', 'تخفيض ساعات العمل اليومية', 1, 'min', 'ساعة', 'policies[pregnancy_reduced_hours_per_day]', $pol('pregnancy_reduced_hours_per_day', 1)) !!}
-{!! $lvN('pregnant', 'fromMonth', 'اعتبارًا من الشهر', 6, 'max', 'من الحمل', null, 6, 'يبدأ التخفيض بتاريخ موثق من الشهادة الطبية على إجازة الوضع — الاحتساب بالشهر مرجع فقط') !!}
+{!! $lvN('pregnant', 'fromMonth', 'اعتبارًا من الشهر', 6, 'max', 'من الحمل', 'policies[pregnancy_reduced_hours_from_month]', $pol('pregnancy_reduced_hours_from_month', 6), 'محفوظ لشركتك — البدء الفعلي يتبع التاريخ الموثق في الشهادة الطبية حاليًا') !!}
 {!! $lvN('pregnant', 'noOT', 'منع الإضافي حتى بعد الوضع بـ', 6, 'min', 'شهر', 'policies[pregnancy_overtime_protection_months]', $pol('pregnancy_overtime_protection_months', 6)) !!}
 </div><div class="note-op-block">مطبّقة في الحساب: التخفيض وسماح الرضاعة يعوّضان التأخير والانصراف المبكر، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع.</div></div></div></div>
 </div>
@@ -453,7 +459,8 @@
     if (!slot) return;
     if (ctl.disabled) return; // الحقول المعطلة تحمل ملاحظتها التشغيلية الثابتة
     const st = statusOf(ctl);
-    slot.innerHTML = st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '';
+    if (slot._opNote === undefined) slot._opNote = slot.querySelector('.note-op')?.outerHTML || '';
+    slot.innerHTML = slot._opNote + (st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '');
   }
   function cardState(card) {
     // Only the card's own toggle and statutory subsections count toward the violation
