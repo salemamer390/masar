@@ -11,7 +11,7 @@ class CompanyManagerOnly
     {
         if ($request->user()?->role?->name !== 'company_manager') {
             return redirect()->route('dashboard')
-                ->with('error', 'حذف المسير المقفول متاح لمدير الشركة فقط.');
+                ->with('error', __('حذف المسير المقفول متاح لمدير الشركة فقط.'));
         }
 
         return $next($request);
