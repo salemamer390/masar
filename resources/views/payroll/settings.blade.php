@@ -22,7 +22,7 @@
 ['key'=>'overtime.hours_divisor','label'=>'أساس ساعة الإضافي','unit'=>'ساعة','hint'=>'عدد ساعات الشهر المستخدمة لحساب أجر الساعة'],
 ['key'=>'overtime.day_multiplier','label'=>'معامل الإضافي النهاري','unit'=>'×'],
 ['key'=>'overtime.night_multiplier','label'=>'معامل الإضافي الليلي','unit'=>'×','hint'=>'يُضرب في أجر الساعة'],
-['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين'],
+['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين إجمالًا — يُضاف الفرق فوق المرتب'],
 ['key'=>'overtime.weekly_rest_multiplier','label'=>'معامل الراحة الأسبوعية','unit'=>'×','hint'=>'1 = بنفس سعر اليوم'],
 ['key'=>'overtime.days_divisor','label'=>'أيام الشهر لأجر يوم الراحة والعطلات','unit'=>'يوم']]],
 ['title'=>'الغياب والجزاءات','subtitle'=>'مقسوم الخصم وحدود الجزاءات','fields'=>[
@@ -285,7 +285,7 @@
 {!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
 <div class="leave-body"><div class="row g-3">
 {!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
-{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
+{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (إجمالي أمثال أجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
 {!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
 </div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 {!! $lvCardOpen('exam', !$lvActive($examsType)) !!}
