@@ -76,6 +76,7 @@ class PayrollDefaultsService
         'pregnancy_reduced_hours_from_month' => '6',
         'pregnancy_reduced_hours_per_day' => '1',
         'pregnancy_overtime_protection_months' => '6',
+        'nursing_window_months' => '24',
         'nursing_sessions_per_day' => '2',
         'nursing_minutes_per_session' => '30',
         'childcare_max_years_per_request' => '2',
