@@ -103,6 +103,7 @@
 </div>
 
 @push('scripts')
+<script src="{{ asset('js/import-dropzone.js') }}?v={{ filemtime(public_path('js/import-dropzone.js')) }}"></script>
 <script>
 (function () {
     const modalEl = document.getElementById('employeesImportModal');
@@ -119,6 +120,7 @@
     const steps = { upload: q('[data-import-step="upload"]'), sheets: q('[data-import-step="sheets"]'), preview: q('[data-import-step="preview"]'), result: q('[data-import-step="result"]') };
     const sheetsList = q('[data-import-sheets-list]');
     const fileInput = q('#employeesImportFile');
+    window.MasarImportDropzone?.init(fileInput, { maxBytes: 5 * 1024 * 1024 });
     const alertBox = q('[data-import-alert]');
     const box = {
         verdict: q('[data-import-verdict]'), decisions: q('[data-import-decisions]'), info: q('[data-import-info]'),
@@ -691,6 +693,7 @@
 
     function reset() {
         fileInput.value = '';
+        fileInput.dispatchEvent(new Event('change'));
         lastData = null;
         lastResult = null;
         state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' };
