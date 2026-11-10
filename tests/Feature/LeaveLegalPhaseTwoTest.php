@@ -436,7 +436,7 @@ class LeaveLegalPhaseTwoTest extends TestCase
         foreach (['pregnancy_reduced_hours_per_day', 'pregnancy_overtime_protection_months', 'nursing_sessions_per_day', 'nursing_minutes_per_session'] as $key) {
             $this->assertStringContainsString('name="policies['.$key.']"', $html, $key.' must be an editable policy input now');
         }
-        $this->assertStringContainsString('محفوظ للعرض فقط', $html);
+        $this->assertStringContainsString('مرجع فقط', $html);
         // Reference-only keys (proration, and the month convention pending the
         // owner's decision) never render as editable inputs.
         $this->assertStringNotContainsString('name="policies[annual_prorate_first_year]"', $html);
