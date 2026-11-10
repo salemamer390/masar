@@ -158,9 +158,12 @@ class PayrollSettingsController extends Controller
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
         $companyId = (int) auth()->user()->company_id;
-        // Only settings that actually drive behaviour may be changed here. Legacy display-only keys stay read-only.
+        // Every declared policy is editable per company; the UI identifies stored-only values.
         $allowedPolicies = array_merge(array_keys(\App\Support\LeaveLegalReference::policyRules()), ['annual_wait_months', 'allow_early_leave']);
         $data['policies'] = array_intersect_key($data['policies'], array_flip($allowedPolicies));
+        foreach (['weekly_enabled', 'holidays_enabled', 'jobsearch_enabled', 'nursing_enabled', 'pregnant_enabled', 'annual_prorate_first_year', 'weekly_rest_paid', 'jobsearch_paid', 'nursing_paid_full', 'holidays_paid', 'holidays_alt_day_allowed'] as $key) {
+            if (isset($data['policies'][$key]) && !in_array((string) $data['policies'][$key], ['0', '1'], true)) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون 0 أو 1.']);
+        }
         foreach (['nursing_window_months', 'maternity_months', 'childcare_max_years_per_request', 'childcare_min_gap_years', 'exam_notice_days', 'exam_annual_leave_notice_days', 'annual_min_consecutive_days', 'leave_settlement_planning_years', 'weekly_rest_accumulate_weeks', 'jobsearch_weekly_hours', 'pregnancy_reduced_hours_from_month', 'contagious_max_months', 'maternity_min_postpartum_days', 'sick_phase1_months', 'sick_phase1_pct', 'sick_phase2_months', 'sick_phase2_pct', 'sick_phase3_months', 'sick_phase3_pct', 'sick_cycle_years', 'sick_termination_notice_days'] as $key) {
             if (isset($data['policies'][$key]) && (float) $data['policies'][$key] != (int) $data['policies'][$key]) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون عددًا صحيحًا.']);
         }
