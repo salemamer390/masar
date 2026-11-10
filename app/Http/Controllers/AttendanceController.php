@@ -113,7 +113,7 @@ class AttendanceController extends Controller
         $to = $request->filled('to_date') ? Carbon::parse($request->string('to_date')->toString())->startOfDay() : $period['end']->copy()->startOfDay();
         if ($from->diffInDays($to) > self::MAX_RANGE_DAYS) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'to_date' => 'نطاق العرض يتجاوز ' . self::MAX_RANGE_DAYS . ' يومًا. قلّص الفترة ثم أعد العرض.',
+                'to_date' => __('نطاق العرض يتجاوز') . self::MAX_RANGE_DAYS . ' يومًا. قلّص الفترة ثم أعد العرض.',
             ]);
         }
 
