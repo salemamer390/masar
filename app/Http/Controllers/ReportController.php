@@ -22,6 +22,9 @@ class ReportController extends Controller
     public function show(Request $request, string $type)
     {
         $data = $this->getReportData($type, $request);
+        $data['title'] = __($data['title']);
+        $data['subtitle'] = __($data['subtitle']);
+        $data['columns'] = array_map(fn ($column) => __($column), $data['columns'] ?? []);
         return view('reports.show', array_merge(['type' => $type, 'departments' => Department::where('is_active', 1)->orderBy('name')->get()], $data));
     }
 

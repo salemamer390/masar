@@ -179,6 +179,36 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'attributes' => [],
+    'attributes' => [
+        'employee_id' => 'الموظف', 'employee_code' => 'كود الموظف', 'full_name' => 'الاسم الكامل', 'first_name' => 'الاسم الأول',
+        'middle_name' => 'الاسم الأوسط', 'last_name' => 'اسم العائلة', 'name' => 'الاسم', 'email' => 'البريد الإلكتروني',
+        'password' => 'كلمة المرور', 'phone' => 'رقم الهاتف', 'address' => 'العنوان', 'gender' => 'النوع', 'birth_date' => 'تاريخ الميلاد',
+        'national_id' => 'الرقم القومي', 'marital_status' => 'الحالة الاجتماعية', 'department_id' => 'القسم', 'job_id' => 'الوظيفة',
+        'branch_id' => 'الفرع', 'status_id' => 'الحالة', 'status' => 'الحالة', 'employment_type_id' => 'نوع التوظيف',
+        'manager_employee_id' => 'المدير المباشر', 'hire_date' => 'تاريخ التعيين', 'contract_start_date' => 'بداية العقد',
+        'contract_end_date' => 'نهاية العقد', 'termination_date' => 'تاريخ إنهاء الخدمة', 'termination_type' => 'نوع إنهاء الخدمة',
+        'request_type_id' => 'نوع الطلب', 'request_type' => 'نوع الطلب', 'title' => 'عنوان الطلب', 'details' => 'التفاصيل',
+        'reason' => 'السبب', 'notes' => 'الملاحظات', 'note' => 'الملاحظة', 'rejection_reason' => 'سبب الرفض',
+        'request_date' => 'التاريخ', 'from_time' => 'من الساعة', 'to_time' => 'إلى الساعة', 'permission_from_time' => 'من الساعة',
+        'permission_to_time' => 'إلى الساعة', 'start_date' => 'تاريخ البداية', 'end_date' => 'تاريخ النهاية',
+        'from_date' => 'من تاريخ', 'to_date' => 'إلى تاريخ', 'date' => 'التاريخ', 'attendance_date' => 'تاريخ الحضور',
+        'check_in' => 'وقت الحضور', 'check_out' => 'وقت الانصراف', 'leave_type_id' => 'نوع الإجازة', 'amount' => 'المبلغ',
+        'advance_amount' => 'مبلغ السلفة', 'financial_amount' => 'المبلغ', 'financial_request_date' => 'تاريخ الطلب',
+        'advance_request_date' => 'تاريخ السلفة', 'overtime_request_date' => 'تاريخ الإضافي', 'other_request_date' => 'تاريخ الطلب',
+        'penalty_type_id' => 'نوع الجزاء', 'penalty_date' => 'تاريخ الجزاء', 'deduction_days' => 'أيام الخصم', 'deduction_amount' => 'مبلغ الخصم',
+        'movement_type_id' => 'نوع الحركة', 'movement_date' => 'تاريخ الحركة', 'new_salary' => 'الراتب الجديد',
+        'new_job_id' => 'الوظيفة الجديدة', 'new_department_id' => 'القسم الجديد', 'effective_from' => 'تاريخ السريان',
+        'effective_to' => 'نهاية السريان', 'salary_type' => 'نوع الراتب', 'salary_input' => 'الراتب المدخل', 'gross_salary' => 'الراتب الإجمالي',
+        'basic_salary' => 'الأجر الأساسي', 'payment_method_id' => 'طريقة الدفع', 'insurance_wage' => 'الأجر التأميني',
+        'insured_salary' => 'الأجر التأميني', 'insurance_number' => 'رقم التأمين', 'insurance_start_date' => 'تاريخ بداية التأمين',
+        'document_type_id' => 'نوع المستند', 'document' => 'المستند', 'document_file' => 'ملف المستند', 'document_name' => 'اسم المستند',
+        'file' => 'الملف', 'profile_photo' => 'الصورة الشخصية', 'role_id' => 'الدور', 'permissions' => 'الصلاحيات',
+        'is_active' => 'التفعيل', 'code' => 'الكود', 'holiday_date' => 'تاريخ الإجازة الرسمية', 'search' => 'البحث',
+        'month' => 'الشهر', 'payroll_month' => 'شهر المسير', 'expiry_date' => 'تاريخ الانتهاء', 'return_date' => 'تاريخ العودة',
+        'bank_id' => 'البنك', 'iban' => 'رقم الآيبان', 'account_number' => 'رقم الحساب', 'account_holder_name' => 'اسم صاحب الحساب',
+        'housing_allowance' => 'بدل السكن', 'transportation_allowance' => 'بدل المواصلات', 'meal_allowance' => 'بدل الوجبات',
+        'clothing_allowance' => 'بدل الملابس', 'day_overtime_hours' => 'ساعات الإضافي النهاري', 'night_overtime_hours' => 'ساعات الإضافي الليلي',
+        'impact_type' => 'نوع الأثر', 'impact_amount' => 'قيمة الأثر', 'late_minutes' => 'دقائق التأخير',
+    ],
 
 ];

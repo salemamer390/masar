@@ -2047,5 +2047,21 @@
   "registered": "Registered",
   "unregistered": "Not registered",
   "pending": "Pending",
-  "العاملون لدى الغير": "Workers employed by others"
+  "العاملون لدى الغير": "Workers employed by others",
+  " ج.م": " EGP",
+  "Net المتفق عليه": "Agreed net",
+  "إجمالي طلبات الإجازات": "Total leave requests",
+  "إجمالي فاتورة الرواتب": "Total payroll bill",
+  "الأرصدة والطلبات والحالات": "Balances, requests and statuses",
+  "التأخير والغياب وساعات العمل": "Lateness, absence and working hours",
+  "التقرير الإداري الشامل": "Comprehensive management report",
+  "الصافي المتفق عليه وGross والتأمينات والضريبة وتكلفة الموظف": "Agreed net, gross, insurance, tax and employee cost",
+  "المؤشر": "Indicator",
+  "بيانات الموظفين والحالات والأقسام": "Employee data, statuses and departments",
+  "تاريخ التسجيل": "Registration date",
+  "تقرير الحضور والانصراف": "Attendance report",
+  "تقرير الرواتب": "Payroll report",
+  "حالة التسجيل وأكواد المهن": "Registration status and job codes",
+  "رقم التأمين": "Insurance number",
+  "ملخص مؤشرات شؤون العاملين": "HR indicators summary"
 }
