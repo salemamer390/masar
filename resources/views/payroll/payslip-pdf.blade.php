@@ -5,7 +5,7 @@
     $pad = fn (float $mm) => round($mm * $scale, 1) . 'mm';
 @endphp
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
 <meta charset="utf-8">
 <title>Payslip</title>
@@ -38,47 +38,47 @@ td { vertical-align: top; }
 
 <table>
   <tr>
-    <td class="brand-cell" width="65%"><div class="title">MASAR HR</div><div class="sub">&#x642;&#x633;&#x64a;&#x645;&#x629; &#x631;&#x627;&#x62a;&#x628;</div></td>
+    <td class="brand-cell" width="65%"><div class="title">MASAR HR</div><div class="sub">{{ __('قسيمة راتب') }}</div></td>
     <td class="brand-cell period" width="35%">{{ $record->payroll_month?->translatedFormat('F Y') }}</td>
   </tr>
 </table>
 
 <table class="emp">
   <tr>
-    <td width="34%"><div class="label">&#x627;&#x633;&#x645; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td>
-    <td width="22%"><div class="label">&#x627;&#x644;&#x643;&#x648;&#x62f; &#x627;&#x644;&#x648;&#x638;&#x64a;&#x641;&#x64a;</div><div class="value">{{ $record->employee?->employee_code ?? '—' }}</div></td>
-    <td width="44%"><div class="label">&#x627;&#x644;&#x642;&#x633;&#x645; / &#x627;&#x644;&#x648;&#x638;&#x64a;&#x641;&#x629;</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td>
+    <td width="34%"><div class="label">{{ __('اسم الموظف') }}</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td>
+    <td width="22%"><div class="label">{{ __('الكود الوظيفي') }}</div><div class="value">{{ $record->employee?->employee_code ?? '—' }}</div></td>
+    <td width="44%"><div class="label">{{ __('القسم / الوظيفة') }}</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td>
   </tr>
 </table>
 
 <div class="gap"></div>
 
-<table><tr><td class="h-earn">&#x627;&#x644;&#x627;&#x633;&#x62a;&#x62d;&#x642;&#x627;&#x642;&#x627;&#x62a;</td></tr></table>
+<table><tr><td class="h-earn">{{ __('الاستحقاقات') }}</td></tr></table>
 <table class="line">
   @foreach($earnings as [$label, $amount])
     <tr><td width="68%">{{ $label }}</td><td width="32%" class="amt">{{ number_format($amount, 2) }} EGP</td></tr>
   @endforeach
 </table>
-<table class="tot-earn"><tr><td width="68%">&#x625;&#x62c;&#x645;&#x627;&#x644;&#x64a; &#x627;&#x644;&#x627;&#x633;&#x62a;&#x62d;&#x642;&#x627;&#x627;&#x62a;</td><td width="32%" class="amt">{{ number_format($earningsTotal, 2) }} EGP</td></tr></table>
+<table class="tot-earn"><tr><td width="68%">{{ __('إجمالي الاستحقاات') }}</td><td width="32%" class="amt">{{ number_format($earningsTotal, 2) }} EGP</td></tr></table>
 
 <div class="gap"></div>
 
-<table><tr><td class="h-ded">&#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a;</td></tr></table>
+<table><tr><td class="h-ded">{{ __('استقطاعات') }}</td></tr></table>
 <table class="line">
   @forelse($deductions as [$label, $amount])
     <tr><td width="68%">{{ $label }}</td><td width="32%" class="amt">{{ number_format($amount, 2) }} EGP</td></tr>
   @empty
-    <tr><td colspan="2" style="text-align:center;color:#71809a;">&#x644;&#x627; &#x62a;&#x648;&#x62c;&#x62f; &#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a;</td></tr>
+    <tr><td colspan="2" style="text-align:center;color:#71809a;">{{ __('لا توجد استقطاعات') }}</td></tr>
   @endforelse
 </table>
-<table class="tot-ded"><tr><td width="68%">&#x625;&#x62c;&#x645;&#x627;&#x644;&#x64a; &#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a;</td><td width="32%" class="amt">{{ number_format($deductionsTotal, 2) }} EGP</td></tr></table>
+<table class="tot-ded"><tr><td width="68%">{{ __('إجمالي استقطاعات') }}</td><td width="32%" class="amt">{{ number_format($deductionsTotal, 2) }} EGP</td></tr></table>
 
 <div class="gap"></div>
 
-<table class="net"><tr><td width="55%">&#x635;&#x627;&#x641;&#x64a; &#x627;&#x644;&#x631;&#x627;&#x62a;&#x628;</td><td width="45%" class="amt">{{ number_format($net, 2) }} EGP</td></tr></table>
+<table class="net"><tr><td width="55%">{{ __('صافي الراتب') }}</td><td width="45%" class="amt">{{ number_format($net, 2) }} EGP</td></tr></table>
 
 <div class="gap"></div>
-<div class="foot">&#x62a;&#x645; &#x625;&#x646;&#x634;&#x627;&#x621; &#x627;&#x644;&#x642;&#x633;&#x64a;&#x645;&#x629; &#x628;&#x648;&#x627;&#x633;&#x637;&#x629; MASAR HR</div>
+<div class="foot">{{ __('تم إنشاء القسيمة بواسطة MASAR HR') }}</div>
 
 </body>
 </html>
