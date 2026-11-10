@@ -127,7 +127,8 @@
       if (!isset($leavePolicies[$key])) return '';
       $status = $key === 'annual_first_year' ? 'review' : $ref::policyStatus($key, $leavePolicies[$key]->setting_value);
       $implBadge = $readonly ? '<span class="lv-impl">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
-      return '<div class="lv-field"><label class="lv-lbl">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small class="lv-hint">'.e($ref::policyHint($key)).'</small><span class="badge lv-badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span>'.$implBadge.'</div>';
+      $hintPrefix = $status === 'ok' ? '' : $ref::LABELS[$status].' — ';
+      return '<div class="lv-field"><label class="lv-lbl">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small class="lv-hint lv-hint-'.$status.'">'.e($hintPrefix.$ref::policyHint($key)).'</small>'.$implBadge.'</div>';
   };
   $lvTypeLimits = function ($type) use ($lvNum) {
       $lim = $type->limits; $code = $type->policy_code;
@@ -554,6 +555,5 @@ document.addEventListener('masar:error', (event) => {
 </script>
 @endpush
 @push('styles')
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="{{ asset('leave-policy.css') }}?v={{ @filemtime(public_path('leave-policy.css')) }}" rel="stylesheet">
 @endpush
