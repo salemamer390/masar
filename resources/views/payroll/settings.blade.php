@@ -169,20 +169,27 @@
       $h .= '<div class="lp-field lp-check"><div class="form-check form-switch m-0"><input type="hidden" name="types['.$type->id.'][requires_document]" value="0"><input class="form-check-input" type="checkbox" id="doc-'.$type->id.'" name="types['.$type->id.'][requires_document]" value="1"'.($lim['requires_document'] ? ' checked' : '').'><label class="form-check-label" for="doc-'.$type->id.'">مستند مطلوب</label></div><small class="lp-hint" data-lp-hint></small></div>';
       return $h;
   };
+  $lvMandated = ['annual', 'casual', 'sick', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare'];
+  $lvToggle = function ($type) use ($lvMandated) {
+      if (!$type) return '';
+      $active = array_key_exists('is_active', $type->limits) ? (bool) $type->limits['is_active'] : (bool) $type->is_active;
+      return '<span class="form-check form-switch m-0" title="تفعيل النوع لشركتك"><input type="hidden" name="types['.$type->id.'][is_active]" value="0"><input class="form-check-input" type="checkbox" name="types['.$type->id.'][is_active]" value="1"'.($active ? ' checked' : '').' data-lp-toggle></span>';
+  };
   $lvStatus = fn ($type) => $ref::typeStatus($type->policy_code, $type->limits, $type->is_paid, $type->limits['requires_document'], $policyValues);
   $lvNotes = function (array $cmp) {
       $h = '';
       foreach ($cmp['notes'] as $note) $h .= '<small class="lp-card-note d-block">'.e($note).'</small>';
       return $h;
   };
-  $lvTypeCard = function (string $code, array $policyKeys = [], string $extraDesc = '') use ($leaveTypes, $lvStatus, $lvTypeLimits, $lvField, $lvNotes, $ref) {
+  $lvTypeCard = function (string $code, array $policyKeys = [], string $extraDesc = '') use ($leaveTypes, $lvStatus, $lvTypeLimits, $lvField, $lvNotes, $lvToggle, $lvMandated, $ref) {
       $type = $leaveTypes->firstWhere('policy_code', $code);
       if (!$type) return '';
       $rules = $ref::typeRules()[$code] ?? null;
       $cmp = $lvStatus($type);
-      $h = '<div class="lp-card lp-st-'.$cmp['status'].'" data-lp-card data-lp-name="'.e($type->name).'" data-status="'.$cmp['status'].'"><div class="lp-card-head"><h4>'.e($type->name).'</h4>';
+      $mandated = in_array($code, $lvMandated, true) ? ' data-mandated="1"' : '';
+      $h = '<div class="lp-card lp-st-'.$cmp['status'].'" data-lp-card data-lp-name="'.e($type->name).'" data-status="'.$cmp['status'].'"'.$mandated.'><div class="lp-card-head"><h4>'.e($type->name).'</h4>';
       if ($rules && $rules['article']) $h .= '<span class="lp-art">م'.$rules['article'].'</span>';
-      $h .= '<span class="badge text-bg-'.$ref::CLASSES[$cmp['status']].'" data-lp-badge>'.$ref::LABELS[$cmp['status']].'</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>';
+      $h .= '<span class="badge text-bg-'.$ref::CLASSES[$cmp['status']].'" data-lp-badge>'.$ref::LABELS[$cmp['status']].'</span>'.$lvToggle($type).'<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>';
       if ($rules && $rules['text']) $h .= '<p class="lp-card-desc">'.e($rules['text']).($extraDesc ? ' '.e($extraDesc) : '').'</p>';
       $h .= '<div class="lp-fields">'.$lvTypeLimits($type);
       foreach ($policyKeys as $k) $h .= $lvField($k);
@@ -204,8 +211,6 @@
   <span class="lp-dirty" data-lp-dirty hidden>تغييرات غير محفوظة</span>
   <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> حفظ التغييرات</button>
   <button type="button" class="btn btn-outline-secondary btn-sm" data-lp-reset-all>استعادة القيم القانونية</button>
-  <button type="button" class="btn btn-outline-secondary btn-sm" data-lp-export>تصدير</button>
-  <label class="btn btn-outline-secondary btn-sm m-0">استيراد<input type="file" accept="application/json" hidden data-lp-import></label>
 </header>
 <details class="lp-card lp-law-ref"><summary>المرجع القانوني (للقراءة فقط)</summary><div class="lp-law-body">@foreach(\App\Support\LeaveLegalReference::typeRules() as $code => $reference)<p><strong>{{ $leaveTypes->firstWhere('policy_code', $code)?->name ?? $code }} @if($reference['article'])(م{{ $reference['article'] }})@endif</strong>: {{ $reference['text'] }}</p>@endforeach<a href="https://eta.gov.eg/sites/default/files/2026-03/law.no_.14.of_.2025.pdf" target="_blank" rel="noopener">نص القانون</a></div></details>
 <div class="lp-search-row">
@@ -218,8 +223,8 @@
   <h3 class="lp-group-title">الإجازات العامة</h3>
   <div class="lp-cards">
 @php($annualCmp = $annualType ? $lvStatus($annualType) : ['status' => 'review', 'notes' => []])
-    <div class="lp-card lp-wide lp-st-{{ $annualCmp['status'] }}" data-lp-card data-lp-name="الإجازة السنوية" data-status="{{ $annualCmp['status'] }}">
-      <div class="lp-card-head"><h4>الإجازة السنوية@if($annualType && $annualType->name !== 'الإجازة السنوية') ({{ $annualType->name }})@endif</h4><span class="lp-art">م124–127</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$annualCmp['status']] }}</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
+    <div class="lp-card lp-wide lp-st-{{ $annualCmp['status'] }}" data-lp-card data-lp-name="الإجازة السنوية" data-status="{{ $annualCmp['status'] }}" data-mandated="1">
+      <div class="lp-card-head"><h4>الإجازة السنوية@if($annualType && $annualType->name !== 'الإجازة السنوية') ({{ $annualType->name }})@endif</h4><span class="lp-art">م124–127</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$annualCmp['status']] }}</span>{!! $lvToggle($annualType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
       <p class="lp-card-desc">{{ $ref::typeRules()['annual']['text'] }}. الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</p>
       <div class="lp-sub-title">الاستحقاق (يوم)</div>
       <div class="lp-fields">{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}</div>
@@ -259,10 +264,10 @@
   <h3 class="lp-group-title">المرض</h3>
   <div class="lp-cards">
 @php($sickCmp = $sickType ? $lvStatus($sickType) : ['status' => 'review', 'notes' => []])
-    <div class="lp-card lp-wide lp-st-{{ $sickCmp['status'] }}" data-lp-card data-lp-name="{{ $sickType?->name ?? 'الإجازة المرضية' }}" data-status="{{ $sickCmp['status'] }}">
-      <div class="lp-card-head"><h4>{{ $sickType?->name ?? 'الإجازة المرضية' }}</h4><span class="lp-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$sickCmp['status']] }}</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
+    <div class="lp-card lp-wide lp-st-{{ $sickCmp['status'] }}" data-lp-card data-lp-name="{{ $sickType?->name ?? 'الإجازة المرضية' }}" data-status="{{ $sickCmp['status'] }}" data-mandated="1">
+      <div class="lp-card-head"><h4>{{ $sickType?->name ?? 'الإجازة المرضية' }}</h4><span class="lp-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$sickCmp['status']] }}</span>{!! $lvToggle($sickType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
       <p class="lp-card-desc">{{ $ref::typeRules()['sick']['text'] }}</p>
-      @if($sickType)<div class="lp-fields">{!! $lvTypeLimits($sickType) !!}</div>@endif
+      @if($sickType)@php($sickBasis = $policyValues['sick_pay_basis'] ?? ($sickType->is_paid ? 'full' : 'none'))<div class="lp-fields"><div class="lp-field"><label class="lp-lbl" for="sickPayBasis">أساس التعويض</label><div class="lp-input"><select id="sickPayBasis" name="sick_pay_basis" class="form-select"><option value="ins" @selected($sickBasis === 'ins')>حسب قانون التأمينات</option><option value="full" @selected($sickBasis === 'full')>أجر كامل</option><option value="none" @selected($sickBasis === 'none')>بدون أجر</option></select></div><small class="lp-hint">مرجع م131: أساس التعويض حسب قانون التأمينات. الاختيار يُحفظ لشركتك فقط.</small></div>{!! $lvTypeLimits($sickType) !!}</div>@endif
       <p class="lp-ref-note">مرجع م131: أساس التعويض حسب قانون التأمينات؛ للمنشآت الصناعية 3 أشهر بأجر كامل ثم 6 أشهر بـ85% ثم 3 أشهر بـ75%، وتتكرر المراحل عن كل 3 سنوات خدمة، مع إخطار 15 يومًا قبل إنهاء العقد بسبب المرض — مراحل الأجر هذه مرجع قانوني ولا تُحفظ كإعدادات مستقلة حاليًا.</p>
       {!! $lvNotes($sickCmp) !!}
 @if($contactType)@php($contactCmp = $lvStatus($contactType))
@@ -321,7 +326,7 @@
   <div class="lp-cards">
 @foreach($extraTypes as $extraType)@php($extraCmp = $lvStatus($extraType))
     <div class="lp-card lp-st-{{ $extraCmp['status'] }}" data-lp-card data-lp-name="{{ $extraType->name }}" data-status="{{ $extraCmp['status'] }}">
-      <div class="lp-card-head"><h4>{{ $extraType->name }}</h4><span class="badge text-bg-{{ $ref::CLASSES[$extraCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$extraCmp['status']] }}</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
+      <div class="lp-card-head"><h4>{{ $extraType->name }}</h4><span class="badge text-bg-{{ $ref::CLASSES[$extraCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$extraCmp['status']] }}</span>{!! $lvToggle($extraType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
       <div class="lp-fields">{!! $lvTypeLimits($extraType) !!}</div>
       {!! $lvNotes($extraCmp) !!}
     </div>
@@ -366,15 +371,25 @@
     return st;
   }
   function cardState(card) {
+    const t = card.querySelector('[data-lp-toggle]');
+    if (t && !t.checked) return 'below';
     const sts = $$('[data-lp-field]', card).map(f => fieldState(f));
     if (sts.includes('bad')) return 'below';
     if (sts.includes('mod')) return 'review';
     return card.dataset.status || 'ok';
   }
+  const BADGE_LABEL = { ok: 'مطابق للقانون', review: 'يحتاج مراجعة', below: 'غير مطابق للقانون', outside: 'خارج نطاق القانون' };
+  const BADGE_CLASS = { ok: 'text-bg-success', review: 'text-bg-warning', below: 'text-bg-danger', outside: 'text-bg-secondary' };
   function paintCard(card) {
     const st = cardState(card);
     card.classList.remove('lp-st-ok', 'lp-st-review', 'lp-st-below', 'lp-st-outside');
     card.classList.add('lp-st-' + st);
+    const badge = card.querySelector('[data-lp-badge]');
+    if (badge) {
+      badge.classList.remove('text-bg-success', 'text-bg-warning', 'text-bg-danger', 'text-bg-secondary');
+      badge.classList.add(BADGE_CLASS[st]);
+      badge.textContent = BADGE_LABEL[st];
+    }
     return st;
   }
   const PILL = { ok: 'مطابقة للقانون', review: 'يحتاج مراجعة', below: 'غير مطابق' };
@@ -399,6 +414,18 @@
     const field = e.target.closest('[data-lp-field]');
     if (field) { paintField(field); const card = e.target.closest('[data-lp-card]'); if (card) paintCard(card); summary(); }
   });
+  pane.addEventListener('change', e => {
+    if (!e.target.matches('[data-lp-toggle]')) return;
+    const card = e.target.closest('[data-lp-card]');
+    if (!card) return;
+    card.classList.toggle('lp-off', !e.target.checked);
+    let w = card.querySelector('[data-lp-off-hint]');
+    if (!e.target.checked && card.dataset.mandated === '1') {
+      if (!w) { w = document.createElement('small'); w.className = 'lp-hint is-bad d-block'; w.setAttribute('data-lp-off-hint', ''); card.appendChild(w); }
+      w.textContent = 'إجازة مقررة بالقانون، وتعطيلها يخالفه';
+    } else if (w) w.remove();
+    paintCard(card); summary();
+  });
 
   function resetScope(scope) {
     $$('[data-lp-field][data-law]', scope).forEach(f => {
@@ -415,36 +442,6 @@
       if (!confirm('استعادة كل القيم إلى ما ينص عليه القانون؟')) return;
       resetScope(pane); toast('تمت استعادة كل القيم القانونية');
     }
-    if (e.target.closest('[data-lp-export]')) {
-      const data = {};
-      $$('[name]', form).forEach(el => {
-        if (el.type === 'file') return;
-        if (el.type === 'checkbox') { data[el.name] = el.checked ? el.value : (data[el.name] !== undefined ? data[el.name] : '0'); }
-        else data[el.name] = el.value;
-      });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-      a.download = 'leave-settings.json'; a.click(); URL.revokeObjectURL(a.href);
-    }
-  });
-  const importInput = $('[data-lp-import]');
-  if (importInput) importInput.addEventListener('change', () => {
-    const file = importInput.files[0]; if (!file) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const data = JSON.parse(r.result);
-        Object.keys(data).forEach(name => {
-          $$('[name]', form).filter(el => el.name === name).forEach(el => {
-            if (el.type === 'checkbox') el.checked = String(data[name]) === el.value && String(data[name]) !== '0';
-            else if (el.type !== 'file' && el.type !== 'hidden') el.value = data[name];
-            el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
-          });
-        });
-        toast('تم استيراد الإعدادات');
-      } catch (x) { toast('الملف غير صالح'); }
-    };
-    r.readAsText(file); importInput.value = '';
   });
 
   const search = $('[data-lp-search]');
@@ -474,7 +471,11 @@
 
   // تهيئة أولية
   $$('[data-lp-field]').forEach(paintField);
-  $$('[data-lp-card]').forEach(card => card.classList.add('lp-st-' + (card.dataset.status || 'ok')));
+  $$('[data-lp-card]').forEach(card => {
+    card.classList.add('lp-st-' + (card.dataset.status || 'ok'));
+    const t = card.querySelector('[data-lp-toggle]');
+    if (t && !t.checked) { card.classList.add('lp-off'); paintCard(card); }
+  });
   summary();
 })();
 </script>
