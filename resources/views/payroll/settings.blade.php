@@ -219,7 +219,7 @@
 {!! $lvN('annual', 'minMonths', 'أقل خدمة لإجازة بنسبة المدة', 6, 'max', 'شهر', 'policies[annual_wait_months]', $pol('annual_wait_months', 6)) !!}
 {!! $lvN('annual', 'guaranteed', 'الحد الأدنى المضمون سنويًا', 15, 'min', 'يوم', null, 15, 'يظل الرصيد 15 يومًا كاملة بعد مدة الانتظار بدون تناسب، وفق قرار الشركة — مرجع ثابت حاليًا') !!}
 {!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
-{!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'دورة التسوية 3 سنوات مطبقة في احتساب الرصيد المرحّل — غير قابلة للتعديل حاليًا') !!}
+{!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'مرجع قانوني — الرصيد المرحّل لا تنتهي صلاحيته آليًا في النظام حاليًا') !!}
 {!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
 </div>{!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
 {!! $lvCardOpen('casual', !$lvActive($casualType)) !!}
@@ -331,7 +331,7 @@
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('nursing', 'sessions', 'عدد الفترات يوميًا', 2, 'min', 'فترة', 'policies[nursing_sessions_per_day]', $pol('nursing_sessions_per_day', 2)) !!}
 {!! $lvN('nursing', 'minutes', 'مدة كل فترة', 30, 'min', 'دقيقة', 'policies[nursing_minutes_per_session]', $pol('nursing_minutes_per_session', 30)) !!}
-{!! $lvN('nursing', 'months', 'خلال', 24, 'min', 'شهر من الوضع', null, 24, 'فترة 24 شهرًا مطبقة من تاريخ الوضع المسجل — غير قابلة للتعديل حاليًا') !!}
+{!! $lvN('nursing', 'months', 'خلال', 24, 'min', 'شهر من الوضع', 'policies[nursing_window_months]', $pol('nursing_window_months', 24)) !!}
 {!! $lvS('nursing', 'paid', 'تُحسب من ساعات العمل بدون خفض الأجر', true, true, null, true, $constNote) !!}
 </div></div></div></div>
 {!! $lvCardOpen('pregnant') !!}
