@@ -4,7 +4,7 @@
 @if(session('attendance_import_errors'))
 <div class="alert alert-warning mt-3"><strong>{{ __('مراجعة استيراد الحضور:') }}</strong><ul class="mb-0 mt-2">@foreach(session('attendance_import_errors') as $importError)<li>{{ $importError }}</li>@endforeach</ul></div>
 @endif
-<div class="attendance-today-label"><i class="bi bi-calendar-day"></i> {{ __('اليوم —') }} {{ today()->locale('ar')->translatedFormat('l d/m/Y') }}</div>
+<div class="attendance-today-label"><i class="bi bi-calendar-day"></i> {{ __('اليوم —') }} {{ today()->locale(app()->getLocale())->translatedFormat('l d/m/Y') }}</div>
 <div class="attendance-stat-grid">@foreach([[__('حاضر اليوم'),$presentToday,'green','person-check'],[__('غياب اليوم'),$absentToday,'red','person-x'],[__('متأخرون'),$lateToday,'orange','clock-history'],[__('متوسط الحضور'),$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>{{ __('اليوم') }}</small></div></div>@endforeach</div>
 <div class="attendance-toolbar">
 <nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">{{ __('استثناءات البصمات') }} <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
@@ -282,15 +282,15 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     // Keep the dynamically added cells aligned with the static header order:
     // late, day overtime, night overtime, source, status, actions.
     const insertBefore = cells[cells.length - 3];
-    const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = 'الإضافي النهاري';
-    const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = 'الإضافي الليلي';
+    const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = @js(__('الإضافي النهاري'));
+    const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = @js(__('الإضافي الليلي'));
     row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);
     row.dataset.overtimeColumns = '1';
   };
   const head = table.tHead?.rows[0];
   if (head && !head.dataset.overtimeColumns) {
     const sourceHead = head.cells[6];
-    if (sourceHead) { const day = document.createElement('th'); day.textContent = 'الإضافي النهاري'; const night = document.createElement('th'); night.textContent = 'الإضافي الليلي'; head.insertBefore(day, sourceHead); head.insertBefore(night, sourceHead); }
+    if (sourceHead) { const day = document.createElement('th'); day.textContent = @js(__('الإضافي النهاري')); const night = document.createElement('th'); night.textContent = @js(__('الإضافي الليلي')); head.insertBefore(day, sourceHead); head.insertBefore(night, sourceHead); }
     head.dataset.overtimeColumns = '1';
   }
   table.tBodies[0]?.querySelectorAll('tr').forEach(addOvertimeColumns);

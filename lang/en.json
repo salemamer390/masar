@@ -2065,5 +2065,7 @@
   "رقم التأمين": "Insurance number",
   "ملخص مؤشرات شؤون العاملين": "HR indicators summary",
   "تعذر قراءة الملف: ": "Could not read the file: ",
-  "لم يُعثر على ورقة حضور قابلة للاستيراد. ": "No importable attendance sheet was found. "
+  "لم يُعثر على ورقة حضور قابلة للاستيراد. ": "No importable attendance sheet was found. ",
+  "الإضافي النهاري": "Day overtime",
+  "الإضافي الليلي": "Night overtime"
 }
