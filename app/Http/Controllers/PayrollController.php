@@ -502,7 +502,7 @@ class PayrollController extends Controller
     private function requireCompany(): int
     {
         $companyId = auth()->user()?->company_id;
-        abort_if(!$companyId, 403, 'حساب بدون شركة لا يمكنه إنشاء مسير رواتب.');
+        abort_if(!$companyId, 403, __('حساب بدون شركة لا يمكنه إنشاء مسير رواتب.'));
 
         return (int) $companyId;
     }
@@ -573,7 +573,7 @@ class PayrollController extends Controller
         $batchSize = (int) ($data['batch_size'] ?? 25);
         $ids = $allIds->slice($offset, $batchSize)->values()->all();
         $run = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->firstOrFail();
-        abort_unless($run->status === 'Generating', 422, 'لا توجد عملية إنشاء نشطة لهذا الشهر.');
+        abort_unless($run->status === 'Generating', 422, __('لا توجد عملية إنشاء نشطة لهذا الشهر.'));
         if ($ids) $service->generate($month, $ids, $companyId);
         $processed = min($offset + count($ids), $allIds->count());
         $complete = $processed >= $allIds->count();
@@ -648,7 +648,7 @@ class PayrollController extends Controller
     public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollRunService $service)
     {
         $this->assertSameCompanyRecord($payrollRecord);
-        abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, 'لا يمكن تعديل مدخلات مسير معتمد أو مقفل.');
+        abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, __('لا يمكن تعديل مدخلات مسير معتمد أو مقفل.'));
         $data = $request->validate([
             'ot_day_hours'=>['nullable','numeric','min:0'], 'ot_night_hours'=>['nullable','numeric','min:0'],
             'bonus'=>['nullable','numeric','min:0'], 'loans'=>['nullable','numeric','min:0'],
@@ -656,7 +656,7 @@ class PayrollController extends Controller
             'other_earnings'=>['nullable','numeric','min:0'], 'other_deductions'=>['nullable','numeric','min:0'],
         ]);
         $salary = $payrollRecord->salary ?? Salary::find($payrollRecord->salary_id);
-        abort_unless($salary, 422, 'لا يوجد هيكل راتب مرتبط بهذا السجل.');
+        abort_unless($salary, 422, __('لا يوجد هيكل راتب مرتبط بهذا السجل.'));
         $snapshot = $payrollRecord->calculation_snapshot ?? [];
         $advanceDetails = (array) ($snapshot['advance_details'] ?? []);
         $advanceAvailable = round(collect($advanceDetails)->sum(fn ($detail) => (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0)), 2);
@@ -716,7 +716,7 @@ class PayrollController extends Controller
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
         $this->assertSameCompany($payrollRun);
-        abort_unless(auth()->user()?->hasPermission('payroll.delete'), 403, 'حذف المسير متاح لمدير الشركة أو لدور مُنح هذه الصلاحية.');
+        abort_unless(auth()->user()?->hasPermission('payroll.delete'), 403, __('حذف المسير متاح لمدير الشركة أو لدور مُنح هذه الصلاحية.'));
         $service->destroy($payrollRun);
         return back()->with('toast', __('تم حذف المسير وسجلاته.'));
     }
