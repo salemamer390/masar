@@ -245,6 +245,23 @@ class LeaveLegalPhaseTwoTest extends TestCase
         $this->assertSame(60, $this->rights()->nursingAllowanceMinutes($e2->fresh(), today()));
     }
 
+    public function test_nursing_window_months_is_company_adjustable(): void
+    {
+        // Default law window: 24 months from the recorded birth.
+        $e = $this->employee();
+        $this->maternityLeaveFor($e, ['birth_date' => today()->subMonths(25)->toDateString()]);
+        $this->assertSame(0, $this->rights()->nursingAllowanceMinutes($e->fresh(), today()));
+
+        // A company may extend the window for itself (art. 56 sets a minimum).
+        \Illuminate\Support\Facades\DB::table('leave_policy_settings')->updateOrInsert(
+            ['company_id' => $this->company->id, 'setting_key' => 'nursing_window_months'],
+            ['setting_value' => '30', 'created_at' => now(), 'updated_at' => now()]
+        );
+        $e2 = $this->employee('E2');
+        $this->maternityLeaveFor($e2, ['birth_date' => today()->subMonths(25)->toDateString()]);
+        $this->assertSame(60, app(\App\Services\PregnancyNursingRightsService::class)->nursingAllowanceMinutes($e2->fresh(), today()));
+    }
+
     public function test_pregnancy_reduction_requires_the_certificate_start_date(): void
     {
         // The expected delivery date alone never activates the paid reduction:
