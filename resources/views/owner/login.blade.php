@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>دخول المالك — MASAR HR</title>
+  <title>{{ __('دخول المالك — MASAR HR') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,13 +40,14 @@
     }
     .owner-login-card .btn-login:hover { background: #1e2c4d; }
   </style>
+@include('components.interface-i18n')
 </head>
 <body>
   <div class="owner-login-card">
     <div class="text-center mb-4">
-      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> وصول خاص</span>
-      <h1 class="mt-3">لوحة تحكم المالك</h1>
-      <p class="subtitle mb-0">تسجيل الدخول بحساب المالك المخصص</p>
+      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> {{ __('وصول خاص') }}</span>
+      <h1 class="mt-3">{{ __('لوحة تحكم المالك') }}</h1>
+      <p class="subtitle mb-0">{{ __('تسجيل الدخول بحساب المالك المخصص') }}</p>
     </div>
 
     @if($errors->any())
@@ -56,14 +57,14 @@
     <form method="POST" action="{{ route('owner.login.attempt') }}">
       @csrf
       <div class="mb-3">
-        <label for="email" class="form-label">البريد الإلكتروني</label>
+        <label for="email" class="form-label">{{ __('البريد الإلكتروني') }}</label>
         <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
       </div>
       <div class="mb-4">
-        <label for="password" class="form-label">كلمة المرور</label>
+        <label for="password" class="form-label">{{ __('كلمة المرور') }}</label>
         <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
       </div>
-      <button type="submit" class="btn btn-primary btn-login w-100">دخول</button>
+      <button type="submit" class="btn btn-primary btn-login w-100">{{ __('دخول') }}</button>
     </form>
   </div>
 </body>
