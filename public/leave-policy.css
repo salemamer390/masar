@@ -21,15 +21,16 @@
 #leavePolicy .group-title{font-size:1.1rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:2px solid var(--lp-ink)}
 #leavePolicy > .group-title:first-of-type{margin-top:0}
 
-/* البطاقة — إطار كامل بحد خفيف وظل بدل الشريط الجانبي */
-#leavePolicy .leave{background:#fff;border:1px solid var(--lp-border);border-radius:8px;height:100%;box-shadow:0 1px 3px rgba(11,31,85,.08)}
+/* البطاقة — إطار كامل بحد أوضح وظل خفيف يفصل البطاقات بصريًا */
+#leavePolicy .leave{background:#fff;border:1px solid #cbd5e1;border-radius:10px;height:100%;box-shadow:0 2px 6px rgba(11,31,85,.10);transition:box-shadow .15s,border-color .15s}
+#leavePolicy .leave:hover{box-shadow:0 4px 12px rgba(11,31,85,.14);border-color:#aab8cc}
 #leavePolicy .leave.is-mod{border-color:var(--lp-mod)}
 #leavePolicy .leave.is-bad{border-color:var(--lp-bad)}
 #leavePolicy .leave.is-off{opacity:.6}
-#leavePolicy .leave-head{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-bottom:1px solid #eef1f4}
+#leavePolicy .leave-head{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;background:#f8fafd;border-bottom:1px solid var(--lp-border);border-radius:10px 10px 0 0}
 #leavePolicy .leave-head h3{font-size:1rem;margin:0;flex:1}
 #leavePolicy .art{font-size:.75rem;background:var(--lp-soft);color:var(--lp-law);padding:.15rem .5rem;border-radius:4px;white-space:nowrap}
-#leavePolicy .leave-body{padding:1rem}
+#leavePolicy .leave-body{padding:1.1rem 1.15rem}
 
 /* قسم فرعي داخل بطاقة (العارضة داخل السنوية، المخالطة داخل المرضية) */
 #leavePolicy .leave-sub{margin-top:1rem;padding-top:.75rem;border-top:1px dashed var(--lp-border)}
@@ -39,7 +40,7 @@
 #leavePolicy .leave-sub-note{font-size:.72rem;color:var(--lp-muted);white-space:nowrap}
 
 /* الحقول — نفس تسميات وتلميحات التصميم */
-#leavePolicy .lbl{font-size:.82rem;font-weight:700;color:var(--lp-muted);margin-bottom:.2rem}
+#leavePolicy .lbl{font-size:.82rem;font-weight:700;color:#3d4a63;margin-bottom:.25rem}
 #leavePolicy .hint-wrap .hint,#leavePolicy .hint{font-size:.74rem;min-height:1.1rem;margin-top:.2rem;color:var(--lp-hint);display:block}
 #leavePolicy .hint.mod{color:var(--lp-mod)}
 #leavePolicy .hint.bad{color:var(--lp-bad)}
@@ -58,6 +59,9 @@
 @media (max-width:767.98px){
   #leavePolicy .lp-search-row{grid-template-columns:1fr}
   #leavePolicy .lp-summary{justify-content:flex-start}
+  #leavePolicy .leave-head{padding:.65rem .85rem;flex-wrap:wrap}
+  #leavePolicy .leave-body{padding:.85rem}
+  #leavePolicy .group-title{font-size:1rem;margin:1.5rem 0 .6rem}
 }
 
 /* Legal-reference display: statutory values are shown as read-only text, never as dead controls. */
