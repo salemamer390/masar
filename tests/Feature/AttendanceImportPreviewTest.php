@@ -512,4 +512,43 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertCount(1, $rows);
         $this->assertStringStartsWith('18:30', (string) $rows[0]->check_out);
     }
+
+    public function test_upload_progress_request_returns_token_that_opens_normal_preview(): void
+    {
+        $response = $this->withHeaders(['X-Import-Upload' => '1', 'Accept' => 'application/json'])
+            ->post('/attendance/import/preview', ['file' => $this->workbook($this->dailyRows([['I1', '2026-11-20', '09:00', '17:00', '']]))]);
+        $response->assertOk()->assertJsonStructure(['import_token']);
+        $token = $response->json('import_token');
+        $this->post('/attendance/import/preview', ['import_token' => $token])->assertOk()->assertSee($token, false);
+    }
+
+    public function test_upload_progress_request_reports_unreadable_sheet_as_json_error(): void
+    {
+        $file = $this->workbook([['name' => 'x', 'rows' => [['a', 'b'], ['1', '2']]]]);
+        $this->withHeaders(['X-Import-Upload' => '1', 'Accept' => 'application/json'])
+            ->post('/attendance/import/preview', ['file' => $file])
+            ->assertStatus(422)->assertJsonPath('errors.file.0', fn ($m) => str_contains($m, 'لم يُعثر'));
+    }
+
+    public function test_common_header_names_are_recognised_without_manual_mapping(): void
+    {
+        $rows = [['name' => 'Sheet1', 'rows' => [['كود العامل', 'تاريخ اليوم', 'دخول', 'خروج'], ['I1', '2026-11-20', '09:00', '17:00']]]];
+        [$token, $units] = $this->preview($this->workbook($rows));
+        $this->assertNotSame('', $token);
+        $this->assertNotEmpty($units);
+        $english = [['name' => 'Sheet1', 'rows' => [['Employee ID', 'Date', 'Time In', 'Time Out'], ['I1', '2026-11-20', '09:00', '17:00']]]];
+        [, $units] = $this->preview($this->workbook($english));
+        $this->assertNotEmpty($units);
+    }
+
+    public function test_sheet_name_hint_only_classifies_when_columns_are_inconclusive(): void
+    {
+        $service = app(\App\Services\Imports\EmployeeImportService::class);
+        $method = new \ReflectionMethod($service, 'detectWorkbookSheetKind');
+        $method->setAccessible(true);
+        $this->assertSame('attendance', $method->invoke($service, [['x', 'y']], [], 'Attendance'));
+        $this->assertSame('employees', $method->invoke($service, [['x', 'y']], [], 'بيانات العاملين'));
+        $this->assertSame('unknown', $method->invoke($service, [['x', 'y']], [], 'Sheet1'));
+        $this->assertSame('auxiliary', $method->invoke($service, [['x', 'y']], [], 'لوحة التحكم'));
+    }
 }
