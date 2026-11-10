@@ -16,7 +16,7 @@ class DashboardController extends Controller
     public function index(\Illuminate\Http\Request $request)
     {
         $user = auth()->user();
-        abort_if($user?->role?->name === 'employee', 403, 'لوحة التحكم الإدارية غير متاحة لحساب الموظف.');
+        abort_if($user?->role?->name === 'employee', 403, __('لوحة التحكم الإدارية غير متاحة لحساب الموظف.'));
         $can = fn (string $permission) => (bool) $user?->hasPermission($permission);
         $today = today();
         $currentMonth = $today->copy()->startOfMonth();
