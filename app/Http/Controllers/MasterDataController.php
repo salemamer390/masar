@@ -158,13 +158,13 @@ class MasterDataController extends Controller
             'code' => ['nullable', 'string', 'max:50'],
             'category' => $type === 'documents' ? ['required', 'in:basic,job,workplace'] : ['nullable'],
         ], [
-            'name.unique' => 'نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا أو عدّل النوع الموجود.',
+            'name.unique' => __('نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا أو عدّل النوع الموجود.'),
         ]);
 
         $currentMeta = $meta[$type];
         $modelClass = $currentMeta['model'];
 
-        abort_if(!auth()->user()->isSuperAdmin() && !Schema::hasColumn((new $modelClass)->getTable(), 'company_id'), 403, 'هذه قائمة عامة لا يمكن تعديلها من حساب الشركة.');
+        abort_if(!auth()->user()->isSuperAdmin() && !Schema::hasColumn((new $modelClass)->getTable(), 'company_id'), 403, __('هذه قائمة عامة لا يمكن تعديلها من حساب الشركة.'));
         $nameCol = $currentMeta['name_col'];
         $data = [$nameCol => $request->name];
 
@@ -196,13 +196,13 @@ class MasterDataController extends Controller
 
     public function updateDocument(Request $request, DocumentType $documentType)
     {
-        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, 'لا يمكن تعديل العنصر العام من حساب الشركة.');
+        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, __('لا يمكن تعديل العنصر العام من حساب الشركة.'));
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150', Rule::unique('document_types', 'name')->where(fn ($query) => $query->where('company_id', $documentType->company_id))->ignore($documentType->id)],
             'category' => ['required', 'in:basic,job,workplace'],
             'required' => ['nullable', 'boolean'],
         ], [
-            'name.unique' => 'نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا.',
+            'name.unique' => __('نوع المستند بهذا الاسم موجود بالفعل. استخدم اسمًا مختلفًا.'),
         ]);
 
         $documentType->update([
@@ -230,7 +230,7 @@ class MasterDataController extends Controller
         abort_if(!isset($meta[$type]) || $type === 'documents', 404);
         $currentMeta = $meta[$type];
         $model = $currentMeta['model']::query()->findOrFail($item);
-        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, 'لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.');
+        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, __('لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.'));
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'code' => ['nullable', 'string', 'max:100'],
@@ -250,15 +250,15 @@ class MasterDataController extends Controller
         abort_if(!isset($meta[$type]) || $type === 'documents', 404);
         $currentMeta = $meta[$type];
         $model = $currentMeta['model']::query()->findOrFail($item);
-        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, 'لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.');
+        abort_if(!auth()->user()->isSuperAdmin() && !$model->company_id, 403, __('لا يمكن تعديل أو حذف العنصر العام من حساب الشركة.'));
         $name = (string) ($model->{$currentMeta['name_col']} ?? '');
         if (Schema::hasColumn($model->getTable(), 'is_active')) {
             $model->forceFill(['is_active' => false])->save();
-            $message = 'تم إيقاف العنصر بنجاح';
+            $message = __('تم إيقاف العنصر بنجاح');
         } else {
             try {
                 $model->delete();
-                $message = 'تم حذف العنصر بنجاح';
+                $message = __('تم حذف العنصر بنجاح');
             } catch (\Throwable) {
                 return back()->withErrors(['master' => __('لا يمكن حذف هذا العنصر لأنه مستخدم في بيانات أخرى.')]);
             }
@@ -269,7 +269,7 @@ class MasterDataController extends Controller
 
     public function destroyDocument(Request $request, DocumentType $documentType)
     {
-        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, 'لا يمكن حذف العنصر العام من حساب الشركة.');
+        abort_if(!$documentType->company_id && !auth()->user()->isSuperAdmin(), 403, __('لا يمكن حذف العنصر العام من حساب الشركة.'));
         if ($documentType->documents()->exists()) {
             if ($request->wantsJson()) {
                 return response()->json([
