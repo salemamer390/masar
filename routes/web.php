@@ -390,6 +390,8 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
             ->middleware('permission:payroll.settings')->name('settings.leaves.update');
         Route::post('/settings/leave-types', [PayrollSettingsController::class, 'storeLeaveType'])
             ->middleware('permission:payroll.settings')->name('settings.leave-types.store');
+        Route::delete('/settings/leave-types/{leaveType}', [PayrollSettingsController::class, 'destroyLeaveType'])
+            ->middleware('permission:payroll.settings')->name('settings.leave-types.destroy');
         Route::post('/settings/holidays', [PayrollSettingsController::class, 'storeHoliday'])
             ->middleware('permission:payroll.settings')->name('settings.holidays.store');
         Route::put('/settings/holidays/{holiday}', [PayrollSettingsController::class, 'updateHoliday'])
