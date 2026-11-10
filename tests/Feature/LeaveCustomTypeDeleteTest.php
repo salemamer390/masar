@@ -74,6 +74,20 @@ class LeaveCustomTypeDeleteTest extends TestCase
 
         // Archived: gone from the new-request choices (its name stays visible in history rows, which is the point of archiving).
         $this->get(route('leaves.index'))->assertOk()->assertDontSee('<option value="'.$type->id.'"', false);
+        $this->assertNotNull($type->archived_at, 'archive is stamped, distinct from an ordinary off switch');
+
+        // Gone from the settings cards too, even though settings deliberately keeps
+        // ordinary inactive company types listed for reactivation.
+        $this->get(route('payroll.settings.index'))->assertOk()->assertDontSee('إجازة لها طلبات');
+
+        // A crafted settings save cannot resurrect it.
+        $this->put(route('payroll.settings.leaves.update'), [
+            'policies' => ['annual_first_year' => 15, 'annual_wait_months' => 6],
+            'types' => [$type->id => ['is_active' => '1']],
+        ])->assertSessionDoesntHaveErrors();
+        $type->refresh();
+        $this->assertFalse((bool) $type->is_active, 'archived type stays off');
+        $this->assertNotNull($type->archived_at, 'archive stamp survives a settings save');
     }
 
     public function test_shared_statutory_type_cannot_be_deleted(): void
@@ -90,6 +104,23 @@ class LeaveCustomTypeDeleteTest extends TestCase
         $this->actingAs($this->ua);
         $this->deleteJson(route('payroll.settings.leave-types.destroy', $theirs->id))->assertNotFound();
         $this->assertNotNull(LeaveType::withoutGlobalScopes()->find($theirs->id));
+    }
+
+    public function test_ordinary_inactive_custom_type_stays_listed_for_reactivation(): void
+    {
+        $type = $this->makeType($this->a, 'إجازة موقوفة مؤقتًا');
+        $type->is_active = false;
+        $type->save();
+
+        $this->actingAs($this->ua);
+        $this->get(route('payroll.settings.index'))->assertOk()->assertSee('إجازة موقوفة مؤقتًا');
+
+        // And a normal settings save switches it back on (contrast with archived types).
+        $this->put(route('payroll.settings.leaves.update'), [
+            'policies' => ['annual_first_year' => 15, 'annual_wait_months' => 6],
+            'types' => [$type->id => ['is_active' => '1']],
+        ])->assertSessionDoesntHaveErrors();
+        $this->assertTrue((bool) $type->fresh()->is_active);
     }
 
     public function test_user_without_payroll_settings_permission_gets_403(): void
