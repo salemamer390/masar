@@ -17,6 +17,7 @@
 #leavePolicy .lp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 #leavePolicy .lp-card{background:#fff;border:1px solid var(--lp-border);border-inline-start:5px solid var(--lp-primary);border-radius:6px;padding:16px 18px;height:100%}
 #leavePolicy .lp-card.lp-wide{grid-column:1/-1}
+#leavePolicy .lp-card.lp-off{opacity:.6}
 #leavePolicy .lp-card.lp-st-ok{border-inline-start-color:var(--lp-ok)}
 #leavePolicy .lp-card.lp-st-review{border-inline-start-color:var(--lp-mod)}
 #leavePolicy .lp-card.lp-st-below{border-inline-start-color:var(--lp-bad)}
