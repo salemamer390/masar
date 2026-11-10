@@ -49,3 +49,12 @@ html[dir="ltr"] .app-shell .sidebar { border-left: 0; border-right: 1px solid #e
   html[dir="ltr"] .sidebar.open { right: auto; left: 0; }
   html[dir="ltr"] .main { margin-right: 0; margin-left: 0; }
 }
+
+html[dir="ltr"] .dashboard-reference-column,
+html[dir="ltr"] .reference-kpi-grid--six .reference-kpi > span:last-child {
+  direction: ltr !important;
+}
+html[dir="ltr"] .reference-kpi-grid--six .reference-kpi,
+html[dir="ltr"] .dashboard-reference-column .panel-head,
+html[dir="ltr"] .dashboard-reference-column .table { text-align: left !important; }
+html[dir="ltr"] .dashboard-reference-layout .panel-head h3 i { margin-left: 0; margin-right: 8px; }
