@@ -9,7 +9,7 @@
 <div class="dashboard-command-bar dashboard-command-bar--reference" aria-label="{{ __('إجراءات سريعة') }}">
     @foreach($quickActions as $action)
     @php($actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa-calendar-check','تسجيل حضور'=>'fa-clock','تسجيل جزاء'=>'fa-gavel','طلب HR جديد'=>'fa-file-circle-plus'])
-    <button type="button" class="dashboard-existing-action" data-short-label="{{ $action['short'] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ $action['label'] }}</span></button>
+    <button type="button" class="dashboard-existing-action" data-short-label="{{ $action['short'] ?? 'إجراء' }}" data-dashboard-page="{{ $action['page'] }}" data-dashboard-source-modal="{{ $action['source_modal'] ?? '' }}" data-dashboard-source-selector="{{ $action['source_selector'] ?? '' }}"><i class="fa-solid {{ $actionIcons[$action['label']] ?? 'fa-bolt' }}"></i><span>{{ __($action['label']) }}</span></button>
   @endforeach
   @if(auth()->user()?->hasPermission('employees.import'))
     <button type="button" class="dashboard-import-action" data-short-label="استيراد" data-bs-toggle="modal" data-bs-target="#employeesImportModal"><i class="fa-solid fa-file-excel"></i><span>{{ __('استيراد موظفين') }}</span></button>
