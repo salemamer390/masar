@@ -1,90 +1,54 @@
-/* إعدادات الإجازات — نفس تصميم الصفحة المعتمدة بخط التطبيق Cairo وألوان مسار (هذا القسم فقط) */
-#leavePolicy{--lp-ink:var(--color-primary-dark,#0B1F55);--lp-primary:var(--color-primary,#1677FF);--lp-soft:var(--color-primary-soft,#EAF2FF);--lp-border:var(--color-border,#E5ECF5);--lp-muted:var(--color-text-secondary,#6479A5);--lp-ok:#16a34a;--lp-mod:#d97706;--lp-bad:#dc2626;--lp-outside:#94a3b8}
-#leavePolicy .lp-toolbar{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--lp-border);border-radius:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px;margin-bottom:14px}
-#leavePolicy .lp-toolbar-title{flex:1;min-width:220px}
-#leavePolicy .lp-toolbar-title h3{font-size:17px;font-weight:600;color:var(--lp-ink);margin:0}
-#leavePolicy .lp-toolbar-title small{color:var(--lp-muted);font-size:12px}
-#leavePolicy .lp-dirty{font-size:12px;font-weight:600;color:#92610a;background:#fdf0d5;border:1px solid #f0d9a8;border-radius:20px;padding:3px 10px}
-#leavePolicy .lp-search-row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:12px;align-items:center;margin-bottom:18px}
-#leavePolicy .lp-summary{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-#leavePolicy .lp-pill{font-size:13px;padding:4px 12px;border-radius:20px;background:#fff;border:1px solid var(--lp-border);color:#44536b}
-#leavePolicy .lp-pill.mod{color:var(--lp-mod);border-color:var(--lp-mod)}
-#leavePolicy .lp-pill.bad{color:var(--lp-bad);border-color:var(--lp-bad)}
-#leavePolicy .lp-alert{font-size:13px;color:#44536b;background:var(--lp-soft);border:1px solid var(--lp-border);border-radius:8px;padding:10px 14px;margin-bottom:16px}
-#leavePolicy .lp-group{margin-top:26px}
-#leavePolicy .lp-group-title{font-size:17.6px;font-weight:600;color:var(--lp-ink);margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--lp-ink)}
-#leavePolicy .lp-group-note{font-size:13px;color:var(--lp-muted);margin:-4px 0 12px}
-#leavePolicy .lp-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-#leavePolicy .lp-card{background:#fff;border:1px solid var(--lp-border);border-inline-start:5px solid var(--lp-primary);border-radius:6px;padding:16px 18px;height:100%}
-#leavePolicy .lp-card.lp-wide{grid-column:1/-1}
-#leavePolicy .lp-card.lp-off{opacity:.6}
-#leavePolicy .lp-card.lp-st-ok{border-inline-start-color:var(--lp-ok)}
-#leavePolicy .lp-card.lp-st-review{border-inline-start-color:var(--lp-mod)}
-#leavePolicy .lp-card.lp-st-below{border-inline-start-color:var(--lp-bad)}
-#leavePolicy .lp-card.lp-st-outside{border-inline-start-color:var(--lp-outside)}
-#leavePolicy .lp-card.lp-refonly{border-inline-start-color:var(--lp-outside);background:#fbfcfe}
-#leavePolicy .lp-card-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid #eef1f4;margin-bottom:10px}
-#leavePolicy .lp-card-head h4{font-size:16px;font-weight:600;color:var(--lp-ink);margin:0;flex:1;min-width:140px}
-#leavePolicy .lp-art{font-size:12px;font-weight:500;background:var(--lp-soft);color:var(--lp-primary);padding:2px 8px;border-radius:4px;white-space:nowrap}
-#leavePolicy .lp-card-desc{font-size:13px;color:var(--lp-muted);margin:0 0 12px}
-#leavePolicy .lp-ref-note{font-size:12.5px;color:var(--lp-muted);background:#f6f8fa;border-radius:6px;padding:8px 10px;margin:10px 0 0}
-#leavePolicy .lp-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
-#leavePolicy .lp-lbl{display:block;font-size:13px;font-weight:500;color:#44536b;margin-bottom:4px}
-#leavePolicy .lp-input{display:flex;align-items:stretch;gap:0}
-#leavePolicy .lp-input .form-control,#leavePolicy .lp-input .form-select{flex:1;min-width:0}
-#leavePolicy .lp-unit{display:inline-flex;align-items:center;padding:0 10px;font-size:12.5px;color:var(--lp-muted);background:#f6f8fa;border:1px solid #dde3e8;border-inline-start:0;border-radius:0 6px 6px 0;white-space:nowrap}
-#leavePolicy .lp-input .form-control:has(+ .lp-unit),#leavePolicy .lp-input .form-select:has(+ .lp-unit){border-radius:6px 0 0 6px}
-#leavePolicy .lp-hint{display:block;font-size:12.5px;min-height:1.1rem;color:var(--lp-muted);margin-top:4px}
-#leavePolicy .lp-hint.is-mod{color:var(--lp-mod)}
-#leavePolicy .lp-hint.is-bad{color:var(--lp-bad)}
-#leavePolicy .lp-static{font-size:13px;color:var(--lp-muted);padding:7px 0}
-#leavePolicy .lp-impl{display:inline-block;font-size:12px;color:#64748b;background:#f1f5f9;border-radius:4px;padding:2px 8px;margin-top:4px}
-#leavePolicy .lp-check{display:flex;flex-direction:column;justify-content:flex-end}
-#leavePolicy .lp-card-note{font-size:12.5px;color:var(--lp-mod);margin-top:6px}
-#leavePolicy .lp-sub-title{grid-column:1/-1;font-size:14px;font-weight:600;color:var(--lp-primary);border-bottom:1px solid var(--lp-border);padding-bottom:6px;margin:16px 0 10px}
-#leavePolicy .lp-sect{margin-top:16px;border-top:1px dashed var(--lp-border);padding-top:14px}
-#leavePolicy .lp-sect-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-#leavePolicy .lp-sect-head h5{font-size:15px;font-weight:600;color:var(--lp-ink);margin:0;flex:1;min-width:140px}
-#leavePolicy .lp-note{grid-column:1/-1;font-size:13px;color:var(--lp-muted);margin:4px 0 0}
-#leavePolicy .lp-note-inline{display:block;font-size:12px;color:var(--lp-mod);margin-top:4px}
-#leavePolicy .lp-law-ref,#leavePolicy .lp-ref{margin-bottom:14px;padding:10px 14px;border-inline-start-width:1px}
-#leavePolicy .lp-law-ref summary,#leavePolicy .lp-ref summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--lp-ink)}
-#leavePolicy .lp-ref summary small{font-weight:400;color:var(--lp-muted);margin-inline-start:6px}
-#leavePolicy .lp-law-body{padding-top:12px;font-size:13px}
-#leavePolicy .lp-law-body p{margin:0 0 8px}
-#leavePolicy .lp-ref .lp-fields{margin-top:12px}
-#leavePolicy .lp-foot-note{font-size:13px;color:var(--lp-muted);margin-top:18px}
-#leavePolicy .lp-toast{position:fixed;bottom:18px;inset-inline-start:18px;z-index:1050;background:#1d2b36;color:#fff;font-size:13px;border-radius:8px;padding:10px 16px;opacity:0;pointer-events:none;transition:opacity .2s}
-#leavePolicy .lp-toast.show{opacity:1}
-#leavePolicy .form-control:focus,#leavePolicy .form-select:focus{border-color:var(--lp-primary);box-shadow:0 0 0 .2rem rgba(22,119,255,.18)}
-#leavePolicy .form-check-input:checked{background-color:var(--lp-primary);border-color:var(--lp-primary)}
-#leavePolicy .form-check-input:focus{box-shadow:0 0 0 .2rem rgba(22,119,255,.18);border-color:var(--lp-primary)}
-@media(max-width:900px){#leavePolicy .lp-cards{grid-template-columns:1fr}#leavePolicy .lp-fields{grid-template-columns:1fr}#leavePolicy .lp-search-row{grid-template-columns:1fr}#leavePolicy .lp-summary{justify-content:flex-start}}
+/* إعدادات الإجازات — نفس تصميم الصفحة المعتمدة حرفيًا (الترميز والترتيب والمقاسات)،
+   بألوان مسار وخط التطبيق Cairo، بدون استيراد/تصدير. النطاق: هذا القسم فقط. */
+#leavePolicy{--lp-ink:var(--color-primary-dark,#0B1F55);--lp-law:var(--color-primary,#1677FF);--lp-soft:var(--color-primary-soft,#EAF2FF);--lp-border:#dde3e8;--lp-paper:#f6f8fa;--lp-muted:#52616d;--lp-hint:#7a8791;--lp-mod:#b7791f;--lp-bad:#b42318}
+#leavePolicy h2,#leavePolicy h3{color:var(--lp-ink);font-weight:600}
 
-/* الوضع الداكن */
-body.preview-dark #leavePolicy{--lp-ink:var(--dm-text);--lp-soft:var(--dm-primary-soft);--lp-border:var(--dm-border);--lp-muted:var(--dm-muted)}
-body.preview-dark #leavePolicy .lp-toolbar,body.preview-dark #leavePolicy .lp-card{background:var(--dm-surface);border-color:var(--dm-border)}
-body.preview-dark #leavePolicy .lp-card.lp-refonly{background:var(--dm-surface-2)}
-body.preview-dark #leavePolicy .lp-card.lp-st-ok{border-inline-start-color:var(--lp-ok)}
-body.preview-dark #leavePolicy .lp-card.lp-st-review{border-inline-start-color:var(--lp-mod)}
-body.preview-dark #leavePolicy .lp-card.lp-st-below{border-inline-start-color:var(--lp-bad)}
-body.preview-dark #leavePolicy .lp-card.lp-refonly,body.preview-dark #leavePolicy .lp-card.lp-st-outside{border-inline-start-color:var(--lp-outside)}
-body.preview-dark #leavePolicy .lp-toolbar-title h3,body.preview-dark #leavePolicy .lp-card-head h4,body.preview-dark #leavePolicy .lp-sect-head h5,body.preview-dark #leavePolicy .lp-group-title{color:var(--dm-text)}
-body.preview-dark #leavePolicy .lp-group-title{border-bottom-color:var(--dm-primary)}
-body.preview-dark #leavePolicy .lp-card-head{border-bottom-color:var(--dm-border)}
-body.preview-dark #leavePolicy .lp-card-desc,body.preview-dark #leavePolicy .lp-hint,body.preview-dark #leavePolicy .lp-static,body.preview-dark #leavePolicy .lp-note,body.preview-dark #leavePolicy .lp-group-note,body.preview-dark #leavePolicy .lp-foot-note,body.preview-dark #leavePolicy .lp-ref-note{color:var(--dm-muted)}
-body.preview-dark #leavePolicy .lp-hint.is-mod{color:#f0b35c}
-body.preview-dark #leavePolicy .lp-hint.is-bad{color:#ff8a80}
-body.preview-dark #leavePolicy .lp-lbl{color:var(--dm-text-2)}
-body.preview-dark #leavePolicy .lp-pill{background:var(--dm-surface-2);border-color:var(--dm-border);color:var(--dm-text-2)}
-body.preview-dark #leavePolicy .lp-pill.mod{color:#f0b35c;border-color:#f0b35c}
-body.preview-dark #leavePolicy .lp-pill.bad{color:#ff8a80;border-color:#ff8a80}
-body.preview-dark #leavePolicy .lp-alert{background:var(--dm-surface-2);border-color:var(--dm-border);color:var(--dm-text-2)}
-body.preview-dark #leavePolicy .lp-art{background:var(--dm-primary-soft);color:#9ec2ff}
-body.preview-dark #leavePolicy .lp-unit{background:var(--dm-surface-2);border-color:var(--dm-border);color:var(--dm-muted)}
-body.preview-dark #leavePolicy .lp-ref-note{background:var(--dm-surface-2)}
-body.preview-dark #leavePolicy .lp-impl{background:var(--dm-surface-2);color:var(--dm-muted)}
-body.preview-dark #leavePolicy .lp-sub-title{color:#9ec2ff;border-bottom-color:var(--dm-border)}
-body.preview-dark #leavePolicy .lp-sect{border-top-color:var(--dm-border)}
-body.preview-dark #leavePolicy .lp-law-ref summary,body.preview-dark #leavePolicy .lp-ref summary{color:var(--dm-text)}
-body.preview-dark #leavePolicy .lp-ref summary small{color:var(--dm-muted)}
+/* شريط الأدوات — نفس محتوى التصميم: العنوان والوصف وزرا الحفظ والاستعادة */
+#leavePolicy .lp-toolbar{position:sticky;top:0;z-index:15;background:#fff;border:1px solid var(--lp-border);border-radius:6px;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem 1rem;margin-bottom:1rem}
+#leavePolicy .lp-toolbar-title{flex:1;min-width:220px;margin-inline-end:auto}
+#leavePolicy .lp-toolbar-title h3{font-size:1.05rem;margin:0}
+#leavePolicy .lp-toolbar-title small{color:var(--lp-hint);font-size:.78rem}
+#leavePolicy .lp-dirty{font-size:.78rem;font-weight:600;color:#92610a;background:#fdf0d5;border:1px solid #f0d9a8;border-radius:20px;padding:.2rem .7rem}
+
+/* البحث والملخص — نفس صف التصميم */
+#leavePolicy .lp-search-row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:.75rem;align-items:center;margin-bottom:1.5rem}
+#leavePolicy .lp-summary{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end}
+#leavePolicy .pill{font-size:.82rem;padding:.25rem .7rem;border-radius:20px;background:#fff;border:1px solid var(--lp-border);color:#44536b}
+#leavePolicy .pill.mod{color:var(--lp-mod);border-color:var(--lp-mod)}
+#leavePolicy .pill.bad{color:var(--lp-bad);border-color:var(--lp-bad)}
+
+/* عناوين المجموعات — نفس خط التصميم السفلي */
+#leavePolicy .group-title{font-size:1.1rem;margin:2rem 0 .75rem;padding-bottom:.4rem;border-bottom:2px solid var(--lp-ink)}
+#leavePolicy > .group-title:first-of-type{margin-top:0}
+
+/* البطاقة — نفس إطار التصميم: حد يمين 5px بلون الحالة */
+#leavePolicy .leave{background:#fff;border:1px solid var(--lp-border);border-inline-start:5px solid var(--lp-law);border-radius:6px;height:100%}
+#leavePolicy .leave.is-mod{border-inline-start-color:var(--lp-mod)}
+#leavePolicy .leave.is-bad{border-inline-start-color:var(--lp-bad)}
+#leavePolicy .leave.is-off{opacity:.6}
+#leavePolicy .leave-head{display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-bottom:1px solid #eef1f4}
+#leavePolicy .leave-head h3{font-size:1rem;margin:0;flex:1}
+#leavePolicy .art{font-size:.75rem;background:var(--lp-soft);color:var(--lp-law);padding:.15rem .5rem;border-radius:4px;white-space:nowrap}
+#leavePolicy .leave-body{padding:1rem}
+
+/* الحقول — نفس تسميات وتلميحات التصميم */
+#leavePolicy .lbl{font-size:.82rem;color:var(--lp-muted);margin-bottom:.2rem}
+#leavePolicy .hint-wrap .hint,#leavePolicy .hint{font-size:.74rem;min-height:1.1rem;margin-top:.2rem;color:var(--lp-hint);display:block}
+#leavePolicy .hint.mod{color:var(--lp-mod)}
+#leavePolicy .hint.bad{color:var(--lp-bad)}
+#leavePolicy .hint.note-op{color:var(--lp-hint)}
+#leavePolicy .note-op-block{font-size:.78rem;color:var(--lp-hint);margin-top:.6rem}
+#leavePolicy .note{font-size:.8rem;color:#6b7782}
+#leavePolicy .input-group-text{font-size:.78rem;color:var(--lp-muted);background:var(--lp-paper)}
+#leavePolicy .form-control:disabled,#leavePolicy .form-select:disabled{background:#fbfcfe;color:#6b7782}
+
+#leavePolicy .form-control:focus,#leavePolicy .form-check-input:focus{box-shadow:0 0 0 .2rem rgba(11,31,85,.18);border-color:var(--lp-ink)}
+#leavePolicy .form-check-input:checked{background-color:var(--lp-ink);border-color:var(--lp-ink)}
+
+#leavePolicy .lp-toast{position:sticky;bottom:10px;z-index:20;width:max-content;max-width:100%;margin-inline-start:auto;background:#14324a;color:#fff;font-size:.85rem;padding:.5rem 1rem;border-radius:6px;opacity:0;transition:opacity .2s}
+#leavePolicy .lp-toast.show{opacity:1}
+
+@media (max-width:767.98px){
+  #leavePolicy .lp-search-row{grid-template-columns:1fr}
+  #leavePolicy .lp-summary{justify-content:flex-start}
+}
