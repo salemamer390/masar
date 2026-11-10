@@ -36,7 +36,7 @@ class EmployeeImportController extends Controller
     public function template()
     {
         $path = resource_path('import-templates/employees-import-template.xlsx');
-        abort_unless(is_file($path), 404, 'ملف النموذج غير موجود.');
+        abort_unless(is_file($path), 404, __('ملف النموذج غير موجود.'));
 
         return response()->download($path, 'employees-import-template.xlsx', ['Cache-Control' => 'no-store']);
     }
@@ -515,9 +515,9 @@ class EmployeeImportController extends Controller
             'ack_dates' => ['nullable', 'boolean'],
             'ack_updates' => ['nullable', 'boolean'],
         ], [
-            'file.required' => 'اختر ملف Excel أو CSV أولًا.',
+            'file.required' => __('اختر ملف Excel أو CSV أولًا.'),
             'file.file' => 'الملف المرفوع غير صالح.',
-            'file.max' => 'حجم الملف يجب ألا يتجاوز 5 ميجابايت.',
+            'file.max' => __('حجم الملف يجب ألا يتجاوز 5 ميجابايت.'),
             'file.uploaded' => 'تعذر رفع الملف. تحقق من حجمه (الحد 5 ميجابايت) وحاول مرة أخرى.',
         ]);
 
