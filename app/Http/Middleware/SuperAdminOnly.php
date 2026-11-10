@@ -8,7 +8,7 @@ class SuperAdminOnly
     {
         if (!$request->user()?->isSuperAdmin()) {
             return redirect()->route('dashboard')
-                ->with('error', 'هذه الشاشة متاحة لمدير المنصة فقط.');
+                ->with('error', __('هذه الشاشة متاحة لمدير المنصة فقط.'));
         }
 
         return $next($request);
