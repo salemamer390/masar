@@ -167,7 +167,10 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_shared_type_edit_is_saved_per_company_and_does_not_touch_other_companies(): void
     {
         $page = $this->actingAs($this->ua)->get(route('payroll.settings.index'));
-        $page->assertOk()->assertSee('الإجازة السنوية')->assertSee('الحد الأدنى المضمون سنويًا');
+        $page->assertOk()->assertSee('الإجازة السنوية')->assertSee('name="policies[annual_first_year]"', false);
+        // The static «guaranteed 15» row was removed: it duplicated the same rule already
+        // governed by the editable السنة الأولى and مدة الانتظار fields (single source).
+        $page->assertDontSee('الحد الأدنى المضمون سنويًا');
         foreach (['maternity_days', 'maternity_max_occurrences', 'childcare_max_occurrences', 'pilgrimage_min_service_months', 'newborn_max_occurrences'] as $dup) {
             $page->assertDontSee('name="policies['.$dup.']"', false);
         }
