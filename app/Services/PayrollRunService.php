@@ -733,12 +733,30 @@ class PayrollRunService
             })->values();
     }
 
+    private array $sickPayBasisCache = [];
+
     private function isUnpaidLeave(Leave $leave): bool
     {
         $type = $leave->leaveType;
         if (!$type) return false;
+        if (strtolower(trim((string) $type->policy_code)) === 'unpaid') return true;
+        // Sick pay basis is a per-company policy (leave_policy_settings.sick_pay_basis):
+        // «أجر كامل» = never deducted, «بدون أجر» = deducted like unpaid leave. «حسب قانون
+        // التأمينات» is the phased insurance-law compensation which payroll does not compute;
+        // it keeps the shared type's flag until the business rule is decided.
+        if ($type->policy_code === 'sick' && $leave->employee_id) {
+            $companyId = \Illuminate\Support\Facades\DB::table('employees')->where('id', $leave->employee_id)->value('company_id');
+            if ($companyId) {
+                if (!array_key_exists($companyId, $this->sickPayBasisCache)) {
+                    $this->sickPayBasisCache[$companyId] = \Illuminate\Support\Facades\DB::table('leave_policy_settings')->where('company_id', $companyId)->where('setting_key', 'sick_pay_basis')->value('setting_value');
+                }
+                $basis = $this->sickPayBasisCache[$companyId];
+                if ($basis === 'full') return false;
+                if ($basis === 'none') return true;
+            }
+        }
 
-        return !(bool) $type->is_paid || strtolower(trim((string) $type->policy_code)) === 'unpaid';
+        return !(bool) $type->is_paid;
     }
 
     /** @return string[] Y-m-d dates of the leave that fall inside the window (rest days and holidays optionally skipped) */
