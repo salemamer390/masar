@@ -24,8 +24,9 @@
  * structures, profile details, emergency contacts, bank accounts, attendance
  * states, leaves (incl. maternity), leave balances, HR requests, documents
  * (with real downloadable demo PDF files), insurance, penalties, movements,
- * a Draft payroll run with records, and required reference rows (leave types,
- * penalty/movement types, payment methods, bank).
+ * payroll runs in three states (Draft, Approved, Locked) with their records,
+ * a Draft end-of-service settlement, and required reference rows (leave
+ * types, penalty/movement types, payment methods, bank).
  */
 
 require 'vendor/autoload.php';
@@ -150,11 +151,14 @@ DB::transaction(function () use ($now, $cid, $ensure, $makePdf, &$inserted, &$sk
     $mona  = $mk(['employee_code'=>'D002','first_name'=>'Mona','last_name'=>'Ali','full_name'=>'Mona Ali','national_id'=>'29505050505050','phone'=>'01000000002','email'=>'mona.demo@masar.test','gender'=>'female','birth_date'=>'1995-05-05','address'=>'New Cairo','marital_status'=>'single','qualification'=>'BA Media','hire_date'=>'2023-06-01','contract_start_date'=>'2023-06-01','contract_end_date'=>'2026-05-31','shift_start'=>'10:00','shift_end'=>'18:00','manager_employee_id'=>$ahmed->id,'gross_salary'=>$grossOf(12000)]);
     $sara  = $mk(['employee_code'=>'D003','first_name'=>'Sara','last_name'=>'Hassan','full_name'=>'Sara Hassan','national_id'=>'29003030303030','phone'=>'01000000003','email'=>'sara.demo@masar.test','gender'=>'female','birth_date'=>'1990-03-03','address'=>'Sheikh Zayed','marital_status'=>'married','qualification'=>'BSc CS','hire_date'=>'2019-09-01','contract_start_date'=>'2019-09-01','contract_end_date'=>null,'shift_start'=>'09:00','shift_end'=>'17:00','expected_delivery_date'=>'2027-01-15','pregnancy_reduction_start'=>'2026-12-01','gross_salary'=>$grossOf(25000)]);
     $omar  = $mk(['employee_code'=>'D004','first_name'=>'Omar','last_name'=>'Farouk','full_name'=>'Omar Farouk','national_id'=>'28807070707070','phone'=>'01000000004','email'=>'omar.demo@masar.test','gender'=>'male','birth_date'=>'1988-07-07','address'=>'6th October','marital_status'=>'married','qualification'=>'MBA','hire_date'=>'2024-01-15','contract_start_date'=>'2024-01-15','contract_end_date'=>'2026-01-14','shift_start'=>'08:30','shift_end'=>'16:30','gross_salary'=>$grossOf(22000)]);
+    $hassan= $mk(['employee_code'=>'D005','first_name'=>'Hassan','last_name'=>'Mostafa','full_name'=>'Hassan Mostafa','national_id'=>'29404040404040','phone'=>'01000000005','email'=>'hassan.demo@masar.test','gender'=>'male','birth_date'=>'1994-04-04','address'=>'Heliopolis, Cairo','marital_status'=>'single','qualification'=>'BSc Engineering','hire_date'=>'2022-03-01','contract_start_date'=>'2022-03-01','contract_end_date'=>'2027-02-28','shift_start'=>'09:00','shift_end'=>'17:00','gross_salary'=>$grossOf(15000)]);
+    $laila = $mk(['employee_code'=>'D006','first_name'=>'Laila','last_name'=>'Samir','full_name'=>'Laila Samir','national_id'=>'29606060606060','phone'=>'01000000006','email'=>'laila.demo@masar.test','gender'=>'female','birth_date'=>'1996-06-06','address'=>'Maadi, Cairo','marital_status'=>'single','qualification'=>'BA Accounting','hire_date'=>'2024-05-01','contract_start_date'=>'2024-05-01','contract_end_date'=>'2027-04-30','shift_start'=>'09:00','shift_end'=>'17:00','gross_salary'=>$grossOf(13500)]);
+    $karim = $mk(['employee_code'=>'D007','first_name'=>'Karim','last_name'=>'Adel','full_name'=>'Karim Adel','national_id'=>'29109090909090','phone'=>'01000000007','email'=>'karim.demo@masar.test','gender'=>'male','birth_date'=>'1991-09-09','address'=>'Dokki, Giza','marital_status'=>'married','qualification'=>'B.Com','hire_date'=>'2020-11-01','contract_start_date'=>'2020-11-01','contract_end_date'=>null,'shift_start'=>'08:00','shift_end'=>'16:00','gross_salary'=>$grossOf(17000)]);
 
     // --- Salaries, profiles, contacts, bank accounts ------------------------------
     // NOTE: these child tables carry a company scope, so company_id is set
     // explicitly (direct inserts bypass the model hook that would do it).
-    foreach ([[$ahmed,18000], [$mona,12000], [$sara,25000], [$omar,22000]] as [$e, $amt]) {
+    foreach ([[$ahmed,18000], [$mona,12000], [$sara,25000], [$omar,22000], [$hassan,15000], [$laila,13500], [$karim,17000]] as [$e, $amt]) {
         $structure = $calc->structure(['salary_type' => 'net', 'salary_input' => $amt]);
         $ensure('salaries', ['employee_id' => $e->id, 'effective_from' => $e->hire_date],
             array_merge(['company_id'=>$cid,'employee_id'=>$e->id,'effective_from'=>$e->hire_date,'salary_type'=>'net','salary_input'=>$amt,'deductions'=>0,'fixed_deductions'=>0,'status'=>'Active','payment_method_id'=>$pm->first(),'created_at'=>$now,'updated_at'=>$now], $calc->persistFields($structure)));
@@ -172,7 +176,7 @@ DB::transaction(function () use ($now, $cid, $ensure, $makePdf, &$inserted, &$sk
     }
 
     // --- Attendance ----------------------------------------------------------------
-    foreach ([[$ahmed,'2026-11-02','09:05','17:12','Present',0,7], [$mona,'2026-11-03','10:21','18:00','Late',21,0], [$sara,'2026-11-04','09:00','16:10','Early Leave',0,0], [$omar,'2026-11-05',null,null,'Absent',0,0]] as [$e,$date,$in,$out,$status,$late,$ot]) {
+    foreach ([[$ahmed,'2026-11-02','09:05','17:12','Present',0,7], [$mona,'2026-11-03','10:21','18:00','Late',21,0], [$sara,'2026-11-04','09:00','16:10','Early Leave',0,0], [$omar,'2026-11-05',null,null,'Absent',0,0], [$hassan,'2026-11-06','08:55','17:02','Present',0,0], [$laila,'2026-11-06','09:18','17:05','Late',18,0], [$karim,'2026-11-06','08:02','16:20','Present',0,20]] as [$e,$date,$in,$out,$status,$late,$ot]) {
         $ensure('attendance', ['employee_id' => $e->id, 'attendance_date' => $date],
             ['company_id'=>$cid,'employee_id'=>$e->id,'attendance_date'=>$date,'check_in'=>$in,'check_out'=>$out,'status'=>$status,'source'=>'manual','approval_status'=>'approved','late_minutes'=>$late,'overtime_minutes'=>$ot,'early_leave_minutes'=>$status==='Early Leave'?50:0,'worked_hours'=>$in&&$out?7.5:0,'created_at'=>$now,'updated_at'=>$now]);
     }
@@ -182,7 +186,7 @@ DB::transaction(function () use ($now, $cid, $ensure, $makePdf, &$inserted, &$sk
         $ensure('leaves', ['employee_id' => $e->id, 'start_date' => $from, 'leave_type_id' => $lt[$code] ?? null],
             ['company_id'=>$cid,'employee_id'=>$e->id,'leave_type_id'=>$lt[$code]??null,'start_date'=>$from,'end_date'=>$to,'days'=>$days,'reason'=>'Demo '.$code,'status'=>$status,'created_at'=>$now,'updated_at'=>$now]);
     }
-    foreach ([$ahmed,$mona,$sara,$omar] as $e) {
+    foreach ([$ahmed,$mona,$sara,$omar,$hassan,$laila,$karim] as $e) {
         $ensure('leave_balances', ['employee_id' => $e->id, 'leave_year' => 2026],
             ['employee_id'=>$e->id,'leave_year'=>2026,'annual_entitlement'=>21,'annual_used'=>$e->id===$ahmed->id?3:0,'carried_balance'=>0,'annual_balance_remaining'=>$e->id===$ahmed->id?18:21,'casual_used'=>$e->id===$mona->id?1:0,'advance_used'=>0,'manual_adjustment'=>0,'created_at'=>$now,'updated_at'=>$now]);
     }
@@ -222,31 +226,35 @@ DB::transaction(function () use ($now, $cid, $ensure, $makePdf, &$inserted, &$sk
     $ensure('movement_records', ['employee_id' => $ahmed->id, 'movement_type_id' => $mt->get('Promotion', $mt->first()), 'movement_date' => '2025-01-01'],
         ['company_id'=>$cid,'employee_id'=>$ahmed->id,'movement_type_id'=>$mt->get('Promotion', $mt->first()),'movement_date'=>'2025-01-01','old_department_id'=>$ahmed->department_id,'new_department_id'=>$ahmed->department_id,'old_job_id'=>$ahmed->job_id,'new_job_id'=>$ahmed->job_id,'old_salary'=>15000,'new_salary'=>18000,'reason'=>'Annual promotion','created_at'=>$now,'updated_at'=>$now]);
 
-    // --- Draft payroll run for 2026-10 -------------------------------------------------
-    // Idempotence marker: a Draft run for 2026-10 in this company. If one already
-    // exists (ours or the user's in this isolated DB) it is reused, and records
-    // are still ensured per employee.
-    // One run per company+month is enforced by a unique key; reuse whatever
-    // exists. Records are only added while the run is still a Draft.
-    $run = DB::table('payroll_runs')->where(['company_id'=>$cid,'payroll_month'=>'2026-10-01'])->first();
-    if (!$run) {
-        $runId = DB::table('payroll_runs')->insertGetId(['company_id'=>$cid,'payroll_month'=>'2026-10-01','period_start'=>'2026-10-01','period_end'=>'2026-10-31','status'=>'Draft','created_at'=>$now,'updated_at'=>$now]);
-        $inserted++;
-        $runIsDraft = true;
-    } else {
-        $runId = $run->id;
-        $runIsDraft = $run->status === 'Draft';
-        $skipped++;
-        if (!$runIsDraft) echo "note: 2026-10 payroll run #{$runId} already exists with status {$run->status}; leaving it untouched.\n";
-    }
-    foreach ($runIsDraft ? [$ahmed,$mona,$sara,$omar] : [] as $e) {
-        $sal = DB::table('salaries')->where('employee_id', $e->id)->where('status', 'Active')->first();
-        if (!$sal) continue;
-        $ensure('payroll_records', ['payroll_run_id' => $runId, 'employee_id' => $e->id],
-            ['company_id'=>$cid,'payroll_run_id'=>$runId,'employee_id'=>$e->id,'salary_id'=>$sal->id,'agreed_net_salary'=>$sal->net_salary,'payroll_month'=>'2026-10-01','basic_salary'=>$sal->basic_salary,'allowances'=>$sal->allowances,'housing_allowance'=>$sal->housing_allowance,'transportation_allowance'=>$sal->transportation_allowance,'meal_allowance'=>$sal->meal_allowance,'deductions'=>$sal->deductions,'net_salary'=>$sal->net_salary,'status'=>'Draft','gross_salary'=>$sal->gross_salary,'monthly_total'=>$sal->gross_salary,'insurance_wage'=>$sal->insurance_wage?:0,'employee_insurance'=>$sal->employee_insurance,'income_tax'=>$sal->income_tax,'martyrs_fund'=>$sal->martyrs_fund,'employer_insurance'=>$sal->employer_insurance,'employee_cost'=>$sal->employee_cost,'fixed_deductions'=>$sal->fixed_deductions,'clothing_allowance'=>$sal->clothing_allowance,'created_at'=>$now,'updated_at'=>$now]);
+    // --- Payroll runs in three states ---------------------------------------------------
+    // Locked 2026-08, Approved 2026-09, Draft 2026-10 - so the payroll screens,
+    // payslips and reports all have data in every workflow state.
+    // One run per company+month is enforced by a unique key; an existing run
+    // whose status differs from the plan is left untouched (never downgraded).
+    $allEmployees = [$ahmed,$mona,$sara,$omar,$hassan,$laila,$karim];
+    foreach ([['2026-08-01','2026-08-31','Locked'], ['2026-09-01','2026-09-30','Approved'], ['2026-10-01','2026-10-31','Draft']] as [$mStart,$mEnd,$runStatus]) {
+        $run = DB::table('payroll_runs')->where(['company_id'=>$cid,'payroll_month'=>$mStart])->first();
+        if (!$run) {
+            $runId = DB::table('payroll_runs')->insertGetId(['company_id'=>$cid,'payroll_month'=>$mStart,'period_start'=>$mStart,'period_end'=>$mEnd,'status'=>$runStatus,'created_at'=>$now,'updated_at'=>$now]);
+            $inserted++;
+        } else {
+            $runId = $run->id;
+            $skipped++;
+            if ($run->status !== $runStatus) { echo "note: {$mStart} payroll run #{$runId} already exists with status {$run->status}; leaving it untouched.\n"; continue; }
+        }
+        foreach ($allEmployees as $e) {
+            $sal = DB::table('salaries')->where('employee_id', $e->id)->where('status', 'Active')->first();
+            if (!$sal) continue;
+            $ensure('payroll_records', ['payroll_run_id' => $runId, 'employee_id' => $e->id],
+                ['company_id'=>$cid,'payroll_run_id'=>$runId,'employee_id'=>$e->id,'salary_id'=>$sal->id,'agreed_net_salary'=>$sal->net_salary,'payroll_month'=>$mStart,'basic_salary'=>$sal->basic_salary,'allowances'=>$sal->allowances,'housing_allowance'=>$sal->housing_allowance,'transportation_allowance'=>$sal->transportation_allowance,'meal_allowance'=>$sal->meal_allowance,'deductions'=>$sal->deductions,'net_salary'=>$sal->net_salary,'status'=>$runStatus,'is_locked'=>$runStatus==='Locked'?1:0,'gross_salary'=>$sal->gross_salary,'monthly_total'=>$sal->gross_salary,'insurance_wage'=>$sal->insurance_wage?:0,'employee_insurance'=>$sal->employee_insurance,'income_tax'=>$sal->income_tax,'martyrs_fund'=>$sal->martyrs_fund,'employer_insurance'=>$sal->employer_insurance,'employee_cost'=>$sal->employee_cost,'fixed_deductions'=>$sal->fixed_deductions,'clothing_allowance'=>$sal->clothing_allowance,'created_at'=>$now,'updated_at'=>$now]);
+        }
     }
 
-    echo "employees: D001={$ahmed->id} D002={$mona->id} D003={$sara->id} D004={$omar->id}, draft payroll run={$runId}\n";
+    // --- Draft end-of-service settlement -------------------------------------------------
+    $ensure('settlements', ['employee_id' => $omar->id, 'last_working_day' => '2026-11-15'],
+        ['company_id'=>$cid,'employee_id'=>$omar->id,'reason'=>'contract_end','last_working_day'=>'2026-11-15','status'=>'Draft','anchor_month'=>'2026-11-01','period_start'=>'2026-11-01','period_end'=>'2026-11-30','leave_balance_days'=>0,'leave_payout_mode'=>'pending','leave_payout_amount'=>0,'advance_outstanding'=>0,'advance_recovery_mode'=>'pending','advance_recovery_amount'=>0,'gratuity_amount'=>0,'manual_earnings'=>0,'manual_deductions'=>0,'total_earnings'=>0,'total_deductions'=>0,'net_amount'=>0,'notes'=>'Demo settlement (isolated test data)','created_at'=>$now,'updated_at'=>$now]);
+
+    echo "employees: D001={$ahmed->id} D002={$mona->id} D003={$sara->id} D004={$omar->id} D005={$hassan->id} D006={$laila->id} D007={$karim->id}\n";
 });
 
 echo "Done. Rows inserted: {$inserted}, already present (skipped): {$skipped}.\n";
