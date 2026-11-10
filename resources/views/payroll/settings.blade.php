@@ -321,7 +321,7 @@
 <div class="leave-body"><div class="row g-3">
 {!! $lvN('childcare', 'months', 'المدة', 24, 'min', 'شهر', 'policies[childcare_max_years_per_request]', ((float) $pol('childcare_max_years_per_request', 2)) * 12, null, ['op' => 'div', 'factor' => 12, 'target' => 'childcare-months-years']) !!}
 {!! $lvN('childcare', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $childcareType ? 'types['.$childcareType->id.'][max_occurrences_service]' : null, $childcareType?->limits['max_occurrences_service'] ?? 3) !!}
-{!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', null, 50, 'مرجع قانوني — أهلية حجم المنشأة لا تُتحقق آليًا حاليًا') !!}
+{!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', null, 50, 'مرجع قانوني — تُتحقق آليًا من عدد عمال شركتك عند الاعتماد، وقيمتها ثابتة حاليًا') !!}
 {!! $lvN('childcare', 'service', 'أقل مدة وجود في المنشأة', 1, 'max', 'سنة', $childcareType ? 'types['.$childcareType->id.'][min_service_months]' : null, ($childcareType?->limits['min_service_months'] ?? 12) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'childcare-service-months']) !!}
 {!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
 {!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
