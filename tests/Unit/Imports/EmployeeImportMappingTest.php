@@ -48,6 +48,15 @@ class EmployeeImportMappingTest extends TestCase
         $this->assertSame([0 => 'full_name', 1 => 'status'], $map);
     }
 
+    public function test_common_personnel_aliases_are_mapped(): void
+    {
+        $aliases = $this->invoke('aliasMap');
+
+        $this->assertSame('employee_code', $aliases[$this->service->key('الرقم')]);
+        $this->assertSame('full_name', $aliases[$this->service->key('الاسم الرباعي')]);
+        $this->assertSame('national_id', $aliases[$this->service->key('البطاقة')]);
+    }
+
     public function test_unknown_header_needs_a_manual_mapping_until_the_user_confirms(): void
     {
         $aliases = $this->invoke('aliasMap');
