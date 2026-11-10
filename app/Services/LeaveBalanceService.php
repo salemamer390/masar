@@ -246,12 +246,17 @@ class LeaveBalanceService
         }
         if ($type->policy_code === 'maternity') {
             $minPost = (int) $this->policyFor('maternity_min_postpartum_days', '45', $companyIdForPolicy);
+            // The recorded birth is the fact; the expected delivery date is the
+            // plan HR enters up front. The postpartum minimum checks the fact
+            // when present, otherwise the plan. The two are never mixed.
             $birth = $leave->birth_date ? Carbon::parse($leave->birth_date)->startOfDay() : null;
-            if ($birth && $minPost > 0) {
-                $postStart = $start->copy()->startOfDay()->max($birth->copy()->addDay());
+            $expected = $leave->expected_delivery_date ? Carbon::parse($leave->expected_delivery_date)->startOfDay() : null;
+            $deliveryReference = $birth ?? $expected;
+            if ($deliveryReference && $minPost > 0) {
+                $postStart = $start->copy()->startOfDay()->max($deliveryReference->copy()->addDay());
                 $needed = $postStart->copy()->addDays($minPost - 1);
                 if (Carbon::parse($leave->end_date)->startOfDay()->lt($needed)) $this->fail('end_date', "لا يمكن اعتماد {$type->name}: يجب ألا تقل المدة بعد الوضع عن {$minPost} يومًا، فلا تنتهي الإجازة قبل {$needed->format('d/m/Y')}.");
-            } elseif (!$birth && $minPost > 0) {
+            } elseif (!$deliveryReference && $minPost > 0) {
                 $proofErrors[] = "{$type->name}: لم يُسجَّل تاريخ الولادة (أو التاريخ المرجح)، فلا يمكن التحقق من حد {$minPost} يومًا بعد الوضع.";
             }
         }

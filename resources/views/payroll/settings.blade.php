@@ -126,7 +126,8 @@
       if (!isset($leavePolicies[$key])) return '';
       $ref = \App\Support\LeaveLegalReference::class;
       $status = $key === 'annual_first_year' ? 'review' : $ref::policyStatus($key, $leavePolicies[$key]->setting_value);
-      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small>'.e($ref::policyHint($key)).'</small><span class="badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span></div>';
+      $implBadge = $readonly ? '<span class="badge text-bg-secondary">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
+      return '<div class="settings-field"><label class="form-label">'.e($leavePolicyLabels[$key] ?? $key).'</label><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control"><small>'.e($ref::policyHint($key)).'</small><span class="badge text-bg-'.$ref::CLASSES[$status].'">'.$ref::LABELS[$status].'</span>'.$implBadge.'</div>';
   };
 ?>
 <div class="settings-card lv-wide"><div class="settings-card-head"><h3>الإجازة السنوية</h3><span>الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</span></div><div class="settings-card-grid lv-grid4">
@@ -153,8 +154,11 @@
 <div class="settings-card lv-wide"><div class="settings-card-head"><h3>المدد التقويمية والمستندات</h3><span>الوضع بالشهور ورعاية الطفل بالسنوات. رفع المستند مطلوب فعليًا عند تفعيل «مستند مطلوب». إجازة الامتحانات بأجر: 10 أيام إخطار، بخلاف 15 يومًا لاختيار توقيت السنوية للامتحان.</span></div><div class="settings-card-grid lv-grid4">
 {!! $lvField('maternity_months') !!}{!! $lvField('maternity_min_postpartum_days') !!}{!! $lvField('childcare_max_years_per_request') !!}{!! $lvField('childcare_min_gap_years') !!}{!! $lvField('exam_notice_days') !!}{!! $lvField('contagious_max_months') !!}
 </div></div>
-<details class="settings-card wide lv-ref"><summary>إعدادات محفوظة للعرض فقط <small>لا تؤثر على الحساب حاليًا</small></summary><div class="settings-card-grid">
-{!! $lvField('annual_prorate_first_year', true) !!}{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('pregnancy_reduced_hours_per_day', true) !!}{!! $lvField('pregnancy_overtime_protection_months', true) !!}{!! $lvField('nursing_sessions_per_day', true) !!}{!! $lvField('nursing_minutes_per_session', true) !!}
+<div class="settings-card lv-wide"><div class="settings-card-head"><h3>حقوق الحمل والرضاعة (م54–م56)</h3><span>مطبّقة في الحساب: تخفيض ساعات الحامل وسماح الرضاعة يعوّضان التأخير والانصراف المبكر بحد اليومية أدناه، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع. الأساس: التاريخ المتوقع للولادة وتاريخ الولادة الفعلي المسجَّلان على إجازة الوضع، ولا يبدأ تخفيض ساعات الحامل إلا بتاريخ موثّق من الشهادة الطبية على الإجازة. إعداد «بدء تخفيض ساعات الحامل (الشهر)» مرجع قانوني فقط حاليًا ولا يؤثر على الحساب.</span></div><div class="settings-card-grid">
+{!! $lvField('pregnancy_reduced_hours_per_day') !!}{!! $lvField('pregnancy_overtime_protection_months') !!}{!! $lvField('nursing_sessions_per_day') !!}{!! $lvField('nursing_minutes_per_session') !!}
+</div></div>
+<details class="settings-card wide lv-ref"><summary>إعداد محفوظ للعرض فقط <small>لا يؤثر على الحساب حاليًا</small></summary><div class="settings-card-grid">
+{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}{!! $lvField('annual_prorate_first_year', true) !!}
 </div></details>
 </div>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ التعديلات</button></span></div>

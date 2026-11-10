@@ -14,6 +14,7 @@ use App\Services\LeaveBalanceService;
 use App\Services\PayrollRunService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class LeaveController extends Controller
 {
@@ -63,6 +64,8 @@ class LeaveController extends Controller
             'is_early_grant' => ['nullable', 'boolean'],
             'early_grant_reason' => ['nullable', 'string', 'max:500'],
             'birth_date' => ['nullable', 'date'],
+            'expected_delivery_date' => ['nullable', 'date'],
+            'pregnancy_reduction_start' => ['nullable', 'date'],
             'document' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
@@ -95,6 +98,8 @@ class LeaveController extends Controller
         $proposed->fill(['employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'], 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'is_early_grant' => (bool) ($data['is_early_grant'] ?? false), 'early_grant_reason' => $data['early_grant_reason'] ?? null]);
         $proposed->unsetRelation('employee')->unsetRelation('leaveType');
         if ($request->has('birth_date')) $proposed->birth_date = $data['birth_date'] ?? null;
+        if ($request->has('expected_delivery_date')) $proposed->expected_delivery_date = $data['expected_delivery_date'] ?? null;
+        if ($request->has('pregnancy_reduction_start')) $proposed->pregnancy_reduction_start = $data['pregnancy_reduction_start'] ?? null;
         if ((int) $leave->employee_id !== (int) $data['employee_id']) { $proposed->document_path = null; $proposed->document_name = null; }
         if ($request->hasFile('document')) { $proposed->document_path = '(uploaded)'; $proposed->document_name = $request->file('document')->getClientOriginalName(); }
         $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
@@ -102,6 +107,8 @@ class LeaveController extends Controller
         $newDocumentPath = $request->hasFile('document') ? $request->file('document')->store('leave-documents/'.$data['employee_id'], 'local') : null;
         $leave->update([
             'birth_date' => $proposed->birth_date,
+            'expected_delivery_date' => $proposed->expected_delivery_date,
+            'pregnancy_reduction_start' => $proposed->pregnancy_reduction_start,
             'document_path' => $newDocumentPath ?? $proposed->document_path, 'document_name' => $proposed->document_name,
             'employee_id' => $data['employee_id'], 'leave_type_id' => $data['leave_type_id'],
             'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(), 'days' => $days,
@@ -139,6 +146,8 @@ class LeaveController extends Controller
             'is_early_grant' => ['nullable', 'boolean'],
             'early_grant_reason' => ['nullable', 'string', 'max:500'],
             'birth_date' => ['nullable', 'date'],
+            'expected_delivery_date' => ['nullable', 'date'],
+            'pregnancy_reduction_start' => ['nullable', 'date'],
             'document' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ]);
         $data['status'] = ($data['status'] ?? null) === 'Rejected' ? 'Rejected' : 'Approved';
@@ -205,7 +214,10 @@ class LeaveController extends Controller
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $data = $request->validate(['rejection_reason' => ['nullable', 'string', 'max:500']]);
         $oldValues = $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']);
-        $leave->update(['status' => 'Rejected', 'approved_by' => auth()->id(), 'approved_at' => now(), 'rejection_reason' => $data['rejection_reason'] ?? null]);
+        DB::transaction(function () use ($leave, $data): void {
+            $leave->update(['status' => 'Rejected', 'approved_by' => auth()->id(), 'approved_at' => now(), 'rejection_reason' => $data['rejection_reason'] ?? null]);
+            $this->restorePregnancyDatesToEmployeeFile($leave);
+        });
         $this->leaveBalances->sync($leave->employee, $leave->start_date);
         $this->leaveStatus->sync();
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
@@ -221,7 +233,10 @@ class LeaveController extends Controller
         $snapshot = $leave->toArray();
         $employee = $leave->employee;
         $start = $leave->start_date->copy();
-        $leave->delete();
+        DB::transaction(function () use ($leave): void {
+            $this->restorePregnancyDatesToEmployeeFile($leave);
+            $leave->delete();
+        });
         $this->leaveBalances->sync($employee, $start);
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $snapshot['employee_id']);
         $this->leaveStatus->sync();
@@ -229,6 +244,25 @@ class LeaveController extends Controller
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request deleted.', 'leave_id' => $snapshot['id']])
             : back()->with('toast', 'تم حذف طلب الإجازة.');
+    }
+
+    /**
+     * A rejected or deleted maternity leave must not silently drop the working
+     * pregnancy rights its certificate dates carried: hand them back to the
+     * employee file unless a newer pregnancy is already recorded there.
+     */
+    private function restorePregnancyDatesToEmployeeFile(Leave $leave): void
+    {
+        if (!$leave->expected_delivery_date || $leave->leaveType?->policy_code !== 'maternity') {
+            return;
+        }
+        $employee = $leave->employee;
+        if (!$employee || $employee->expected_delivery_date !== null) {
+            return;
+        }
+        $employee->expected_delivery_date = $leave->expected_delivery_date;
+        $employee->pregnancy_reduction_start = $leave->pregnancy_reduction_start;
+        $employee->save();
     }
 
     private function workingDays(Carbon $start, Carbon $end): int

@@ -164,6 +164,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
         Route::put('/{employee}', [EmployeeController::class, 'update'])
             ->middleware('permission:employees.edit')
             ->name('update');
+        Route::post('/{employee}/maternity-leave', [EmployeeController::class, 'maternityLeave'])
+            ->middleware('permission:employees.edit')
+            ->name('maternity-leave');
         Route::get('/{employee}/photo', [EmployeeController::class, 'showPhoto'])
             ->middleware('permission:employees.view')
             ->name('photo.show');

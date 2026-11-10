@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = Number(form.closest('.modal')?.id?.replace('editLeave',''));
     const leave = leaveCache[id] || {};
     const area = document.createElement('div'); area.className='mt-3 leave-proof-fields';
-    area.innerHTML = `<div data-birth-fields><label class="form-label">تاريخ الولادة (أو المتوقع، لإجازة الوضع)</label><input type="date" name="birth_date" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.birth_date || '').slice(0,10))}"></div><label class="form-label">مستند الإجازة (حتى 10 ميجابايت)</label><input type="file" name="document" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><small class="text-muted" data-proof-instruction></small>${leave.document_path ? `<a class="d-block mt-1" target="_blank" href="${leaveBaseUrl}/${id}/document">عرض المستند المحفوظ</a>` : ''}`;
+    area.innerHTML = `<div data-birth-fields><label class="form-label">التاريخ المتوقع للولادة (خطة، من الشهادة الطبية)</label><input type="date" name="expected_delivery_date" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.expected_delivery_date || '').slice(0,10))}"><label class="form-label">تاريخ الولادة الفعلي (يُسجَّل بعد الولادة)</label><input type="date" name="birth_date" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.birth_date || '').slice(0,10))}"><label class="form-label">بداية تخفيض ساعات الحمل (اختياري، من الشهادة الطبية)</label><input type="date" name="pregnancy_reduction_start" class="form-control mb-2" value="${escapeLeaveHtml(String(leave.pregnancy_reduction_start || '').slice(0,10))}"><small class="text-muted d-block mb-2">بدونها لا يُطبَّق تخفيض ساعات الحامل؛ التاريخ المتوقع وحده لا يكفي.</small><small class="text-muted d-block mb-2">التاريخ المتوقع لحقوق الحمل، والفعلي لحقوق الرضاعة ومنع الإضافي بعد الوضع.</small></div><label class="form-label">مستند الإجازة (حتى 10 ميجابايت)</label><input type="file" name="document" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"><small class="text-muted" data-proof-instruction></small>${leave.document_path ? `<a class="d-block mt-1" target="_blank" href="${leaveBaseUrl}/${id}/document">عرض المستند المحفوظ</a>` : ''}`;
     form.querySelector('.modal-body').appendChild(area);
     const select = form.querySelector('[name="leave_type_id"]');
     const updateProof = () => {
@@ -93,7 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const maternity = type.policy_code === 'maternity';
       area.querySelector('[data-birth-fields]').hidden = !maternity;
       area.querySelector('[name="birth_date"]').disabled = !maternity;
-      area.querySelector('[name="birth_date"]').required = maternity;
+      area.querySelector('[name="expected_delivery_date"]').disabled = !maternity;
+      area.querySelector('[name="pregnancy_reduction_start"]').disabled = !maternity;
       area.querySelector('[data-proof-instruction]').textContent = type.policy_code === 'exams'
         ? 'إثبات دخول الامتحان مطلوب حسب سياسة الشركة. مهلة الإخطار المحددة: ' + @json(app(\App\Services\LeaveBalanceService::class)->policy('exam_notice_days', '10')) + ' أيام.'
         : maternity ? 'شهادة طبية موضح بها تاريخ الولادة المتوقع، مع تاريخ الولادة للتحقق من الحد الأدنى بعدها.'

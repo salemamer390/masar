@@ -9,7 +9,10 @@ use Illuminate\Support\Collection;
 /** One day is classified once, for the attendance page, the monthly summary and open payroll. */
 class EmployeePeriodMetrics
 {
-    public function __construct(private readonly HrOperationalSettingsService $settings) {}
+    public function __construct(
+        private readonly HrOperationalSettingsService $settings,
+        private readonly PregnancyNursingRightsService $rights,
+    ) {}
 
     /**
      * Per-day classification over [$from, $to]. Each entry:
@@ -69,6 +72,16 @@ class EmployeePeriodMetrics
                 $early = max(0, (int) $present->max('early_leave_minutes'));
                 if ($clockIns->isNotEmpty()) $late = max(0, $late - $this->covered($permissions, $shiftStart->timestamp, min($shiftEnd->timestamp, $clockIns->first()->timestamp)));
                 if ($clockOuts->isNotEmpty()) $early = max(0, $early - $this->covered($permissions, max($shiftStart->timestamp, $clockOuts->last()->timestamp), $shiftEnd->timestamp));
+                // Statutory pregnancy hour reduction (art. 54) and nursing
+                // sessions (art. 56) are paid time: they offset recorded
+                // lateness first, then early departure, up to the daily
+                // allowance from the company's leave policy. Dates come only
+                // from the recorded maternity leave; nothing is inferred.
+                if (($late > 0 || $early > 0) && ($allowance = $this->rights->dailyAllowanceMinutes($employee, $date)) > 0) {
+                    $offset = min($late, $allowance);
+                    $late -= $offset;
+                    $early = max(0, $early - ($allowance - $offset));
+                }
             }
             $explicitAbsent = $rows->contains(fn ($a) => in_array($a->status, ['Absent', 'غائب', 'غياب'], true));
             $day = array_merge($blank, [

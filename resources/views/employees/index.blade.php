@@ -96,13 +96,15 @@
             @php($employeeStatus = $employee->status?->name ?? 'Active')
             @if(auth()->user()?->hasPermission('employees.edit'))
             <div class="dropdown">
-              <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave', 'Pending' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+              <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave', 'Pending', 'اجازة وضع' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
                 {{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}
               </button>
               <ul class="dropdown-menu shadow-sm border-0 p-2">
                 @foreach($statuses as $status)
-                  @php($statusTone = match($status->name) { 'Leave', 'Pending' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' })
-                  @if(in_array($status->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Suspended', 'موقوف', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true))
+                  @php($statusTone = match($status->name) { 'Leave', 'Pending', 'اجازة وضع' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' })
+                  @if($status->name === 'اجازة وضع')
+                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-maternity-action" data-employee-url="{{ route('employees.maternity-leave', $employee) }}" data-employee-name="{{ $employee->full_name }}" data-employee-expected="{{ $employee->expected_delivery_date?->format('Y-m-d') }}"><span class="badge-soft warning">اجازة وضع</span><small class="text-muted">نموذج موجّه بالإرشادات والتاريخ المتوقع للولادة</small></a></li>
+                  @elseif(in_array($status->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Suspended', 'موقوف', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true))
                     <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-status-action" data-status-id="{{ $status->id }}" data-status-name="{{ $status->name }}" data-employee-url="{{ route('employees.update', $employee) }}"><span class="badge-soft danger">{{ in_array($status->name, ['Suspended', 'موقوف'], true) ? 'موقوف' : 'منتهي الخدمة' }}</span><small class="text-muted">حدّد تاريخ الحالة</small></a></li>
                   @else
                     <li><form method="POST" action="{{ route('employees.update', $employee) }}" onsubmit="return confirm('تأكيد تغيير حالة الموظف إلى: {{ $status->name }}؟')">@csrf @method('PUT')<input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_id" value="{{ $status->id }}"><button class="dropdown-item rounded-2 d-flex align-items-center gap-2" @disabled($employee->status_id == $status->id)><span class="badge-soft {{ $statusTone }}">{{ match($status->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $status->name } }}</span>@if($employee->status_id == $status->id)<i class="bi bi-check-lg ms-auto"></i>@endif</button></form></li>
@@ -111,7 +113,7 @@
               </ul>
             </div>
             @else
-            <span class="badge-soft {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}">
+            <span class="badge-soft {{ match($employeeStatus) { 'Leave', 'اجازة وضع' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}">
               {{ match($employeeStatus) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $employeeStatus } }}
             </span>
             @endif
@@ -280,7 +282,7 @@
     const canEditEmployees = @json(auth()->user()?->hasPermission('employees.edit'));
     const escapeEmployeeHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
     const statusLabel = (status) => ({Active: 'نشط', Leave: 'إجازة', Suspended: 'موقوف', Terminated: 'منتهي الخدمة', Pending: 'قيد التعيين'}[status] || status || '—');
-    const statusTone = (status) => ['Leave', 'Pending'].includes(status) ? 'warning' : ['Suspended', 'Terminated'].includes(status) ? 'danger' : 'success';
+    const statusTone = (status) => ['Leave', 'Pending', 'اجازة وضع'].includes(status) ? 'warning' : ['Suspended', 'Terminated'].includes(status) ? 'danger' : 'success';
     const employeeRow = (employee) => {
         const status = employee.status?.name || employee.status_name || 'Active';
         const id = Number(employee.id);
@@ -408,4 +410,25 @@ const kpiData=@json($employeeCardDetails);const kpiKeys=['total','active','depar
 </form></div></div></div>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElementById('employeeListStatusModal'),form=document.getElementById('employeeListStatusForm'),date=document.getElementById('employeeListTerminationDate'),type=document.getElementById('employeeListTerminationType');document.querySelectorAll('.employee-status-action').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();const row=link.closest('tr');form.action=link.dataset.employeeUrl;document.getElementById('employeeListStatusId').value=link.dataset.statusId;document.getElementById('employeeListStatusName').value=row?.querySelector('.employee-link')?.textContent.trim()||'';const name=link.dataset.statusName,suspended=['Suspended','موقوف'].includes(name),resigned=['Resigned','Resignation','مستقيل','استقالة'].includes(name);document.getElementById('employeeListStatusLabel').textContent=suspended?'موقوف — حدّد تاريخ الإيقاف':(resigned?'استقالة — حدّد تاريخ الاستقالة':'منتهي الخدمة — حدّد النوع والتاريخ');type.closest('.col-6').classList.toggle('d-none',suspended||resigned);type.value=suspended?'':(resigned?'resignation':'');date.value=new Date().toISOString().slice(0,10);bootstrap.Modal.getOrCreateInstance(modal).show();}));});
+</script>
+@php($matRights = app(\App\Services\PregnancyNursingRightsService::class))
+@php($matMonths = (int) $matRights->policy('maternity_months', '4', auth()->user()?->company_id))
+@php($matMinPost = (int) $matRights->policy('maternity_min_postpartum_days', '45', auth()->user()?->company_id))
+<div class="modal fade" id="employeeMaternityModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="employeeMaternityForm" enctype="multipart/form-data">@csrf
+  <div class="modal-header"><h5 class="modal-title">تسجيل إجازة وضع</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <div class="alert alert-info mb-3"><strong>التعليمات والإرشادات — م54 من قانون العمل 14 لسنة 2025:</strong><div>{{ \App\Support\LeaveLegalReference::typeRules()['maternity']['text'] ?? '' }}</div><small class="d-block mt-1">يُنشأ طلب إجازة الوضع في صفحة الإجازات بالمدة التقويمية من الإعدادات ({{ $matMonths }} أشهر) على ألا تقل المدة بعد الوضع عن {{ $matMinPost }} يومًا. تتغير حالة الموظفة إلى «اجازة وضع» مع بداية الإجازة وتعود لحالتها السابقة بعد انتهائها. بعد الولادة سجّل تاريخها الفعلي على الإجازة لتُحسب حقوق الرضاعة (م56) ومنع الإضافي بعد الوضع.</small></div>
+    <div class="alert alert-light mb-3" id="employeeMaternityName"></div>
+    <label class="form-label" for="employeeMaternityDate">التاريخ المتوقع للولادة (من الشهادة الطبية)</label>
+    <input type="date" name="expected_delivery_date" id="employeeMaternityDate" class="form-control" min="{{ now()->toDateString() }}" required>
+    <label class="form-label mt-3" for="employeeMaternityStart">بداية الإجازة (افتراضيًا اليوم — يجب أن تغطي الإجازة {{ $matMinPost }} يومًا بعد التاريخ المتوقع)</label>
+    <input type="date" name="start_date" id="employeeMaternityStart" class="form-control" min="{{ now()->toDateString() }}" value="{{ now()->toDateString() }}" required>
+    <label class="form-label mt-3" for="employeeMaternityDocument">الشهادة الطبية (مطلوبة حسب سياسة نوع الإجازة)</label>
+    <input type="file" name="document" id="employeeMaternityDocument" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+    <small class="text-muted d-block mt-2" id="employeeMaternityPreview"></small>
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">تسجيل الإجازة وتغيير الحالة</button></div>
+</form></div></div></div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElementById('employeeMaternityModal'),form=document.getElementById('employeeMaternityForm'),date=document.getElementById('employeeMaternityDate'),preview=document.getElementById('employeeMaternityPreview');const months={{ $matMonths }},minPost={{ $matMinPost }};const fmt=(d)=>d.toLocaleDateString('ar-EG',{day:'numeric',month:'numeric',year:'numeric'});const subMonths=(d,m)=>{const day=d.getDate();const r=new Date(d);r.setDate(1);r.setMonth(r.getMonth()-m);const last=new Date(r.getFullYear(),r.getMonth()+1,0).getDate();r.setDate(Math.min(day,last));return r;};const startInput=document.getElementById('employeeMaternityStart');const updatePreview=()=>{if(!date.value||!startInput.value){preview.textContent='';return;}const start=new Date(startInput.value+'T00:00:00');const end=new Date(start);end.setMonth(end.getMonth()+months);end.setDate(end.getDate()-1);const minEnd=new Date(date.value+'T00:00:00');minEnd.setDate(minEnd.getDate()+minPost);preview.textContent='ستُنشأ إجازة الوضع من '+fmt(start)+' إلى '+fmt(end)+' وتظهر في صفحة الإجازات.'+(end<minEnd?' تنبيه: النهاية قبل '+fmt(minEnd)+' — حدّد بداية أقرب للتاريخ المتوقع حتى تستوفي '+minPost+' يومًا بعد الوضع.':'');};date.addEventListener('input',updatePreview);startInput.addEventListener('input',updatePreview);document.querySelectorAll('.employee-maternity-action').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();form.action=link.dataset.employeeUrl;document.getElementById('employeeMaternityName').textContent='الموظفة: '+(link.dataset.employeeName||'');date.value=link.dataset.employeeExpected||'';preview.textContent='';updatePreview();bootstrap.Modal.getOrCreateInstance(modal).show();}));});
 </script>
