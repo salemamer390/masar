@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     event.stopImmediatePropagation();
     if (form.dataset.busy === '1') return;
-    if (!window.confirm('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061f')) return;
+    if (!window.confirm(window.masarT('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628\u061f'))) return;
     form.dataset.busy = '1';
     const row = form.closest('tr');
     const employeeId = row?.dataset.employeeId || row?.querySelector('td:nth-child(2) a[href*="/employees/"]')?.href.match(/\/employees\/(\d+)/)?.[1] || '';
@@ -75,13 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' } });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
+      if (!response.ok) throw new Error(payload.message || window.masarT('\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.'));
       document.dispatchEvent(new CustomEvent('masar:request-deleted', { detail: { ...payload, employee_id: payload.employee_id || employeeId } }));
       setTimeout(() => row?.remove(), 260);
-      window.showToast?.(payload.message || '\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628 \u0628\u0646\u062c\u0627\u062d.');
+      window.showToast?.(payload.message || window.masarT('\u062a\u0645 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628 \u0628\u0646\u062c\u0627\u062d.'));
     } catch (error) {
       form.dataset.busy = '0';
-      window.showToast?.(error.message || '\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.');
+      window.showToast?.(error.message || window.masarT('\u062a\u0639\u0630\u0631 \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628.'));
     }
   }, true);
 })();
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     <select name="type" onchange="this.form.submit()">
         <option value="">{{ __('كل الأنواع') }}</option>
         @foreach($requestTypes as $type)
-            <option value="{{ $type->code }}" @selected(request('type') === $type->code)>{{ $type->display_name }}</option>
+            <option value="{{ $type->code }}" @selected(request('type') === $type->code)>{{ __($type->display_name) }}</option>
         @endforeach
     </select>
     <select name="status" onchange="this.form.submit()">
@@ -138,18 +138,18 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="panel-head">
         <div>
             <h3><i class="bi {{ $selectedRequest->requestType?->icon ?? 'bi-file-earmark-text' }}"></i> {{ __('تفاصيل الطلب') }}</h3>
-            <span>{{ $selectedRequest->requestType?->display_name ?? $selectedRequest->request_type }}</span>
+            <span>{{ __($selectedRequest->requestType?->display_name ?? $selectedRequest->request_type) }}</span>
         </div>
         <a class="btn btn-sm btn-light" href="{{ route('requests.index', request()->except('request')) }}">{{ __('إغلاق') }}</a>
     </div>
     <div class="details-grid p-3">
         <div><label>{{ __('الموظف') }}</label><b>{{ $selectedRequest->employee?->full_name ?? '—' }}</b></div>
         <div><label>{{ __('القسم') }}</label><b>{{ $selectedRequest->employee?->department?->name ?? '—' }}</b></div>
-        <div><label>{{ __('نوع الطلب') }}</label><b>{{ $selectedRequest->requestType?->display_name ?? $selectedRequest->request_type }}</b></div>
-        <div><label>{{ __('الحالة') }}</label><b><span class="badge-soft {{ $selectedRequest->status_badge_class }}">{{ $selectedRequest->status_label }}</span></b></div>
+        <div><label>{{ __('نوع الطلب') }}</label><b>{{ __($selectedRequest->requestType?->display_name ?? $selectedRequest->request_type) }}</b></div>
+        <div><label>{{ __('الحالة') }}</label><b><span class="badge-soft {{ $selectedRequest->status_badge_class }}">{{ __($selectedRequest->status_label) }}</span></b></div>
         <div><label>{{ __('العنوان') }}</label><b>{{ $selectedRequest->title }}</b></div>
         <div><label>{{ __('تاريخ الإنشاء') }}</label><b>{{ $selectedRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</b></div>
-        <div class="details-grid-full"><label>{{ __('التفاصيل') }}</label><p class="mb-0">{{ $selectedRequest->details ?: 'لا توجد تفاصيل إضافية.' }}</p></div>
+        <div class="details-grid-full"><label>{{ __('التفاصيل') }}</label><p class="mb-0">{{ $selectedRequest->details ?: __('لا توجد تفاصيل إضافية.') }}</p></div>
         @if($selectedRequest->rejection_reason)
             <div class="details-grid-full"><label>{{ __('سبب الرفض') }}</label><p class="mb-0 text-danger">{{ $selectedRequest->rejection_reason }}</p></div>
         @endif
@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
 @include('requests.partials.create-behavior')
 @push('scripts')
 <script>
-const requestCardData=@json($requestCardDetails);const requestKeys=['all','approved','rejected'];const requestTitles=['إجمالي الطلبات','الطلبات المؤكدة','الطلبات الملغاة'];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">لا توجد طلبات.</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
+const requestCardData=@json($requestCardDetails);const requestKeys=['all','approved','rejected'];const requestTitles=[window.masarT('إجمالي الطلبات'),window.masarT('الطلبات المؤكدة'),window.masarT('الطلبات الملغاة')];document.querySelectorAll('[data-request-kpi]').forEach(card=>card.addEventListener('click',()=>{const i=Number(card.dataset.requestKpi);const list=requestCardData[requestKeys[i]]||[];document.getElementById('requestCardTitle').textContent=requestTitles[i];document.getElementById('requestCardBody').innerHTML=list.length?list.map(item=>'<div class="employee-kpi-detail-row"><span class="employee-kpi-detail-avatar">'+(item.employee?.initials||item.employee?.full_name?.slice(0,1)||'—')+'</span><div><a href="{{ url('/employees') }}/'+(item.employee_id||'')+'">'+(item.employee?.full_name||'—')+'</a><small>'+item.title+' · '+(item.status||'')+'</small></div></div>').join(''):'<div class="text-muted text-center p-4">'+window.masarT('لا توجد طلبات.')+'</div>';bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCardDetails')).show();}));
 </script>
 @endpush
 
@@ -197,9 +197,9 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
       if (employee) { employee.value = editingRequest.employee_id || ''; employee.disabled = true; employee.required = false; }
       if (type) { type.value = editingRequest.request_type_id || ''; type.disabled = true; type.required = false; }
       const heading = document.getElementById('requestCreateTitle');
-      if (heading) heading.textContent = '\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0637\u0644\u0628';
+      if (heading) heading.textContent = window.masarT('\u062a\u0639\u062f\u064a\u0644 \u0627\u0644\u0637\u0644\u0628');
       const submit = editForm.querySelector('button[type="submit"]');
-      if (submit) submit.textContent = '\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644';
+      if (submit) submit.textContent = window.masarT('\u062d\u0641\u0638 \u0627\u0644\u062a\u0639\u062f\u064a\u0644');
       const applyEditingFields = () => {
         const payload = editingRequest.payload || {};
         const advanceCard = editForm.querySelector('.advance-request-fields');
@@ -211,7 +211,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
         [employee, type].forEach((field) => field?.closest('.mb-3') && (field.closest('.mb-3').hidden = true));
         const note = document.createElement('div');
         note.className = 'alert alert-info py-2 mb-3';
-        note.textContent = '\u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0646\u0648\u0639 \u0627\u0644\u0637\u0644\u0628 \u062b\u0627\u0628\u062a\u0627\u0646 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062a\u0639\u062f\u064a\u0644.';
+        note.textContent = window.masarT('\u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u0646\u0648\u0639 \u0627\u0644\u0637\u0644\u0628 \u062b\u0627\u0628\u062a\u0627\u0646 \u0623\u062b\u0646\u0627\u0621 \u0627\u0644\u062a\u0639\u062f\u064a\u0644.');
         editForm.querySelector('.modal-body')?.prepend(note);
         const lookup = editForm.querySelector('[name="employee_lookup"]');
         const hiddenEmployee = editForm.querySelector('input[name="employee_id"]');
@@ -263,7 +263,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   if (!table || !header) return;
   const valueHeader = document.createElement('th');
   valueHeader.dataset.requestValue = 'true';
-  valueHeader.textContent = '\u0627\u0644\u0642\u064a\u0645\u0629';
+  valueHeader.textContent = window.masarT('\u0627\u0644\u0642\u064a\u0645\u0629');
   header.cells[3]?.before(valueHeader);
   [...table.tBodies].flatMap((body) => [...body.rows]).forEach((row) => {
     row.dataset.requestId ||= row.querySelector('a[href*="request="]')?.href.match(/request=(\d+)/)?.[1] || '';
@@ -279,8 +279,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     const actions = row.lastElementChild;
     if (!id || !actions) return;
     const buttons = [];
-    if (canEdit) buttons.push(`<a class="btn btn-sm btn-outline-primary" href="?edit=${id}" title="تعديل"><i class="bi bi-pencil"></i></a>`);
-    if (canDelete) buttons.push(`<form method="POST" action="/requests/${id}"><input type="hidden" name="_token" value="${typeof csrfToken !== 'undefined' ? csrfToken : ''}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>`);
+    if (canEdit) buttons.push(`<a class="btn btn-sm btn-outline-primary" href="?edit=${id}" title="${window.masarT('تعديل')}"><i class="bi bi-pencil"></i></a>`);
+    if (canDelete) buttons.push(`<form method="POST" action="/requests/${id}"><input type="hidden" name="_token" value="${typeof csrfToken !== 'undefined' ? csrfToken : ''}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="${window.masarT('حذف')}"><i class="bi bi-trash"></i></button></form>`);
     if (buttons.length) actions.innerHTML = `<div class="d-flex gap-1 align-items-center">${buttons.join('')}</div>`;
   });
 })();
@@ -299,7 +299,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
                         @if($hrRequest->details)<div class="text-muted small mt-1">{{ mb_strimwidth($hrRequest->details, 0, 70, '…') }}</div>@endif
                     </td>
                     <td><a href="{{ $hrRequest->employee ? route('employees.show', $hrRequest->employee) : '#' }}">{{ $hrRequest->employee?->full_name ?? '—' }}</a></td>
-                    <td><span class="badge-soft info">{{ $hrRequest->requestType?->display_name ?? $hrRequest->request_type }}</span></td>
+                    <td><span class="badge-soft info">{{ __($hrRequest->requestType?->display_name ?? $hrRequest->request_type) }}</span></td>
                     <td>{{ $hrRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
                     <td>
                         <div class="d-flex gap-1 align-items-center">
@@ -309,7 +309,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
                                 <form method="POST" action="{{ route('requests.reject', $hrRequest) }}">@csrf @method('PATCH')<input type="hidden" name="rejection_reason" value="تم الرفض من شاشة الطلبات"><button class="btn btn-sm btn-outline-danger" title="{{ __('رفض') }}"><i class="bi bi-x-lg"></i></button></form>
                             @endif
                             @if($hrRequest->status === 'Pending' && auth()->user()?->hasPermission('requests.delete'))
-                                <form method="POST" action="{{ route('requests.destroy', $hrRequest) }}" onsubmit="return confirm('هل تريد حذف الطلب المعلق؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button></form>
+                                <form method="POST" action="{{ route('requests.destroy', $hrRequest) }}" onsubmit="return confirm({{ Js::from(__('هل تريد حذف الطلب المعلق؟')) }})">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button></form>
                             @endif
                         </div>
                     </td>
@@ -333,7 +333,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   // Stage 4: approval/rejection of an HR request updates only its table row.
   document.querySelectorAll('table form[action*="/requests/"][action$="/approve"], table form[action*="/requests/"][action$="/reject"]').forEach((form) => {
     form.dataset.ajax = 'true';
-    form.dataset.ajaxLabel = form.action.endsWith('/reject') ? 'جارٍ الرفض' : 'جارٍ الاعتماد';
+    form.dataset.ajaxLabel = form.action.endsWith('/reject') ? window.masarT('جارٍ الرفض') : window.masarT('جارٍ الاعتماد');
   });
 
   document.addEventListener('masar:success', (event) => {
@@ -345,8 +345,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     const statusCell = row.querySelector('[data-request-status-cell]');
     if (!statusCell) return;
     statusCell.innerHTML = status === 'Rejected'
-      ? '<span class="badge-soft danger">مرفوض</span>'
-      : '<span class="badge-soft success">معتمد</span>';
+      ? '<span class="badge-soft danger">'+window.masarT('مرفوض')+'</span>'
+      : '<span class="badge-soft success">'+window.masarT('معتمد')+'</span>';
     row.lastElementChild?.querySelectorAll('form[action$="/approve"], form[action$="/reject"]').forEach((actionForm) => actionForm.remove());
   });
 </script>
@@ -364,7 +364,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     const dateCell = row?.children[4];
     if (dateCell && dateValue) {
       const parsedDate = new Date(dateValue);
-      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
   }, true);
 
@@ -376,31 +376,31 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   if (false && requestCreateForm && !requestCreateForm.querySelector('[name="duration_days"]')) {
     const fields = document.createElement('div');
     fields.className = 'row g-2 mt-2';
-    fields.innerHTML = '<div class="col-md-4"><label class="form-label">تاريخ الطلب</label><input type="date" name="request_date" class="form-control"></div><div class="col-md-4"><label class="form-label">من</label><input type="date" name="start_date" class="form-control"></div><div class="col-md-4"><label class="form-label">إلى</label><input type="date" name="end_date" class="form-control"></div><div class="col-md-3"><label class="form-label">الأيام</label><input type="number" step="0.5" min="0" name="duration_days" class="form-control"></div><div class="col-md-3"><label class="form-label">الساعات</label><input type="number" step="0.5" min="0" name="duration_hours" class="form-control"></div><div class="col-md-3"><label class="form-label">إضافة مالية</label><input type="number" step="0.01" min="0" name="addition_amount" class="form-control"></div><div class="col-md-3"><label class="form-label">خصم مالي</label><input type="number" step="0.01" min="0" name="deduction_amount" class="form-control"></div>';
+    fields.innerHTML = '<div class="col-md-4"><label class="form-label">' + @json(__('تاريخ الطلب')) + '</label><input type="date" name="request_date" class="form-control"></div><div class="col-md-4"><label class="form-label">' + @json(__('من')) + '</label><input type="date" name="start_date" class="form-control"></div><div class="col-md-4"><label class="form-label">' + @json(__('إلى')) + '</label><input type="date" name="end_date" class="form-control"></div><div class="col-md-3"><label class="form-label">' + @json(__('الأيام')) + '</label><input type="number" step="0.5" min="0" name="duration_days" class="form-control"></div><div class="col-md-3"><label class="form-label">' + @json(__('الساعات')) + '</label><input type="number" step="0.5" min="0" name="duration_hours" class="form-control"></div><div class="col-md-3"><label class="form-label">' + @json(__('إضافة مالية')) + '</label><input type="number" step="0.01" min="0" name="addition_amount" class="form-control"></div><div class="col-md-3"><label class="form-label">' + @json(__('خصم مالي')) + '</label><input type="number" step="0.01" min="0" name="deduction_amount" class="form-control"></div>';
     requestCreateForm.querySelector('.modal-footer')?.before(fields);
   }
   const requestBaseUrl = @json(url('/requests'));
   const requestTableBody = document.querySelector('.table-panel table tbody');
   const canDeleteHrRequest = @json(auth()->user()?->hasPermission('requests.delete'));
   const escapeRequestHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
-  const requestDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const requestDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   document.querySelectorAll('tr[data-request-date]').forEach((row) => {
     const dateCell = row.children[4];
     if (dateCell && row.dataset.requestDate) {
       const parsedDate = new Date(row.dataset.requestDate);
-      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
   });
   const requestRow = (item) => {
     const employee = item.employee || {};
     const id = Number(item.id);
     const detailUrl = `${requestBaseUrl}?request=${id}`;
-    const remove = item.status === 'Pending' && canDeleteHrRequest ? `<form method="POST" action="${requestBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف الطلب المعلق؟')"><input type="hidden" name="_token" value="${escapeRequestHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
-    return `<tr data-request-id="${id}"><td><a href="${detailUrl}" class="fw-bold">${escapeRequestHtml(item.title)}</a>${item.details ? `<div class="text-muted small mt-1">${escapeRequestHtml(item.details).slice(0, 70)}${String(item.details).length > 70 ? '…' : ''}</div>` : ''}</td><td><a href="${escapeRequestHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeRequestHtml(employee.full_name)}</a></td><td><span class="badge-soft info">${escapeRequestHtml(item.request_type_label)}</span></td><td>${requestDate(item.created_at)}</td><td><span class="badge-soft warning">معلق</span></td><td><div class="d-flex gap-1 align-items-center"><a class="btn btn-sm btn-light" href="${detailUrl}" title="التفاصيل"><i class="bi bi-eye"></i></a>${remove}</div></td></tr>`;
+    const remove = item.status === 'Pending' && canDeleteHrRequest ? `<form method="POST" action="${requestBaseUrl}/${id}" onsubmit="return confirm({{ Js::from(__('هل تريد حذف الطلب المعلق؟')) }})"><input type="hidden" name="_token" value="${escapeRequestHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="${window.masarT('حذف')}"><i class="bi bi-trash"></i></button></form>` : '';
+    return `<tr data-request-id="${id}"><td><a href="${detailUrl}" class="fw-bold">${escapeRequestHtml(item.title)}</a>${item.details ? `<div class="text-muted small mt-1">${escapeRequestHtml(item.details).slice(0, 70)}${String(item.details).length > 70 ? '…' : ''}</div>` : ''}</td><td><a href="${escapeRequestHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeRequestHtml(employee.full_name)}</a></td><td><span class="badge-soft info">${escapeRequestHtml(item.request_type_label)}</span></td><td>${requestDate(item.created_at)}</td><td><span class="badge-soft warning">${window.masarT('معلق')}</span></td><td><div class="d-flex gap-1 align-items-center"><a class="btn btn-sm btn-light" href="${detailUrl}" title="${window.masarT('التفاصيل')}"><i class="bi bi-eye"></i></a>${remove}</div></td></tr>`;
   };
   const wireHrRequestAjaxForms = (root = document) => {
-    root.querySelectorAll('#requestCreateModal form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الإرسال'; });
-    root.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => { const form = methodInput.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف الطلب المعلق؟'; form.removeAttribute('onsubmit'); });
+    root.querySelectorAll('#requestCreateModal form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ الإرسال'); });
+    root.querySelectorAll('form[action*="/requests/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => { const form = methodInput.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ الحذف'); form.dataset.ajaxConfirm = window.masarT('هل تريد حذف الطلب المعلق؟'); form.removeAttribute('onsubmit'); });
   };
   wireHrRequestAjaxForms();
   // Edit requests in-place. The edit link fetches the record, fills the
@@ -415,7 +415,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     if (!form) return;
     try {
       const response = await fetch(`${requestBaseUrl}/${id}/edit-data`, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
-      if (!response.ok) throw new Error('تعذر تحميل بيانات الطلب.');
+      if (!response.ok) throw new Error(window.masarT('تعذر تحميل بيانات الطلب.'));
       const data = await response.json();
       const payload = data.payload || {};
       form.dataset.editing = '1';
@@ -444,10 +444,10 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
       form.querySelector('[name="advance_amount"]')?.dispatchEvent(new Event('input', { bubbles: true }));
       form.querySelector('.advance-existing-notice')?.setAttribute('hidden', 'hidden');
       form.querySelector('.advance-existing-confirm')?.setAttribute('hidden', 'hidden');
-      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = 'تعديل الطلب';
-      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = 'حفظ التعديل';
+      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = window.masarT('تعديل الطلب');
+      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = window.masarT('حفظ التعديل');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('requestCreateModal')).show();
-    } catch (error) { window.showToast?.(error.message || 'تعذر تحميل بيانات الطلب.'); }
+    } catch (error) { window.showToast?.(error.message || window.masarT('تعذر تحميل بيانات الطلب.')); }
   });
 
   // Return the form to create mode after an in-place edit is saved.
@@ -463,8 +463,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
       delete form.dataset.editingId;
       form.querySelector('input[name="_method"]')?.remove();
       form.querySelector('[name="request_type_id"]')?.removeAttribute('disabled');
-      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = 'طلب HR جديد';
-      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = 'إرسال الطلب';
+      const heading = document.getElementById('requestCreateTitle'); if (heading) heading.textContent = window.masarT('طلب HR جديد');
+      const submit = form.querySelector('button[type="submit"]'); if (submit) submit.textContent = window.masarT('إرسال الطلب');
     }
   });
   document.addEventListener('masar:success', (event) => {
@@ -515,8 +515,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
           if (legacyStatusCell?.querySelector('.badge-soft') && !legacyStatusCell.querySelector('form, a, button')) legacyStatusCell.remove();
           const actions = addedRow.lastElementChild;
           if (actions) {
-            const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="تعديل"><i class="bi bi-pencil"></i></a>` : '';
-            const remove = @json(auth()->user()?->hasPermission('requests.delete')) ? `<form method="POST" action="${requestBaseUrl}/${Number(item.id)}"><input type="hidden" name="_token" value="${escapeRequestHtml(document.querySelector('meta[name=\"csrf-token\"]')?.content || '')}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>` : '';
+            const edit = @json(auth()->user()?->hasPermission('requests.create')) ? `<a class="btn btn-sm btn-outline-primary" href="?edit=${Number(item.id)}" title="${window.masarT('تعديل')}"><i class="bi bi-pencil"></i></a>` : '';
+            const remove = @json(auth()->user()?->hasPermission('requests.delete')) ? `<form method="POST" action="${requestBaseUrl}/${Number(item.id)}"><input type="hidden" name="_token" value="${escapeRequestHtml(document.querySelector('meta[name=\"csrf-token\"]')?.content || '')}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="${window.masarT('حذف')}"><i class="bi bi-trash"></i></button></form>` : '';
             actions.innerHTML = `<div class="d-flex gap-1 align-items-center">${edit}${remove}</div>`;
           }
         }
@@ -556,7 +556,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   const fields = document.createElement('div');
   fields.className = 'request-conditional-card overtime-request-fields';
   fields.hidden = true;
-  fields.innerHTML = '<div class="col-12"><label class="form-label">تاريخ الإضافي</label><input type="date" name="request_date" class="form-control" required></div><div class="col-12"><label class="form-label">نوع ساعات الإضافي</label><select name="overtime_period" class="form-select" required><option value="">اختر نوع الساعات</option><option value="day">ساعات عمل نهاري</option><option value="night">ساعات عمل ليلي</option></select></div><div class="col-12"><label class="form-label">عدد الساعات</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control" required></div>';
+  fields.innerHTML = '<div class="col-12"><label class="form-label">' + @json(__('تاريخ الإضافي')) + '</label><input type="date" name="request_date" class="form-control" required></div><div class="col-12"><label class="form-label">' + @json(__('نوع ساعات الإضافي')) + '</label><select name="overtime_period" class="form-select" required><option value="">' + @json(__('اختر نوع الساعات')) + '</option><option value="day">' + @json(__('ساعات عمل نهاري')) + '</option><option value="night">' + @json(__('ساعات عمل ليلي')) + '</option></select></div><div class="col-12"><label class="form-label">' + @json(__('عدد الساعات')) + '</label><input type="number" step="0.25" min="0.25" name="duration_hours" class="form-control" required></div>';
   modalFooter?.before(fields);
   const date = fields.querySelector('[name="request_date"]');
   const period = fields.querySelector('[name="overtime_period"]');
@@ -585,8 +585,8 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const tokenInput = form.querySelector('input[name="_token"]');
   if (token && tokenInput) tokenInput.value = token;
   form.dataset.ajax = 'true';
-  form.dataset.ajaxLabel = '\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641';
-  form.dataset.ajaxConfirm = '\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f';
+  form.dataset.ajaxLabel = window.masarT('\u062c\u0627\u0631\u064d \u0627\u0644\u062d\u0630\u0641');
+  form.dataset.ajaxConfirm = window.masarT('\u0647\u0644 \u062a\u0631\u064a\u062f \u062d\u0630\u0641 \u0627\u0644\u0637\u0644\u0628\u061f');
   form.removeAttribute('onsubmit');
 });
 </script>
@@ -603,7 +603,7 @@ document.querySelectorAll('form[action*="/requests/"] input[name="_method"][valu
   const card = document.createElement('div');
   card.className = 'row g-2 mt-3 excuse-request-fields';
   card.dataset.excuseCard = 'true';
-  card.innerHTML = '<div class="col-12 text-muted small">الإذن والمأمورية يغطيان الفترة المحددة (من ساعة إلى ساعة) فقط.</div><div class="col-12"><label class="form-label">التاريخ</label><input type="date" name="request_date" class="form-control"></div><div class="col-6"><label class="form-label">من الساعة</label><input type="time" name="permission_from_time" class="form-control" dir="ltr"></div><div class="col-6"><label class="form-label">إلى الساعة</label><input type="time" name="permission_to_time" class="form-control" dir="ltr"></div>';
+  card.innerHTML = '<div class="col-12 text-muted small">' + @json(__('الإذن والمأمورية يغطيان الفترة المحددة (من ساعة إلى ساعة) فقط.')) + '</div><div class="col-12"><label class="form-label">' + @json(__('التاريخ')) + '</label><input type="date" name="request_date" class="form-control"></div><div class="col-6"><label class="form-label">' + @json(__('من الساعة')) + '</label><input type="time" name="permission_from_time" class="form-control" dir="ltr"></div><div class="col-6"><label class="form-label">' + @json(__('إلى الساعة')) + '</label><input type="time" name="permission_to_time" class="form-control" dir="ltr"></div>';
   form.querySelector('.modal-body').append(card);
   const sync = () => {
     const source = sources[type.value];
