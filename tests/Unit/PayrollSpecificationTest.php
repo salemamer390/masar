@@ -25,9 +25,9 @@ class PayrollSpecificationTest extends TestCase
         $r = $engine->calculate(24000, 10, 5, 2, 1);
         $this->assertEquals(1350.00, $r['day_overtime']);
         $this->assertEquals(850.00, $r['night_overtime']);
-        $this->assertEquals(3200.00, $r['official_holiday']);
+        $this->assertEquals(1600.00, $r['official_holiday']); // 2 days x daily x (2 - 1): the base day is already inside the salary
         $this->assertEquals(800.00, $r['weekly_rest']);
-        $this->assertEquals(6200.00, $r['total_overtime']);
+        $this->assertEquals(4600.00, $r['total_overtime']);
     }
 
     public function test_gross_up_solver_converges(): void
