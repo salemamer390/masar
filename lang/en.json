@@ -2042,5 +2042,10 @@
   "تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.": "Could not reach the server. Check the connection and try again.",
   "انتهت صلاحية الجلسة. أعد تحميل الصفحة وحاول مرة أخرى.": "Session expired. Reload the page and try again.",
   "الملف أكبر من الحجم المسموح به على الخادم.": "The file exceeds the size allowed on the server.",
-  "حدث خطأ غير متوقع أثناء معالجة الملف.": "An unexpected error occurred while processing the file."
+  "حدث خطأ غير متوقع أثناء معالجة الملف.": "An unexpected error occurred while processing the file.",
+  "تعذر تحديث حالة التأمين.": "Could not update the insurance status.",
+  "registered": "Registered",
+  "unregistered": "Not registered",
+  "pending": "Pending",
+  "العاملون لدى الغير": "Workers employed by others"
 }
