@@ -2,8 +2,8 @@
 @section('title',__('مراجعة صف مرفوض'))
 @section('content')
 <a href="{{ route('employees.import-batches.index') }}">{{ __('صفوف الاستيراد المرفوضة') }}</a>
-<h3 class="my-3">{{ $payload['full_name'] ?? ($payload['values'][1] ?? 'صف بدون اسم') }} · {{ $row->sheet ?? 'ورقة غير محددة' }} {{ __('· صف') }} {{ $row->line }} <span class="badge text-bg-light border">{{ \App\Services\Imports\EmployeeImportService::kindLabels()[$row->kind] ?? $row->kind }}</span></h3>
-<p>{{ __('الحالة:') }} {{ ['pending'=>'تحتاج مراجعة','fixed'=>'تم التصحيح والحفظ','dismissed'=>'مستبعد مع الاحتفاظ بالأصل'][$row->status] }}@if($row->employee) · <a href="{{ route('employees.show', $row->employee) }}">{{ $row->employee->full_name }}</a>@endif</p>
+<h3 class="my-3">{{ $payload['full_name'] ?? ($payload['values'][1] ?? __('صف بدون اسم')) }} · {{ $row->sheet ?? __('ورقة غير محددة') }} {{ __('· صف') }} {{ $row->line }} <span class="badge text-bg-light border">{{ \App\Services\Imports\EmployeeImportService::kindLabels()[$row->kind] ?? $row->kind }}</span></h3>
+<p>{{ __('الحالة:') }} {{ ['pending'=>__('تحتاج مراجعة'),'fixed'=>__('تم التصحيح والحفظ'),'dismissed'=>__('مستبعد مع الاحتفاظ بالأصل')][$row->status] }}@if($row->employee) · <a href="{{ route('employees.show', $row->employee) }}">{{ $row->employee->full_name }}</a>@endif</p>
 <p class="small text-muted">{{ __('الملف:') }} {{ $row->batch->file_name ?? '-' }} · {{ $row->batch?->created_at?->format('d/m/Y H:i') }}</p>
 @if(session('toast'))<div class="alert alert-success">{{ session('toast') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger">{{ implode(' ', $errors->all()) }}</div>@endif
@@ -31,7 +31,7 @@
 <button class="btn btn-primary">{{ __('حفظ وإعادة التحقق') }}</button>
 </form>
 @else
-<div class="alert alert-info small">{{ __('صفوف «') }}{{ \App\Services\Imports\EmployeeImportService::kindLabels()[$row->kind] ?? $row->kind }}{{ __('» لا تُخمَّن هنا: صحّحها من شاشة') }} {{ $row->kind === 'attendance' ? 'الحضور والانصراف' : ($row->kind === 'leaves' ? 'الإجازات' : ($row->kind === 'penalties' ? 'الجزاءات' : ($row->kind === 'insurance' ? 'التأمينات' : 'الطلبات'))) }} {{ __('أو أعد رفع ملف مُصحَّح، ثم استبعدها من هنا بعد معالجتها.') }}</div>
+<div class="alert alert-info small">{{ __('صفوف «') }}{{ \App\Services\Imports\EmployeeImportService::kindLabels()[$row->kind] ?? $row->kind }}{{ __('» لا تُخمَّن هنا: صحّحها من شاشة') }} {{ $row->kind === 'attendance' ? __('الحضور والانصراف') : ($row->kind === 'leaves' ? __('الإجازات') : ($row->kind === 'penalties' ? __('الجزاءات') : ($row->kind === 'insurance' ? __('التأمينات') : __('الطلبات')))) }} {{ __('أو أعد رفع ملف مُصحَّح، ثم استبعدها من هنا بعد معالجتها.') }}</div>
 @endif
 <form method="post" action="{{ route('employees.import-rows.destroy', $row) }}" class="card p-3 my-3">@csrf @method('DELETE')
 <input type="hidden" name="version" value="{{ $row->revisions->count() }}">
@@ -42,7 +42,7 @@
 @endif
 <h5 class="mt-4">{{ __('سجل المراجعة') }}</h5>
 @forelse($row->revisions as $revision)
-<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? 'حساب سابق' }} · {{ $revision->created_at->format('d/m/Y H:i') }} · {{ $revision->action === 'fix' ? 'تصحيح' : 'استبعاد' }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
+<div class="card p-3 mb-2"><strong>{{ $revision->user?->name ?? __('حساب سابق') }} · {{ $revision->created_at->format('d/m/Y H:i') }} · {{ $revision->action === 'fix' ? __('تصحيح') : __('استبعاد') }}</strong><div>{{ $revision->reason }}</div><pre class="small mt-2" dir="ltr" style="white-space:pre-wrap">{{ json_encode(['before'=>$revision->before_data,'after'=>$revision->after_data],JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE) }}</pre></div>
 @empty
 <p class="text-muted">{{ __('لا توجد مراجعات بعد.') }}</p>
 @endforelse
