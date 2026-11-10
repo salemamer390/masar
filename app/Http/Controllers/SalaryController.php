@@ -89,7 +89,7 @@ class SalaryController extends Controller
         $employee = Employee::findOrFail((int) $validated['employee_id']);
         $this->ensureEmployeeIsEligibleForSalary($employee);
         if ((float) $employee->gross_salary <= 0) {
-            throw ValidationException::withMessages(['employee_id' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف. أدخل الراتب من ملف الموظف أولًا.']);
+            throw ValidationException::withMessages(['employee_id' => __('لا يوجد راتب إجمالي محفوظ في ملف الموظف. أدخل الراتب من ملف الموظف أولًا.')]);
         }
         $validated['salary_type'] = 'gross';
         $validated['salary_input'] = (float) $employee->gross_salary;
@@ -132,7 +132,7 @@ class SalaryController extends Controller
         $employee = $salary->employee;
         $this->ensureEmployeeIsEligibleForSalary($employee);
         if ((float) $employee?->gross_salary <= 0) {
-            throw ValidationException::withMessages(['salary_input' => 'لا يوجد راتب إجمالي محفوظ في ملف الموظف.']);
+            throw ValidationException::withMessages(['salary_input' => __('لا يوجد راتب إجمالي محفوظ في ملف الموظف.')]);
         }
         $validated['employee_id'] = $employee->id;
         $validated['salary_type'] = 'gross';
@@ -343,7 +343,7 @@ class SalaryController extends Controller
             || ($currentCompanyId && (int) $employee->company_id !== (int) $currentCompanyId)
             || !$this->eligibleEmployeesForSalary($employee->company_id)->whereKey($employee->id)->exists()) {
             throw ValidationException::withMessages([
-                'employee_id' => 'لا يمكن إنشاء أو تعديل هيكل راتب لموظف مستقيل أو منتهي الخدمة.',
+                'employee_id' => __('لا يمكن إنشاء أو تعديل هيكل راتب لموظف مستقيل أو منتهي الخدمة.'),
             ]);
         }
     }
