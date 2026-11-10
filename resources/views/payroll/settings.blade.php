@@ -22,7 +22,7 @@
 ['key'=>'overtime.hours_divisor','label'=>'أساس ساعة الإضافي','unit'=>'ساعة','hint'=>'عدد ساعات الشهر المستخدمة لحساب أجر الساعة'],
 ['key'=>'overtime.day_multiplier','label'=>'معامل الإضافي النهاري','unit'=>'×'],
 ['key'=>'overtime.night_multiplier','label'=>'معامل الإضافي الليلي','unit'=>'×','hint'=>'يُضرب في أجر الساعة'],
-['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين إجمالًا — يُضاف الفرق فوق المرتب. الحد القانوني للتشغيل في العطلة: أجر اليوم + مثليه (3 إجمالًا)'],
+['key'=>'overtime.official_holiday_multiplier','label'=>'معامل العطلة الرسمية','unit'=>'×','hint'=>'2 = يومين إجمالًا — يُضاف الفرق فوق المرتب'],
 ['key'=>'overtime.weekly_rest_multiplier','label'=>'معامل الراحة الأسبوعية','unit'=>'×','hint'=>'1 = بنفس سعر اليوم'],
 ['key'=>'overtime.days_divisor','label'=>'أيام الشهر لأجر يوم الراحة والعطلات','unit'=>'يوم']]],
 ['title'=>'الغياب والجزاءات','subtitle'=>'مقسوم الخصم وحدود الجزاءات','fields'=>[
