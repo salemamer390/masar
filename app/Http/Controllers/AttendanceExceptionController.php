@@ -46,14 +46,14 @@ class AttendanceExceptionController extends Controller
         $punches = array_values($data['punches'] ?? []);
         $start = $day->work_date->copy()->startOfDay()->subHours(4);
         $end = $day->work_date->copy()->startOfDay()->addDays(2);
-        foreach ($punches as $punch) abort_unless(Carbon::parse($punch)->betweenIncluded($start,$end),422,'البصمة خارج يوم العمل ونطاق الوردية الليلية.');
+        foreach ($punches as $punch) abort_unless(Carbon::parse($punch)->betweenIncluded($start,$end),422,__('البصمة خارج يوم العمل ونطاق الوردية الليلية.'));
         $hasIn = isset($data['check_in_index']); $hasOut = isset($data['check_out_index']);
-        abort_if($hasIn !== $hasOut,422,'حدد بصمة الحضور والانصراف معًا أو اترك اليوم للمراجعة.');
+        abort_if($hasIn !== $hasOut,422,__('حدد بصمة الحضور والانصراف معًا أو اترك اليوم للمراجعة.'));
         if ($hasIn) {
             $in = $punches[$data['check_in_index']] ?? null; $out = $punches[$data['check_out_index']] ?? null;
-            abort_unless($in && $out && Carbon::parse($out)->gt(Carbon::parse($in)) && Carbon::parse($out)->diffInHours(Carbon::parse($in),true) <= 24,422,'اختيار الحضور والانصراف غير صالح.');
+            abort_unless($in && $out && Carbon::parse($out)->gt(Carbon::parse($in)) && Carbon::parse($out)->diffInHours(Carbon::parse($in),true) <= 24,422,__('اختيار الحضور والانصراف غير صالح.'));
             $inAt=Carbon::parse($in); $outAt=Carbon::parse($out);
-            abort_unless($inAt->toDateString()===$day->work_date->toDateString() && $outAt->toDateString()===($outAt->format('H:i') < $inAt->format('H:i') ? $day->work_date->copy()->addDay()->toDateString() : $day->work_date->toDateString()),422,'تاريخ البصمات المختارة لا يطابق يوم العمل أو عبور منتصف الليل.');
+            abort_unless($inAt->toDateString()===$day->work_date->toDateString() && $outAt->toDateString()===($outAt->format('H:i') < $inAt->format('H:i') ? $day->work_date->copy()->addDay()->toDateString() : $day->work_date->toDateString()),422,__('تاريخ البصمات المختارة لا يطابق يوم العمل أو عبور منتصف الليل.'));
         }
         DB::transaction(function () use ($day,$request,$data,$punches,$hasIn) {
             $archive = app(AttendancePeriodArchiveService::class);
@@ -61,11 +61,11 @@ class AttendanceExceptionController extends Controller
             $day = AttendanceImportDay::lockForUpdate()->findOrFail($day->id);
             app(PayrollPeriodGuard::class)->ensureOpen($day->work_date); $archive->ensureDateOpen($day->work_date);
             abort_if(isset($data['version']) && (int)$data['version'] !== $day->revisions()->count(),409,'اتغير اليوم بعد فتحه؛ أعد تحميل الصفحة.');
-            abort_if($day->resolution==='deleted',422,'تم حذف هذا اليوم؛ لا يمكن تعديل سجل محذوف.');
+            abort_if($day->resolution==='deleted',422,__('تم حذف هذا اليوم؛ لا يمكن تعديل سجل محذوف.'));
             $old = ['punches'=>$day->current_punches,'resolution'=>$day->resolution];
-            if (count($punches) < count($day->current_punches)) abort_unless($request->user()->hasPermission('attendance.delete'),403,'إزالة بصمة تتطلب صلاحية الحذف.');
+            if (count($punches) < count($day->current_punches)) abort_unless($request->user()->hasPermission('attendance.delete'),403,__('إزالة بصمة تتطلب صلاحية الحذف.'));
             $existing = Attendance::where('employee_id',$day->employee_id)->whereDate('attendance_date',$day->work_date)->lockForUpdate()->first();
-            if ($existing) abort_unless($request->boolean('overwrite'),422,'أكد تحديث سجل الحضور الموجود.');
+            if ($existing) abort_unless($request->boolean('overwrite'),422,__('أكد تحديث سجل الحضور الموجود.'));
             if ($hasIn) {
                 abort_unless($request->user()->hasPermission($existing ? 'attendance.edit':'attendance.create'),403);
                 $in = Carbon::parse($punches[$data['check_in_index']])->format('H:i');
@@ -93,9 +93,9 @@ class AttendanceExceptionController extends Controller
             $day=AttendanceImportDay::lockForUpdate()->findOrFail($day->id);
             app(PayrollPeriodGuard::class)->ensureOpen($day->work_date); $archive->ensureDateOpen($day->work_date);
             abort_if((int)$data['version'] !== $day->revisions()->count(),409,'اتغير اليوم بعد فتحه؛ أعد تحميل الصفحة.');
-            abort_if($day->resolution==='deleted',422,'هذا اليوم محذوف بالفعل.');
+            abort_if($day->resolution==='deleted',422,__('هذا اليوم محذوف بالفعل.'));
             $existing = Attendance::where('employee_id',$day->employee_id)->whereDate('attendance_date',$day->work_date)->lockForUpdate()->first();
-            abort_if($existing && !$request->boolean('delete_attendance'),422,'أكد حذف سجل الحضور المرتبط أيضًا.');
+            abort_if($existing && !$request->boolean('delete_attendance'),422,__('أكد حذف سجل الحضور المرتبط أيضًا.'));
             $old=['punches'=>$day->current_punches,'resolution'=>$day->resolution,'attendance'=>$existing?->toArray()];
             if ($existing) $existing->delete();
             $day->update(['current_punches'=>[],'resolution'=>'deleted','attendance_id'=>null]);
