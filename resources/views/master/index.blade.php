@@ -25,9 +25,9 @@
                     @forelse($items->where('category',$groupKey) as $item)
                         <div class="master-row master-document-row document-type-card">
                             <b>{{$item->name}}</b>
-                            <span>{{$item->is_required?'مطلوب لكل موظف':'حسب الحاجة'}}</span>
+                            <span>{{$item->is_required?__('مطلوب لكل موظف'):__('حسب الحاجة')}}</span>
                             <div class="d-flex align-items-center justify-content-end gap-2">
-                                <em>{{$item->is_active?'نشط':'غير نشط'}}</em>
+                                <em>{{$item->is_active?__('نشط'):__('غير نشط')}}</em>
                                 @if(auth()->user()?->hasPermission('roles.edit') && $item->is_active)
                                     <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editDocumentType{{$item->id}}"><i class="bi bi-pencil-square"></i> {{ __('تعديل') }}</button>
                                     <form method="POST" action="{{route('master.documents.destroy',$item)}}" onsubmit="return confirm('هل تريد حذف نوع المستند: {{$item->name}}؟')">
@@ -46,7 +46,7 @@
                     <div class="master-row">
                         <b>{{$item->{$currentMeta['name_col']}??'—'}}</b>
                         <span>{{$item->{$currentMeta['code_col']}??'—'}}</span>
-                        <em>{{($item->is_active ?? true) ? 'نشط' : 'غير نشط'}}</em>
+                        <em>{{($item->is_active ?? true) ? __('نشط') : __('غير نشط')}}</em>
                         @if(auth()->user()?->hasPermission('roles.edit') && ($item->is_active ?? true))
                             <div class="master-row-actions">
                                 <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editMaster{{$item->id}}" title="{{ __('تعديل') }}"><i class="bi bi-pencil-square"></i> {{ __('تعديل') }}</button>
@@ -149,9 +149,9 @@ document.addEventListener('masar:success', event => {
     const row = document.createElement('div');
     row.className = masterType === 'documents' ? 'master-row master-document-row document-type-card' : 'master-row';
     if (masterType === 'documents') {
-        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${item.is_required ? 'مطلوب لكل موظف' : 'حسب الحاجة'}</span><div><em>${item.is_active === false ? 'غير نشط' : 'نشط'}</em></div>`;
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${item.is_required ? window.masarT('مطلوب لكل موظف') : window.masarT('حسب الحاجة')}</span><div><em>${item.is_active === false ? window.masarT('غير نشط') : window.masarT('نشط')}</em></div>`;
     } else {
-        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${escapeMaster(code)}</span><em>نشط</em>`;
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${escapeMaster(code)}</span><em>${window.masarT("نشط")}</em>`;
     }
     masterRows.querySelector('.text-center.text-muted')?.remove();
     masterRows.appendChild(row);
@@ -177,9 +177,9 @@ if (masterType === 'documents') {
     };
     const bindDocumentForms = () => documentForms().filter(isDocumentForm).forEach(form => {
         form.dataset.ajax = 'true';
-        form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? 'جارٍ الحذف' : 'جارٍ الحفظ';
+        form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? window.masarT('جارٍ الحذف') : window.masarT('جارٍ الحفظ');
         if (form.querySelector('input[name="_method"][value="DELETE"]')) {
-            form.dataset.ajaxConfirm = 'هل تريد حذف نوع المستند؟';
+            form.dataset.ajaxConfirm = window.masarT('هل تريد حذف نوع المستند؟');
             form.removeAttribute('onsubmit');
         }
     });
