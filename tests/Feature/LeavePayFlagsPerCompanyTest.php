@@ -101,4 +101,32 @@ class LeavePayFlagsPerCompanyTest extends TestCase
         $service2 = app(\App\Services\PayrollRunService::class);
         $this->assertFalse($m->invoke($service2, $leave2));
     }
+
+    public function test_size_threshold_counts_requesting_company_only(): void
+    {
+        // Unsaved type instance: min_employees=2, no limits rows, no other policy branch.
+        $type = new LeaveType(['name' => 'SizeTest', 'is_active' => true, 'is_paid' => true]);
+        $type->id = 999999;
+        $type->min_employees = 2;
+        $type->policy_code = null;
+
+        $mk = fn (Company $c, string $code) => Employee::create(['employee_code' => $code, 'first_name' => 'E', 'full_name' => 'E'.$code, 'company_id' => $c->id, 'status_id' => $this->st->id, 'hire_date' => '2020-01-01']);
+        $empA = $mk($this->a, 'sz-a1');
+        foreach (range(1, 3) as $i) $mk($this->b, 'sz-b'.$i); // global headcount already exceeds the threshold
+
+        $leave = new Leave(['employee_id' => $empA->id, 'start_date' => '2026-12-01', 'end_date' => '2026-12-01', 'days' => 1]);
+        $leave->setRelation('leaveType', $type);
+        $leave->setRelation('employee', $empA);
+
+        try {
+            app(LeaveBalanceService::class)->validateForApproval($leave);
+            $this->fail('expected a size-threshold validation failure with 1 employee in company A');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('عدد العاملين', json_encode($e->errors(), JSON_UNESCAPED_UNICODE));
+        }
+
+        $mk($this->a, 'sz-a2'); // company A now meets its own threshold
+        app(LeaveBalanceService::class)->validateForApproval($leave);
+        $this->assertTrue(true);
+    }
 }
