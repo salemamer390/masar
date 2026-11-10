@@ -56,7 +56,11 @@ class PayrollSettingsController extends Controller
         $leavePolicyLabels += array_map(fn ($r) => $r['label'], \App\Support\LeaveLegalReference::policyRules());
         // Effective limits per type for THIS company (own copy of a shared type, casual per-request/year from the company policy).
         $leaveBalances = app(\App\Services\LeaveBalanceService::class);
-        $leaveTypes = LeaveType::where(fn ($q) => $q->where('is_active', true)->orWhere('policy_code', 'contagious_contact')->orWhere('policy_code', 'like', 'contagious_contact_company_%'))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
+        $leaveTypes = LeaveType::where(fn ($q) => $q->where('is_active', true)->orWhere('policy_code', 'contagious_contact')->orWhere('policy_code', 'like', 'contagious_contact_company_%')
+            // Statutory shared types stay listed even if deactivated wholesale, so a company can switch them back on.
+            ->orWhere(fn ($q2) => $q2->whereNull('company_id')->whereIn('policy_code', ['annual', 'casual', 'sick', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare']))
+            // The company's own types stay listed while inactive so they can be reactivated.
+            ->when($companyId, fn ($q2) => $q2->orWhere('company_id', $companyId)))->orderBy('id')->get()->each(function (LeaveType $type) use ($leaveBalances, $companyId, $leavePolicies): void {
             $limits = $leaveBalances->limitsFor($type, $companyId ? (int) $companyId : null);
             if ($type->policy_code === 'casual') {
                 $perRequest = $leavePolicies['casual_max_days_request']->setting_value ?? null;
@@ -222,6 +226,8 @@ class PayrollSettingsController extends Controller
                     $type->update($values);
                 } elseif (!$type->company_id && $companyId) {
                     // Shared type: save this company's own copy, never the shared row other companies use.
+                    // Even switching on a wholesale-inactive shared type only writes this company's limits;
+                    // company-effective activation (limits win over the shared row) restores it for this company alone.
                     $merged = array_merge($balances->limitsFor($type, $companyId), $values);
                     $row = array_intersect_key($merged, array_flip($limitKeys)) + ['updated_at' => now()];
                     $exists = DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->exists();
@@ -361,6 +367,39 @@ class PayrollSettingsController extends Controller
         }
 
         return back()->with('toast', 'تم حفظ العطلة الرسمية.');
+    }
+
+    public function storeLeaveType(Request $request)
+    {
+        $companyId = $this->companyIdOrFail();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'max_days_per_request' => ['nullable', 'numeric', 'min:0'],
+            'max_days_per_year' => ['nullable', 'numeric', 'min:0'],
+            'min_service_months' => ['nullable', 'integer', 'min:0'],
+            'max_occurrences_service' => ['nullable', 'integer', 'min:0'],
+            'is_paid' => ['nullable', 'boolean'],
+            'deducts_annual_balance' => ['nullable', 'boolean'],
+            'requires_document' => ['nullable', 'boolean'],
+        ]);
+        $name = trim($data['name']);
+        $clash = LeaveType::where('name', $name)->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', $companyId))->exists();
+        if ($clash) throw \Illuminate\Validation\ValidationException::withMessages(['name' => 'يوجد نوع إجازة بهذا الاسم بالفعل.']);
+        $type = LeaveType::create([
+            'name' => $name,
+            'company_id' => $companyId,
+            'policy_code' => null,
+            'is_active' => true,
+            'is_paid' => $request->boolean('is_paid'),
+            'deducts_annual_balance' => $request->boolean('deducts_annual_balance'),
+            'requires_document' => $request->boolean('requires_document'),
+            'max_days_per_request' => $data['max_days_per_request'] ?? null,
+            'max_days_per_year' => $data['max_days_per_year'] ?? null,
+            'min_service_months' => $data['min_service_months'] ?? null,
+            'max_occurrences_service' => $data['max_occurrences_service'] ?? null,
+        ]);
+        ActivityLog::record('leave_type_create', 'Custom leave type created.', null, null, $type->toArray(), 'leaves');
+        return back()->with('toast', 'تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.');
     }
 
     public function destroyHoliday(int $holiday, Request $request)
