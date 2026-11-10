@@ -252,6 +252,52 @@ class ImmediateHrIntegrationTest extends TestCase
         $this->assertSame(1, $this->row()['mission_request_count']);
     }
 
+    public function test_timed_mission_covers_exact_early_departure_hour_with_no_deduction(): void
+    {
+        $this->record('2026-11-01', '09:00', '16:00', 'Present', 0, 60);
+        $this->request('mission', ['request_date'=>'2026-11-01','start_date'=>'2026-11-01','end_date'=>'2026-11-01','from_time'=>'16:00','to_time'=>'17:00']);
+        $d = $this->daily();
+        $this->assertSame(0, $d['early_leave_minutes']);
+        $this->assertSame(0, $d['late_minutes']);
+        $this->assertSame(1, $d['attendance_days']);
+    }
+
+    public function test_timed_mission_covers_late_hour_and_partial_overlap_leaves_remainder(): void
+    {
+        $this->record('2026-11-01', '10:00', '17:00', 'Late', 60, 0);
+        $this->request('mission', ['request_date'=>'2026-11-01','start_date'=>'2026-11-01','end_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'09:20']);
+        $this->assertSame(40, $this->daily()['late_minutes']);
+    }
+
+    public function test_permission_and_mission_on_same_interval_are_not_counted_twice(): void
+    {
+        $this->record('2026-11-01', '10:00', '16:00', 'Late', 60, 60);
+        foreach (['permission','mission'] as $source) $this->request($source, ['request_date'=>'2026-11-01','start_date'=>'2026-11-01','end_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'10:00']);
+        $d = $this->daily();
+        $this->assertSame(0, $d['late_minutes']);
+        $this->assertSame(60, $d['early_leave_minutes']);
+    }
+
+    public function test_timed_mission_without_fingerprint_removes_only_its_share_of_the_absence(): void
+    {
+        $this->request('mission', ['request_date'=>'2026-11-01','start_date'=>'2026-11-01','end_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'13:00']);
+        $this->assertSame(0.5, $this->daily()['absence_days']);
+    }
+
+    public function test_permission_covers_a_missing_hour_of_the_day(): void
+    {
+        $this->record('2026-11-01', '09:00', '16:00', 'Present', 0, 60);
+        $this->request('permission', ['request_date'=>'2026-11-01','from_time'=>'16:00','to_time'=>'17:00']);
+        $this->assertSame(0, $this->daily()['early_leave_minutes']);
+    }
+
+    public function test_mission_http_path_requires_a_date_and_from_to_times(): void
+    {
+        $base = ['employee_id'=>$this->employee->id,'request_type_id'=>RequestType::where('code','mission')->value('id'),'title'=>'Mission','details'=>'Test'];
+        $this->postJson(route('requests.store'),$base)->assertUnprocessable()->assertJsonValidationErrors(['request_date','from_time','to_time']);
+        $this->postJson(route('requests.store'),$base+['request_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'11:00'])->assertOk();
+    }
+
     public function test_summary_and_payroll_share_missing_days_and_excuses(): void
     {
         $this->request('permission', ['request_date'=>'2026-11-01','from_time'=>'09:00','to_time'=>'13:00']);
