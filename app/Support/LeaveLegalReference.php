@@ -73,6 +73,7 @@ final class LeaveLegalReference
             // مفاتيح مطبّقة فعلًا في الحساب (تعويض التأخير/الانصراف المبكر ومنع الإضافي).
             'pregnancy_reduced_hours_per_day' => ['label' => 'تخفيض ساعات الحامل يوميًا', 'article' => 54, 'ref' => 1, 'dir' => 'min', 'unit' => 'ساعة'],
             'pregnancy_overtime_protection_months' => ['label' => 'حماية منع الإضافي بعد الوضع (شهر)', 'article' => 54, 'ref' => 6, 'dir' => 'min', 'unit' => 'شهر'],
+            'nursing_window_months' => ['label' => 'مدة فترة الرضاعة من الوضع (شهر)', 'article' => 56, 'ref' => 24, 'dir' => 'min', 'unit' => 'شهر'],
             'nursing_sessions_per_day' => ['label' => 'فترات الرضاعة يوميًا', 'article' => 56, 'ref' => 2, 'dir' => 'min', 'unit' => 'فترة'],
             'nursing_minutes_per_session' => ['label' => 'مدة فترة الرضاعة (دقيقة)', 'article' => 56, 'ref' => 30, 'dir' => 'min', 'unit' => 'دقيقة'],
         ];
