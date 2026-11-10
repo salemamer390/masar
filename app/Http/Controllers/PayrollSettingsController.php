@@ -138,11 +138,13 @@ class PayrollSettingsController extends Controller
             'types.*.min_service_months' => ['nullable', 'integer', 'min:0'],
             'types.*.max_occurrences_service' => ['nullable', 'integer', 'min:0'],
             'types.*.requires_document' => ['nullable', 'boolean'],
+            'types.*.is_active' => ['nullable', 'boolean'],
+            'sick_pay_basis' => ['nullable', 'in:ins,full,none'],
             'confirm_below_reference' => ['sometimes', 'accepted'],
             'contact_pay' => ['nullable', 'in:paid,unpaid'],
             'contact_active' => ['nullable', 'boolean'],
         ]);
-        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document')) {
+        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active')) {
             $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
@@ -180,9 +182,15 @@ class PayrollSettingsController extends Controller
         if ($warnings && !$request->boolean('confirm_below_reference')) throw \Illuminate\Validation\ValidationException::withMessages(['below_reference' => array_values(array_unique($warnings))]);
         $before = ['policies' => $currentPolicies, 'types' => []];
         foreach (($data['types'] ?? []) as $id => $values) { $type = LeaveType::find($id); if ($type) $before['types'][$id] = $balances->limitsFor($type, $companyId); }
-        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document'];
+        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document', 'is_active'];
         $balances = app(\App\Services\LeaveBalanceService::class);
         DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
+            if (!empty($data['sick_pay_basis'])) {
+                $basisWhere = [['company_id', '=', $companyId], ['setting_key', '=', 'sick_pay_basis']];
+                $existsBasis = DB::table('leave_policy_settings')->where($basisWhere)->exists();
+                if ($existsBasis) DB::table('leave_policy_settings')->where($basisWhere)->update(['setting_value' => $data['sick_pay_basis'], 'updated_at' => now()]);
+                else DB::table('leave_policy_settings')->insert(['company_id' => $companyId, 'setting_key' => 'sick_pay_basis', 'setting_value' => $data['sick_pay_basis'], 'created_at' => now(), 'updated_at' => now()]);
+            }
             if (!empty($data['contact_pay'])) {
                 LeaveType::updateOrCreate(['company_id' => $companyId, 'policy_code' => 'contagious_contact_company_'.$companyId], ['name' => 'إجازة مخالطة مريض بمرض معد', 'is_paid' => $data['contact_pay'] === 'paid', 'is_active' => (bool) ($data['contact_active'] ?? false), 'deducts_annual_balance' => false, 'requires_document' => true]);
             }

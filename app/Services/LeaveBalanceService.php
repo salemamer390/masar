@@ -189,6 +189,7 @@ class LeaveBalanceService
             'max_days_per_year' => $src->max_days_per_year !== null ? (float) $src->max_days_per_year : null,
             'min_service_months' => $src->min_service_months !== null ? (int) $src->min_service_months : null,
             'max_occurrences_service' => $src->max_occurrences_service !== null ? (int) $src->max_occurrences_service : null,
+            'is_active' => $row && property_exists($row, 'is_active') && $row->is_active !== null ? (bool) $row->is_active : (bool) $type->is_active,
         ];
     }
 
@@ -201,6 +202,7 @@ class LeaveBalanceService
         if (!$type || !$employee) return;
         if ($type->policy_code === 'contagious_contact' && !$type->is_active) $this->fail('leave_type_id', 'نوع المخالطة غير مفعّل. حدد سياسة الأجر وفعّل نسخة الشركة من إعدادات الإجازات أولًا.');
         $limits = $this->limitsFor($type, $employee->company_id ? (int) $employee->company_id : null);
+        if (array_key_exists('is_active', $limits) && $limits['is_active'] === false) $this->fail('leave_type_id', "نوع الإجازة «{$type->name}» غير مفعّل لشركتك. فعّله من إعدادات الإجازات أولًا.");
         $calendar = self::CALENDAR_TYPES[$type->policy_code] ?? null;
         $companyIdForPolicy = $employee->company_id ? (int) $employee->company_id : null;
         // Maternity / childcare / contagious-contact are calendar periods (months / years), not a fixed day count. The old fixed

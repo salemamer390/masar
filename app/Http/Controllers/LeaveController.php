@@ -44,7 +44,11 @@ class LeaveController extends Controller
         $totalDays = Leave::effective()->sum('days');
         $onLeaveToday = Leave::effective()->whereDate('start_date', '<=', today())->whereDate('end_date', '>=', today())->count();
         $rejectedThisMonth = Leave::where('status', 'Rejected')->whereMonth('updated_at', now()->month)->whereYear('updated_at', now()->year)->count();
-        $leaveTypes = LeaveType::where('is_active', 1)->get();
+        $companyIdForTypes = auth()->user()->company_id ?? null;
+        $deactivatedTypeIds = $companyIdForTypes && \Illuminate\Support\Facades\Schema::hasTable('leave_type_company_limits')
+            ? \Illuminate\Support\Facades\DB::table('leave_type_company_limits')->where('company_id', $companyIdForTypes)->where('is_active', 0)->pluck('leave_type_id')->all()
+            : [];
+        $leaveTypes = LeaveType::where('is_active', 1)->whereNotIn('id', $deactivatedTypeIds)->get();
         $employees = Employee::orderBy('full_name')->get();
         $departments = Department::where('is_active', 1)->orderBy('name')->get();
 
