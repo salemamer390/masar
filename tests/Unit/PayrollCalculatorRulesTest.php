@@ -97,10 +97,35 @@ class PayrollCalculatorRulesTest extends TestCase
     public function test_work_on_official_holiday_and_weekly_rest_is_paid_in_whole_days(): void
     {
         $r = $this->calculator()->monthly(25536.0, ['official_holiday_days' => 1, 'weekly_rest_days' => 1]);
-        $this->assertEqualsWithDelta(1702.40, $r['official_holiday_amount'], 0.01); // 2 x daily rate
+        // Multiplier 2 = two days' wage TOTAL for the worked holiday; the base day is
+        // already inside the monthly salary, so only one extra day is added.
+        $this->assertEqualsWithDelta(851.20, $r['official_holiday_amount'], 0.01);  // (2 - 1) x daily rate
         $this->assertEqualsWithDelta(851.20, $r['weekly_rest_amount'], 0.01);        // 1 x daily rate
-        $this->assertEqualsWithDelta(2553.60, $r['overtime_amount'], 0.01);
-        $this->assertEqualsWithDelta(21978.90, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(1702.40, $r['overtime_amount'], 0.01);
+        $this->assertEqualsWithDelta(383.04, $r['income_tax_variable'], 0.01);
+        $this->assertEqualsWithDelta(21319.22, $r['net_monthly'], 0.01);
+    }
+
+    public function test_worked_official_holiday_totals_two_days_wages_not_two_extra_days(): void
+    {
+        // 200-day employee (6000/30) working one official holiday: total for that day is
+        // 400 (200 already inside the salary + 200 added), not 600.
+        $r = $this->calculator()->monthly(6000.0, ['official_holiday_days' => 1]);
+        $this->assertEqualsWithDelta(200.0, $r['official_holiday_amount'], 0.01);
+        $this->assertEqualsWithDelta(200.0, $r['overtime_amount'], 0.01);
+        $this->assertEqualsWithDelta(6000.0, $r['gross'], 0.01);
+    }
+
+    public function test_official_holiday_multiplier_of_one_adds_nothing_and_below_one_never_deducts(): void
+    {
+        // A company that configures 1 (= the holiday day counts once, already in salary)
+        // gets no extra earning; values below 1 clamp to zero rather than deducting.
+        $one = $this->calculator(['overtime.official_holiday_multiplier' => 1])->monthly(6000.0, ['official_holiday_days' => 2]);
+        $this->assertEqualsWithDelta(0.0, $one['official_holiday_amount'], 0.01);
+        $half = $this->calculator(['overtime.official_holiday_multiplier' => 0.5])->monthly(6000.0, ['official_holiday_days' => 2]);
+        $this->assertEqualsWithDelta(0.0, $half['official_holiday_amount'], 0.01);
+        $none = $this->calculator()->monthly(6000.0);
+        $this->assertEqualsWithDelta(0.0, $none['official_holiday_amount'], 0.01);
     }
 
     public function test_basis_rules_are_read_from_settings(): void
