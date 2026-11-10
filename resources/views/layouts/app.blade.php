@@ -108,7 +108,9 @@
     'Insurance record updated.':'تم تحديث بيانات التأمين بنجاح.',
     'Payroll run generated in Draft status.':'تم إنشاء مسير الرواتب كمسودة.',
     'Payroll run approved.':'تم اعتماد مسير الرواتب.',
-    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.'
+    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.',
+    'Attendance saved.':'تم حفظ الحضور بنجاح.',
+    'Attendance record saved.':'تم حفظ سجل الحضور بنجاح.'
   };
   function translateInterfaceText(root = document.body) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -121,7 +123,24 @@
       node.nodeValue = source.replace(compact, arabicUiLabels[compact]);
     });
   }
-  document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
+  // Calendar date (Africa/Cairo) of a date or ISO timestamp, so UTC timestamps never shift the day.
+  window.masarYmd = function (value) {
+    const text = String(value || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const date = new Date(text);
+    if (isNaN(date)) return text.slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', {timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'}).format(date);
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    translateInterfaceText();
+    // Re-translate text injected later by AJAX (alerts, toasts, rebuilt rows).
+    let pending = false;
+    new MutationObserver(() => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; translateInterfaceText(); });
+    }).observe(document.body, {childList: true, subtree: true, characterData: true});
+  });
 
   // استخراج تاريخ الميلاد والنوع من الرقم القومي، بما في ذلك النماذج التي تُحقن داخل نافذة منبثقة.
   document.addEventListener('input', (event) => {
