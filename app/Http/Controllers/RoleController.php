@@ -48,10 +48,10 @@ class RoleController extends Controller
 
     public function store(Request $request)
     {
-        abort_if(auth()->user()->isSuperAdmin() && !auth()->user()->company_id, 403, 'أنشئ أدوار الشركات من حساب الشركة التابعة لها.');
+        abort_if(auth()->user()->isSuperAdmin() && !auth()->user()->company_id, 403, __('أنشئ أدوار الشركات من حساب الشركة التابعة لها.'));
         $data = $request->validate(['display_name' => ['required', 'string', 'max:150'], 'description' => ['nullable', 'string', 'max:255']]);
         $companyId = auth()->user()->company_id;
-        abort_if(!$companyId, 403, 'لا يمكن إنشاء دور دون شركة.');
+        abort_if(!$companyId, 403, __('لا يمكن إنشاء دور دون شركة.'));
         Role::create(['name' => 'custom_'.str()->slug($data['display_name']).'_'.str()->random(6), 'display_name' => $data['display_name'], 'description' => $data['description'] ?? null, 'company_id' => $companyId]);
         return redirect()->route('roles.index')->with('toast', __('تم إنشاء الدور بنجاح.'));
     }
