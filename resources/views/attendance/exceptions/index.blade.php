@@ -6,7 +6,7 @@
 <form method="get" class="d-flex gap-2 mb-3"><input class="form-control" type="date" name="from" value="{{ request('from') }}" aria-label="{{ __('من تاريخ') }}"><input class="form-control" type="date" name="to" value="{{ request('to') }}" aria-label="{{ __('إلى تاريخ') }}"><button class="btn btn-primary">{{ __('عرض') }}</button></form>
 <div class="table-responsive"><table class="table"><thead><tr><th>{{ __('الكود') }}</th><th>{{ __('الموظف') }}</th><th>{{ __('التاريخ') }}</th><th>{{ __('سبب المراجعة') }}</th><th>{{ __('البصمات') }}</th><th></th></tr></thead><tbody>
 @forelse($days as $day)
-<tr><td>{{ $day->employee->employee_code }}</td><td>{{ $day->employee->full_name }}</td><td>{{ $day->work_date->format('d/m/Y') }}</td><td>{{ $day->issue==='extra' ? 'بصمات زائدة' : 'بصمة ناقصة / تحتاج تحديد' }}</td><td>{{ count($day->current_punches) }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ route('attendance.exceptions.show',$day) }}">{{ __('فتح') }}</a></td></tr>
+<tr><td>{{ $day->employee->employee_code }}</td><td>{{ $day->employee->full_name }}</td><td>{{ $day->work_date->format('d/m/Y') }}</td><td>{{ $day->issue==='extra' ? __('بصمات زائدة') : __('بصمة ناقصة / تحتاج تحديد') }}</td><td>{{ count($day->current_punches) }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ route('attendance.exceptions.show',$day) }}">{{ __('فتح') }}</a></td></tr>
 @empty
 <tr><td colspan="6">{{ __('لا توجد استثناءات معلقة.') }}</td></tr>
 @endforelse
