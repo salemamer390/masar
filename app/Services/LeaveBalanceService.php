@@ -237,7 +237,7 @@ class LeaveBalanceService
         }
         $gender = match (mb_strtolower((string) $employee->gender)) { 'female', 'أنثى', 'انثى' => 'female', 'male', 'ذكر' => 'male', default => null };
         if ($type->eligibility_gender && $gender !== $type->eligibility_gender) $this->fail('employee_id', "لا يمكن اعتماد {$type->name}: هذا النوع متاح للموظفات فقط.");
-        if ($type->min_employees && ($currentEmployees = Employee::count()) < (int) $type->min_employees) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: عدد العاملين الحالي {$currentEmployees}، بينما الحد الأدنى المطلوب {$type->min_employees} عاملًا.");
+        if ($type->min_employees && ($currentEmployees = Employee::where('company_id', $employee->company_id)->count()) < (int) $type->min_employees) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: عدد العاملين الحالي بشركتك {$currentEmployees}، بينما الحد الأدنى المطلوب {$type->min_employees} عاملًا.");
         if ($limits['min_service_months'] && !in_array($type->policy_code, ['annual', 'casual'], true) && $employee->hire_date && ($eligibleAt = Carbon::parse($employee->hire_date)->addMonths((int) $limits['min_service_months']))->gt($start)) $this->fail('start_date', "لا يمكن اعتماد {$type->name}: يشترط إتمام {$limits['min_service_months']} شهر خدمة. يصبح الموظف مستحقًا في {$eligibleAt->format('d/m/Y')}.");
         if ($limits['max_occurrences_service'] && ($usedOccurrences = $this->occurrences($employee, $type, $excludeId)) >= (int) $limits['max_occurrences_service']) $this->fail('leave_type_id', "لا يمكن اعتماد {$type->name}: استخدم الموظف {$usedOccurrences} من الحد الأقصى {$limits['max_occurrences_service']} مرات طوال مدة الخدمة.");
         if ($limits['max_days_per_year'] !== null) {
