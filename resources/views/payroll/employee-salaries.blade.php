@@ -7,7 +7,7 @@
     $pageBody = view('payroll.partials.employee-salaries-body')->render();
     $peopleJson = json_encode($prototypePeople, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $monthIndex = max(0, min(11, (int) $month->format('n') - 1));
-    $arabicMonthLabel = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][$monthIndex] . ' ' . $month->format('Y');
+    $arabicMonthLabel = $month->locale(app()->getLocale())->translatedFormat('F Y');
 @endphp
 
 <link rel="stylesheet" href="{{ asset('payroll-assets/employee-salaries.css') }}">
