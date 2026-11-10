@@ -238,9 +238,9 @@ class HrRequestController extends Controller
         if (in_array($type->source_key, ['permission', 'mission'], true)) {
             $validated = array_merge($validated, $this->validateExcuse($request, $type->source_key));
         }
-        abort_if($type->source_key === 'leave', 422, 'طلبات الإجازة تُسجّل من وحدة الإجازات.');
+        abort_if($type->source_key === 'leave', 422, __('طلبات الإجازة تُسجّل من وحدة الإجازات.'));
         $employee = Employee::findOrFail($validated['employee_id']);
-        abort_unless($this->canTargetEmployee($user, $employee), 403, 'لا يمكنك إنشاء طلب لهذا الموظف.');
+        abort_unless($this->canTargetEmployee($user, $employee), 403, __('لا يمكنك إنشاء طلب لهذا الموظف.'));
         if ($type->source_key === 'overtime') {
             // Art. 54: no overtime during pregnancy or the configured postpartum
             // months. Dates come only from the recorded maternity leave.
@@ -277,7 +277,7 @@ class HrRequestController extends Controller
             if ($outstandingAdvance['amount'] > 0) {
                 if (!$request->boolean('advance_existing_confirm')) {
                     throw ValidationException::withMessages([
-                        'advance_existing_confirm' => 'لدى الموظف سلفة سابقة غير مسددة. فعّل مربع التأكيد للمتابعة أو عدّل السلفة السابقة أولاً.',
+                        'advance_existing_confirm' => __('لدى الموظف سلفة سابقة غير مسددة. فعّل مربع التأكيد للمتابعة أو عدّل السلفة السابقة أولاً.'),
                     ]);
                 }
             }
@@ -385,7 +385,7 @@ class HrRequestController extends Controller
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
-        abort_unless($user->hasPermission('requests.create'), 403, 'لا توجد صلاحية لتعديل الطلبات.');
+        abort_unless($user->hasPermission('requests.create'), 403, __('لا توجد صلاحية لتعديل الطلبات.'));
         $hrRequest->loadMissing(['requestType', 'employee']);
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:200'],
@@ -525,7 +525,7 @@ class HrRequestController extends Controller
         if (in_array($source, ['advance', 'bonus'], true)) {
             $errorKey = $source === 'advance' ? 'advance_request_date' : 'financial_request_date';
             throw ValidationException::withMessages([
-                $errorKey => 'يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن حفظ طلب آخر من النوع نفسه.',
+                $errorKey => __('يوجد طلب قائم لهذا الموظف داخل نفس الشهر. لا يمكن حفظ طلب آخر من النوع نفسه.'),
             ]);
         }
         if ($source === 'overtime') {
@@ -588,8 +588,8 @@ class HrRequestController extends Controller
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
-        abort_unless($user->hasPermission('requests.approve'), 403, 'لا توجد صلاحية لاعتماد الطلبات.');
-        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, 'الطلب ملغى.');
+        abort_unless($user->hasPermission('requests.approve'), 403, __('لا توجد صلاحية لاعتماد الطلبات.'));
+        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, __('الطلب ملغى.'));
         app(PayrollPeriodGuard::class)->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
 
         $old = $hrRequest->only(['status', 'reviewed_by', 'reviewed_at', 'rejection_reason']);
@@ -610,8 +610,8 @@ class HrRequestController extends Controller
     {
         $user = $request->user();
         $this->authorizeVisible($hrRequest, $user);
-        abort_unless($user->hasPermission('requests.approve'), 403, 'لا توجد صلاحية لمراجعة الطلبات.');
-        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, 'الطلب ملغى بالفعل.');
+        abort_unless($user->hasPermission('requests.approve'), 403, __('لا توجد صلاحية لمراجعة الطلبات.'));
+        abort_if(in_array($hrRequest->status, HrRequest::inactiveStatuses(), true), 422, __('الطلب ملغى بالفعل.'));
         app(PayrollPeriodGuard::class)->ensureRangeOpen(data_get($hrRequest->payload, 'start_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString(), data_get($hrRequest->payload, 'end_date') ?: data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at->toDateString());
 
         $validated = $request->validate([
@@ -698,7 +698,7 @@ class HrRequestController extends Controller
         abort_unless(
             HrRequest::query()->whereKey($hrRequest->id)->visibleTo($user)->exists(),
             403,
-            'لا يمكنك الوصول إلى هذا الطلب.'
+            __('لا يمكنك الوصول إلى هذا الطلب.')
         );
     }
 }
