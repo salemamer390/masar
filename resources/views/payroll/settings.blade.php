@@ -183,9 +183,9 @@
 <div class="lv-group">
   <h3 class="lv-group-title">الإجازات العامة</h3>
   <div class="lv-cards">
-@if($annualType)@php($annualCmp = $lvStatus($annualType))
+@php($annualCmp = $annualType ? $lvStatus($annualType) : ['status' => 'review', 'notes' => []])
     <div class="lv-card lv-wide lv-st-{{ $annualCmp['status'] }}">
-      <div class="lv-card-head"><h4>{{ $annualType->name }}</h4><span class="lv-art">م124</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}">{{ $ref::LABELS[$annualCmp['status']] }}</span></div>
+      <div class="lv-card-head"><h4>الإجازة السنوية@if($annualType && $annualType->name !== 'الإجازة السنوية') ({{ $annualType->name }})@endif</h4><span class="lv-art">م124</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}">{{ $ref::LABELS[$annualCmp['status']] }}</span></div>
       <p class="lv-card-desc">{{ $ref::typeRules()['annual']['text'] }}. الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</p>
       <div class="lv-sub-title">الاستحقاق (يوم)</div>
       <div class="lv-fields">{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}</div>
@@ -193,8 +193,10 @@
       <div class="lv-fields">{!! $lvField('annual_long_service_years') !!}{!! $lvField('annual_age_threshold') !!}{!! $lvField('annual_hazardous_extra_days') !!}</div>
       <div class="lv-sub-title">الانتظار والاستثناء</div>
       <div class="lv-fields">{!! $lvField('annual_wait_months') !!}{!! $lvField('allow_early_leave') !!}<p class="lv-note">لو الموظف لم يكمل مدة الانتظار، تظهر رسالة بسبب المنع وزر «موافق» لمن يملك صلاحية الاعتماد، وتُسجَّل الإجازة كمنح استثنائي. تظهر الرسالة فقط لو «السماح بمنح استثنائي» = 1.</p></div>
+      @if($annualType)
       <div class="lv-sub-title">الحدود</div>
       <div class="lv-fields">{!! $lvTypeLimits($annualType) !!}</div>
+      @endif
       {!! $lvNotes($annualCmp) !!}
 @if($casualType)@php($casualCmp = $lvStatus($casualType))
       <div class="lv-sect">
@@ -205,18 +207,17 @@
       </div>
 @endif
     </div>
-@endif
   </div>
 </div>
 @if($sickType || $contactType)
 <div class="lv-group">
   <h3 class="lv-group-title">المرض</h3>
   <div class="lv-cards">
-@if($sickType)@php($sickCmp = $lvStatus($sickType))
+@php($sickCmp = $sickType ? $lvStatus($sickType) : ['status' => 'review', 'notes' => []])
     <div class="lv-card lv-wide lv-st-{{ $sickCmp['status'] }}">
-      <div class="lv-card-head"><h4>{{ $sickType->name }}</h4><span class="lv-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}">{{ $ref::LABELS[$sickCmp['status']] }}</span></div>
+      <div class="lv-card-head"><h4>{{ $sickType?->name ?? 'الإجازة المرضية' }}</h4><span class="lv-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}">{{ $ref::LABELS[$sickCmp['status']] }}</span></div>
       <p class="lv-card-desc">{{ $ref::typeRules()['sick']['text'] }}</p>
-      <div class="lv-fields">{!! $lvTypeLimits($sickType) !!}</div>
+      @if($sickType)<div class="lv-fields">{!! $lvTypeLimits($sickType) !!}</div>@endif
       {!! $lvNotes($sickCmp) !!}
 @if($contactType)@php($contactCmp = $lvStatus($contactType))
       <div class="lv-sect">
@@ -232,7 +233,6 @@
       </div>
 @endif
     </div>
-@endif
   </div>
 </div>
 @endif
