@@ -118,224 +118,249 @@
 <form method="POST" action="{{ route('payroll.settings.leaves.update') }}" data-ajax="true" data-track-dirty="true">
 @csrf @method('PUT')
 <?php
-  $ref = \App\Support\LeaveLegalReference::class;
+  // نفس صفحة التصميم المعتمدة حرفيًا (نفس المجموعات والبطاقات والحقول وترتيبها)،
+  // بألوان مسار وخط التطبيق، بدون استيراد/تصدير، والحقول مربوطة بحفظ التطبيق الفعلي.
   $lvNum = fn ($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.');
   $policyValues = $leavePolicies->pluck('setting_value', 'setting_key')->all();
-  $lvHintText = function (string $status, string $key) use ($ref) {
-      $law = $ref::policyRules()[$key] ?? null;
-      $lawText = $law ? 'القانون: '.$law['ref'].($law['unit'] ? ' '.$law['unit'] : '') : $ref::policyHint($key);
-      if ($status === 'below') return 'يخالف الحد القانوني — '.$lawText;
-      if ($status === 'review') return 'يحتاج مراجعة — '.$lawText;
-      return '';
-  };
-  $lvField = function (string $key, bool $readonly = false) use ($leavePolicies, $leavePolicyLabels, $lvNum, $ref, $lvHintText) {
-      if (!isset($leavePolicies[$key])) return '';
-      $status = $key === 'annual_first_year' ? 'review' : $ref::policyStatus($key, $leavePolicies[$key]->setting_value);
-      $rule = $ref::policyRules()[$key] ?? null;
-      $unit = $rule['unit'] ?? '';
-      $label = $leavePolicyLabels[$key] ?? $key;
-      $chip = $unit !== '' && mb_strpos($label, $unit) === false ? '<span class="lp-unit">'.e($unit).'</span>' : '';
-      $implBadge = $readonly ? '<span class="lp-impl">محفوظ للعرض فقط — غير مطبّق في الحساب حاليًا</span>' : '';
-      $attrs = $rule ? ' data-law="'.e((string) $rule['ref']).'" data-dir="'.e($rule['dir']).'" data-unit="'.e($unit).'"' : '';
-      return '<div class="lp-field" data-lp-field'.$attrs.'><label class="lp-lbl">'.e($label).'</label><div class="lp-input"><input type="number" step="1" min="0" '.($readonly ? 'disabled' : 'name="policies['.e($key).']"').' value="'.e($lvNum($leavePolicies[$key]->setting_value)).'" class="form-control" data-lp-input>'.$chip.'</div><small class="lp-hint'.($status !== 'ok' ? ' is-'.($status === 'below' ? 'bad' : 'mod') : '').'" data-lp-hint>'.e($lvHintText($status, $key)).'</small>'.$implBadge.'</div>';
-  };
-  $lvOccLaw = ['newborn' => 3, 'pilgrimage' => 1, 'maternity' => 3, 'childcare' => 3];
-  $lvLimitField = function (string $label, string $inner, string $unit = '', ?float $law = null, string $dir = '', string $hint = '') {
-      $chip = $unit !== '' && mb_strpos($label, $unit) === false ? '<span class="lp-unit">'.e($unit).'</span>' : '';
-      $attrs = $law !== null ? ' data-law="'.e((string) $law).'" data-dir="'.e($dir).'" data-unit="'.e($unit).'"' : '';
-      return '<div class="lp-field" data-lp-field'.$attrs.'><label class="lp-lbl">'.e($label).'</label><div class="lp-input">'.$inner.$chip.'</div><small class="lp-hint" data-lp-hint>'.e($hint).'</small></div>';
-  };
-  $lvTypeLimits = function ($type) use ($lvNum, $lvLimitField) {
-      $lim = $type->limits; $code = $type->policy_code;
-      $isAnnual = $code === 'annual'; $isCasual = $code === 'casual';
-      $isCalendar = isset(\App\Services\LeaveBalanceService::CALENDAR_TYPES[$code]);
-      $h = '';
-      if ($isAnnual) {
-          $h .= $lvLimitField('الحد في الطلب (يوم)', '<div class="lp-static">حسب الرصيد المتاح</div>');
-      } elseif ($isCalendar && in_array((float) ($lim['max_days_per_request'] ?? 0), [0.0, $code === 'maternity' ? 120.0 : ($code === 'childcare' ? 730.0 : 0.0)], true)) {
-          $h .= $lvLimitField('الحد في الطلب', '<div class="lp-static">بالتقويم من إعداد المدة في هذه البطاقة</div>');
-      } else {
-          $law = $isCasual ? 2.0 : null;
-          $h .= $lvLimitField('الحد في الطلب (يوم)', '<input type="number" min="0" step="0.5" name="types['.$type->id.'][max_days_per_request]" value="'.e($lvNum($lim['max_days_per_request'])).'" class="form-control" data-lp-input>', 'يوم', $law, $law !== null ? 'min' : '');
-          if ($isCalendar) $h = substr_replace($h, '<small class="lp-note-inline">حد قديم مخصص بالأيام، محفوظ دون تقليل ميزته. امسحه لتطبيق مدة التقويم. يحتاج مراجعة.</small>', strrpos($h, '</div>', 0), 0);
-      }
-      $lawYear = $isCasual ? 7.0 : null;
-      $h .= $lvLimitField('الحد السنوي (يوم)', '<input type="number" min="0" step="0.5" name="types['.$type->id.'][max_days_per_year]" value="'.e($lvNum($lim['max_days_per_year'])).'" class="form-control" data-lp-input>', 'يوم', $lawYear, $lawYear !== null ? 'min' : '');
-      if ($isAnnual) $h .= $lvLimitField('الحد الأدنى للخدمة (شهر)', '<div class="lp-static">من «مدة الانتظار»</div>');
-      elseif ($isCasual) $h .= $lvLimitField('الحد الأدنى للخدمة (شهر)', '<div class="lp-static">بدون انتظار</div>');
-      else $h .= $lvLimitField('الحد الأدنى للخدمة (شهر)', '<input type="number" min="0" name="types['.$type->id.'][min_service_months]" value="'.e($lvNum($lim['min_service_months'])).'" class="form-control" data-lp-input>', 'شهر');
-      $occLaw = ['newborn' => 3.0, 'pilgrimage' => 1.0, 'maternity' => 3.0, 'childcare' => 3.0][$code] ?? null;
-      $h .= $lvLimitField('مرات طوال الخدمة', '<input type="number" min="0" name="types['.$type->id.'][max_occurrences_service]" value="'.e($lvNum($lim['max_occurrences_service'])).'" class="form-control" data-lp-input>', 'مرة', $occLaw, $occLaw !== null ? 'min' : '');
-      $h .= '<div class="lp-field lp-check"><div class="form-check form-switch m-0"><input type="hidden" name="types['.$type->id.'][requires_document]" value="0"><input class="form-check-input" type="checkbox" id="doc-'.$type->id.'" name="types['.$type->id.'][requires_document]" value="1"'.($lim['requires_document'] ? ' checked' : '').'><label class="form-check-label" for="doc-'.$type->id.'">مستند مطلوب</label></div><small class="lp-hint" data-lp-hint></small></div>';
-      return $h;
-  };
+  $pol = fn (string $key, $default) => $policyValues[$key] ?? $default;
+  $lvType = fn (string $code) => $leaveTypes->firstWhere('policy_code', $code);
+  $companyContact = $leaveTypes->first(fn ($t) => $t->policy_code === 'contagious_contact' && $t->company_id);
+  $contactType = $companyContact ?? $leaveTypes->first(fn ($t) => $t->policy_code === 'contagious_contact' && !$t->company_id);
   $lvMandated = ['annual', 'casual', 'sick', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare'];
-  $lvToggle = function ($type) use ($lvMandated) {
-      if (!$type) return '';
-      $active = array_key_exists('is_active', $type->limits) ? (bool) $type->limits['is_active'] : (bool) $type->is_active;
-      return '<span class="form-check form-switch m-0" title="تفعيل النوع لشركتك"><input type="hidden" name="types['.$type->id.'][is_active]" value="0"><input class="form-check-input" type="checkbox" name="types['.$type->id.'][is_active]" value="1"'.($active ? ' checked' : '').' data-lp-toggle></span>';
-  };
-  $lvStatus = fn ($type) => $ref::typeStatus($type->policy_code, $type->limits, $type->is_paid, $type->limits['requires_document'], $policyValues);
-  $lvNotes = function (array $cmp) {
-      $h = '';
-      foreach ($cmp['notes'] as $note) $h .= '<small class="lp-card-note d-block">'.e($note).'</small>';
+
+  // حقل رقمي بنفس ترميز التصميم: input-group + وحدة + مساحة تلميح.
+  $lvN = function (string $card, string $key, string $label, $law, string $dir, string $unit, ?string $name = null, $value = null, ?string $note = null, ?array $scale = null) use ($lvNum) {
+      $id = $card.'-'.$key;
+      $disabled = $name === null;
+      $v = $lvNum($value ?? $law);
+      $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><div class="input-group input-group-sm">'
+          .'<input type="number" min="0" step="any" class="form-control" id="'.e($id).'"'
+          .($name && !$scale ? ' name="'.e($name).'"' : '')
+          .' value="'.e($v).'" data-lp-ctl data-t="n" data-law="'.e((string) $law).'" data-dir="'.e($dir).'" data-unit="'.e($unit).'"'
+          .($scale ? ' data-scale-op="'.e($scale['op']).'" data-scale-factor="'.e((string) $scale['factor']).'" data-scale-target="'.e($scale['target']).'"' : '')
+          .($disabled ? ' disabled' : '').'>'
+          .'<span class="input-group-text">'.e($unit).'</span></div>'
+          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+      if ($name && $scale) $h .= '<input type="hidden" id="'.e($scale['target']).'" name="'.e($name).'" value="'.e($lvNum($scale['op'] === 'div' ? ($value ?? $law) / $scale['factor'] : ($value ?? $law) * $scale['factor'])).'">';
       return $h;
   };
-  $lvTypeCard = function (string $code, array $policyKeys = [], string $extraDesc = '') use ($leaveTypes, $lvStatus, $lvTypeLimits, $lvField, $lvNotes, $lvToggle, $lvMandated, $ref) {
-      $type = $leaveTypes->firstWhere('policy_code', $code);
-      if (!$type) return '';
-      $rules = $ref::typeRules()[$code] ?? null;
-      $cmp = $lvStatus($type);
-      $mandated = in_array($code, $lvMandated, true) ? ' data-mandated="1"' : '';
-      $h = '<div class="lp-card lp-st-'.$cmp['status'].'" data-lp-card data-lp-name="'.e($type->name).'" data-status="'.$cmp['status'].'"'.$mandated.'><div class="lp-card-head"><h4>'.e($type->name).'</h4>';
-      if ($rules && $rules['article']) $h .= '<span class="lp-art">م'.$rules['article'].'</span>';
-      $h .= '<span class="badge text-bg-'.$ref::CLASSES[$cmp['status']].'" data-lp-badge>'.$ref::LABELS[$cmp['status']].'</span>'.$lvToggle($type).'<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>';
-      if ($rules && $rules['text']) $h .= '<p class="lp-card-desc">'.e($rules['text']).($extraDesc ? ' '.e($extraDesc) : '').'</p>';
-      $h .= '<div class="lp-fields">'.$lvTypeLimits($type);
-      foreach ($policyKeys as $k) $h .= $lvField($k);
-      $h .= '</div>'.$lvNotes($cmp).'</div>';
+  // مفتاح تبديل بنفس ترميز التصميم.
+  $lvS = function (string $card, string $key, string $label, bool $law, bool $strict, ?string $name = null, ?bool $value = null, ?string $note = null) {
+      $id = $card.'-'.$key;
+      $disabled = $name === null;
+      $on = $value ?? $law;
+      return '<div class="col-md-6"><div class="form-check form-switch">'
+          .($name ? '<input type="hidden" name="'.e($name).'" value="0">' : '')
+          .'<input class="form-check-input" type="checkbox" id="'.e($id).'"'.($name ? ' name="'.e($name).'" value="1"' : '').($on ? ' checked' : '')
+          .' data-lp-ctl data-t="s" data-law="'.($law ? '1' : '0').'"'.($strict ? ' data-strict="1"' : '').($disabled ? ' disabled' : '').'>'
+          .'<label class="form-check-label" for="'.e($id).'">'.e($label).'</label></div>'
+          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+  };
+  // قائمة منسدلة بنفس ترميز التصميم.
+  $lvSel = function (string $card, string $key, string $label, string $law, array $opts, ?string $name = null, ?string $value = null, ?string $note = null) {
+      $id = $card.'-'.$key;
+      $v = $value ?? $law;
+      $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><select class="form-select form-select-sm" id="'.e($id).'"'.($name ? ' name="'.e($name).'"' : ' disabled')
+          .' data-lp-ctl data-t="sel" data-law="'.e($law).'">';
+      foreach ($opts as $ov => $ol) $h .= '<option value="'.e($ov).'"'.($ov === $v ? ' selected' : '').'>'.e($ol).'</option>';
+      $h .= '</select><div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
       return $h;
   };
-  $companyContact = $leaveTypes->first(fn($t) => $t->policy_code === 'contagious_contact' && $t->company_id);
-  $contactType = $companyContact ?? $leaveTypes->first(fn($t) => $t->policy_code === 'contagious_contact' && !$t->company_id);
-  $lvKnownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'unpaid', 'maternity', 'childcare'];
-  $annualType = $leaveTypes->firstWhere('policy_code', 'annual');
-  $casualType = $leaveTypes->firstWhere('policy_code', 'casual');
-  $sickType = $leaveTypes->firstWhere('policy_code', 'sick');
+  // رأس بطاقة: الاسم + المادة + مفتاح التفعيل + زر «القانون»، بنفس ترتيب التصميم.
+  $lvHead = function (string $card, string $name, string $art, ?string $toggleName = null, ?bool $active = null) {
+      $h = '<div class="leave-head"><h3>'.e($name).'</h3><span class="art">'.e($art).'</span>';
+      if ($toggleName !== null) {
+          $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
+              .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle></div>';
+      } else {
+          $h .= '<div class="form-check form-switch m-0" title="حق مقرر بالقانون"><input class="form-check-input" type="checkbox" checked disabled></div>';
+      }
+      $h .= '<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset="'.e($card).'">القانون</button></div>';
+      return $h;
+  };
+  $lvCardOpen = function (string $card, bool $off = false, bool $mandated = false) {
+      return '<div class="col-lg-6" data-card-wrap="'.e($card).'"><div class="leave'.($off ? ' is-off' : '').'" id="c-'.e($card).'"'.($mandated ? ' data-mandated="1"' : '').'>';
+  };
+  $lvOffSlot = fn (string $card, bool $show) => '<div id="h-'.e($card).'-on" class="mt-2">'.($show ? '<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>' : '').'</div>';
+  $lvActive = function ($type) { return $type ? (array_key_exists('is_active', $type->limits) ? (bool) $type->limits['is_active'] : (bool) $type->is_active) : true; };
+
+  $annualType = $lvType('annual'); $casualType = $lvType('casual'); $sickType = $lvType('sick');
+  $examsType = $lvType('exams'); $newbornType = $lvType('newborn'); $pilgrimageType = $lvType('pilgrimage');
+  $maternityType = $lvType('maternity'); $childcareType = $lvType('childcare');
+  $sickBasis = $policyValues['sick_pay_basis'] ?? ($sickType?->is_paid ? 'full' : 'none');
+  $knownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare'];
+  $extraTypes = $leaveTypes->reject(fn ($t) => in_array($t->policy_code, $knownCodes, true));
+  $constNote = 'ثابت قانوني — غير قابل للتعديل';
 ?>
 <header class="lp-toolbar">
   <div class="lp-toolbar-title">
     <h3>إعدادات الإجازات</h3>
-    <small>القيم الافتراضية مطابقة لقانون العمل رقم 14 لسنة 2025. الوسم يقارن القيم المعروفة فقط، وليس شهادة مطابقة قانونية كاملة. الإعدادات تخص شركتك فقط.</small>
+    <small>القيم الافتراضية مطابقة لقانون العمل رقم 14 لسنة 2025</small>
   </div>
   <span class="lp-dirty" data-lp-dirty hidden>تغييرات غير محفوظة</span>
-  <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save"></i> حفظ التغييرات</button>
+  <button type="submit" class="btn btn-primary btn-sm">حفظ التغييرات</button>
   <button type="button" class="btn btn-outline-secondary btn-sm" data-lp-reset-all>استعادة القيم القانونية</button>
 </header>
-<details class="lp-card lp-law-ref"><summary>المرجع القانوني (للقراءة فقط)</summary><div class="lp-law-body">@foreach(\App\Support\LeaveLegalReference::typeRules() as $code => $reference)<p><strong>{{ $leaveTypes->firstWhere('policy_code', $code)?->name ?? $code }} @if($reference['article'])(م{{ $reference['article'] }})@endif</strong>: {{ $reference['text'] }}</p>@endforeach<a href="https://eta.gov.eg/sites/default/files/2026-03/law.no_.14.of_.2025.pdf" target="_blank" rel="noopener">نص القانون</a></div></details>
 <div class="lp-search-row">
   <input type="search" class="form-control" placeholder="ابحث عن إجازة" data-lp-search>
   <div class="lp-summary" data-lp-summary></div>
 </div>
-<div class="lp-alert">أي تعديل يقلل حقًا يظهر بتحذير وتأكيد وسجل، والتأكيد لا يجعله قانونيًا. رصيد أول سنة يظل كاملًا بعد الانتظار بدون تناسب وفق قرار الشركة، ويحتاج مراجعة مع القواعد المرتبطة.</div>
 
-<div class="lp-group" data-lp-group>
-  <h3 class="lp-group-title">الإجازات العامة</h3>
-  <div class="lp-cards">
-@php($annualCmp = $annualType ? $lvStatus($annualType) : ['status' => 'review', 'notes' => []])
-    <div class="lp-card lp-wide lp-st-{{ $annualCmp['status'] }}" data-lp-card data-lp-name="الإجازة السنوية" data-status="{{ $annualCmp['status'] }}" data-mandated="1">
-      <div class="lp-card-head"><h4>الإجازة السنوية@if($annualType && $annualType->name !== 'الإجازة السنوية') ({{ $annualType->name }})@endif</h4><span class="lp-art">م124–127</span><span class="badge text-bg-{{ $ref::CLASSES[$annualCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$annualCmp['status']] }}</span>{!! $lvToggle($annualType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
-      <p class="lp-card-desc">{{ $ref::typeRules()['annual']['text'] }}. الاستحقاق حسب مدة الخدمة والسن، ومدة الانتظار قبل أول إجازة. الإجازة تنفذ فور تسجيلها دون دورة اعتماد. الحجز من الرصيد يشمل الطلبات المستقبلية.</p>
-      <div class="lp-sub-title">الاستحقاق (يوم)</div>
-      <div class="lp-fields">{!! $lvField('annual_first_year') !!}{!! $lvField('annual_second_year') !!}{!! $lvField('annual_long_service') !!}{!! $lvField('annual_disability_days') !!}</div>
-      <div class="lp-sub-title">شروط الأرصدة الأعلى</div>
-      <div class="lp-fields">{!! $lvField('annual_long_service_years') !!}{!! $lvField('annual_age_threshold') !!}{!! $lvField('annual_hazardous_extra_days') !!}</div>
-      <div class="lp-sub-title">الانتظار والاستثناء</div>
-      <div class="lp-fields">{!! $lvField('annual_wait_months') !!}{!! $lvField('allow_early_leave') !!}<p class="lp-note">لو الموظف لم يكمل مدة الانتظار، تظهر رسالة بسبب المنع وزر «موافق» لمن يملك صلاحية الاعتماد، وتُسجَّل الإجازة كمنح استثنائي. تظهر الرسالة فقط لو «السماح بمنح استثنائي» = 1.</p></div>
-      @if($annualType)
-      <div class="lp-sub-title">الحدود</div>
-      <div class="lp-fields">{!! $lvTypeLimits($annualType) !!}</div>
-      @endif
-      <p class="lp-ref-note">مرجع م124–127: الحد الأدنى المضمون سنويًا 15 يومًا، منها 6 أيام متصلة على الأقل، وتسوية الرصيد كل 3 سنوات، وإجازة بنسبة المدة بعد 6 أشهر خدمة — نقاط مرجعية لا تُحفظ كإعدادات مستقلة حاليًا.</p>
-      {!! $lvNotes($annualCmp) !!}
-@if($casualType)@php($casualCmp = $lvStatus($casualType))
-      <div class="lp-sect">
-        <div class="lp-sect-head"><h5>{{ $casualType->name }}</h5><span class="lp-art">م128</span><span class="badge text-bg-{{ $ref::CLASSES[$casualCmp['status']] }}">{{ $ref::LABELS[$casualCmp['status']] }}</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذا القسم">القانون</button></div>
-        <p class="lp-card-desc">{{ $ref::typeRules()['casual']['text'] }} تُخصم من السنوية ومدفوعة الأجر.</p>
-        <div class="lp-fields">{!! $lvTypeLimits($casualType) !!}</div>
-        {!! $lvNotes($casualCmp) !!}
-      </div>
-@endif
-    </div>
-    <div class="lp-card lp-refonly" data-lp-card data-lp-name="الأعياد والمناسبات الرسمية" data-status="ok">
-      <div class="lp-card-head"><h4>الأعياد والمناسبات الرسمية</h4><span class="lp-art">م129</span></div>
-      <p class="lp-card-desc">مدفوعة الأجر، وأجر التشغيل فيها مثلا الأجر مضافًا لأجر اليوم، ويجوز يوم بديل بطلب كتابي.</p>
-      <p class="lp-ref-note">تُدار أيام العطلات من تبويب «العطلات الرسمية»، ومضاعف أجر التشغيل من «قواعد الرواتب» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</p>
-    </div>
-    <div class="lp-card lp-refonly" data-lp-card data-lp-name="الراحة الأسبوعية" data-status="ok">
-      <div class="lp-card-head"><h4>الراحة الأسبوعية</h4><span class="lp-art">م120</span></div>
-      <p class="lp-card-desc">مدفوعة الأجر: 24 ساعة بعد 6 أيام عمل متصلة على الأكثر، وتجميع حتى 8 أسابيع للمواقع البعيدة.</p>
-      <p class="lp-ref-note">تُدار من تبويب «أوقات الدوام» (نمط الراحة الأسبوعية) — مصدر واحد لكل قاعدة، لا تُكرر هنا.</p>
-    </div>
-  </div>
+<h2 class="group-title">الإجازات العامة</h2>
+<div class="row g-3" data-lp-group>
+{!! $lvCardOpen('annual', !$lvActive($annualType), true) !!}
+{!! $lvHead('annual', 'الإجازة السنوية', 'م124–127', $annualType ? 'types['.$annualType->id.'][is_active]' : null, $lvActive($annualType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('annual', 'd1', 'السنة الأولى', 15, 'min', 'يوم', 'policies[annual_first_year]', $pol('annual_first_year', 15)) !!}
+{!! $lvN('annual', 'd2', 'من السنة الثانية', 21, 'min', 'يوم', 'policies[annual_second_year]', $pol('annual_second_year', 21)) !!}
+{!! $lvN('annual', 'd3', '10 سنوات خدمة أو تجاوز 50 سنة', 30, 'min', 'يوم', 'policies[annual_long_service]', $pol('annual_long_service', 30)) !!}
+{!! $lvN('annual', 'd4', 'ذوو الإعاقة والأقزام', 45, 'min', 'يوم', 'policies[annual_disability_days]', $pol('annual_disability_days', 45)) !!}
+{!! $lvN('annual', 'extra', 'إضافة للأعمال الخطرة والمناطق النائية', 7, 'min', 'يوم', 'policies[annual_hazardous_extra_days]', $pol('annual_hazardous_extra_days', 7)) !!}
+{!! $lvN('annual', 'minMonths', 'أقل خدمة لإجازة بنسبة المدة', 6, 'max', 'شهر', 'policies[annual_wait_months]', $pol('annual_wait_months', 6)) !!}
+{!! $lvN('annual', 'guaranteed', 'الحد الأدنى المضمون سنويًا', 15, 'min', 'يوم', null, 15, 'يظل الرصيد 15 يومًا كاملة بعد مدة الانتظار بدون تناسب، وفق قرار الشركة — مرجع ثابت حاليًا') !!}
+{!! $lvN('annual', 'continuous', 'منها أيام متصلة', 6, 'min', 'يوم', null, 6, 'مرجع قانوني — لا يُطبَّق كقيد مستقل في الاعتماد حاليًا') !!}
+{!! $lvN('annual', 'settle', 'تسوية الرصيد كل', 3, 'max', 'سنة', null, 3, 'مرجع قانوني — الرصيد المرحّل لا تنتهي صلاحيته آليًا في النظام حاليًا') !!}
+{!! $lvS('annual', 'paid', 'مدفوعة الأجر', true, false, $annualType ? 'types['.$annualType->id.'][is_paid]' : null, $annualType ? (bool) ($annualType->limits['is_paid'] ?? $annualType->is_paid) : true, $annualType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('annual', !$lvActive($annualType)) !!}</div></div></div>
+{!! $lvCardOpen('casual', !$lvActive($casualType)) !!}
+{!! $lvHead('casual', 'الإجازة العارضة', 'م128', $casualType ? 'types['.$casualType->id.'][is_active]' : null, $lvActive($casualType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('casual', 'days', 'الحد السنوي', 7, 'min', 'يوم', 'policies[casual_max_days_year]', $pol('casual_max_days_year', 7)) !!}
+{!! $lvN('casual', 'perTime', 'الحد الأقصى في المرة', 2, 'min', 'يوم', 'policies[casual_max_days_request]', $pol('casual_max_days_request', 2)) !!}
+{!! $lvS('casual', 'deduct', 'تُخصم من السنوية', true, false, $casualType ? 'types['.$casualType->id.'][deducts_annual_balance]' : null, $casualType ? (bool) ($casualType->limits['deducts_annual_balance'] ?? $casualType->deducts_annual_balance) : true, $casualType ? null : $constNote) !!}
+{!! $lvS('casual', 'paid', 'مدفوعة الأجر', true, false, $casualType ? 'types['.$casualType->id.'][is_paid]' : null, $casualType ? (bool) ($casualType->limits['is_paid'] ?? $casualType->is_paid) : true, $casualType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('casual', !$lvActive($casualType)) !!}</div></div></div>
+{!! $lvCardOpen('holidays') !!}
+{!! $lvHead('holidays', 'الأعياد والمناسبات الرسمية', 'م129') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvS('holidays', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+{!! $lvN('holidays', 'extraPay', 'أجر التشغيل فيها (أمثال الأجر مضافة لأجر اليوم)', 2, 'min', 'مثل', null, 2, 'يُدار مضاعف أجر التشغيل من تبويب «قواعد الرواتب» — مصدر واحد لكل قاعدة') !!}
+{!! $lvS('holidays', 'altDay', 'السماح بيوم بديل بطلب كتابي', false, false, null, false, 'مرجع قانوني — تُدار أيام العطلات من تبويب «العطلات الرسمية»') !!}
+</div><div class="note-op-block">تُدار أيام العطلات من تبويب «العطلات الرسمية» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
+{!! $lvCardOpen('weekly') !!}
+{!! $lvHead('weekly', 'الراحة الأسبوعية', 'م120') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('weekly', 'hours', 'مدة الراحة', 24, 'min', 'ساعة', null, 24, 'تُدار من تبويب «أوقات الدوام» — مصدر واحد لكل قاعدة') !!}
+{!! $lvN('weekly', 'afterDays', 'بعد أيام عمل متصلة لا تزيد على', 6, 'max', 'يوم', null, 6, 'تُدار من تبويب «أوقات الدوام» (نمط الراحة الأسبوعية)') !!}
+{!! $lvN('weekly', 'accumulate', 'أقصى مدة تجميع (مواقع بعيدة)', 8, 'max', 'أسبوع', null, 8, 'مرجع قانوني — التجميع للمواقع البعيدة غير مربوط بالحساب حاليًا') !!}
+{!! $lvS('weekly', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+</div><div class="note-op-block">تُدار الراحة الأسبوعية من تبويب «أوقات الدوام» — مصدر واحد لكل قاعدة، لا تُكرر هنا.</div></div></div></div>
 </div>
-@if($sickType || $contactType)
-<div class="lp-group" data-lp-group>
-  <h3 class="lp-group-title">المرض</h3>
-  <div class="lp-cards">
-@php($sickCmp = $sickType ? $lvStatus($sickType) : ['status' => 'review', 'notes' => []])
-    <div class="lp-card lp-wide lp-st-{{ $sickCmp['status'] }}" data-lp-card data-lp-name="{{ $sickType?->name ?? 'الإجازة المرضية' }}" data-status="{{ $sickCmp['status'] }}" data-mandated="1">
-      <div class="lp-card-head"><h4>{{ $sickType?->name ?? 'الإجازة المرضية' }}</h4><span class="lp-art">م131</span><span class="badge text-bg-{{ $ref::CLASSES[$sickCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$sickCmp['status']] }}</span>{!! $lvToggle($sickType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
-      <p class="lp-card-desc">{{ $ref::typeRules()['sick']['text'] }}</p>
-      @if($sickType)@php($sickBasis = $policyValues['sick_pay_basis'] ?? ($sickType->is_paid ? 'full' : 'none'))<div class="lp-fields"><div class="lp-field"><label class="lp-lbl" for="sickPayBasis">أساس التعويض</label><div class="lp-input"><select id="sickPayBasis" name="sick_pay_basis" class="form-select"><option value="ins" @selected($sickBasis === 'ins')>حسب قانون التأمينات</option><option value="full" @selected($sickBasis === 'full')>أجر كامل</option><option value="none" @selected($sickBasis === 'none')>بدون أجر</option></select></div><small class="lp-hint">مرجع م131. «أجر كامل» و«بدون أجر» يُطبَّقان فعليًا في المسير لشركتك. «حسب قانون التأمينات» لا تُحتسب مراحله في المسير بعد: يبقى السلوك الحالي (مدفوعة بدون خصم) حتى يتحدد أساس الأجر وآلية الصرف.</small></div>{!! $lvTypeLimits($sickType) !!}</div>@endif
-      <p class="lp-ref-note">مرجع م131: أساس التعويض حسب قانون التأمينات؛ للمنشآت الصناعية 3 أشهر بأجر كامل ثم 6 أشهر بـ85% ثم 3 أشهر بـ75%، وتتكرر المراحل عن كل 3 سنوات خدمة، مع إخطار 15 يومًا قبل إنهاء العقد بسبب المرض — مراحل الأجر هذه مرجع قانوني ولا تُحفظ كإعدادات مستقلة حاليًا.</p>
-      {!! $lvNotes($sickCmp) !!}
-@if($contactType)@php($contactCmp = $lvStatus($contactType))
-      <div class="lp-sect">
-        <div class="lp-sect-head"><h5>{{ $contactType->name }}</h5><span class="lp-art">م132</span><span class="badge text-bg-{{ $ref::CLASSES[$contactCmp['status']] }}">{{ $ref::LABELS[$contactCmp['status']] }}</span></div>
-        <p class="lp-card-desc">{{ $ref::typeRules()['contagious_contact']['text'] }} المادة لا تحدد الأجر. النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله. الاختيار يخص شركتك فقط.</p>
-        <div class="lp-fields">
-          <div class="lp-field"><label class="lp-lbl" for="contactPay">سياسة أجر المخالطة</label><div class="lp-input"><select id="contactPay" name="contact_pay" class="form-select"><option value="">لم تحدد بعد</option><option value="paid" @selected($companyContact && $companyContact->is_paid)>مدفوعة الأجر (اختيار الشركة)</option><option value="unpaid" @selected($companyContact && !$companyContact->is_paid)>بدون أجر (اختيار الشركة، يحتاج مراجعة)</option></select></div><small class="lp-hint is-mod">اختيار الأجر هو سياسة الشركة، وليس حكمًا بالمطابقة القانونية.</small></div>
-          <div class="lp-field lp-check"><div class="form-check form-switch m-0"><input type="hidden" name="contact_active" value="0"><input class="form-check-input" type="checkbox" id="contactActive" name="contact_active" value="1" @checked($companyContact?->is_active)><label class="form-check-label" for="contactActive">تفعيل النوع لشركتي بعد تحديد الأجر</label></div><small class="lp-hint"></small></div>
-          {!! $lvField('contagious_max_months') !!}
-          {!! $lvTypeLimits($contactType) !!}
-        </div>
-        {!! $lvNotes($contactCmp) !!}
-      </div>
-@endif
-    </div>
-  </div>
+
+<h2 class="group-title">المرض</h2>
+<div class="row g-3" data-lp-group>
+{!! $lvCardOpen('sick', !$lvActive($sickType)) !!}
+{!! $lvHead('sick', 'الإجازة المرضية', 'م131', $sickType ? 'types['.$sickType->id.'][is_active]' : null, $lvActive($sickType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvSel('sick', 'pay', 'أساس التعويض', 'ins', ['ins' => 'حسب قانون التأمينات', 'full' => 'أجر كامل', 'none' => 'بدون أجر'], 'sick_pay_basis', $sickBasis, '«أجر كامل» و«بدون أجر» يُطبَّقان فعليًا في المسير لشركتك. «حسب قانون التأمينات» لا تُحتسب مراحله في المسير بعد: يبقى السلوك الحالي (مدفوعة بدون خصم) حتى يتحدد أساس الأجر وآلية الصرف.') !!}
+{!! $lvS('sick', 'doc', 'تتطلب تقريرًا طبيًا', true, false, $sickType ? 'types['.$sickType->id.'][requires_document]' : null, $sickType ? (bool) $sickType->limits['requires_document'] : true) !!}
+{!! $lvN('sick', 's1m', 'المنشآت الصناعية: المرحلة 1', 3, 'min', 'شهر', 'policies[sick_phase1_months]', $pol('sick_phase1_months', 3)) !!}
+{!! $lvN('sick', 's1p', 'نسبة الأجر في المرحلة 1', 100, 'min', '%', 'policies[sick_phase1_pct]', $pol('sick_phase1_pct', 100)) !!}
+{!! $lvN('sick', 's2m', 'المرحلة 2', 6, 'min', 'شهر', 'policies[sick_phase2_months]', $pol('sick_phase2_months', 6)) !!}
+{!! $lvN('sick', 's2p', 'نسبة الأجر في المرحلة 2', 85, 'min', '%', 'policies[sick_phase2_pct]', $pol('sick_phase2_pct', 85)) !!}
+{!! $lvN('sick', 's3m', 'المرحلة 3', 3, 'min', 'شهر', 'policies[sick_phase3_months]', $pol('sick_phase3_months', 3)) !!}
+{!! $lvN('sick', 's3p', 'نسبة الأجر في المرحلة 3', 75, 'min', '%', 'policies[sick_phase3_pct]', $pol('sick_phase3_pct', 75)) !!}
+{!! $lvN('sick', 'per', 'تتكرر المراحل عن كل', 3, 'max', 'سنوات خدمة', 'policies[sick_cycle_years]', $pol('sick_cycle_years', 3)) !!}
+{!! $lvN('sick', 'notice', 'إخطار قبل إنهاء العقد بسبب المرض', 15, 'min', 'يوم', 'policies[sick_termination_notice_days]', $pol('sick_termination_notice_days', 15)) !!}
+</div><div class="note-op-block">مراحل الأجر للمنشآت الصناعية تُحفظ لشركتك ولا تُحتسب في المسير بعد — تُربط بالحساب فور تحديد أساس الأجر وآلية الصرف.</div>{!! $lvOffSlot('sick', !$lvActive($sickType)) !!}</div></div></div>
+{!! $lvCardOpen('contact', !(bool) ($companyContact?->is_active)) !!}
+{!! $lvHead('contact', 'المنع بسبب مخالطة مرض معدٍ', 'م132', 'contact_active', (bool) ($companyContact?->is_active)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('contact', 'months', 'أقصى مدة منع', 3, 'max', 'شهر', 'policies[contagious_max_months]', $pol('contagious_max_months', 3)) !!}
+{!! $lvSel('contact', 'pay', 'سياسة أجر المخالطة', '', ['' => 'لم تحدد بعد', 'paid' => 'مدفوعة الأجر (اختيار الشركة)', 'unpaid' => 'بدون أجر (اختيار الشركة)'], 'contact_pay', $companyContact ? ($companyContact->is_paid ? 'paid' : 'unpaid') : '', 'المادة لا تحدد الأجر — اختر سياسة الشركة قبل التفعيل. الاختيار يخص شركتك فقط.') !!}
+</div><div class="note-op-block">النوع غير متاح للطلبات حتى تختار الشركة سياسة الأجر وتفعّله.</div></div></div></div>
 </div>
-@endif
-<div class="lp-group" data-lp-group>
-  <h3 class="lp-group-title">ظروف خاصة</h3>
-  <div class="lp-cards">
-{!! $lvTypeCard('exams', ['exam_notice_days'], 'بخلاف 15 يومًا لاختيار توقيت السنوية للامتحان.') !!}
-{!! $lvTypeCard('newborn') !!}
-{!! $lvTypeCard('pilgrimage') !!}
-{!! $lvTypeCard('unpaid') !!}
-    <div class="lp-card lp-refonly" data-lp-card data-lp-name="يوم البحث عن عمل" data-status="ok">
-      <div class="lp-card-head"><h4>يوم البحث عن عمل</h4><span class="lp-art">م162</span></div>
-      <p class="lp-card-desc">8 ساعات أسبوعيًا مدفوعة الأجر خلال مهلة الإخطار قبل انتهاء العقد.</p>
-      <p class="lp-ref-note">غير مُدار في النظام حاليًا — مرجع قانوني للقراءة فقط.</p>
-    </div>
-  </div>
+
+<h2 class="group-title">ظروف خاصة</h2>
+<div class="row g-3" data-lp-group>
+{!! $lvCardOpen('exam', !$lvActive($examsType)) !!}
+{!! $lvHead('exam', 'إجازة الامتحانات', 'م126', $examsType ? 'types['.$examsType->id.'][is_active]' : null, $lvActive($examsType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('exam', 'noticeAnnual', 'إخطار لتحديد موعد السنوية', 15, 'max', 'يوم', null, 15, 'مرجع قانوني — لا يُتحقق منه في الطلبات حاليًا') !!}
+{!! $lvN('exam', 'noticeStudy', 'إخطار للإجازة الدراسية', 10, 'max', 'يوم', 'policies[exam_notice_days]', $pol('exam_notice_days', 10)) !!}
+{!! $lvS('exam', 'paid', 'مدفوعة الأجر', true, false, $examsType ? 'types['.$examsType->id.'][is_paid]' : null, $examsType ? (bool) ($examsType->limits['is_paid'] ?? $examsType->is_paid) : true, $examsType ? null : $constNote) !!}
+{!! $lvS('exam', 'deduct', 'تُخصم من السنوية', false, false, $examsType ? 'types['.$examsType->id.'][deducts_annual_balance]' : null, $examsType ? (bool) ($examsType->limits['deducts_annual_balance'] ?? $examsType->deducts_annual_balance) : false, $examsType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('exam', !$lvActive($examsType)) !!}</div></div></div>
+{!! $lvCardOpen('hajj', !$lvActive($pilgrimageType)) !!}
+{!! $lvHead('hajj', 'الحج أو زيارة بيت المقدس', 'م130', $pilgrimageType ? 'types['.$pilgrimageType->id.'][is_active]' : null, $lvActive($pilgrimageType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('hajj', 'days', 'المدة', 30, 'min', 'يوم', $pilgrimageType ? 'types['.$pilgrimageType->id.'][max_days_per_request]' : null, $pilgrimageType?->limits['max_days_per_request'] ?? 30) !!}
+{!! $lvN('hajj', 'service', 'الخدمة المتصلة المطلوبة', 5, 'max', 'سنة', $pilgrimageType ? 'types['.$pilgrimageType->id.'][min_service_months]' : null, ($pilgrimageType?->limits['min_service_months'] ?? 60) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'hajj-service-months']) !!}
+{!! $lvN('hajj', 'times', 'عدد المرات طوال الخدمة', 1, 'min', 'مرة', $pilgrimageType ? 'types['.$pilgrimageType->id.'][max_occurrences_service]' : null, $pilgrimageType?->limits['max_occurrences_service'] ?? 1) !!}
+{!! $lvS('hajj', 'paid', 'مدفوعة الأجر', true, false, $pilgrimageType ? 'types['.$pilgrimageType->id.'][is_paid]' : null, $pilgrimageType ? (bool) ($pilgrimageType->limits['is_paid'] ?? $pilgrimageType->is_paid) : true, $pilgrimageType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('hajj', !$lvActive($pilgrimageType)) !!}</div></div></div>
+{!! $lvCardOpen('paternity', !$lvActive($newbornType)) !!}
+{!! $lvHead('paternity', 'مولود جديد (للأب)', 'م128', $newbornType ? 'types['.$newbornType->id.'][is_active]' : null, $lvActive($newbornType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('paternity', 'days', 'المدة (يوم الولادة)', 1, 'min', 'يوم', $newbornType ? 'types['.$newbornType->id.'][max_days_per_request]' : null, $newbornType?->limits['max_days_per_request'] ?? 1) !!}
+{!! $lvN('paternity', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $newbornType ? 'types['.$newbornType->id.'][max_occurrences_service]' : null, $newbornType?->limits['max_occurrences_service'] ?? 3) !!}
+{!! $lvS('paternity', 'paid', 'مدفوعة الأجر', true, false, $newbornType ? 'types['.$newbornType->id.'][is_paid]' : null, $newbornType ? (bool) ($newbornType->limits['is_paid'] ?? $newbornType->is_paid) : true, $newbornType ? null : $constNote) !!}
+{!! $lvS('paternity', 'deduct', 'تُخصم من السنوية', false, false, $newbornType ? 'types['.$newbornType->id.'][deducts_annual_balance]' : null, $newbornType ? (bool) ($newbornType->limits['deducts_annual_balance'] ?? $newbornType->deducts_annual_balance) : false, $newbornType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('paternity', !$lvActive($newbornType)) !!}</div></div></div>
+{!! $lvCardOpen('jobsearch') !!}
+{!! $lvHead('jobsearch', 'يوم البحث عن عمل', 'م162') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('jobsearch', 'hours', 'الساعات أسبوعيًا خلال مهلة الإخطار', 8, 'min', 'ساعة', null, 8, 'مرجع قانوني — غير مُدار في النظام حاليًا') !!}
+{!! $lvS('jobsearch', 'paid', 'مدفوعة الأجر', true, true, null, true, $constNote) !!}
+</div></div></div></div>
 </div>
-<div class="lp-group" data-lp-group>
-  <h3 class="lp-group-title">المرأة العاملة</h3>
-  <p class="lp-group-note">الوضع بالشهور التقويمية ورعاية الطفل بالسنوات. رفع المستند مطلوب فعليًا عند تفعيل «مستند مطلوب».</p>
-  <div class="lp-cards">
-{!! $lvTypeCard('maternity', ['maternity_months', 'maternity_min_postpartum_days']) !!}
-{!! $lvTypeCard('childcare', ['childcare_max_years_per_request', 'childcare_min_gap_years']) !!}
-    <div class="lp-card" data-lp-card data-lp-name="فترتا الرضاعة" data-status="ok">
-      <div class="lp-card-head"><h4>فترتا الرضاعة</h4><span class="lp-art">م56</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
-      <p class="lp-card-desc">فترتا رضاعة يوميًا تُحسبان من ساعات العمل بدون خفض الأجر، لمدة 24 شهرًا من الوضع.</p>
-      <div class="lp-fields">{!! $lvField('nursing_sessions_per_day') !!}{!! $lvField('nursing_minutes_per_session') !!}</div>
-    </div>
-    <div class="lp-card" data-lp-card data-lp-name="تخفيف عمل الحامل" data-status="ok">
-      <div class="lp-card-head"><h4>تخفيف عمل الحامل</h4><span class="lp-art">م54</span><button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
-      <p class="lp-card-desc">مطبّقة في الحساب: تخفيض ساعات الحامل وسماح الرضاعة يعوّضان التأخير والانصراف المبكر بحد اليومية أدناه، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع. الأساس: التاريخ المتوقع للولادة وتاريخ الولادة الفعلي المسجَّلان على إجازة الوضع، ولا يبدأ التخفيض إلا بتاريخ موثّق من الشهادة الطبية على الإجازة.</p>
-      <div class="lp-fields">{!! $lvField('pregnancy_reduced_hours_per_day') !!}{!! $lvField('pregnancy_overtime_protection_months') !!}{!! $lvField('pregnancy_reduced_hours_from_month', true) !!}</div>
-    </div>
-  </div>
+
+<h2 class="group-title">المرأة العاملة</h2>
+<div class="row g-3" data-lp-group>
+{!! $lvCardOpen('maternity', !$lvActive($maternityType)) !!}
+{!! $lvHead('maternity', 'إجازة الوضع', 'م54–55', $maternityType ? 'types['.$maternityType->id.'][is_active]' : null, $lvActive($maternityType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('maternity', 'months', 'المدة الكلية', 4, 'min', 'شهر', 'policies[maternity_months]', $pol('maternity_months', 4)) !!}
+{!! $lvN('maternity', 'after', 'الحد الأدنى بعد الوضع', 45, 'min', 'يوم', 'policies[maternity_min_postpartum_days]', $pol('maternity_min_postpartum_days', 45)) !!}
+{!! $lvN('maternity', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $maternityType ? 'types['.$maternityType->id.'][max_occurrences_service]' : null, $maternityType?->limits['max_occurrences_service'] ?? 3) !!}
+{!! $lvS('maternity', 'paid', 'مدفوعة الأجر', true, false, $maternityType ? 'types['.$maternityType->id.'][is_paid]' : null, $maternityType ? (bool) ($maternityType->limits['is_paid'] ?? $maternityType->is_paid) : true, $maternityType ? null : $constNote) !!}
+{!! $lvS('maternity', 'cert', 'تتطلب شهادة طبية', true, false, $maternityType ? 'types['.$maternityType->id.'][requires_document]' : null, $maternityType ? (bool) $maternityType->limits['requires_document'] : true) !!}
+</div>{!! $lvOffSlot('maternity', !$lvActive($maternityType)) !!}</div></div></div>
+{!! $lvCardOpen('childcare', !$lvActive($childcareType)) !!}
+{!! $lvHead('childcare', 'رعاية الطفل', 'م57', $childcareType ? 'types['.$childcareType->id.'][is_active]' : null, $lvActive($childcareType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('childcare', 'months', 'المدة', 24, 'min', 'شهر', 'policies[childcare_max_years_per_request]', ((float) $pol('childcare_max_years_per_request', 2)) * 12, null, ['op' => 'div', 'factor' => 12, 'target' => 'childcare-months-years']) !!}
+{!! $lvN('childcare', 'times', 'الحد الأقصى طوال الخدمة', 3, 'min', 'مرات', $childcareType ? 'types['.$childcareType->id.'][max_occurrences_service]' : null, $childcareType?->limits['max_occurrences_service'] ?? 3) !!}
+{!! $lvN('childcare', 'staff', 'حد حجم المنشأة', 50, 'max', 'عامل', null, 50, 'مرجع قانوني — تُتحقق آليًا من عدد عمال شركتك عند الاعتماد، وقيمتها ثابتة حاليًا') !!}
+{!! $lvN('childcare', 'service', 'أقل مدة وجود في المنشأة', 1, 'max', 'سنة', $childcareType ? 'types['.$childcareType->id.'][min_service_months]' : null, ($childcareType?->limits['min_service_months'] ?? 12) / 12, null, ['op' => 'mul', 'factor' => 12, 'target' => 'childcare-service-months']) !!}
+{!! $lvN('childcare', 'gap', 'الفاصل بين الإجازتين', 2, 'max', 'سنة', 'policies[childcare_min_gap_years]', $pol('childcare_min_gap_years', 2)) !!}
+{!! $lvS('childcare', 'paid', 'مدفوعة الأجر', false, false, $childcareType ? 'types['.$childcareType->id.'][is_paid]' : null, $childcareType ? (bool) ($childcareType->limits['is_paid'] ?? $childcareType->is_paid) : false, $childcareType ? null : $constNote) !!}
+</div>{!! $lvOffSlot('childcare', !$lvActive($childcareType)) !!}</div></div></div>
+{!! $lvCardOpen('nursing') !!}
+{!! $lvHead('nursing', 'فترتا الرضاعة', 'م56') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('nursing', 'sessions', 'عدد الفترات يوميًا', 2, 'min', 'فترة', 'policies[nursing_sessions_per_day]', $pol('nursing_sessions_per_day', 2)) !!}
+{!! $lvN('nursing', 'minutes', 'مدة كل فترة', 30, 'min', 'دقيقة', 'policies[nursing_minutes_per_session]', $pol('nursing_minutes_per_session', 30)) !!}
+{!! $lvN('nursing', 'months', 'خلال', 24, 'min', 'شهر من الوضع', 'policies[nursing_window_months]', $pol('nursing_window_months', 24)) !!}
+{!! $lvS('nursing', 'paid', 'تُحسب من ساعات العمل بدون خفض الأجر', true, true, null, true, $constNote) !!}
+</div></div></div></div>
+{!! $lvCardOpen('pregnant') !!}
+{!! $lvHead('pregnant', 'تخفيف عمل الحامل', 'م54') !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('pregnant', 'hours', 'تخفيض ساعات العمل اليومية', 1, 'min', 'ساعة', 'policies[pregnancy_reduced_hours_per_day]', $pol('pregnancy_reduced_hours_per_day', 1)) !!}
+{!! $lvN('pregnant', 'fromMonth', 'اعتبارًا من الشهر', 6, 'max', 'من الحمل', null, 6, 'يبدأ التخفيض بتاريخ موثق من الشهادة الطبية على إجازة الوضع — الاحتساب بالشهر مرجع فقط') !!}
+{!! $lvN('pregnant', 'noOT', 'منع الإضافي حتى بعد الوضع بـ', 6, 'min', 'شهر', 'policies[pregnancy_overtime_protection_months]', $pol('pregnancy_overtime_protection_months', 6)) !!}
+</div><div class="note-op-block">مطبّقة في الحساب: التخفيض وسماح الرضاعة يعوّضان التأخير والانصراف المبكر، ومنع الإضافي يوقف طلبات الإضافي أثناء الحمل وللمدة المحددة بعد الوضع.</div></div></div></div>
 </div>
-@php($extraTypes = $leaveTypes->reject(fn($t) => in_array($t->policy_code, $lvKnownCodes, true) || $t->policy_code === 'contagious_contact'))
+
 @if($extraTypes->isNotEmpty())
-<div class="lp-group" data-lp-group>
-  <h3 class="lp-group-title">أنواع إضافية خاصة بالشركة</h3>
-  <div class="lp-cards">
-@foreach($extraTypes as $extraType)@php($extraCmp = $lvStatus($extraType))
-    <div class="lp-card lp-st-{{ $extraCmp['status'] }}" data-lp-card data-lp-name="{{ $extraType->name }}" data-status="{{ $extraCmp['status'] }}">
-      <div class="lp-card-head"><h4>{{ $extraType->name }}</h4><span class="badge text-bg-{{ $ref::CLASSES[$extraCmp['status']] }}" data-lp-badge>{{ $ref::LABELS[$extraCmp['status']] }}</span>{!! $lvToggle($extraType) !!}<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset title="استعادة القيم القانونية لهذه البطاقة">القانون</button></div>
-      <div class="lp-fields">{!! $lvTypeLimits($extraType) !!}</div>
-      {!! $lvNotes($extraCmp) !!}
-    </div>
+<h2 class="group-title">أنواع إضافية خاصة بالشركة</h2>
+<div class="row g-3" data-lp-group>
+@foreach($extraTypes as $extraType)
+{!! $lvCardOpen('x'.$extraType->id, !$lvActive($extraType)) !!}
+{!! $lvHead('x'.$extraType->id, $extraType->name, 'نوع خاص', 'types['.$extraType->id.'][is_active]', $lvActive($extraType)) !!}
+<div class="leave-body"><div class="row g-3">
+{!! $lvN('x'.$extraType->id, 'per', 'الحد في الطلب (يوم)', $extraType->limits['max_days_per_request'] ?? 0, 'min', 'يوم', 'types['.$extraType->id.'][max_days_per_request]', $extraType->limits['max_days_per_request']) !!}
+{!! $lvN('x'.$extraType->id, 'year', 'الحد السنوي (يوم)', $extraType->limits['max_days_per_year'] ?? 0, 'min', 'يوم', 'types['.$extraType->id.'][max_days_per_year]', $extraType->limits['max_days_per_year']) !!}
+{!! $lvN('x'.$extraType->id, 'service', 'الحد الأدنى للخدمة (شهر)', $extraType->limits['min_service_months'] ?? 0, 'max', 'شهر', 'types['.$extraType->id.'][min_service_months]', $extraType->limits['min_service_months']) !!}
+{!! $lvN('x'.$extraType->id, 'times', 'مرات طوال الخدمة', $extraType->limits['max_occurrences_service'] ?? 0, 'min', 'مرة', 'types['.$extraType->id.'][max_occurrences_service]', $extraType->limits['max_occurrences_service']) !!}
+{!! $lvS('x'.$extraType->id, 'doc', 'مستند مطلوب', false, false, 'types['.$extraType->id.'][requires_document]', (bool) $extraType->limits['requires_document']) !!}
+</div>{!! $lvOffSlot('x'.$extraType->id, false) !!}</div></div></div>
 @endforeach
-  </div>
 </div>
 @endif
-<details class="lp-card lp-ref"><summary>إعداد محفوظ للعرض فقط <small>لا يؤثر على الحساب حاليًا</small></summary><div class="lp-fields">{!! $lvField('annual_prorate_first_year', true) !!}</div></details>
-<p class="lp-foot-note">هذه الإعدادات إرشادية وتُبنى على نص القانون. راجع القرارات التنفيذية السارية قبل اعتمادها في لائحة داخلية أو في احتساب الأجور.</p>
+
+<p class="note mt-4">هذه الإعدادات إرشادية وتُبنى على نص القانون. راجع القرارات التنفيذية السارية قبل اعتمادها في لائحة داخلية أو في احتساب الأجور.</p>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">تعديلات غير محفوظة: <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>تراجع</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> حفظ التعديلات</button></span></div>
 </form>
 </div>
@@ -348,119 +373,111 @@
   const $ = (sel, root) => (root || pane).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || pane).querySelectorAll(sel));
 
-  // حالة الحقل مقارنة بالمرجع
-  function fieldState(field) {
-    const input = $('[data-lp-input]', field);
-    if (!input || field.dataset.law === undefined || field.dataset.law === '') return '';
-    const v = parseFloat(input.value), law = parseFloat(field.dataset.law), dir = field.dataset.dir;
-    if (isNaN(v)) return '';
-    if (dir === 'bool') return v === law ? '' : 'mod';
-    if (v === law) return '';
-    if ((dir === 'min' && v < law) || ((dir === 'max' || dir === 'cap') && v > law)) return 'bad';
+  // نفس منطق التصميم: الحالة bad عند النقص عن المرجع، وmod عند الاختلاف عنه.
+  function fmt(ctl) {
+    const t = ctl.dataset.t, law = ctl.dataset.law;
+    if (t === 's') return law === '1' ? 'مفعّل' : 'معطّل';
+    if (t === 'sel') { const o = Array.from(ctl.options).find(o => o.value === law); return o ? o.textContent : law; }
+    return law + (ctl.dataset.unit ? ' ' + ctl.dataset.unit : '');
+  }
+  function statusOf(ctl) {
+    const t = ctl.dataset.t, law = ctl.dataset.law, dir = ctl.dataset.dir;
+    if (t === 's') { const v = ctl.checked ? '1' : '0'; if (v === law) return ''; return ctl.dataset.strict === '1' ? 'bad' : 'mod'; }
+    if (t === 'sel') return ctl.value === law ? '' : 'mod';
+    const v = parseFloat(ctl.value), l = parseFloat(law);
+    if (isNaN(v) || isNaN(l)) return '';
+    if (v === l) return '';
+    if ((dir === 'min' && v < l) || ((dir === 'max' || dir === 'cap') && v > l)) return 'bad';
     return 'mod';
   }
-  function paintField(field) {
-    const hint = $('[data-lp-hint]', field);
-    if (!hint) return '';
-    const st = fieldState(field);
-    const law = field.dataset.law, unit = field.dataset.unit || '';
-    hint.classList.toggle('is-bad', st === 'bad');
-    hint.classList.toggle('is-mod', st === 'mod');
-    hint.textContent = st === 'bad' ? 'يخالف الحد القانوني — القانون: ' + law + (unit ? ' ' + unit : '')
-      : st === 'mod' ? 'يحتاج مراجعة — القانون: ' + law + (unit ? ' ' + unit : '') : '';
-    return st;
+  function syncScale(ctl) {
+    if (!ctl.dataset.scaleTarget) return;
+    const hidden = document.getElementById(ctl.dataset.scaleTarget);
+    if (!hidden) return;
+    const v = parseFloat(ctl.value), f = parseFloat(ctl.dataset.scaleFactor);
+    if (isNaN(v) || isNaN(f) || f === 0) return;
+    hidden.value = ctl.dataset.scaleOp === 'div' ? String(v / f) : String(v * f);
+  }
+  function paint(ctl) {
+    const slot = document.getElementById('h-' + ctl.id);
+    if (!slot) return;
+    if (ctl.disabled) return; // الحقول المعطلة تحمل ملاحظتها التشغيلية الثابتة
+    const st = statusOf(ctl);
+    slot.innerHTML = st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '';
   }
   function cardState(card) {
     const t = card.querySelector('[data-lp-toggle]');
-    if (t && !t.checked) return 'below';
-    const sts = $$('[data-lp-field]', card).map(f => fieldState(f));
-    if (sts.includes('bad')) return 'below';
-    if (sts.includes('mod')) return 'review';
-    return card.dataset.status || 'ok';
+    if (t && !t.checked) return 'bad';
+    const sts = $$('[data-lp-ctl]', card).filter(c => !c.disabled).map(statusOf);
+    if (sts.includes('bad')) return 'bad';
+    return sts.includes('mod') ? 'mod' : '';
   }
-  const BADGE_LABEL = { ok: 'مطابق للقانون', review: 'يحتاج مراجعة', below: 'غير مطابق للقانون', outside: 'خارج نطاق القانون' };
-  const BADGE_CLASS = { ok: 'text-bg-success', review: 'text-bg-warning', below: 'text-bg-danger', outside: 'text-bg-secondary' };
   function paintCard(card) {
     const st = cardState(card);
-    card.classList.remove('lp-st-ok', 'lp-st-review', 'lp-st-below', 'lp-st-outside');
-    card.classList.add('lp-st-' + st);
-    const badge = card.querySelector('[data-lp-badge]');
-    if (badge) {
-      badge.classList.remove('text-bg-success', 'text-bg-warning', 'text-bg-danger', 'text-bg-secondary');
-      badge.classList.add(BADGE_CLASS[st]);
-      badge.textContent = BADGE_LABEL[st];
-    }
-    return st;
+    card.className = 'leave' + (st ? ' is-' + st : '') + (card.querySelector('[data-lp-toggle]') && !card.querySelector('[data-lp-toggle]').checked ? ' is-off' : '');
   }
-  const PILL = { ok: 'مطابقة للقانون', review: 'يحتاج مراجعة', below: 'غير مطابق' };
   function summary() {
-    const c = { ok: 0, review: 0, below: 0 };
-    $$('[data-lp-card]').forEach(card => {
-      const cls = ['lp-st-below', 'lp-st-review', 'lp-st-outside', 'lp-st-ok'].find(x => card.classList.contains(x));
-      const st = cls ? cls.replace('lp-st-', '') : (card.dataset.status || 'ok');
-      if (st === 'below') c.below++; else if (st === 'ok') c.ok++; else c.review++;
-    });
+    const c = { '': 0, mod: 0, bad: 0 };
+    $$('.leave', pane).forEach(card => { c[cardState(card)]++; });
     $('[data-lp-summary]').innerHTML =
-      '<span class="lp-pill">' + PILL.ok + ': ' + c.ok + '</span>' +
-      '<span class="lp-pill mod">' + PILL.review + ': ' + c.review + '</span>' +
-      '<span class="lp-pill bad">' + PILL.below + ': ' + c.below + '</span>';
+      '<span class="pill">مطابقة للقانون: ' + c[''] + '</span><span class="pill mod">معدّلة: ' + c.mod + '</span><span class="pill bad">مخالفة: ' + c.bad + '</span>';
   }
+  function setDirty(d) { const b = $('[data-lp-dirty]'); if (b) b.hidden = !d; }
 
   pane.addEventListener('input', e => {
-    const field = e.target.closest('[data-lp-field]');
-    if (field) { paintField(field); const card = e.target.closest('[data-lp-card]'); if (card) paintCard(card); summary(); }
+    const ctl = e.target.closest('[data-lp-ctl]');
+    if (!ctl) return;
+    syncScale(ctl); paint(ctl);
+    const card = ctl.closest('.leave'); if (card) paintCard(card);
+    summary(); setDirty(true);
   });
   pane.addEventListener('change', e => {
-    const field = e.target.closest('[data-lp-field]');
-    if (field) { paintField(field); const card = e.target.closest('[data-lp-card]'); if (card) paintCard(card); summary(); }
-  });
-  pane.addEventListener('change', e => {
-    if (!e.target.matches('[data-lp-toggle]')) return;
-    const card = e.target.closest('[data-lp-card]');
-    if (!card) return;
-    card.classList.toggle('lp-off', !e.target.checked);
-    let w = card.querySelector('[data-lp-off-hint]');
-    if (!e.target.checked && card.dataset.mandated === '1') {
-      if (!w) { w = document.createElement('small'); w.className = 'lp-hint is-bad d-block'; w.setAttribute('data-lp-off-hint', ''); card.appendChild(w); }
-      w.textContent = 'إجازة مقررة بالقانون، وتعطيلها يخالفه';
-    } else if (w) w.remove();
-    paintCard(card); summary();
+    const ctl = e.target.closest('[data-lp-ctl]');
+    if (ctl) { syncScale(ctl); paint(ctl); const card = ctl.closest('.leave'); if (card) paintCard(card); }
+    const t = e.target.closest('[data-lp-toggle]');
+    if (t) {
+      const card = t.closest('.leave');
+      const slot = document.getElementById('h-' + card.id.slice(2) + '-on');
+      if (slot) slot.innerHTML = !t.checked && card.dataset.mandated === '1' ? '<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>' : '';
+      paintCard(card);
+    }
+    if (ctl || t) { summary(); setDirty(true); }
   });
 
-  function resetScope(scope) {
-    $$('[data-lp-field][data-law]', scope).forEach(f => {
-      const input = $('[data-lp-input]', f);
-      if (input && !input.disabled) { input.value = f.dataset.law; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); }
+  function resetCard(card) {
+    $$('[data-lp-ctl]', card).forEach(ctl => {
+      if (ctl.disabled || ctl.dataset.law === undefined || ctl.dataset.law === '') return;
+      if (ctl.dataset.t === 's') ctl.checked = ctl.dataset.law === '1';
+      else ctl.value = ctl.dataset.law;
+      syncScale(ctl); paint(ctl);
     });
+    paintCard(card);
   }
   pane.addEventListener('click', e => {
-    if (e.target.closest('[data-lp-reset]')) {
-      resetScope(e.target.closest('[data-lp-sect]') || e.target.closest('[data-lp-card]'));
-      toast('تمت استعادة القيم القانونية');
-    }
+    const rst = e.target.closest('[data-lp-reset]');
+    if (rst) { const card = document.getElementById('c-' + rst.dataset.lpReset); if (card) { resetCard(card); summary(); setDirty(true); toast('تمت استعادة القيم القانونية'); } return; }
     if (e.target.closest('[data-lp-reset-all]')) {
       if (!confirm('استعادة كل القيم إلى ما ينص عليه القانون؟')) return;
-      resetScope(pane); toast('تمت استعادة كل القيم القانونية');
+      $$('.leave', pane).forEach(resetCard); summary(); setDirty(true); toast('تمت استعادة كل القيم القانونية');
     }
   });
 
   const search = $('[data-lp-search]');
   if (search) search.addEventListener('input', () => {
     const q = search.value.trim();
-    $$('[data-lp-group]').forEach(group => {
+    $$('[data-lp-group]', pane).forEach(group => {
       let visible = 0;
-      $$('[data-lp-card]', group).forEach(card => {
-        const show = !q || (card.dataset.lpName || '').includes(q);
-        card.style.display = show ? '' : 'none';
+      Array.from(group.children).forEach(wrap => {
+        const name = wrap.querySelector('.leave-head h3');
+        const show = !q || (name && name.textContent.includes(q));
+        wrap.style.display = show ? '' : 'none';
         if (show) visible++;
       });
+      const title = group.previousElementSibling;
+      if (title && title.classList.contains('group-title')) title.style.display = visible ? '' : 'none';
       group.style.display = visible ? '' : 'none';
     });
   });
-
-  // شارة «تغييرات غير محفوظة» تتبع شريط الحفظ الحالي
-  const bar = $('[data-save-bar]', form), badge = $('[data-lp-dirty]');
-  if (bar && badge) new MutationObserver(() => { badge.hidden = bar.hidden; }).observe(bar, { attributes: true, attributeFilter: ['hidden'] });
 
   function toast(msg) {
     let t = $('.lp-toast');
@@ -468,14 +485,11 @@
     t.textContent = msg; t.classList.add('show');
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
   }
+  document.addEventListener('masar:success', e => { if (e.target === form) setDirty(false); });
 
-  // تهيئة أولية
-  $$('[data-lp-field]').forEach(paintField);
-  $$('[data-lp-card]').forEach(card => {
-    card.classList.add('lp-st-' + (card.dataset.status || 'ok'));
-    const t = card.querySelector('[data-lp-toggle]');
-    if (t && !t.checked) { card.classList.add('lp-off'); paintCard(card); }
-  });
+  // تهيئة أولية (نفس render() في التصميم)
+  $$('[data-lp-ctl]', pane).forEach(paint);
+  $$('.leave', pane).forEach(paintCard);
   summary();
 })();
 </script>

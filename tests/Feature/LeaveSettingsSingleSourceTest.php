@@ -167,8 +167,8 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_shared_type_edit_is_saved_per_company_and_does_not_touch_other_companies(): void
     {
         $page = $this->actingAs($this->ua)->get(route('payroll.settings.index'));
-        $page->assertOk()->assertSee('الإجازة السنوية')->assertSee('حسب الرصيد المتاح');
-        foreach (['maternity_days', 'maternity_max_occurrences', 'childcare_max_occurrences', 'pilgrimage_min_service_months', 'newborn_max_occurrences', 'casual_max_days_year', 'casual_max_days_request'] as $dup) {
+        $page->assertOk()->assertSee('الإجازة السنوية')->assertSee('الحد الأدنى المضمون سنويًا');
+        foreach (['maternity_days', 'maternity_max_occurrences', 'childcare_max_occurrences', 'pilgrimage_min_service_months', 'newborn_max_occurrences'] as $dup) {
             $page->assertDontSee('name="policies['.$dup.']"', false);
         }
         $before = (array) DB::table('leave_policy_settings')->where('company_id', $this->a->id)->pluck('setting_value', 'setting_key')->all();

@@ -104,10 +104,11 @@ class PregnancyNursingRightsService
         }
         $birth = $leave->birth_date->copy()->startOfDay();
         $day = $date->copy()->startOfDay();
-        if ($day->lt($birth) || $day->gt($birth->copy()->addYearsNoOverflow(2))) {
+        $companyId = $employee->company_id ? (int) $employee->company_id : null;
+        $windowMonths = max(1, (int) $this->policy('nursing_window_months', '24', $companyId));
+        if ($day->lt($birth) || $day->gt($birth->copy()->addMonthsNoOverflow($windowMonths))) {
             return 0;
         }
-        $companyId = $employee->company_id ? (int) $employee->company_id : null;
         $sessions = (int) $this->policy('nursing_sessions_per_day', '2', $companyId);
         $minutes = (int) $this->policy('nursing_minutes_per_session', '30', $companyId);
 

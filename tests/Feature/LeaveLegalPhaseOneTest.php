@@ -156,7 +156,8 @@ class LeaveLegalPhaseOneTest extends TestCase
         $t=LeaveType::withoutGlobalScopes()->where('policy_code','contagious_contact')->firstOrFail();
         $this->assertFalse($t->is_active);
         $cmp=\App\Support\LeaveLegalReference::typeStatus('contagious_contact',[],true,true,['contagious_max_months'=>3]);
-        $this->assertSame('review',$cmp['status']);
+        $this->assertSame('ok',$cmp['status']);
+        $this->assertStringContainsString('م132', implode(' ', $cmp['notes']));
     }
     public function test_contact_activation_requires_explicit_pay_and_is_company_scoped(): void
     {

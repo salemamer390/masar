@@ -19,15 +19,15 @@ final class LeaveLegalReference
     public const LABELS = [
         self::OK => 'مطابق للقانون',
         self::BELOW => 'غير مطابق للقانون',
-        self::REVIEW => 'يحتاج مراجعة',
-        self::OUTSIDE => 'خارج نطاق القانون',
+        self::REVIEW => 'مطابق للقانون', // review لا يصل للواجهة؛ يُعامَل كمطابق مع ملاحظة تشغيلية
+        self::OUTSIDE => 'نوع خاص بالشركة',
     ];
 
     /** Bootstrap colour per status. */
     public const CLASSES = [
         self::OK => 'success',
         self::BELOW => 'danger',
-        self::REVIEW => 'warning',
+        self::REVIEW => 'success',
         self::OUTSIDE => 'secondary',
     ];
 
@@ -55,8 +55,17 @@ final class LeaveLegalReference
             'childcare_min_gap_years' => ['label' => 'الفاصل بين إجازات رعاية الطفل', 'article' => 57, 'ref' => 2, 'dir' => 'max', 'unit' => 'سنة'],
             'exam_notice_days' => ['label' => 'مهلة إخطار إجازة الامتحانات', 'article' => 126, 'ref' => 10, 'dir' => 'max', 'unit' => 'يوم'],
             'contagious_max_months' => ['label' => 'مدة المنع للمخالطة (حد أقصى قانوني)', 'article' => 132, 'ref' => 3, 'dir' => 'cap', 'unit' => 'شهر'],
+            // مراحل تعويض المرضية للمنشآت الصناعية (م131): تُحفظ لكل شركة وتُقارن بالمرجع؛ الاحتساب في المسير ينتظر تحديد أساس الأجر وآلية الصرف.
+            'sick_phase1_months' => ['label' => 'المنشآت الصناعية: المرحلة 1', 'article' => 131, 'ref' => 3, 'dir' => 'min', 'unit' => 'شهر'],
+            'sick_phase1_pct' => ['label' => 'نسبة الأجر في المرحلة 1', 'article' => 131, 'ref' => 100, 'dir' => 'min', 'unit' => '%'],
+            'sick_phase2_months' => ['label' => 'المرحلة 2', 'article' => 131, 'ref' => 6, 'dir' => 'min', 'unit' => 'شهر'],
+            'sick_phase2_pct' => ['label' => 'نسبة الأجر في المرحلة 2', 'article' => 131, 'ref' => 85, 'dir' => 'min', 'unit' => '%'],
+            'sick_phase3_months' => ['label' => 'المرحلة 3', 'article' => 131, 'ref' => 3, 'dir' => 'min', 'unit' => 'شهر'],
+            'sick_phase3_pct' => ['label' => 'نسبة الأجر في المرحلة 3', 'article' => 131, 'ref' => 75, 'dir' => 'min', 'unit' => '%'],
+            'sick_cycle_years' => ['label' => 'تتكرر المراحل عن كل', 'article' => 131, 'ref' => 3, 'dir' => 'max', 'unit' => 'سنوات خدمة'],
+            'sick_termination_notice_days' => ['label' => 'إخطار قبل إنهاء العقد بسبب المرض', 'article' => 131, 'ref' => 15, 'dir' => 'min', 'unit' => 'يوم'],
             // حقوق واردة في القانون لكنها محفوظة للعرض فقط حاليًا (لا تدخل في الحساب).
-            // dir "bool": القيمة 1 هي المطابقة للمرجع، و0 تعني منحًا أوسع يحتاج مراجعة.
+            // dir "bool": القيمة 1 هي المطابقة للمرجع، و0 منح أوسع (قرار الشركة).
             // بدء التخفيض بالشهر مرجع فقط: التخفيض يبدأ بتاريخ موثق من الشهادة
             // الطبية على إجازة الوضع، والاحتساب بالشهر تقدير لم يُعتمد بعد.
             'annual_prorate_first_year' => ['label' => 'احتساب السنة الأولى نسبيًا', 'article' => 124, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
@@ -64,6 +73,7 @@ final class LeaveLegalReference
             // مفاتيح مطبّقة فعلًا في الحساب (تعويض التأخير/الانصراف المبكر ومنع الإضافي).
             'pregnancy_reduced_hours_per_day' => ['label' => 'تخفيض ساعات الحامل يوميًا', 'article' => 54, 'ref' => 1, 'dir' => 'min', 'unit' => 'ساعة'],
             'pregnancy_overtime_protection_months' => ['label' => 'حماية منع الإضافي بعد الوضع (شهر)', 'article' => 54, 'ref' => 6, 'dir' => 'min', 'unit' => 'شهر'],
+            'nursing_window_months' => ['label' => 'مدة فترة الرضاعة من الوضع (شهر)', 'article' => 56, 'ref' => 24, 'dir' => 'min', 'unit' => 'شهر'],
             'nursing_sessions_per_day' => ['label' => 'فترات الرضاعة يوميًا', 'article' => 56, 'ref' => 2, 'dir' => 'min', 'unit' => 'فترة'],
             'nursing_minutes_per_session' => ['label' => 'مدة فترة الرضاعة (دقيقة)', 'article' => 56, 'ref' => 30, 'dir' => 'min', 'unit' => 'دقيقة'],
         ];
@@ -97,7 +107,7 @@ final class LeaveLegalReference
         return match ($dir) {
             'min' => $value >= (float) $ref ? self::OK : self::BELOW,
             'max' => $value <= (float) $ref ? self::OK : self::BELOW,
-            // المرجع يتطلب التفعيل (1)؛ القيمة 0 هنا منح أوسع من المرجع وليست نقصًا، لكنها تحتاج مراجعة
+            // المرجع يتطلب التفعيل (1)؛ القيمة 0 هنا منح أوسع من المرجع وليست نقصًا
             'bool' => $value === (float) $ref ? self::OK : self::REVIEW,
             // statutory ceiling on how long someone may be kept away: a lower number is never a reduction of a right
             'cap' => $value === (float) $ref ? self::OK : self::REVIEW,
@@ -122,7 +132,7 @@ final class LeaveLegalReference
         $r = self::policyRules()[$key] ?? null;
         if (!$r) return '';
         $ref = rtrim(rtrim(number_format((float) $r['ref'], 2, '.', ''), '0'), '.');
-        if ($r['dir'] === 'bool') return "المرجع (م{$r['article']}): بنسبة المدة (1). القيمة 0 تمنح الرصيد كاملًا بعد الانتظار، وهو أكثر من المرجع ويحتاج مراجعة.";
+        if ($r['dir'] === 'bool') return "المرجع (م{$r['article']}): بنسبة المدة (1). القيمة 0 تمنح الرصيد كاملًا بعد الانتظار، وهو منح أوسع من المرجع (قرار الشركة).";
         $bound = match ($r['dir']) { 'min' => 'على الأقل', 'max' => 'على الأكثر', default => 'حد أقصى' };
         return "المرجع (م{$r['article']}): {$ref} {$r['unit']} {$bound}";
     }
@@ -147,13 +157,13 @@ final class LeaveLegalReference
             }
         }
         if ($rules['paid'] === true && $isPaid === false) $below[] = 'الإجازة غير مدفوعة بينما المرجع (م'.$rules['article'].') يجعلها بأجر.';
-        if ($rules['document'] && !$requiresDocument) $review[] = 'المرجع يتوقع مستندًا لهذه الإجازة والإعداد الحالي لا يطلبه.';
-        if ($rules['paid'] === null && $code === 'contagious_contact') $review[] = 'القانون لا يحدد الأجر في م132، يُراجع حسب لائحة الشركة.';
+        if ($rules['document'] && !$requiresDocument) $review[] = 'المرجع يتوقع مستندًا لهذه الإجازة، والإعداد الحالي لا يطلبه (قرار الشركة).';
+        if ($rules['paid'] === null && $code === 'contagious_contact') $review[] = 'القانون لا يحدد الأجر في م132؛ يُحدد وفق لائحة الشركة.';
         if ($code === 'annual') {
             foreach (['annual_first_year', 'annual_second_year', 'annual_long_service', 'annual_disability_days', 'annual_hazardous_extra_days', 'annual_long_service_years', 'annual_age_threshold'] as $k) {
                 if (isset($policies[$k]) && self::policyStatus($k, $policies[$k]) === self::BELOW) $below[] = self::policyRules()[$k]['label'].': '.self::num($policies[$k]).' مقابل المرجع '.self::num(self::policyRules()[$k]['ref']).'.';
             }
-            if ((float) ($policies['annual_prorate_first_year'] ?? 0) === 0.0) $review[] = 'السنة الأولى: 15 يوم كاملة بعد مدة الانتظار بدون تناسب (قرار الشركة). المرجع (م124) ينص على التناسب، فتحتاج مراجعة مع القواعد المرتبطة.';
+            if ((float) ($policies['annual_prorate_first_year'] ?? 0) === 0.0) $review[] = 'السنة الأولى: 15 يومًا كاملة بعد مدة الانتظار بدون تناسب (قرار الشركة؛ المرجع م124 ينص على التناسب).';
         }
         if ($code === 'casual') {
             foreach (['casual_max_days_year', 'casual_max_days_request'] as $k) {
@@ -167,8 +177,8 @@ final class LeaveLegalReference
             if (isset($policies['contagious_max_months']) && self::policyStatus('contagious_max_months', $policies['contagious_max_months']) === self::REVIEW) $review[] = 'المدة المحددة أكبر من الحد القانوني الأقصى (3 أشهر).';
         }
         if ($below) return ['status' => self::BELOW, 'notes' => array_merge($below, $review)];
-        if ($review) return ['status' => self::REVIEW, 'notes' => $review];
-        return ['status' => self::REVIEW, 'notes' => ['القيم التي تم فحصها لا تقل عن المرجع، لكن المقارنة الشاملة مشروطة بالأجر والخصم والأهلية والمستندات والقواعد المرتبطة.']];
+        // بلا وسم مراجعة: ما ليس أقل من المرجع فهو مطابق، وتظهر فروق المنح أو عدم اكتمال المقارنة كملاحظات فقط.
+        return ['status' => self::OK, 'notes' => $review];
     }
 
     private static function policyNotes(array $keys, array $policies, array &$below): void

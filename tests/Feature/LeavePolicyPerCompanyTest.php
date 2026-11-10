@@ -54,8 +54,8 @@ class LeavePolicyPerCompanyTest extends TestCase
         $this->assertSame('0', $policies['annual_prorate_first_year']);
 
         // The card is no longer empty: Arabic labels and inputs render.
-        $response->assertSee('رصيد السنة الأولى');
-        $response->assertSee('مدة الانتظار (شهر)');
+        $response->assertSee('أقل خدمة لإجازة بنسبة المدة');
+        $response->assertSee('ذوو الإعاقة والأقزام');
         $response->assertSee('name="policies[annual_first_year]"', false);
     }
 

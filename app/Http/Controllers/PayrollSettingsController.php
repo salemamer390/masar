@@ -139,12 +139,14 @@ class PayrollSettingsController extends Controller
             'types.*.max_occurrences_service' => ['nullable', 'integer', 'min:0'],
             'types.*.requires_document' => ['nullable', 'boolean'],
             'types.*.is_active' => ['nullable', 'boolean'],
+            'types.*.is_paid' => ['nullable', 'boolean'],
+            'types.*.deducts_annual_balance' => ['nullable', 'boolean'],
             'sick_pay_basis' => ['nullable', 'in:ins,full,none'],
             'confirm_below_reference' => ['sometimes', 'accepted'],
             'contact_pay' => ['nullable', 'in:paid,unpaid'],
             'contact_active' => ['nullable', 'boolean'],
         ]);
-        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active')) {
+        if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance')) {
             $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
@@ -152,7 +154,7 @@ class PayrollSettingsController extends Controller
         // Only settings that actually drive behaviour may be changed here. Legacy display-only keys stay read-only.
         $allowedPolicies = array_merge(array_keys(\App\Support\LeaveLegalReference::policyRules()), ['annual_wait_months', 'allow_early_leave']);
         $data['policies'] = array_intersect_key($data['policies'], array_flip($allowedPolicies));
-        foreach (['maternity_months', 'childcare_max_years_per_request', 'childcare_min_gap_years', 'exam_notice_days', 'contagious_max_months', 'maternity_min_postpartum_days'] as $key) {
+        foreach (['nursing_window_months', 'maternity_months', 'childcare_max_years_per_request', 'childcare_min_gap_years', 'exam_notice_days', 'contagious_max_months', 'maternity_min_postpartum_days', 'sick_phase1_months', 'sick_phase1_pct', 'sick_phase2_months', 'sick_phase2_pct', 'sick_phase3_months', 'sick_phase3_pct', 'sick_cycle_years', 'sick_termination_notice_days'] as $key) {
             if (isset($data['policies'][$key]) && (float) $data['policies'][$key] != (int) $data['policies'][$key]) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون عددًا صحيحًا.']);
         }
         if ($request->boolean('contact_active') && !$request->filled('contact_pay')) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => 'اختر سياسة الأجر أولًا قبل تفعيل إجازة المخالطة. المادة 132 لا تحدد الأجر.']);
@@ -175,14 +177,14 @@ class PayrollSettingsController extends Controller
                 }
             }
             if ($next != $current) {
-                $comparison = \App\Support\LeaveLegalReference::typeStatus($type->policy_code, $next, $type->is_paid, (bool) ($next['requires_document'] ?? $type->requires_document), $nextPolicies);
+                $comparison = \App\Support\LeaveLegalReference::typeStatus($type->policy_code, $next, (bool) ($next['is_paid'] ?? $type->is_paid), (bool) ($next['requires_document'] ?? $type->requires_document), $nextPolicies);
                 if ($comparison['status'] === 'below') $warnings = array_merge($warnings, $comparison['notes']);
             }
         }
         if ($warnings && !$request->boolean('confirm_below_reference')) throw \Illuminate\Validation\ValidationException::withMessages(['below_reference' => array_values(array_unique($warnings))]);
         $before = ['policies' => $currentPolicies, 'types' => []];
         foreach (($data['types'] ?? []) as $id => $values) { $type = LeaveType::find($id); if ($type) $before['types'][$id] = $balances->limitsFor($type, $companyId); }
-        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document', 'is_active'];
+        $limitKeys = ['max_days_per_request', 'max_days_per_year', 'min_service_months', 'max_occurrences_service', 'requires_document', 'is_active', 'is_paid', 'deducts_annual_balance'];
         $balances = app(\App\Services\LeaveBalanceService::class);
         DB::transaction(function () use ($data, $companyId, $limitKeys, $balances): void {
             if (!empty($data['sick_pay_basis'])) {
@@ -194,7 +196,11 @@ class PayrollSettingsController extends Controller
             if (!empty($data['contact_pay'])) {
                 LeaveType::updateOrCreate(['company_id' => $companyId, 'policy_code' => 'contagious_contact_company_'.$companyId], ['name' => 'إجازة مخالطة مريض بمرض معد', 'is_paid' => $data['contact_pay'] === 'paid', 'is_active' => (bool) ($data['contact_active'] ?? false), 'deducts_annual_balance' => false, 'requires_document' => true]);
             }
-            $setPolicy = fn (string $key, $value) => DB::table('leave_policy_settings')->where('company_id', $companyId)->where('setting_key', $key)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
+            $setPolicy = function (string $key, $value) use ($companyId): void {
+                $where = [['company_id', '=', $companyId], ['setting_key', '=', $key]];
+                if (DB::table('leave_policy_settings')->where($where)->exists()) DB::table('leave_policy_settings')->where($where)->update(['setting_value' => (string) $value, 'updated_at' => now()]);
+                else DB::table('leave_policy_settings')->insert(['company_id' => $companyId, 'setting_key' => $key, 'setting_value' => (string) $value, 'label' => $key, 'created_at' => now(), 'updated_at' => now()]);
+            };
             foreach ($data['policies'] as $key => $value) {
                 $setPolicy($key, $value);
             }
