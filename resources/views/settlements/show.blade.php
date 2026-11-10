@@ -57,8 +57,8 @@
 <div class="panel p-4 mb-3">
   <h5 class="mb-3">{{ __('بنود التسوية المعتمدة') }}</h5>
   <table class="table"><tbody>
-    <tr><td>{{ __('صرف رصيد الإجازات') }}</td><td>{{ $settlement->leave_payout_mode === 'skip' ? 'بدون صرف' : format_number($settlement->leave_payout_amount).' ج.م (بتحديد المراجع)' }}</td></tr>
-    <tr><td>{{ __('استرداد السلف') }}</td><td>{{ $settlement->advance_recovery_mode === 'scheduled' ? 'إبقاء الجدولة الحالية' : format_number($settlement->advance_recovery_amount).' ج.م (استرداد كامل)' }}</td></tr>
+    <tr><td>{{ __('صرف رصيد الإجازات') }}</td><td>{{ $settlement->leave_payout_mode === 'skip' ? __('بدون صرف') : format_number($settlement->leave_payout_amount).' '.__('ج.م (بتحديد المراجع)') }}</td></tr>
+    <tr><td>{{ __('استرداد السلف') }}</td><td>{{ $settlement->advance_recovery_mode === 'scheduled' ? __('إبقاء الجدولة الحالية') : format_number($settlement->advance_recovery_amount).' '.__('ج.م (استرداد كامل)') }}</td></tr>
     <tr><td>{{ __('مكافأة نهاية الخدمة') }}</td><td>{{ format_number($settlement->gratuity_amount) }} {{ __('ج.م') }}</td></tr>
     <tr><td>{{ __('مستحقات إضافية') }}</td><td>{{ format_number($settlement->manual_earnings) }} {{ __('ج.م') }}</td></tr>
     <tr><td>{{ __('خصومات إضافية') }}</td><td>{{ format_number($settlement->manual_deductions) }} {{ __('ج.م') }}</td></tr>
