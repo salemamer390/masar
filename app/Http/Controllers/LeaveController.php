@@ -207,7 +207,7 @@ class LeaveController extends Controller
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $oldValues = $leave->only(['status', 'manager_approved_by', 'manager_approved_at', 'approved_by', 'approved_at']);
-        abort_if(in_array($leave->status, Leave::inactiveStatuses(), true), 422, 'لا يمكن إعادة تفعيل إجازة ملغاة من رابط اعتماد قديم.');
+        abort_if(in_array($leave->status, Leave::inactiveStatuses(), true), 422, __('لا يمكن إعادة تفعيل إجازة ملغاة من رابط اعتماد قديم.'));
         $this->leaveBalances->validateForApproval($leave, $leave->id);
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now(), 'early_grant_approved_by' => $leave->is_early_grant ? auth()->id() : null, 'early_grant_approved_at' => $leave->is_early_grant ? now() : null]);
         $this->leaveStatus->sync();
