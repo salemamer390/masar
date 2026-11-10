@@ -412,8 +412,11 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
   if (payrollDetailsTable) {
     const employeeCodes = @json($records->getCollection()->map(fn ($record) => $record->employee?->employee_code)->values());
     const netSalaries = @json($records->getCollection()->map(fn ($record) => (float) $record->net_salary)->values());
+    // Locate columns by their header text so the net salary label always reads the net column.
+    const headerTexts = [...payrollDetailsTable.tHead.rows[0].cells].map((cell) => cell.textContent.trim());
+    const colIndex = (label) => headerTexts.indexOf(label);
     [...payrollDetailsTable.tBodies].flatMap((body) => [...body.rows]).forEach((row, index) => {
-      const employeeCell = row.cells[1];
+      const employeeCell = row.cells[colIndex('الموظف')];
       if (employeeCell && employeeCodes[index] && !employeeCell.querySelector('[data-employee-code]')) {
         const code = document.createElement('small');
         code.dataset.employeeCode = 'true';
@@ -421,8 +424,8 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
         code.textContent = `كود الموظف: ${employeeCodes[index]}`;
         employeeCell.append(code);
       }
-      const salaryCell = row.cells[2];
-      const netCell = row.cells[9];
+      const salaryCell = row.cells[colIndex('الراتب الإجمالي')];
+      const netCell = row.cells[colIndex('الصافي')];
       if (salaryCell && netCell) {
         const net = salaryCell.querySelector('[data-net-salary]') || document.createElement('small');
         net.dataset.netSalary = 'true';
@@ -514,22 +517,14 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
     const row = form.closest('.modal')?.previousElementSibling?.closest('tr') || document.querySelector(`tr[data-payroll-record-id="${record?.id}"]`);
     if (row && record) {
       const additional = Number(record.additional_amount ?? (Number(record.overtime_amount || 0) + Number(record.advance_earnings || 0) + Number(record.bonus || 0) + Number(record.other_earnings || 0)));
-      row.children[4].textContent = Number(record.monthly_total || 0).toLocaleString('en-US', {maximumFractionDigits: 0});
-      row.children[5].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
-      row.children[5].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
-      row.children[6].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
-      row.children[7].textContent = money(record.employee_insurance);
-      row.children[8].textContent = money(record.income_tax);
-      row.children[9].textContent = money(record.net_salary);
-      row.children[10].textContent = money(record.employee_cost);
-      // Column order includes the new monthly total after gross salary.
-      row.children[5].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
-      row.children[6].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
-      row.children[7].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
-      row.children[8].textContent = money(record.employee_insurance);
-      row.children[9].textContent = money(record.income_tax);
-      row.children[10].textContent = money(record.net_salary);
-      row.children[11].textContent = money(record.employee_cost);
+      // Columns: 0 employee, 1 structure, 2 gross, 3 additional, 4 absence, 5 penalties, 6 insurance, 7 tax, 8 net, 9 company cost.
+      row.children[3].textContent = additional.toLocaleString('en-US', {maximumFractionDigits: 0});
+      row.children[4].innerHTML = `${money(record.absence_deduction)} <small class="text-muted">(${record.absence_days || 0} يوم)</small>`;
+      row.children[5].innerHTML = `${money(record.penalties)} <small class="text-muted">(${record.penalty_days || 0} يوم)</small>`;
+      row.children[6].textContent = money(record.employee_insurance);
+      row.children[7].textContent = money(record.income_tax);
+      row.children[8].textContent = money(record.net_salary);
+      row.children[9].textContent = money(record.employee_cost);
     }
     bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
   });
