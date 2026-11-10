@@ -74,6 +74,20 @@ class LeavePlanningAlertPoliciesTest extends TestCase
         }
     }
 
+    public function test_all_card_activation_settings_render_save_and_stay_company_scoped(): void
+    {
+        $keys = ['weekly_enabled', 'holidays_enabled', 'jobsearch_enabled', 'nursing_enabled', 'pregnant_enabled'];
+        $this->actingAs($this->ua);
+        $page = $this->get(route('payroll.settings.index'))->assertOk();
+        foreach ($keys as $key) $page->assertSee('name="policies['.$key.']"', false);
+        $this->savePolicies($this->ua, array_fill_keys($keys, 0))->assertSessionDoesntHaveErrors();
+        foreach ($keys as $key) {
+            $this->assertSame('0', $this->companyValue($this->a->id, $key));
+            $this->assertNull($this->companyValue($this->b->id, $key));
+        }
+        $this->savePolicies($this->ua, ['nursing_enabled' => 2])->assertSessionHasErrors('policies.nursing_enabled');
+    }
+
     public function test_all_new_keys_round_trip_per_company(): void
     {
         $this->savePolicies($this->ua, [
