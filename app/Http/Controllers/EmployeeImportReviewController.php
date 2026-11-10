@@ -67,8 +67,8 @@ class EmployeeImportReviewController extends Controller
         return DB::transaction(function () use ($request, $row, $service, $data, $values) {
             $row = EmployeeImportRow::lockForUpdate()->findOrFail($row->id);
             abort_if((int) $data['version'] !== $row->revisions()->count(), 409, 'اتغير الصف بعد فتحه؛ أعد تحميل الصفحة.');
-            abort_if($row->status !== 'pending', 422, 'هذا الصف تمت مراجعته بالفعل.');
-            abort_if($row->kind !== 'employees', 422, 'هذا النوع من الصفوف يُصحَّح من شاشته الأصلية ثم يُستبعد هنا.');
+            abort_if($row->status !== 'pending', 422, __('هذا الصف تمت مراجعته بالفعل.'));
+            abort_if($row->kind !== 'employees', 422, __('هذا النوع من الصفوف يُصحَّح من شاشته الأصلية ثم يُستبعد هنا.'));
 
             // Re-validate against live data with the same rules as a fresh import.
             $analyzed = $service->analyzeSingleRow($values, (int) $row->company_id);
@@ -125,7 +125,7 @@ class EmployeeImportReviewController extends Controller
         DB::transaction(function () use ($request, $row, $data): void {
             $row = EmployeeImportRow::lockForUpdate()->findOrFail($row->id);
             abort_if((int) $data['version'] !== $row->revisions()->count(), 409, 'اتغير الصف بعد فتحه؛ أعد تحميل الصفحة.');
-            abort_if($row->status !== 'pending', 422, 'هذا الصف تمت مراجعته بالفعل.');
+            abort_if($row->status !== 'pending', 422, __('هذا الصف تمت مراجعته بالفعل.'));
 
             $before = ['payload' => $row->payload, 'errors' => $row->errors, 'status' => $row->status];
             $row->update([
