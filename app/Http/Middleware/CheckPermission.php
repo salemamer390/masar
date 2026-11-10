@@ -15,15 +15,15 @@ class CheckPermission
         if ($user->hasPermission($permission)) return $next($request);
 
         if ($request->expectsJson()) {
-            return response()->json(['success' => false, 'message' => 'غير مصرح بتنفيذ هذا الإجراء.'], 403);
+            return response()->json(['success' => false, 'message' => __('غير مصرح بتنفيذ هذا الإجراء.')], 403);
         }
 
         $fallback = $this->allowedFallback($request);
         if ($fallback) {
-            return redirect()->route($fallback)->with('toast', 'ليس لديك صلاحية للوصول إلى هذه الصفحة.');
+            return redirect()->route($fallback)->with('toast', __('ليس لديك صلاحية للوصول إلى هذه الصفحة.'));
         }
 
-        return redirect()->route('access.denied')->with('toast', 'لا توجد صفحات متاحة لهذا الحساب حاليًا.');
+        return redirect()->route('access.denied')->with('toast', __('لا توجد صفحات متاحة لهذا الحساب حاليًا.'));
     }
 
     private function allowedFallback(Request $request): ?string
