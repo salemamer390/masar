@@ -571,20 +571,16 @@ class HrRequestController extends Controller
 
     private function validateExcuse(Request $request, string $source): array
     {
-        if ($source === 'permission' && $request->has('permission_from_time')) {
+        if ($request->has('permission_from_time')) {
             $request->merge(['from_time' => $request->input('permission_from_time'), 'to_time' => $request->input('permission_to_time')]);
         }
         $data = $request->validate([
             'request_date' => ['required', 'date'],
-            'start_date' => ['required_with:end_date', 'nullable', 'date'],
-            'end_date' => ['required_with:start_date', 'nullable', 'date', 'after_or_equal:start_date'],
-            'from_time' => [$source === 'permission' ? 'required' : 'nullable', 'date_format:H:i'],
-            'to_time' => [$source === 'permission' ? 'required' : 'nullable', 'date_format:H:i', 'different:from_time'],
+            'from_time' => ['required', 'date_format:H:i'],
+            'to_time' => ['required', 'date_format:H:i', 'different:from_time'],
         ]);
-        // A permission is one dated interval; a mission may span several days.
-        if ($source === 'permission') {
-            $data['start_date'] = $data['end_date'] = $data['request_date'];
-        }
+        // Permission and mission are each one dated interval (date + from/to time).
+        $data['start_date'] = $data['end_date'] = $data['request_date'];
         return $data;
     }
 
