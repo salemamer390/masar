@@ -202,12 +202,12 @@ class OwnerDashboardController extends Controller
     public function updateRenewal(Request $request, SubscriptionRenewalRequest $renewal)
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected']]);
-        abort_if($renewal->status !== 'pending', 422, 'تمت معالجة هذا الطلب بالفعل.');
+        abort_if($renewal->status !== 'pending', 422, __('تمت معالجة هذا الطلب بالفعل.'));
         if ($data['status'] === 'approved') {
             abort_unless(
                 SubscriptionPlan::whereKey($renewal->subscription_plan_id)->where('is_active', true)->exists(),
                 422,
-                'لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.'
+                __('لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.')
             );
         }
 
