@@ -38,9 +38,9 @@
 @foreach($settingsCards as $settingsCard)<div class="settings-card"><div class="settings-card-head"><h3>{{ $settingsCard['title'] }}</h3><span>{{ $settingsCard['subtitle'] }}</span></div><div class="settings-card-grid">@foreach($settingsCard['fields'] as $field)<div class="settings-field"><label class="form-label">{{ $field['label'] }}</label><div class="input-group settings-unit"><input type="number" step="0.000001" min="0" name="settings[{{ $field['key'] }}]" value="{{ format_number(old('settings.'.$field['key'],$settings[$field['key']]->setting_value ?? '')) }}" class="form-control" required><span class="input-group-text">{{ $field['unit'] }}</span></div>@if(!empty($field['hint']))<small class="settings-hint">{{ $field['hint'] }}</small>@endif</div>@endforeach</div></div>@endforeach
 <div class="settings-card wide"><div class="settings-card-head"><h3>{{ __('توزيع البدلات') }}</h3><span>{{ __('البدل الأخير يأخذ الباقي تلقائيًا ليكتمل المجموع 100%. فعّل «حساب جزئي» ليُحتسب البدل بنسبة أيام العمل عند التعيين أو ترك الخدمة خلال الشهر، أو أوقفه ليُصرف كاملًا.') }}</span></div>
 @if(!($allowanceProrationReady ?? true))<div class="alert alert-warning py-2 mb-3" role="alert"><i class="bi bi-exclamation-triangle ms-1"></i> {{ __('اختيار «الحساب الجزئي» للبدلات يحتاج تحديث قاعدة البيانات أولًا: شغّل') }} <code dir="ltr">php artisan migrate</code> {{ __('ثم أعد تحميل الصفحة. النسب تحفظ كالمعتاد.') }}</div>@endif
-<div class="allowance-row">@foreach($allowances as $allowance)<div class="allowance-item"><label class="form-label">{{ $allowance->allowance_name }}</label><div class="input-group settings-unit"><input type="number" step="0.0001" min="0" max="100" name="allowances[{{ $allowance->allowance_key }}]" value="{{ format_number(old('allowances.'.$allowance->allowance_key,$allowance->percentage)) }}" class="form-control allowance-input {{ $loop->last ? 'allowance-auto' : '' }}" @if($loop->last) readonly tabindex="-1" @endif required><span class="input-group-text">{{ __('٪') }}</span></div>@if($allowanceProrationReady ?? true)<label class="allowance-prorate"><input type="hidden" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="0"><input type="checkbox" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="1" @checked(old('allowance_prorated.'.$allowance->allowance_key, $allowance->is_prorated ?? 1))> {{ __('حساب جزئي مع أيام العمل') }}</label>@endif @if($loop->last)<small class="settings-hint">{{ __('يأخذ الباقي تلقائيًا من إجمالي البدلات.') }}</small>@endif</div>@endforeach</div>
+<div class="allowance-row">@foreach($allowances as $allowance)<div class="allowance-item"><label class="form-label">{{ __($allowance->allowance_name) }}</label><div class="input-group settings-unit"><input type="number" step="0.0001" min="0" max="100" name="allowances[{{ $allowance->allowance_key }}]" value="{{ format_number(old('allowances.'.$allowance->allowance_key,$allowance->percentage)) }}" class="form-control allowance-input {{ $loop->last ? 'allowance-auto' : '' }}" @if($loop->last) readonly tabindex="-1" @endif required><span class="input-group-text">{{ __('٪') }}</span></div>@if($allowanceProrationReady ?? true)<label class="allowance-prorate"><input type="hidden" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="0"><input type="checkbox" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="1" @checked(old('allowance_prorated.'.$allowance->allowance_key, $allowance->is_prorated ?? 1))> {{ __('حساب جزئي مع أيام العمل') }}</label>@endif @if($loop->last)<small class="settings-hint">{{ __('يأخذ الباقي تلقائيًا من إجمالي البدلات.') }}</small>@endif</div>@endforeach</div>
 <div class="allowance-bar" aria-label="{{ __('توزيع نسب البدلات') }}">@foreach($allowances as $allowance)<div class="allowance-seg" data-allowance-seg="{{ $allowance->allowance_key }}"><span></span></div>@endforeach</div>
-<div class="allowance-legend">@foreach($allowances as $allowance)<span class="allowance-chip"><i></i>{{ $allowance->allowance_name }} <b data-allowance-chip="{{ $allowance->allowance_key }}"></b></span>@endforeach</div>
+<div class="allowance-legend">@foreach($allowances as $allowance)<span class="allowance-chip"><i></i>{{ __($allowance->allowance_name) }} <b data-allowance-chip="{{ $allowance->allowance_key }}"></b></span>@endforeach</div>
 </div>
 </div>
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">{{ __('تعديلات غير محفوظة:') }} <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>{{ __('تراجع') }}</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> {{ __('حفظ التعديلات') }}</button></span></div>
@@ -85,8 +85,8 @@
     const wrap = document.getElementById('taxCategories');
     const form = document.getElementById('taxBrackets');
     if (!wrap || !form) return;
-    const rowHtml = '<tr><td><input type="number" step="0.01" min="0" data-field="from" class="form-control form-control-sm" required></td><td><input type="number" step="0.01" min="0" data-field="to" class="form-control form-control-sm"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" class="form-control form-control-sm" required></td><td><button type="button" class="btn btn-sm btn-outline-danger remove-bracket">حذف</button></td></tr>';
-    const categoryHtml = '<div class="settings-card tax-category"><div class="settings-card-grid category-head-grid"><div class="settings-field"><label class="form-label">اسم الفئة</label><input data-field="label" class="form-control" required></div><div class="settings-field"><label class="form-label">الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)</label><div class="input-group settings-unit"><input type="number" step="0.01" min="0" data-field="max_income" class="form-control"><span class="input-group-text">ج.م</span></div></div><div class="settings-field d-flex align-items-end"><button type="button" class="btn btn-outline-danger w-100 remove-category">حذف الفئة</button></div></div><div class="table-responsive"><table class="table table-sm align-middle mb-2"><thead><tr><th>من</th><th>إلى (فارغ = بلا حد)</th><th>النسبة %</th><th></th></tr></thead><tbody>' + rowHtml + '</tbody></table></div><button type="button" class="btn btn-sm btn-outline-primary add-bracket"><i class="bi bi-plus"></i> إضافة شريحة</button></div>';
+    const rowHtml = window.masarStaticHtml('<tr><td><input type="number" step="0.01" min="0" data-field="from" class="form-control form-control-sm" required></td><td><input type="number" step="0.01" min="0" data-field="to" class="form-control form-control-sm"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" class="form-control form-control-sm" required></td><td><button type="button" class="btn btn-sm btn-outline-danger remove-bracket">حذف</button></td></tr>');
+    const categoryHtml = window.masarStaticHtml('<div class="settings-card tax-category"><div class="settings-card-grid category-head-grid"><div class="settings-field"><label class="form-label">اسم الفئة</label><input data-field="label" class="form-control" required></div><div class="settings-field"><label class="form-label">الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)</label><div class="input-group settings-unit"><input type="number" step="0.01" min="0" data-field="max_income" class="form-control"><span class="input-group-text">ج.م</span></div></div><div class="settings-field d-flex align-items-end"><button type="button" class="btn btn-outline-danger w-100 remove-category">حذف الفئة</button></div></div><div class="table-responsive"><table class="table table-sm align-middle mb-2"><thead><tr><th>من</th><th>إلى (فارغ = بلا حد)</th><th>النسبة %</th><th></th></tr></thead><tbody>') + rowHtml + window.masarStaticHtml('</tbody></table></div><button type="button" class="btn btn-sm btn-outline-primary add-bracket"><i class="bi bi-plus"></i> إضافة شريحة</button></div>');
     function reindex() {
         wrap.querySelectorAll('.tax-category').forEach(function (category, ci) {
             category.querySelectorAll('[data-field]').forEach(function (input) {
@@ -134,19 +134,19 @@
       $disabled = $name === null;
       $v = $lvNum($value ?? $law);
       if ($disabled) {
-          return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e($unit).'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
-              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+          return '<div class="col-md-6"><div class="lbl">'.e(__($label)).'</div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.e($v).' '.e(__($unit)).'</span><span class="law-ref-tag">'.e(__('يُدار من تبويب أوقات الدوام')).'</span></div>'
+              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e(__($note)).'</span>' : '').'</div></div>';
       }
-      $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><div class="input-group input-group-sm">'
+      $h = '<div class="col-md-6"><div class="lbl">'.e(__($label)).'</div><div class="input-group input-group-sm">'
           .'<input type="number" min="0" step="any" class="form-control" id="'.e($id).'"'
-          .($name && !$scale ? ' name="'.e($name).'"' : '')
-          .' value="'.e($v).'" data-lp-ctl data-t="n" data-law="'.e((string) $law).'" data-dir="'.e($dir).'" data-unit="'.e($unit).'"'
+          .($name && !$scale ? ' name="'.e(__($name)).'"' : '')
+          .' value="'.e($v).'" data-lp-ctl data-t="n" data-law="'.e((string) $law).'" data-dir="'.e($dir).'" data-unit="'.e(__($unit)).'"'
           .($scale ? ' data-scale-op="'.e($scale['op']).'" data-scale-factor="'.e((string) $scale['factor']).'" data-scale-target="'.e($scale['target']).'"' : '')
           .($disabled ? ' disabled' : '').'>'
-          .'<span class="input-group-text">'.e($unit).'</span></div>'
-          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
-      if ($name && $scale) $h .= '<input type="hidden" id="'.e($scale['target']).'" name="'.e($name).'" value="'.e($lvNum($scale['op'] === 'div' ? ($value ?? $law) / $scale['factor'] : ($value ?? $law) * $scale['factor'])).'">';
+          .'<span class="input-group-text">'.e(__($unit)).'</span></div>'
+          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e(__($note)).'</span>' : '').'</div></div>';
+      if ($name && $scale) $h .= '<input type="hidden" id="'.e($scale['target']).'" name="'.e(__($name)).'" value="'.e($lvNum($scale['op'] === 'div' ? ($value ?? $law) / $scale['factor'] : ($value ?? $law) * $scale['factor'])).'">';
       return $h;
   };
   // مفتاح تبديل بنفس ترميز التصميم.
@@ -155,56 +155,56 @@
       $disabled = $name === null;
       $on = $value ?? $law;
       if ($disabled) {
-          return '<div class="col-md-6"><div class="lbl">'.e($label).'</div>'
-              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? 'نعم' : 'لا').'</span><span class="law-ref-tag">يُدار من تبويب أوقات الدوام</span></div>'
-              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+          return '<div class="col-md-6"><div class="lbl">'.e(__($label)).'</div>'
+              .'<div class="law-ref-static"><span class="law-ref-value">'.($on ? __('نعم') : __('لا')).'</span><span class="law-ref-tag">'.e(__('يُدار من تبويب أوقات الدوام')).'</span></div>'
+              .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e(__($note)).'</span>' : '').'</div></div>';
       }
       return '<div class="col-md-6"><div class="form-check form-switch">'
-          .($name ? '<input type="hidden" name="'.e($name).'" value="0">' : '')
-          .'<input class="form-check-input" type="checkbox" id="'.e($id).'"'.($name ? ' name="'.e($name).'" value="1"' : '').($on ? ' checked' : '')
+          .($name ? '<input type="hidden" name="'.e(__($name)).'" value="0">' : '')
+          .'<input class="form-check-input" type="checkbox" id="'.e($id).'"'.($name ? ' name="'.e(__($name)).'" value="1"' : '').($on ? ' checked' : '')
           .' data-lp-ctl data-t="s" data-law="'.($law ? '1' : '0').'"'.($strict ? ' data-strict="1"' : '').($disabled ? ' disabled' : '').'>'
-          .'<label class="form-check-label" for="'.e($id).'">'.e($label).'</label></div>'
-          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+          .'<label class="form-check-label" for="'.e($id).'">'.e(__($label)).'</label></div>'
+          .'<div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e(__($note)).'</span>' : '').'</div></div>';
   };
   // قائمة منسدلة بنفس ترميز التصميم.
   $lvSel = function (string $card, string $key, string $label, string $law, array $opts, ?string $name = null, ?string $value = null, ?string $note = null) {
       $id = $card.'-'.$key;
       $v = $value ?? $law;
-      $h = '<div class="col-md-6"><div class="lbl">'.e($label).'</div><select class="form-select form-select-sm" id="'.e($id).'"'.($name ? ' name="'.e($name).'"' : ' disabled')
+      $h = '<div class="col-md-6"><div class="lbl">'.e(__($label)).'</div><select class="form-select form-select-sm" id="'.e($id).'"'.($name ? ' name="'.e(__($name)).'"' : ' disabled')
           .' data-lp-ctl data-t="sel" data-law="'.e($law).'">';
-      foreach ($opts as $ov => $ol) $h .= '<option value="'.e($ov).'"'.($ov === $v ? ' selected' : '').'>'.e($ol).'</option>';
-      $h .= '</select><div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e($note).'</span>' : '').'</div></div>';
+      foreach ($opts as $ov => $ol) $h .= '<option value="'.e($ov).'"'.($ov === $v ? ' selected' : '').'>'.e(__($ol)).'</option>';
+      $h .= '</select><div class="hint-wrap" id="h-'.e($id).'">'.($note ? '<span class="hint note-op">'.e(__($note)).'</span>' : '').'</div></div>';
       return $h;
   };
   // رأس بطاقة: الاسم + المادة + مفتاح التفعيل + زر «القانون»، بنفس ترتيب التصميم.
   $lvHead = function (string $card, string $name, string $art, ?string $toggleName = null, ?bool $active = null, ?string $deleteUrl = null, ?string $deleteName = null) {
-      $h = '<div class="leave-head"><h3>'.e($name).'</h3><span class="art">'.e($art).'</span>';
+      $h = '<div class="leave-head"><h3>'.e(__($name)).'</h3><span class="art">'.e(__($art)).'</span>';
       if ($toggleName !== null) {
-          $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
+          $h .= '<div class="form-check form-switch m-0" title="'.e(__('تفعيل الإجازة')).'"><input type="hidden" name="'.e($toggleName).'" value="0">'
               .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
       } else {
-          $h .= '<span class="law-fixed-badge" title="حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل، وقيم بطاقته مرجع للمقارنة">حق ثابت بالقانون</span>';
+          $h .= '<span class="law-fixed-badge" title="'.e(__('حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل، وقيم بطاقته مرجع للمقارنة')).'">'.e(__('حق ثابت بالقانون')).'</span>';
       }
-      if ($deleteUrl !== null) $h .= '<button type="button" class="btn btn-sm btn-outline-danger lp-delete-type" data-url="'.e($deleteUrl).'" data-name="'.e($deleteName ?? $name).'" title="حذف النوع"><i class="bi bi-trash"></i></button>';
-      $h .= '<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset="'.e($card).'">القانون</button></div>';
+      if ($deleteUrl !== null) $h .= '<button type="button" class="btn btn-sm btn-outline-danger lp-delete-type" data-url="'.e($deleteUrl).'" data-name="'.e($deleteName ?? $name).'" title="'.e(__('حذف النوع')).'"><i class="bi bi-trash"></i></button>';
+      $h .= '<button type="button" class="btn btn-sm btn-outline-secondary" data-lp-reset="'.e($card).'">'.e(__('القانون')).'</button></div>';
       return $h;
   };
   // رأس قسم فرعي داخل بطاقة (العارضة داخل السنوية، المخالطة داخل المرضية): نفس ترميز التصميم بمستوى أصغر.
   $lvSubHead = function (string $card, string $name, string $art, ?string $note = null, ?string $toggleName = null, ?bool $active = null) {
-      $h = '<div class="leave-sub-head"><h4>'.e($name).'</h4><span class="art">'.e($art).'</span>';
-      if ($note) $h .= '<span class="leave-sub-note">'.e($note).'</span>';
+      $h = '<div class="leave-sub-head"><h4>'.e(__($name)).'</h4><span class="art">'.e(__($art)).'</span>';
+      if ($note) $h .= '<span class="leave-sub-note">'.e(__($note)).'</span>';
       if ($toggleName !== null) {
-          $h .= '<div class="form-check form-switch m-0" title="تفعيل الإجازة"><input type="hidden" name="'.e($toggleName).'" value="0">'
+          $h .= '<div class="form-check form-switch m-0" title="'.e(__('تفعيل الإجازة')).'"><input type="hidden" name="'.e($toggleName).'" value="0">'
               .'<input class="form-check-input" type="checkbox" name="'.e($toggleName).'" value="1"'.($active ? ' checked' : '').' data-lp-toggle="'.e($card).'"></div>';
       } else {
-          $h .= '<span class="law-fixed-badge" title="حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل">حق ثابت بالقانون</span>';
+          $h .= '<span class="law-fixed-badge" title="'.e(__('حق مقرر بالقانون لكل العاملين — لا يقبل التعطيل')).'">'.e(__('حق ثابت بالقانون')).'</span>';
       }
       return $h.'</div>';
   };
   $lvCardOpen = function (string $card, bool $off = false, bool $mandated = false) {
       return '<div class="col-lg-6" data-card-wrap="'.e($card).'"><div class="leave'.($off ? ' is-off' : '').'" id="c-'.e($card).'"'.($mandated ? ' data-mandated="1"' : '').'>';
   };
-  $lvOffSlot = fn (string $card, bool $show) => '<div id="h-'.e($card).'-on" class="mt-2">'.($show ? '<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>' : '').'</div>';
+  $lvOffSlot = fn (string $card, bool $show) => '<div id="h-'.e($card).'-on" class="mt-2">'.($show ? '<span class="hint bad">'.e(__('إجازة مقررة بالقانون، وتعطيلها يخالفه')).'</span>' : '').'</div>';
   $lvActive = function ($type) { return $type ? (array_key_exists('is_active', $type->limits) ? (bool) $type->limits['is_active'] : (bool) $type->is_active) : true; };
 
   $annualType = $lvType('annual'); $casualType = $lvType('casual'); $sickType = $lvType('sick');
@@ -214,7 +214,7 @@
   // «بدون أجر» ليس له بطاقة إعدادات: يبقى نوعًا متاحًا للطلبات ويُخصم في المسير مباشرة.
   $knownCodes = ['annual', 'casual', 'sick', 'contagious_contact', 'exams', 'newborn', 'pilgrimage', 'maternity', 'childcare', 'unpaid'];
   $extraTypes = $leaveTypes->reject(fn ($t) => in_array($t->policy_code, $knownCodes, true));
-  $constNote = 'ثابت قانوني — غير قابل للتعديل';
+  $constNote = __('ثابت قانوني — غير قابل للتعديل');
 ?>
 <header class="lp-toolbar">
   <div class="lp-toolbar-title">
@@ -432,7 +432,7 @@
   // نفس منطق التصميم: الحالة bad عند النقص عن المرجع، وmod عند الاختلاف عنه.
   function fmt(ctl) {
     const t = ctl.dataset.t, law = ctl.dataset.law;
-    if (t === 's') return law === '1' ? 'مفعّل' : 'معطّل';
+    if (t === 's') return law === '1' ? window.masarT('مفعّل') : window.masarT('معطّل');
     if (t === 'sel') { const o = Array.from(ctl.options).find(o => o.value === law); return o ? o.textContent : law; }
     return law + (ctl.dataset.unit ? ' ' + ctl.dataset.unit : '');
   }
@@ -460,7 +460,7 @@
     if (ctl.disabled) return; // الحقول المعطلة تحمل ملاحظتها التشغيلية الثابتة
     const st = statusOf(ctl);
     if (slot._opNote === undefined) slot._opNote = slot.querySelector('.note-op')?.outerHTML || '';
-    slot.innerHTML = slot._opNote + (st ? '<span class="hint ' + st + '">' + (st === 'bad' ? 'يخالف الحد القانوني' : 'معدّل') + ' — القانون: ' + fmt(ctl) + '</span>' : '');
+    slot.innerHTML = slot._opNote + (st ? '<span class="hint ' + st + '">' + (st === 'bad' ? window.masarT('يخالف الحد القانوني') : window.masarT('معدّل')) + window.masarT(' — القانون: ') + fmt(ctl) + '</span>' : '');
   }
   function cardState(card) {
     // Only the card's own toggle and statutory subsections count toward the violation
@@ -487,7 +487,7 @@
     const c = { '': 0, mod: 0, bad: 0 };
     $$('.leave', pane).forEach(card => { c[cardState(card)]++; });
     $('[data-lp-summary]').innerHTML =
-      '<span class="pill">مطابقة للقانون: ' + c[''] + '</span><span class="pill mod">معدّلة: ' + c.mod + '</span><span class="pill bad">مخالفة: ' + c.bad + '</span>';
+      window.masarStaticHtml('<span class="pill">مطابقة للقانون: ') + c[''] + window.masarStaticHtml('</span><span class="pill mod">معدّلة: ') + c.mod + window.masarStaticHtml('</span><span class="pill bad">مخالفة: ') + c.bad + '</span>';
   }
   function setDirty(d) { const b = $('[data-lp-dirty]'); if (b) b.hidden = !d; }
 
@@ -505,7 +505,7 @@
     if (t) {
       const card = t.closest('.leave');
       const slot = document.getElementById('h-' + t.dataset.lpToggle + '-on');
-      if (slot) slot.innerHTML = !t.checked && card.dataset.mandated === '1' ? '<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>' : '';
+      if (slot) slot.innerHTML = !t.checked && card.dataset.mandated === '1' ? window.masarStaticHtml('<span class="hint bad">إجازة مقررة بالقانون، وتعطيلها يخالفه</span>') : '';
       paintCard(card);
     }
     if (ctl || t) { summary(); setDirty(true); }
@@ -522,10 +522,10 @@
   }
   pane.addEventListener('click', e => {
     const rst = e.target.closest('[data-lp-reset]');
-    if (rst) { const card = document.getElementById('c-' + rst.dataset.lpReset); if (card) { resetCard(card); summary(); setDirty(true); toast('تمت استعادة القيم القانونية'); } return; }
+    if (rst) { const card = document.getElementById('c-' + rst.dataset.lpReset); if (card) { resetCard(card); summary(); setDirty(true); toast(window.masarT('تمت استعادة القيم القانونية')); } return; }
     if (e.target.closest('[data-lp-reset-all]')) {
-      if (!confirm('استعادة كل القيم إلى ما ينص عليه القانون؟')) return;
-      $$('.leave', pane).forEach(resetCard); summary(); setDirty(true); toast('تمت استعادة كل القيم القانونية');
+      if (!confirm(window.masarT('استعادة كل القيم إلى ما ينص عليه القانون؟'))) return;
+      $$('.leave', pane).forEach(resetCard); summary(); setDirty(true); toast(window.masarT('تمت استعادة كل القيم القانونية'));
     }
   });
 
@@ -569,7 +569,7 @@
     @php($cycleStart = (int) ($operationalSettings['payroll_period_start_day'] ?? 1))@php($cycleEnd = (int) ($operationalSettings['payroll_period_end_day'] ?? 30))@php($graceDays = (int) ($operationalSettings['attendance_correction_days'] ?? config('attendance.archive_grace_days', 3)))
     <form method="POST" id="operationalForm" action="{{ route('payroll.settings.operational.update') }}" data-track-dirty="true">
         @csrf @method('PUT')
-        <div class="alert alert-info" role="status">{{ __('الدورة الحالية: من يوم') }} {{ $cycleStart }} {{ __('إلى يوم') }} {{ $cycleEnd }}@if($cycleStart > $cycleEnd) {{ __('من الشهر السابق') }}@endif{{ __('. مهلة تصحيح الحضور') }} {{ $graceDays }} {{ $graceDays === 1 ? 'يوم' : 'أيام' }} {{ __('بعد نهاية الفترة، وبعدها يُقفل المسير والحضور والملخص تلقائيًا. تغيير اليومين بيُنشئ مسير انتقالي بالأيام الفعلية عشان ميبقاش في فجوة ولا تداخل.') }}</div>
+        <div class="alert alert-info" role="status">{{ __('الدورة الحالية: من يوم') }} {{ $cycleStart }} {{ __('إلى يوم') }} {{ $cycleEnd }}@if($cycleStart > $cycleEnd) {{ __('من الشهر السابق') }}@endif{{ __('. مهلة تصحيح الحضور') }} {{ $graceDays }} {{ $graceDays === 1 ? __('يوم') : __('أيام') }} {{ __('بعد نهاية الفترة، وبعدها يُقفل المسير والحضور والملخص تلقائيًا. تغيير اليومين بيُنشئ مسير انتقالي بالأيام الفعلية عشان ميبقاش في فجوة ولا تداخل.') }}</div>
         <div class="settings-cards">
             <div class="settings-card"><div class="settings-card-head"><h3>{{ __('الدوام اليومي') }}</h3><span>{{ __('أوقات العمل المعتمدة في الحضور والغياب.') }}</span></div><div class="settings-card-grid">
                 <div class="settings-field"><label class="form-label">{{ __('بداية الدوام') }}</label><input type="time" name="default_shift_start" class="form-control" value="{{ old('default_shift_start', $operationalSettings['default_shift_start'] ?? '09:00') }}" required></div>
@@ -643,7 +643,7 @@
 @foreach(['late', 'early_leave'] as $apKind)
 @php($apKindCount = array_sum(array_map('count', $apGroups[$apKind])))
 <div class="ap-section" data-ap-section="{{ $apKind }}">
-<div class="ap-section-title"><i class="bi {{ $apKindIcons[$apKind] }}"></i> {{ $apKindLabels[$apKind] }} <span class="ap-count" data-ap-count>{{ $apKindCount }} {{ $apKindCount === 1 ? 'شريحة' : 'شرائح' }}</span></div>
+<div class="ap-section-title"><i class="bi {{ $apKindIcons[$apKind] }}"></i> {{ $apKindLabels[$apKind] }} <span class="ap-count" data-ap-count>{{ $apKindCount }} {{ $apKindCount === 1 ? __('شريحة') : __('شرائح') }}</span></div>
 <div class="ap-rows" data-ap-rows>
 @foreach($apGroups[$apKind] as $apBandTiers)
 @if($apMatrixFit($apBandTiers))
@@ -707,14 +707,14 @@
 @push('scripts')<script>(function(){
 const form=document.getElementById('attendancePenalties');if(!form)return;
 let n=1000;
-const occLabels=['المرة الأولى','المرة الثانية','المرة الثالثة','الرابعة فأكثر'];
+const occLabels=[window.masarT('المرة الأولى'),window.masarT('المرة الثانية'),window.masarT('المرة الثالثة'),window.masarT('الرابعة فأكثر')];
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const warnTag='<span class="ap-warn-tag">إنذار</span>';
-const unitSel=(i,u)=>`<select name="tiers[${i}][unit]" aria-label="الوحدة"><option value="days"${u==='minutes'?'':' selected'}>أيام</option><option value="minutes"${u==='minutes'?' selected':''}>دقائق</option></select>`;
-const cellHtml=(i,kind,from,to,occF,occT,amount,unit,label)=>`<div class="ap-cell"><label>${label}</label><div class="ap-cell-inputs${Number(amount)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" value="${esc(amount)}" required aria-label="قيمة الجزاء">${unitSel(i,unit)}${warnTag}</div><input type="hidden" name="tiers[${i}][kind]" value="${kind}"><input type="hidden" class="ap-h-from" name="tiers[${i}][from_minutes]" value="${esc(from)}"><input type="hidden" class="ap-h-to" name="tiers[${i}][to_minutes]" value="${esc(to)}"><input type="hidden" name="tiers[${i}][occurrence_from]" value="${occF}"><input type="hidden" name="tiers[${i}][occurrence_to]" value="${esc(occT)}"></div>`;
-const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row><div class="ap-band"><span class="ap-band-range">من <input type="number" min="1" class="ap-band-from" value="${esc(from)}" aria-label="من دقيقة"> إلى <input type="number" min="1" class="ap-band-to" value="${esc(to)}" placeholder="بلا حد" aria-label="إلى دقيقة"> دقيقة</span></div>${cells.map((c,p)=>cellHtml(c.i,kind,from,to,c.occF,c.occT,c.amount,c.unit,occLabels[p])).join('')}<button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button></div>`;
-const customRow=(i,t)=>{const kind=t&&t.kind==='early_leave'?'early_leave':'late';t=t||{};return `<div class="ap-row ap-row-custom" data-ap-row><div class="ap-custom-grid"><div class="ap-f"><label>النوع</label><select name="tiers[${i}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late"${kind==='late'?' selected':''}>تأخير</option><option value="early_leave"${kind==='early_leave'?' selected':''}>خروج مبكر</option></select></div><div class="ap-f"><label>من دقيقة</label><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control form-control-sm" value="${esc(t.from_minutes)}" required></div><div class="ap-f"><label>إلى دقيقة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control form-control-sm" value="${esc(t.to_minutes)}"></div><div class="ap-f"><label>من المرة</label><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control form-control-sm" value="${esc(t.occurrence_from??1)}"></div><div class="ap-f"><label>إلى المرة <small>(فارغ = بلا حد)</small></label><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control form-control-sm" value="${esc(t.occurrence_to)}"></div><div class="ap-f ap-f-amount"><label>الجزاء (0 = إنذار)</label><div class="ap-cell-inputs${Number(t.deduction_days)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control form-control-sm" value="${esc(t.deduction_days)}" required>${unitSel(i,t.unit)}${warnTag}</div></div></div><button type="button" class="ap-del" data-ap-remove aria-label="حذف الشريحة"><i class="bi bi-trash"></i></button></div>`;};
-const refreshCounts=()=>{form.querySelectorAll('[data-ap-section]').forEach(sec=>{const c=sec.querySelectorAll('[data-ap-row]').length;const el=sec.querySelector('[data-ap-count]');if(el)el.textContent=c+' '+(c===1?'شريحة':'شرائح');const empty=sec.querySelector('[data-ap-empty]');if(empty)empty.hidden=c>0;});};
+const warnTag=window.masarStaticHtml('<span class="ap-warn-tag">إنذار</span>');
+const unitSel=(i,u)=>`<select name="tiers[${i}][unit]" aria-label="${window.masarT("الوحدة")}"><option value="days"${u==='minutes'?'':' selected'}>${window.masarT("أيام")}</option><option value="minutes"${u==='minutes'?' selected':''}>${window.masarT("دقائق")}</option></select>`;
+const cellHtml=(i,kind,from,to,occF,occT,amount,unit,label)=>`<div class="ap-cell"><label>${label}</label><div class="ap-cell-inputs${Number(amount)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" value="${esc(amount)}" required aria-label="${window.masarT("قيمة الجزاء")}">${unitSel(i,unit)}${warnTag}</div><input type="hidden" name="tiers[${i}][kind]" value="${kind}"><input type="hidden" class="ap-h-from" name="tiers[${i}][from_minutes]" value="${esc(from)}"><input type="hidden" class="ap-h-to" name="tiers[${i}][to_minutes]" value="${esc(to)}"><input type="hidden" name="tiers[${i}][occurrence_from]" value="${occF}"><input type="hidden" name="tiers[${i}][occurrence_to]" value="${esc(occT)}"></div>`;
+const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row><div class="ap-band"><span class="ap-band-range">${window.masarT("من")} <input type="number" min="1" class="ap-band-from" value="${esc(from)}" aria-label="${window.masarT("من دقيقة")}"> ${window.masarT("إلى")} <input type="number" min="1" class="ap-band-to" value="${esc(to)}" placeholder="${window.masarT("بلا حد")}" aria-label="${window.masarT("إلى دقيقة")}"> ${window.masarT("دقيقة")}</span></div>${cells.map((c,p)=>cellHtml(c.i,kind,from,to,c.occF,c.occT,c.amount,c.unit,occLabels[p])).join('')}<button type="button" class="ap-del" data-ap-remove aria-label="${window.masarT("حذف الشريحة")}"><i class="bi bi-trash"></i></button></div>`;
+const customRow=(i,t)=>{const kind=t&&t.kind==='early_leave'?'early_leave':'late';t=t||{};return `<div class="ap-row ap-row-custom" data-ap-row><div class="ap-custom-grid"><div class="ap-f"><label>${window.masarT("النوع")}</label><select name="tiers[${i}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late"${kind==='late'?' selected':''}>${window.masarT("تأخير")}</option><option value="early_leave"${kind==='early_leave'?' selected':''}>${window.masarT("خروج مبكر")}</option></select></div><div class="ap-f"><label>${window.masarT("من دقيقة")}</label><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control form-control-sm" value="${esc(t.from_minutes)}" required></div><div class="ap-f"><label>${window.masarT("إلى دقيقة")} <small>(${window.masarT("فارغ")} = ${window.masarT("بلا حد)")}</small></label><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control form-control-sm" value="${esc(t.to_minutes)}"></div><div class="ap-f"><label>${window.masarT("من المرة")}</label><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control form-control-sm" value="${esc(t.occurrence_from??1)}"></div><div class="ap-f"><label>${window.masarT("إلى المرة")} <small>(${window.masarT("فارغ")} = ${window.masarT("بلا حد)")}</small></label><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control form-control-sm" value="${esc(t.occurrence_to)}"></div><div class="ap-f ap-f-amount"><label>${window.masarT("الجزاء (")}0 = ${window.masarT("إنذار)")}</label><div class="ap-cell-inputs${Number(t.deduction_days)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control form-control-sm" value="${esc(t.deduction_days)}" required>${unitSel(i,t.unit)}${warnTag}</div></div></div><button type="button" class="ap-del" data-ap-remove aria-label="${window.masarT("حذف الشريحة")}"><i class="bi bi-trash"></i></button></div>`;};
+const refreshCounts=()=>{form.querySelectorAll('[data-ap-section]').forEach(sec=>{const c=sec.querySelectorAll('[data-ap-row]').length;const el=sec.querySelector('[data-ap-count]');if(el)el.textContent=c+' '+(c===1?window.masarT('شريحة'):window.masarT('شرائح'));const empty=sec.querySelector('[data-ap-empty]');if(empty)empty.hidden=c>0;});};
 const markDirty=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
 form.querySelectorAll('[data-ap-add]').forEach(btn=>btn.addEventListener('click',()=>{const kind=btn.dataset.apAdd==='early_leave'?'early_leave':'late';form.querySelector(`[data-ap-section="${kind}"] [data-ap-rows]`).insertAdjacentHTML('beforeend',customRow(n++,{kind}));refreshCounts();markDirty();}));
 document.getElementById('apRestoreSuggested').addEventListener('click',()=>{
@@ -734,7 +734,7 @@ form.addEventListener('change',e=>{const s=e.target.closest('[data-ap-kind]');if
 form.addEventListener('input',e=>{const wrap=e.target.closest?e.target.closest('.ap-cell-inputs'):null;if(!wrap||!e.target.name||!e.target.name.includes('deduction_days'))return;wrap.classList.toggle('is-warning',Number(e.target.value)===0);});
 document.addEventListener('input',e=>{const band=e.target.closest?e.target.closest('.ap-band'):null;if(!band)return;const row=band.closest('[data-ap-row]');const from=row.querySelector('.ap-band-from').value,to=row.querySelector('.ap-band-to').value;row.querySelectorAll('.ap-h-from').forEach(h=>h.value=from);row.querySelectorAll('.ap-h-to').forEach(h=>h.value=to);},true);
 const pill=document.getElementById('apStatePill'),sw=document.getElementById('apEnabled');
-if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مفعّلة':'معطّلة';pill.classList.toggle('on',sw.checked);pill.classList.toggle('off',!sw.checked);});
+if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?window.masarT('مفعّلة'):window.masarT('معطّلة');pill.classList.toggle('on',sw.checked);pill.classList.toggle('off',!sw.checked);});
 })();</script>@endpush
 <div id="holidays" class="settings-tab-pane" hidden>
     <div class="settings-cards">
@@ -753,19 +753,19 @@ if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مف�
     </div>
 </div>
 
-<div id="history" class="settings-tab-pane" hidden><div class="settings-card"><div class="settings-card-head"><h3>{{ __('سجل تعديلات الإعدادات') }}</h3><span>{{ __('مرجع المراجعة والمساءلة.') }}</span></div><div class="table-responsive"><table class="table"><thead><tr><th>{{ __('تاريخ السريان') }}</th><th>{{ __('المستخدم') }}</th><th>{{ __('وقت الحفظ') }}</th><th>IP</th></tr></thead><tbody>@forelse($history as $item)<tr><td>{{ $item->effective_from }}</td><td>{{ $item->changed_by_name ?? 'النظام' }}</td><td>{{ $item->created_at }}</td><td>{{ $item->ip_address }}</td></tr>@empty<tr><td colspan="4" class="text-center py-4">{{ __('لا توجد تعديلات مسجلة بعد.') }}</td></tr>@endforelse</tbody></table></div></div></div>
+<div id="history" class="settings-tab-pane" hidden><div class="settings-card"><div class="settings-card-head"><h3>{{ __('سجل تعديلات الإعدادات') }}</h3><span>{{ __('مرجع المراجعة والمساءلة.') }}</span></div><div class="table-responsive"><table class="table"><thead><tr><th>{{ __('تاريخ السريان') }}</th><th>{{ __('المستخدم') }}</th><th>{{ __('وقت الحفظ') }}</th><th>IP</th></tr></thead><tbody>@forelse($history as $item)<tr><td>{{ $item->effective_from }}</td><td>{{ $item->changed_by_name ?? __('النظام') }}</td><td>{{ $item->created_at }}</td><td>{{ $item->ip_address }}</td></tr>@empty<tr><td colspan="4" class="text-center py-4">{{ __('لا توجد تعديلات مسجلة بعد.') }}</td></tr>@endforelse</tbody></table></div></div></div>
 
 <div class="modal fade" id="editHolidayModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">{{ __('تعديل العطلة الرسمية') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}"></button></div><form method="POST" id="editHolidayForm">@csrf @method('PUT')<div class="modal-body"><div class="mb-3"><label class="form-label">{{ __('تاريخ العطلة') }}</label><input type="date" name="holiday_date" id="editHolidayDate" class="form-control" required></div><div><label class="form-label">{{ __('اسم العطلة') }}</label><input type="text" name="name" id="editHolidayName" class="form-control" maxlength="150" required></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ التعديل') }}</button></div></form></div></div></div>
 @endsection
 @push('scripts')<script>setTimeout(()=>document.querySelectorAll('.holiday-row').forEach(row=>{const form=row.querySelector('form[action*="/settings/holidays/"]');const edit=row.querySelector('.btn-outline-primary');if(form&&edit&&!row.querySelector('.holiday-actions')){const actions=document.createElement('div');actions.className='holiday-actions';row.append(actions);actions.append(edit,form)}}),0);</script>@endpush
-@push('scripts')<script>document.querySelectorAll('.holiday-row').forEach(row=>row.parentElement?.classList.add('holiday-grid'));document.querySelectorAll('.settings-tab').forEach(tab=>tab.addEventListener('click',()=>{const currentPane=document.querySelector('.settings-tab-pane:not([hidden])');if(currentPane&&currentPane.dataset.dirty==='true'&&currentPane.id!==tab.dataset.settingsTab&&!confirm('لديك تعديلات غير محفوظة في هذا القسم. الانتقال بدون حفظ؟'))return;document.querySelectorAll('.settings-tab').forEach(item=>item.classList.toggle('active',item===tab));document.querySelectorAll('.settings-tab-pane').forEach(pane=>pane.hidden=pane.id!==tab.dataset.settingsTab);localStorage.setItem('masar_settings_tab',tab.dataset.settingsTab)}));const savedSettingsTab=localStorage.getItem('masar_settings_tab');if(savedSettingsTab)document.querySelector(`.settings-tab[data-settings-tab="${savedSettingsTab}"]`)?.click();if(document.getElementById('periodChangeError'))document.querySelector('.settings-tab[data-settings-tab="operational"]')?.click();</script>@endpush
+@push('scripts')<script>document.querySelectorAll('.holiday-row').forEach(row=>row.parentElement?.classList.add('holiday-grid'));document.querySelectorAll('.settings-tab').forEach(tab=>tab.addEventListener('click',()=>{const currentPane=document.querySelector('.settings-tab-pane:not([hidden])');if(currentPane&&currentPane.dataset.dirty==='true'&&currentPane.id!==tab.dataset.settingsTab&&!confirm(window.masarT('لديك تعديلات غير محفوظة في هذا القسم. الانتقال بدون حفظ؟')))return;document.querySelectorAll('.settings-tab').forEach(item=>item.classList.toggle('active',item===tab));document.querySelectorAll('.settings-tab-pane').forEach(pane=>pane.hidden=pane.id!==tab.dataset.settingsTab);localStorage.setItem('masar_settings_tab',tab.dataset.settingsTab)}));const savedSettingsTab=localStorage.getItem('masar_settings_tab');if(savedSettingsTab)document.querySelector(`.settings-tab[data-settings-tab="${savedSettingsTab}"]`)?.click();if(document.getElementById('periodChangeError'))document.querySelector('.settings-tab[data-settings-tab="operational"]')?.click();</script>@endpush
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/payroll-settings-01.css') }}?v={{ filemtime(public_path('css/pages/payroll-settings-01.css')) }}">
 <link rel="stylesheet" href="{{ asset('css/pages/payroll-settings-02.css') }}?v={{ filemtime(public_path('css/pages/payroll-settings-02.css')) }}">
 <link rel="stylesheet" href="{{ asset('css/pages/payroll-settings-03.css') }}?v={{ filemtime(public_path('css/pages/payroll-settings-03.css')) }}">
 @endpush
-@push('scripts')<script>document.querySelectorAll('.holiday-row').forEach(row=>{const deleteForm=row.querySelector('form[action*="/settings/holidays/"]');if(!deleteForm)return;const button=document.createElement('button');button.type='button';button.className='btn btn-sm btn-outline-primary';button.innerHTML='<i class="bi bi-pencil-square"></i> تعديل';button.addEventListener('click',()=>{const dateText=row.querySelector('small')?.textContent.trim()||'';const parts=dateText.split('/');document.getElementById('editHolidayDate').value=parts.length===3?`${parts[2]}-${parts[1]}-${parts[0]}`:'';document.getElementById('editHolidayName').value=row.querySelector('strong')?.textContent.trim()||'';document.getElementById('editHolidayForm').action=deleteForm.action;bootstrap.Modal.getOrCreateInstance(document.getElementById('editHolidayModal')).show()});deleteForm.parentElement.classList.add('d-flex','gap-2');deleteForm.parentElement.insertBefore(button,deleteForm)});const cleanNumber=value=>{const number=Number(value);return Number.isFinite(number)?String(number):''};const allowanceInputs=[...document.querySelectorAll('.allowance-input')];const autoAllowanceInput=document.querySelector('.allowance-input.allowance-auto');const allowanceKeyOf=input=>(input.name.match(/allowances\[(.+?)\]/)||[])[1]||'';const updateAllowanceTotal=()=>{const others=allowanceInputs.filter(input=>input!==autoAllowanceInput).reduce((sum,input)=>sum+(parseFloat(input.value)||0),0);if(autoAllowanceInput)autoAllowanceInput.value=cleanNumber(Math.max(0,Math.round((100-others)*10000)/10000));allowanceInputs.forEach(input=>{const key=allowanceKeyOf(input);if(!key)return;const pct=Math.max(0,parseFloat(input.value)||0);const text=cleanNumber(Math.round(pct*100)/100)+'٪';const seg=document.querySelector(`[data-allowance-seg="${key}"]`);if(seg){seg.style.width=pct+'%';const label=seg.querySelector('span');if(label)label.textContent=pct>=7?text:'';}const chip=document.querySelector(`[data-allowance-chip="${key}"]`);if(chip)chip.textContent=text;})};allowanceInputs.forEach(input=>input.addEventListener('input',updateAllowanceTotal));updateAllowanceTotal();const restField=document.getElementById('weekly-rest-pattern');const restToggles=[...document.querySelectorAll('.weekly-rest-toggle')];const syncRestPattern=()=>{if(!restField)return;const chars=Array(7).fill('0');restToggles.forEach(toggle=>{chars[Number(toggle.dataset.index)]=toggle.checked?'1':'0'});restField.value=chars.join('')};restToggles.forEach(toggle=>toggle.addEventListener('change',syncRestPattern));syncRestPattern();document.getElementById('payrollRules')?.addEventListener('masar:resync',updateAllowanceTotal);document.getElementById('operationalForm')?.addEventListener('masar:resync',syncRestPattern);</script>@endpush
+@push('scripts')<script>document.querySelectorAll('.holiday-row').forEach(row=>{const deleteForm=row.querySelector('form[action*="/settings/holidays/"]');if(!deleteForm)return;const button=document.createElement('button');button.type='button';button.className='btn btn-sm btn-outline-primary';button.innerHTML=window.masarStaticHtml('<i class="bi bi-pencil-square"></i> تعديل');button.addEventListener('click',()=>{const dateText=row.querySelector('small')?.textContent.trim()||'';const parts=dateText.split('/');document.getElementById('editHolidayDate').value=parts.length===3?`${parts[2]}-${parts[1]}-${parts[0]}`:'';document.getElementById('editHolidayName').value=row.querySelector('strong')?.textContent.trim()||'';document.getElementById('editHolidayForm').action=deleteForm.action;bootstrap.Modal.getOrCreateInstance(document.getElementById('editHolidayModal')).show()});deleteForm.parentElement.classList.add('d-flex','gap-2');deleteForm.parentElement.insertBefore(button,deleteForm)});const cleanNumber=value=>{const number=Number(value);return Number.isFinite(number)?String(number):''};const allowanceInputs=[...document.querySelectorAll('.allowance-input')];const autoAllowanceInput=document.querySelector('.allowance-input.allowance-auto');const allowanceKeyOf=input=>(input.name.match(/allowances\[(.+?)\]/)||[])[1]||'';const updateAllowanceTotal=()=>{const others=allowanceInputs.filter(input=>input!==autoAllowanceInput).reduce((sum,input)=>sum+(parseFloat(input.value)||0),0);if(autoAllowanceInput)autoAllowanceInput.value=cleanNumber(Math.max(0,Math.round((100-others)*10000)/10000));allowanceInputs.forEach(input=>{const key=allowanceKeyOf(input);if(!key)return;const pct=Math.max(0,parseFloat(input.value)||0);const text=cleanNumber(Math.round(pct*100)/100)+window.masarT('٪');const seg=document.querySelector(`[data-allowance-seg="${key}"]`);if(seg){seg.style.width=pct+'%';const label=seg.querySelector('span');if(label)label.textContent=pct>=7?text:'';}const chip=document.querySelector(`[data-allowance-chip="${key}"]`);if(chip)chip.textContent=text;})};allowanceInputs.forEach(input=>input.addEventListener('input',updateAllowanceTotal));updateAllowanceTotal();const restField=document.getElementById('weekly-rest-pattern');const restToggles=[...document.querySelectorAll('.weekly-rest-toggle')];const syncRestPattern=()=>{if(!restField)return;const chars=Array(7).fill('0');restToggles.forEach(toggle=>{chars[Number(toggle.dataset.index)]=toggle.checked?'1':'0'});restField.value=chars.join('')};restToggles.forEach(toggle=>toggle.addEventListener('change',syncRestPattern));syncRestPattern();document.getElementById('payrollRules')?.addEventListener('masar:resync',updateAllowanceTotal);document.getElementById('operationalForm')?.addEventListener('masar:resync',syncRestPattern);</script>@endpush
 @push('scripts')
 <script>
   // Per-tab dirty tracking with save/revert bar.
@@ -805,26 +805,26 @@ if(pill&&sw)sw.addEventListener('change',()=>{pill.textContent=sw.checked?'مف�
   const holidaysList = document.getElementById('holidaysList');
   const escapeHolidayHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const holidayDate = (value) => { const parts = window.masarYmd(value).split('-'); return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—'; };
-  const holidayRow = (holiday) => `<div class="holiday-row" data-holiday-id="${holiday.id}"><div><strong>${escapeHolidayHtml(holiday.name)}</strong><small class="text-muted d-block">${holidayDate(holiday.holiday_date)}</small></div><div class="holiday-actions"><button type="button" class="btn btn-sm btn-outline-primary holiday-edit-ajax"><i class="bi bi-pencil-square"></i> تعديل</button><form method="POST" action="${holidayBaseUrl}/${holiday.id}"><input type="hidden" name="_token" value="${escapeHolidayHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> حذف</button></form></div></div>`;
+  const holidayRow = (holiday) => `<div class="holiday-row" data-holiday-id="${holiday.id}"><div><strong>${escapeHolidayHtml(holiday.name)}</strong><small class="text-muted d-block">${holidayDate(holiday.holiday_date)}</small></div><div class="holiday-actions"><button type="button" class="btn btn-sm btn-outline-primary holiday-edit-ajax"><i class="bi bi-pencil-square"></i> ${window.masarT("تعديل")}</button><form method="POST" action="${holidayBaseUrl}/${holiday.id}"><input type="hidden" name="_token" value="${escapeHolidayHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> ${window.masarT("حذف")}</button></form></div></div>`;
   document.addEventListener('click', async (event) => {
     const button = event.target.closest('.lp-delete-type');
     if (!button) return;
     const typeName = button.dataset.name || '';
-    if (!confirm('حذف نوع الإجازة «' + typeName + '»؟ إن كانت له طلبات سابقة سيُزال من الاختيارات الجديدة مع حفظ سجلاته، وإلا سيُحذف نهائيًا.')) return;
+    if (!confirm(window.masarT('حذف نوع الإجازة «') + typeName + window.masarT('»؟ إن كانت له طلبات سابقة سيُزال من الاختيارات الجديدة مع حفظ سجلاته، وإلا سيُحذف نهائيًا.'))) return;
     button.disabled = true;
     try {
       const body = new URLSearchParams();
       body.set('_method', 'DELETE');
       const response = await fetch(button.dataset.url, {method: 'POST', headers: {'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}, body});
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) { alert(data.message || 'تعذر حذف النوع.'); button.disabled = false; return; }
-      alert(data.message || 'تم الحذف.');
+      if (!response.ok) { alert(data.message || window.masarT('تعذر حذف النوع.')); button.disabled = false; return; }
+      alert(data.message || window.masarT('تم الحذف.'));
       location.reload();
-    } catch (error) { alert('تعذر الاتصال بالخادم.'); button.disabled = false; }
+    } catch (error) { alert(window.masarT('تعذر الاتصال بالخادم.')); button.disabled = false; }
   });
   const wireSettingsAjaxForms = (root = document) => {
-    root.querySelectorAll('form[action$="/operational"], form[action$="/holidays"][method="POST"], #editHolidayForm').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحفظ'; });
-    root.querySelectorAll('form[action*="/settings/holidays/"] input[name="_method"][value="DELETE"]').forEach((input) => { const form = input.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = 'جارٍ الحذف'; form.dataset.ajaxConfirm = 'هل تريد حذف هذه العطلة؟'; });
+    root.querySelectorAll('form[action$="/operational"], form[action$="/holidays"][method="POST"], #editHolidayForm').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ الحفظ'); });
+    root.querySelectorAll('form[action*="/settings/holidays/"] input[name="_method"][value="DELETE"]').forEach((input) => { const form = input.form; if (!form) return; form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ الحذف'); form.dataset.ajaxConfirm = window.masarT('هل تريد حذف هذه العطلة؟'); });
   };
   wireSettingsAjaxForms();
   document.addEventListener('click', (event) => { const button = event.target.closest('.holiday-edit-ajax'); if (!button) return; const row = button.closest('.holiday-row'); const id = row?.dataset.holidayId; if (!id) return; document.getElementById('editHolidayDate').value = (() => { const parts = row.querySelector('small')?.textContent.trim().split('/') || []; return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : ''; })(); document.getElementById('editHolidayName').value = row.querySelector('strong')?.textContent.trim() || ''; document.getElementById('editHolidayForm').action = `${holidayBaseUrl}/${id}`; bootstrap.Modal.getOrCreateInstance(document.getElementById('editHolidayModal')).show(); });
@@ -846,7 +846,7 @@ document.addEventListener('masar:error', (event) => {
   const warnings = event.detail?.payload?.errors?.below_reference;
   if (!form.matches?.('#leavePolicy form') || !warnings) return;
   event.preventDefault();
-  if (!window.confirm(warnings.join('\n') + '\nالقيمة أقل من المرجع. التأكيد لا يجعلها قانونية. هل تريد حفظ هذا التعديل مع تسجيله؟')) return;
+  if (!window.confirm(warnings.join('\n') + window.masarT('\nالقيمة أقل من المرجع. التأكيد لا يجعلها قانونية. هل تريد حفظ هذا التعديل مع تسجيله؟'))) return;
   const input = document.createElement('input'); input.type='hidden'; input.name='confirm_below_reference'; input.value='1'; form.appendChild(input);
   const clear=()=>input.remove(); form.addEventListener('masar:success',clear,{once:true});form.addEventListener('masar:error',clear,{once:true}); form.requestSubmit();
 });
