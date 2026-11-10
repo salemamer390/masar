@@ -28,7 +28,7 @@ class MobileJson
                 $request->session()->forget('toast');
             } else {
                 // Never convert an unexplained redirect into a claimed mutation.
-                $response = response()->json(['message'=>'تعذر تأكيد نتيجة العملية. حدّث البيانات قبل تكرارها.'], 502);
+                $response = response()->json(['message'=>__('تعذر تأكيد نتيجة العملية. حدّث البيانات قبل تكرارها.')], 502);
             }
         }
         $response->headers->set('Cache-Control', 'no-store, private');
