@@ -50,6 +50,11 @@ final class LeaveLegalReference
             'annual_min_consecutive_days' => ['label' => 'الحد الأدنى لأيام متصلة من السنوية', 'article' => 125, 'ref' => 6, 'dir' => 'min', 'unit' => 'يوم'],
             'leave_settlement_planning_years' => ['label' => 'مراجعة تسوية الرصيد المرحّل كل', 'article' => 125, 'ref' => 3, 'dir' => 'max', 'unit' => 'سنة'],
             // إعدادات محفوظة لكل شركة بلا مستهلك تشغيلي بعد — قابلة للتعديل والحفظ، وتُذكر حدود ربطها في الشاشة.
+            'weekly_enabled' => ['label' => 'تفعيل الراحة الأسبوعية', 'article' => 120, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
+            'holidays_enabled' => ['label' => 'تفعيل العطلات الرسمية', 'article' => 129, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
+            'jobsearch_enabled' => ['label' => 'تفعيل البحث عن عمل', 'article' => 162, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
+            'nursing_enabled' => ['label' => 'تفعيل الرضاعة', 'article' => 56, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
+            'pregnant_enabled' => ['label' => 'تفعيل تخفيف الحمل', 'article' => 54, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
             'weekly_rest_accumulate_weeks' => ['label' => 'أقصى تجميع للراحة الأسبوعية (مواقع بعيدة)', 'article' => 120, 'ref' => 8, 'dir' => 'max', 'unit' => 'أسبوع'],
             'weekly_rest_paid' => ['label' => 'الراحة الأسبوعية مدفوعة الأجر', 'article' => 120, 'ref' => 1, 'dir' => 'bool', 'unit' => ''],
             'jobsearch_weekly_hours' => ['label' => 'ساعات البحث عن عمل أسبوعيًا خلال مهلة الإخطار', 'article' => 162, 'ref' => 8, 'dir' => 'min', 'unit' => 'ساعة'],
