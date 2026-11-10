@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,6 +34,8 @@
     .owner-content { padding: 24px; }
   </style>
   @stack('styles')
+@if(app()->getLocale() === 'en')<link href="{{ asset('ltr.css') }}" rel="stylesheet">@endif
+@include('components.interface-i18n')
 </head>
 <body>
   <header class="owner-topbar">
@@ -52,7 +54,8 @@
   </header>
 
   <main class="owner-content">
-    @yield('content')
+    <nav aria-label="{{ __('اللغة') }}"><a href="{{ route('locale.switch','ar') }}">العربية</a> | <a href="{{ route('locale.switch','en') }}">English</a></nav>
+@yield('content')
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
