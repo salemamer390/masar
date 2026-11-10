@@ -77,8 +77,8 @@ document.querySelectorAll('select[name="status"]').forEach(function (select) {
     const current = select.value;
     select.innerHTML = '';
     [
-        ['registered', @js(__('مسجل'))],
-        ['unregistered', @js(__('غير مسجل'))]
+        ['registered', @js(__('registered'))],
+        ['unregistered', @js(__('unregistered'))]
     ].forEach(function (item) {
         const option = document.createElement('option');
         option.value = item[0];
@@ -100,7 +100,7 @@ document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft
     const select = document.createElement('select');
     select.className = badge.className.replace('badge-soft', 'badge-soft border-0');
     select.style.cssText = 'cursor:pointer;appearance:auto;';
-    [['registered', @js(__('مسجل'))], ['unregistered', @js(__('غير مسجل'))]].forEach(function (item) {
+    [['registered', @js(__('registered'))], ['unregistered', @js(__('unregistered'))]].forEach(function (item) {
         const option = document.createElement('option');
         option.value = item[0];
         option.innerHTML = item[1];
@@ -170,7 +170,7 @@ document.querySelectorAll('.table-panel tbody tr td:nth-child(8) span.badge-soft
             const select = document.createElement('select');
             select.className = badge.className + ' border-0';
             select.style.cssText = 'cursor:pointer;appearance:auto;';
-            [['registered', @js(__('مسجل'))], ['unregistered', @js(__('غير مسجل'))]].forEach(item => {
+            [['registered', @js(__('registered'))], ['unregistered', @js(__('unregistered'))]].forEach(item => {
                 const option = new Option(item[1], item[0], currentValue === item[0], currentValue === item[0]);
                 select.add(option);
             });
