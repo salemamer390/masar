@@ -735,6 +735,8 @@ class PayrollRunService
 
     private array $sickPayBasisCache = [];
 
+    private array $payFlagOverrideCache = [];
+
     private function isUnpaidLeave(Leave $leave): bool
     {
         $type = $leave->leaveType;
@@ -756,6 +758,21 @@ class PayrollRunService
             }
         }
 
+        // A company's own pay flag for a shared type (leave_type_company_limits.is_paid)
+        // wins over the shared row. Sick keeps its basis select above. Finalized runs are
+        // stored results; this affects new calculations only.
+        if ($leave->employee_id && !$type->company_id && \Illuminate\Support\Facades\Schema::hasTable('leave_type_company_limits')) {
+            $companyId = \Illuminate\Support\Facades\DB::table('employees')->where('id', $leave->employee_id)->value('company_id');
+            if ($companyId) {
+                $key = $type->id.':'.(int) $companyId;
+                if (!array_key_exists($key, $this->payFlagOverrideCache)) {
+                    $this->payFlagOverrideCache[$key] = \Illuminate\Support\Facades\Schema::hasColumn('leave_type_company_limits', 'is_paid')
+                        ? \Illuminate\Support\Facades\DB::table('leave_type_company_limits')->where('company_id', $companyId)->where('leave_type_id', $type->id)->value('is_paid')
+                        : null;
+                }
+                if ($this->payFlagOverrideCache[$key] !== null) return !(bool) $this->payFlagOverrideCache[$key];
+            }
+        }
         return !(bool) $type->is_paid;
     }
 
