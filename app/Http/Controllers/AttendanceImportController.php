@@ -72,7 +72,7 @@ class AttendanceImportController extends Controller
             $token = (string) $request->input('import_token');
             $temp = $this->loadTempImport($token, $request);
             if (!$temp) {
-                return redirect()->route('attendance.index')->withErrors(['file' => 'انتهت صلاحية المعاينة. أعد رفع الملف.']);
+                return redirect()->route('attendance.index')->withErrors(['file' => __('انتهت صلاحية المعاينة. أعد رفع الملف.')]);
             }
             [$sheets, $fileName] = $temp;
             $selectedUnit = $request->input('unit');
@@ -119,14 +119,14 @@ class AttendanceImportController extends Controller
 
         $lock = Cache::lock('attendance-import:' . $token, 60);
         if (!$lock->get()) {
-            return redirect()->route('attendance.index')->withErrors(['file' => 'استيراد هذا الملف قيد التنفيذ بالفعل. انتظر ثوانيًا ثم أعد المحاولة.']);
+            return redirect()->route('attendance.index')->withErrors(['file' => __('استيراد هذا الملف قيد التنفيذ بالفعل. انتظر ثوانيًا ثم أعد المحاولة.')]);
         }
 
         try {
             // Loaded inside the lock: a consumed token can never be replayed by a concurrent request.
             $temp = $this->loadTempImport($token, $request);
             if (!$temp) {
-                return redirect()->route('attendance.index')->withErrors(['file' => 'انتهت صلاحية المعاينة. أعد رفع الملف.']);
+                return redirect()->route('attendance.index')->withErrors(['file' => __('انتهت صلاحية المعاينة. أعد رفع الملف.')]);
             }
             [$sheets, $fileName] = $temp;
             $analysis = $this->analyzer->analyze($sheets);
@@ -134,7 +134,7 @@ class AttendanceImportController extends Controller
             $unit = collect($units)->firstWhere('key', $validated['unit']);
             if (!$unit) {
                 $this->deleteTempImport($token);
-                return redirect()->route('attendance.index')->withErrors(['file' => 'اختيار الورقة لم يعد صالحًا. أعد رفع الملف.']);
+                return redirect()->route('attendance.index')->withErrors(['file' => __('اختيار الورقة لم يعد صالحًا. أعد رفع الملف.')]);
             }
 
             $postedMap = $this->sanitisePostedMap($validated['map'] ?? []);
