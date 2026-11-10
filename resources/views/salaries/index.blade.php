@@ -106,7 +106,7 @@
 <div class="modal-body">
   <div class="alert alert-primary mb-3"><b>{{ __('الراتب الإجمالي هو المدخل الأساسي.') }}</b> {{ __('الأساسي والبدلات الأربعة تُوزع تلقائياً من الإجمالي حسب إعدادات النظام.') }}</div>
   <div class="row g-3">
-    <div class="col-md-6"><label class="form-label">{{ __('الموظف') }}</label><select name="employee_id" id="salary_employee_id" class="form-select" required><option value="">{{ __('اختر الموظف') }}</option>@foreach($employees as $e)<option value="{{ $e->id }}" data-gross="{{ $e->gross_salary ?? '' }}">{{ $e->full_name }} — {{ $e->job?->title ?? 'بدون وظيفة' }}</option>@endforeach</select></div>
+    <div class="col-md-6"><label class="form-label">{{ __('الموظف') }}</label><select name="employee_id" id="salary_employee_id" class="form-select" required><option value="">{{ __('اختر الموظف') }}</option>@foreach($employees as $e)<option value="{{ $e->id }}" data-gross="{{ $e->gross_salary ?? '' }}">{{ $e->full_name }} — {{ $e->job?->title ?? __('بدون وظيفة') }}</option>@endforeach</select></div>
     <div class="col-md-3"><label class="form-label">{{ __('تاريخ السريان') }}</label><input name="effective_from" type="date" class="form-control" value="{{ date('Y-m-d') }}" required></div>
     <div class="col-md-3"><label class="form-label">{{ __('طريقة الصرف') }}</label><select name="payment_method_id" class="form-select"><option value="">{{ __('اختر') }}</option>@foreach($paymentMethods as $m)<option value="{{ $m->id }}">{{ $m->name }}</option>@endforeach</select></div>
     <div class="col-md-4"><label class="form-label">{{ __('الراتب الإجمالي الشهري — من ملف الموظف') }}</label><input id="salary_input" name="salary_input" type="number" step="0.01" min="0.01" class="form-control calc-input" readonly required><div class="form-text">{{ __('يُقرأ تلقائيًا من الراتب الإجمالي في ملف الموظف.') }}</div></div>
@@ -183,7 +183,7 @@
 (function(){
   const modal=document.getElementById('salaryModal'); if(!modal)return;
   const allowanceRate={{ json_encode((float)$allowanceRate) }};
-  const fmt=n=>Math.round(Number(n||0)).toLocaleString('en-US')+' ج.م';
+  const fmt=n=>Math.round(Number(n||0)).toLocaleString('en-US')+window.masarT(' ج.م');
   const form=modal.querySelector('form');
   const input=form.querySelector('[name=salary_input]');
   const employeeSelect=form.querySelector('[name=employee_id]');
@@ -194,7 +194,7 @@
     input.value=gross;
     document.getElementById('gross_display').value=gross ? fmt(gross) : '—';
     document.getElementById('salaryError').classList.add('d-none');
-    if(!gross && option?.value){ document.getElementById('salaryError').textContent='لا يوجد راتب إجمالي محفوظ لهذا الموظف. أدخل الراتب من ملف الموظف أولًا.'; document.getElementById('salaryError').classList.remove('d-none'); }
+    if(!gross && option?.value){ document.getElementById('salaryError').textContent=window.masarT('لا يوجد راتب إجمالي محفوظ لهذا الموظف. أدخل الراتب من ملف الموظف أولًا.'); document.getElementById('salaryError').classList.remove('d-none'); }
   }
   const error=document.getElementById('salaryError');
   function updateAllowanceUI(){
@@ -205,8 +205,8 @@
     document.getElementById('allowances_display').value=fmt(total);
     document.getElementById('allowance_remaining_display').value=fmt(remaining);
     const msg=document.getElementById('allowanceMessage');
-    if(remaining<-.001){msg.className='small text-danger pb-2';msg.textContent='إجمالي البدلات تجاوز نسبة '+allowanceRate+'% — لا يمكن الحفظ.';}
-    else {msg.className='small text-success pb-2';msg.textContent='المتبقي من إجمالي البدلات: '+fmt(remaining);}
+    if(remaining<-.001){msg.className='small text-danger pb-2';msg.textContent=window.masarT('إجمالي البدلات تجاوز نسبة ')+allowanceRate+window.masarT('% — لا يمكن الحفظ.');}
+    else {msg.className='small text-success pb-2';msg.textContent=window.masarT('المتبقي من إجمالي البدلات: ')+fmt(remaining);}
     return remaining;
   }
   function setResult(k,v){const el=form.querySelector('[data-result="'+k+'"]');if(el)el.textContent=fmt(v);}
@@ -219,7 +219,7 @@
     try{
       const r=await fetch('{{ route('salaries.preview') }}',{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content,'Accept':'application/json'},body:data});
       const x=await r.json();
-      if(!r.ok){throw new Error(x.message||'تعذر حساب الراتب');}
+      if(!r.ok){throw new Error(x.message||window.masarT('تعذر حساب الراتب'));}
       Object.keys(x).forEach(k=>setResult(k,x[k]));
       document.getElementById('gross_display').value=fmt(x.gross);
       document.getElementById('basic_display').value=fmt(Math.max(0,Number(x.gross)-Number(x.allowances||0)));
@@ -229,8 +229,8 @@
   employeeSelect?.addEventListener('change',()=>{syncEmployeeGross(); preview();});
   syncEmployeeGross();
   form.querySelectorAll('input,select').forEach(el=>el.addEventListener('change',preview));
-  form.addEventListener('masar:before-submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent='إجمالي البدلات لا يمكن أن يتجاوز نسبة '+allowanceRate+'%.';error.classList.remove('d-none');}});
-  form.addEventListener('submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent='إجمالي البدلات لا يمكن أن يتجاوز نسبة '+allowanceRate+'%.';error.classList.remove('d-none');}});
+  form.addEventListener('masar:before-submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent=window.masarT('إجمالي البدلات لا يمكن أن يتجاوز نسبة ')+allowanceRate+'%.';error.classList.remove('d-none');}});
+  form.addEventListener('submit',function(e){if(updateAllowanceUI()<-.001){e.preventDefault();error.textContent=window.masarT('إجمالي البدلات لا يمكن أن يتجاوز نسبة ')+allowanceRate+'%.';error.classList.remove('d-none');}});
   modal.addEventListener('shown.bs.modal',preview);
 })();
 </script>
@@ -241,9 +241,9 @@
   const bindSalaryForms = (root = document) => {
     root.querySelectorAll('#salaryForm, [id^="editSalary"] form, .salary-layout form[action*="/salaries/"]').forEach(form => {
       form.dataset.ajax = 'true';
-      form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? 'جارٍ الإيقاف' : 'جارٍ الحفظ';
+      form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? window.masarT('جارٍ الإيقاف') : window.masarT('جارٍ الحفظ');
       if (form.querySelector('input[name="_method"][value="DELETE"]')) {
-        form.dataset.ajaxConfirm = 'إيقاف هيكل الراتب الحالي؟';
+        form.dataset.ajaxConfirm = window.masarT('إيقاف هيكل الراتب الحالي؟');
         form.removeAttribute('onsubmit');
       }
     });
