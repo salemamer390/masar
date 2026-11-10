@@ -2063,5 +2063,7 @@
   "تقرير الرواتب": "Payroll report",
   "حالة التسجيل وأكواد المهن": "Registration status and job codes",
   "رقم التأمين": "Insurance number",
-  "ملخص مؤشرات شؤون العاملين": "HR indicators summary"
+  "ملخص مؤشرات شؤون العاملين": "HR indicators summary",
+  "تعذر قراءة الملف: ": "Could not read the file: ",
+  "لم يُعثر على ورقة حضور قابلة للاستيراد. ": "No importable attendance sheet was found. "
 }
