@@ -1,24 +1,24 @@
 @extends('layouts.app')
 
-@section('title', 'الموظفون')
+@section('title', __('الموظفون'))
 
 @section('content')
 <div class="page-head">
   <div>
-    <h1>الموظفون</h1>
-    <p>إدارة ملف الموظف والبيانات الأساسية.</p>
+    <h1>{{ __('الموظفون') }}</h1>
+    <p>{{ __('إدارة ملف الموظف والبيانات الأساسية.') }}</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> إعدادات بيانات الموظفين</a>@endif
+    @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات بيانات الموظفين') }}</a>@endif
     <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
-      <i class="bi bi-file-earmark-excel text-success"></i> استيراد من Excel
+      <i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد من Excel') }}
     </button>
-    <a class="btn btn-light" href="{{ route('employees.import-batches.index') }}" title="صفوف الاستيراد المرفوضة وملفات الاستيراد السابقة">
-      <i class="bi bi-inbox text-warning"></i> سجل الاستيراد
+    <a class="btn btn-light" href="{{ route('employees.import-batches.index') }}" title="{{ __('صفوف الاستيراد المرفوضة وملفات الاستيراد السابقة') }}">
+      <i class="bi bi-inbox text-warning"></i> {{ __('سجل الاستيراد') }}
     </a>
     @if(auth()->user()?->hasPermission('employees.create'))
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
-      <i class="bi bi-plus-lg"></i> إضافة موظف
+      <i class="bi bi-plus-lg"></i> {{ __('إضافة موظف') }}
     </button>
     @endif
   </div>
@@ -26,12 +26,12 @@
 @php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
 <div class="employee-kpi-grid">
   @foreach([
-    ['إجمالي الموظفين', $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' نشط · '.$employeeSummary['inactive'].' غير نشط' : 'جميع الموظفين نشطون', 'blue', 'people-fill', route('employees.index')],
-    ['الموظفون النشطون', $employeeSummary['active'], 'من إجمالي '.$employeeSummary['total'].' موظف', 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],
-    ['عدد الأقسام', $employeeSummary['departments'], $employeeSummary['unassigned'] ? $employeeSummary['unassigned'].' موظف دون قسم' : 'الأقسام التي بها موظفون حاليًا', 'purple', 'diagram-3-fill', route('employees.index')],
-    ['عقود تنتهي قريبًا', $employeeSummary['contracts_due'], 'حتى '.today()->copy()->addDays(30)->format('d/m/Y'), 'orange', 'calendar2-x-fill', route('employees.index')],
-    ['غير مؤمن عليهم', $employeeSummary['uninsured'], 'موظفون بلا سجل تأمين', 'red', 'shield-x', route('insurance.index')],
-    ['في إجازة حاليًا', $employeeSummary['on_leave'], 'إجازات معتمدة تشمل اليوم', 'blue', 'calendar2-check-fill', route('leaves.index')],
+    [__('إجمالي الموظفين'), $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' '.__('نشط ·').' '.$employeeSummary['inactive'].' '.__('غير نشط') : __('جميع الموظفين نشطون'), 'blue', 'people-fill', route('employees.index')],
+    [__('الموظفون النشطون'), $employeeSummary['active'], __('من إجمالي').' '.$employeeSummary['total'].' '.__('موظف'), 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],
+    [__('عدد الأقسام'), $employeeSummary['departments'], $employeeSummary['unassigned'] ? $employeeSummary['unassigned'].' '.__('موظف دون قسم') : __('الأقسام التي بها موظفون حاليًا'), 'purple', 'diagram-3-fill', route('employees.index')],
+    [__('عقود تنتهي قريبًا'), $employeeSummary['contracts_due'], __('حتى').' '.today()->copy()->addDays(30)->format('d/m/Y'), 'orange', 'calendar2-x-fill', route('employees.index')],
+    [__('غير مؤمن عليهم'), $employeeSummary['uninsured'], __('موظفون بلا سجل تأمين'), 'red', 'shield-x', route('insurance.index')],
+    [__('في إجازة حاليًا'), $employeeSummary['on_leave'], __('إجازات معتمدة تشمل اليوم'), 'blue', 'calendar2-check-fill', route('leaves.index')],
   ] as $statIndex => $stat)
   <a href="{{ $stat[5] }}" data-kpi-index="{{ $statIndex }}" class="employee-kpi employee-kpi-detail-trigger {{ $stat[3] }}">
     <span class="employee-kpi-icon"><i class="bi bi-{{ $stat[4] }}"></i></span>
@@ -39,20 +39,20 @@
   </a>
   @endforeach
 </div>
-<div class="modal fade" id="employeeKpiDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="employeeKpiTitle">تفاصيل الكارت</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="employeeKpiBody" class="employee-kpi-detail-list"></div></div></div></div></div>
+<div class="modal fade" id="employeeKpiDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="employeeKpiTitle">{{ __('تفاصيل الكارت') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="employeeKpiBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 <form method="GET" action="{{ route('employees.index') }}" class="filter-bar">
   <div class="search-table">
     <i class="bi bi-search"></i>
-    <input name="search" value="{{ request('search') }}" placeholder="بحث باسم الموظف أو الكود...">
+    <input name="search" value="{{ request('search') }}" placeholder="{{ __('بحث باسم الموظف أو الكود...') }}">
   </div>
   <select name="department_id" onchange="this.form.submit()">
-    <option value="">كل الأقسام</option>
+    <option value="">{{ __('كل الأقسام') }}</option>
     @foreach($departments as $dept)
       <option value="{{ $dept->id }}" {{ request('department_id') == $dept->id ? 'selected' : '' }}>{{ $dept->name }}</option>
     @endforeach
   </select>
   <select name="status_id" onchange="this.form.submit()">
-    <option value="">كل الحالات</option>
+    <option value="">{{ __('كل الحالات') }}</option>
     @foreach($statuses as $st)
       <option value="{{ $st->id }}" {{ request('status_id') == $st->id ? 'selected' : '' }}>{{ $st->name }}</option>
     @endforeach
@@ -66,12 +66,12 @@
   <table class="table align-middle">
     <thead>
       <tr>
-        <th>الكود</th>
-        <th>الموظف</th>
-        <th>الوظيفة</th>
-        <th>القسم</th>
-        <th>الحالة</th>
-        <th>تاريخ بداية العقد</th>
+        <th>{{ __('الكود') }}</th>
+        <th>{{ __('الموظف') }}</th>
+        <th>{{ __('الوظيفة') }}</th>
+        <th>{{ __('القسم') }}</th>
+        <th>{{ __('الحالة') }}</th>
+        <th>{{ __('تاريخ بداية العقد') }}</th>
         <th></th>
       </tr>
     </thead>
@@ -103,9 +103,9 @@
                 @foreach($statuses as $status)
                   @php($statusTone = match($status->name) { 'Leave', 'Pending', 'اجازة وضع' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' })
                   @if($status->name === 'اجازة وضع')
-                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-maternity-action" data-employee-url="{{ route('employees.maternity-leave', $employee) }}" data-employee-name="{{ $employee->full_name }}" data-employee-expected="{{ $employee->expected_delivery_date?->format('Y-m-d') }}"><span class="badge-soft warning">اجازة وضع</span><small class="text-muted">نموذج موجّه بالإرشادات والتاريخ المتوقع للولادة</small></a></li>
+                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-maternity-action" data-employee-url="{{ route('employees.maternity-leave', $employee) }}" data-employee-name="{{ $employee->full_name }}" data-employee-expected="{{ $employee->expected_delivery_date?->format('Y-m-d') }}"><span class="badge-soft warning">{{ __('اجازة وضع') }}</span><small class="text-muted">{{ __('نموذج موجّه بالإرشادات والتاريخ المتوقع للولادة') }}</small></a></li>
                   @elseif(in_array($status->name, ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Suspended', 'موقوف', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'], true))
-                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-status-action" data-status-id="{{ $status->id }}" data-status-name="{{ $status->name }}" data-employee-url="{{ route('employees.update', $employee) }}"><span class="badge-soft danger">{{ in_array($status->name, ['Suspended', 'موقوف'], true) ? 'موقوف' : 'منتهي الخدمة' }}</span><small class="text-muted">حدّد تاريخ الحالة</small></a></li>
+                    <li><a href="#" class="dropdown-item rounded-2 d-flex align-items-center gap-2 employee-status-action" data-status-id="{{ $status->id }}" data-status-name="{{ $status->name }}" data-employee-url="{{ route('employees.update', $employee) }}"><span class="badge-soft danger">{{ in_array($status->name, ['Suspended', 'موقوف'], true) ? 'موقوف' : 'منتهي الخدمة' }}</span><small class="text-muted">{{ __('حدّد تاريخ الحالة') }}</small></a></li>
                   @else
                     <li><form method="POST" action="{{ route('employees.update', $employee) }}" onsubmit="return confirm('تأكيد تغيير حالة الموظف إلى: {{ $status->name }}؟')">@csrf @method('PUT')<input type="hidden" name="full_name" value="{{ $employee->full_name }}"><input type="hidden" name="status_id" value="{{ $status->id }}"><button class="dropdown-item rounded-2 d-flex align-items-center gap-2" @disabled($employee->status_id == $status->id)><span class="badge-soft {{ $statusTone }}">{{ match($status->name) { 'Active' => 'نشط', 'Leave' => 'إجازة', 'Suspended' => 'موقوف', 'Terminated' => 'منتهي الخدمة', 'Pending' => 'قيد التعيين', default => $status->name } }}</span>@if($employee->status_id == $status->id)<i class="bi bi-check-lg ms-auto"></i>@endif</button></form></li>
                   @endif
@@ -123,19 +123,19 @@
             <div class="dropdown">
               <button class="table-action" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
               <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person me-2"></i> عرض الملف الكامل</a></li>
+                <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person me-2"></i> {{ __('عرض الملف الكامل') }}</a></li>
                 @if(auth()->user()?->hasPermission('employees.edit'))
-                <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person-gear me-2"></i> تعديل حالة الموظف</a></li>
+                <li><a class="dropdown-item py-2" href="{{ route('employees.show', $employee) }}"><i class="bi bi-person-gear me-2"></i> {{ __('تعديل حالة الموظف') }}</a></li>
                 @endif
-                <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'documentsProfile']) }}"><i class="bi bi-folder me-2"></i> مسوغات التعيين</a></li>
-                <li><a class="dropdown-item py-2" href="{{ route('employees.print', $employee) }}" target="_blank"><i class="bi bi-printer me-2"></i> طباعة الملف</a></li>
+                <li><a class="dropdown-item py-2" href="{{ route('employees.show', [$employee, 'tab' => 'documentsProfile']) }}"><i class="bi bi-folder me-2"></i> {{ __('مسوغات التعيين') }}</a></li>
+                <li><a class="dropdown-item py-2" href="{{ route('employees.print', $employee) }}" target="_blank"><i class="bi bi-printer me-2"></i> {{ __('طباعة الملف') }}</a></li>
               </ul>
             </div>
           </td>
         </tr>
       @empty
         <tr>
-          <td colspan="7" class="text-center text-muted py-5">لا توجد بيانات موظفين مطابقة للبحث.</td>
+          <td colspan="7" class="text-center text-muted py-5">{{ __('لا توجد بيانات موظفين مطابقة للبحث.') }}</td>
         </tr>
       @endforelse
     </tbody>
@@ -149,8 +149,8 @@
       @foreach(request()->except(['page', 'per_page']) as $key => $value)
         @if(is_scalar($value))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
       @endforeach
-      <label class="small text-muted mb-0" for="employeesPerPage">عدد الصفوف</label>
-      <select id="employeesPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="عدد الصفوف في الصفحة">
+      <label class="small text-muted mb-0" for="employeesPerPage">{{ __('عدد الصفوف') }}</label>
+      <select id="employeesPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('عدد الصفوف في الصفحة') }}">
         @foreach([25, 50, 100, 200] as $size)
           <option value="{{ $size }}" @selected((int) request('per_page', 25) === $size)>{{ $size }}</option>
         @endforeach
@@ -163,8 +163,8 @@
       @foreach(request()->except(['page', 'per_page']) as $key => $value)
         @if(is_scalar($value))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
       @endforeach
-      <label class="small text-muted mb-0" for="employeesPerPage">عدد الصفوف</label>
-      <select id="employeesPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="عدد الصفوف في الصفحة">
+      <label class="small text-muted mb-0" for="employeesPerPage">{{ __('عدد الصفوف') }}</label>
+      <select id="employeesPerPage" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('عدد الصفوف في الصفحة') }}">
         @foreach([25, 50, 100, 200] as $size)<option value="{{ $size }}" @selected((int) request('per_page', 25) === $size)>{{ $size }}</option>@endforeach
       </select>
     </form>
@@ -176,7 +176,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">إضافة موظف جديد</h5>
+        <h5 class="modal-title">{{ __('إضافة موظف جديد') }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="{{ route('employees.store') }}" method="POST" id="addEmployeeForm">
@@ -184,45 +184,45 @@
         <input type="hidden" name="salary_source" id="new_employee_salary_source" value=""><input type="hidden" name="salary_value" id="new_employee_salary_value" value="">
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">الاسم الكامل <span class="text-danger">*</span></label>
-            <input type="text" name="full_name" class="form-control" placeholder="مثال: أحمد محمد علي" required>
+            <label class="form-label">{{ __('الاسم الكامل') }} <span class="text-danger">*</span></label>
+            <input type="text" name="full_name" class="form-control" placeholder="{{ __('مثال: أحمد محمد علي') }}" required>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">كود الموظف</label>
-              <input type="text" name="employee_code" class="form-control" value="{{ old('employee_code') }}" placeholder="اختياري، مثل 101">
-              <div class="form-text">اختياري: أدخل كودًا خاصًا، أو اتركه فارغًا ليُولّده النظام تلقائيًا.</div>
+              <label class="form-label">{{ __('كود الموظف') }}</label>
+              <input type="text" name="employee_code" class="form-control" value="{{ old('employee_code') }}" placeholder="{{ __('اختياري، مثل 101') }}">
+              <div class="form-text">{{ __('اختياري: أدخل كودًا خاصًا، أو اتركه فارغًا ليُولّده النظام تلقائيًا.') }}</div>
             </div>
             <div class="col-6">
-              <label class="form-label">الرقم القومي</label>
-              <input type="text" name="national_id" class="form-control" placeholder="14 رقم">
+              <label class="form-label">{{ __('الرقم القومي') }}</label>
+              <input type="text" name="national_id" class="form-control" placeholder="{{ __('14 رقم') }}">
             </div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">النوع</label><input type="text" name="gender" class="form-control" readonly placeholder="يُستخرج من الرقم القومي"></div>
-            <div class="col-6"><label class="form-label">تاريخ الميلاد</label><input type="date" name="birth_date" class="form-control" readonly></div>
+            <div class="col-6"><label class="form-label">{{ __('النوع') }}</label><input type="text" name="gender" class="form-control" readonly placeholder="{{ __('يُستخرج من الرقم القومي') }}"></div>
+            <div class="col-6"><label class="form-label">{{ __('تاريخ الميلاد') }}</label><input type="date" name="birth_date" class="form-control" readonly></div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">سن الموظف</label><input type="text" id="new_employee_age" class="form-control" readonly placeholder="يُحسب تلقائيًا"></div>
+            <div class="col-6"><label class="form-label">{{ __('سن الموظف') }}</label><input type="text" id="new_employee_age" class="form-control" readonly placeholder="{{ __('يُحسب تلقائيًا') }}"></div>
           </div>
           <div class="row g-2 mb-3">
-            <div class="col-6"><label class="form-label">الجنسية</label><input type="text" name="profile[nationality]" class="form-control" value="مصري"></div>
-            <div class="col-6"><label class="form-label">العملة</label><input type="text" name="profile[currency]" class="form-control" value="EGP"></div>
+            <div class="col-6"><label class="form-label">{{ __('الجنسية') }}</label><input type="text" name="profile[nationality]" class="form-control" value="مصري"></div>
+            <div class="col-6"><label class="form-label">{{ __('العملة') }}</label><input type="text" name="profile[currency]" class="form-control" value="EGP"></div>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">القسم</label>
+              <label class="form-label">{{ __('القسم') }}</label>
               <select name="department_id" class="form-select">
-                <option value="">اختر القسم...</option>
+                <option value="">{{ __('اختر القسم...') }}</option>
                 @foreach($departments as $dept)
                   <option value="{{ $dept->id }}">{{ $dept->name }}</option>
                 @endforeach
               </select>
             </div>
             <div class="col-6">
-              <label class="form-label">الوظيفة</label>
+              <label class="form-label">{{ __('الوظيفة') }}</label>
               <select name="job_id" class="form-select">
-                <option value="">اختر الوظيفة...</option>
+                <option value="">{{ __('اختر الوظيفة...') }}</option>
                 @foreach(\App\Models\Job::all() as $jb)
                   <option value="{{ $jb->id }}">{{ $jb->title }}</option>
                 @endforeach
@@ -231,41 +231,41 @@
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">الراتب الإجمالي</label>
-              <input type="number" id="new_employee_gross" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 28118.56">
-              <div class="form-text">أدخل الإجمالي ليُحسب الصافي فورًا.</div>
+              <label class="form-label">{{ __('الراتب الإجمالي') }}</label>
+              <input type="number" id="new_employee_gross" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="{{ __('مثال: 28118.56') }}">
+              <div class="form-text">{{ __('أدخل الإجمالي ليُحسب الصافي فورًا.') }}</div>
             </div>
             <div class="col-6">
-              <label class="form-label">الراتب الصافي</label>
-              <input type="number" id="new_employee_net" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="مثال: 22000">
-              <div class="form-text">أو أدخل الصافي ليُحسب الإجمالي فورًا. يُحفظ الإجمالي فقط.</div>
+              <label class="form-label">{{ __('الراتب الصافي') }}</label>
+              <input type="number" id="new_employee_net" class="form-control employee-salary-input" min="0.01" step="0.01" placeholder="{{ __('مثال: 22000') }}">
+              <div class="form-text">{{ __('أو أدخل الصافي ليُحسب الإجمالي فورًا. يُحفظ الإجمالي فقط.') }}</div>
             </div>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">رقم الهاتف</label>
+              <label class="form-label">{{ __('رقم الهاتف') }}</label>
               <input type="text" name="phone" class="form-control" placeholder="01xxxxxxxxx">
             </div>
             <div class="col-6">
-              <label class="form-label">البريد الإلكتروني</label>
+              <label class="form-label">{{ __('البريد الإلكتروني') }}</label>
               <input type="email" name="email" class="form-control" placeholder="name@company.com">
             </div>
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">تاريخ بداية العقد</label>
+              <label class="form-label">{{ __('تاريخ بداية العقد') }}</label>
               <input id="new_employee_contract_start_date" type="date" name="contract_start_date" class="form-control" value="{{ old('contract_start_date', date('Y-m-d')) }}">
             </div>
             <div class="col-6">
-              <label class="form-label">تاريخ نهاية العقد</label>
+              <label class="form-label">{{ __('تاريخ نهاية العقد') }}</label>
               <input id="new_employee_contract_end_date" type="date" name="contract_end_date" class="form-control" value="{{ old('contract_end_date', now()->addYear()->format('Y-m-d')) }}">
-              <div class="form-text">يُضبط تلقائيًا لسنة ويمكن تعديله.</div>
+              <div class="form-text">{{ __('يُضبط تلقائيًا لسنة ويمكن تعديله.') }}</div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> حفظ الموظف</button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> {{ __('حفظ الموظف') }}</button>
         </div>
       </form>
     </div>
@@ -404,9 +404,9 @@ const kpiData=@json($employeeCardDetails);const kpiKeys=['total','active','depar
 </script>
 @endpush
 <div class="modal fade" id="employeeListStatusModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="employeeListStatusForm">@csrf @method('PUT')<input type="hidden" name="status_action" value="1">
-  <div class="modal-header"><h5 class="modal-title">تغيير حالة الموظف</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-  <div class="modal-body"><input type="hidden" name="full_name" id="employeeListStatusName"><input type="hidden" name="status_id" id="employeeListStatusId"><div class="alert alert-light mb-3" id="employeeListStatusLabel"></div><div class="row g-3"><div class="col-6"><label class="form-label">نوع انتهاء الخدمة</label><select name="termination_type" id="employeeListTerminationType" class="form-select"><option value="">—</option><option value="resignation">استقالة</option><option value="dismissal">فصل</option></select></div><div class="col-6"><label class="form-label">تاريخ الحالة</label><input type="date" name="termination_date" id="employeeListTerminationDate" class="form-control" value="{{ now()->toDateString() }}"></div></div></div>
-  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ الحالة</button></div>
+  <div class="modal-header"><h5 class="modal-title">{{ __('تغيير حالة الموظف') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input type="hidden" name="full_name" id="employeeListStatusName"><input type="hidden" name="status_id" id="employeeListStatusId"><div class="alert alert-light mb-3" id="employeeListStatusLabel"></div><div class="row g-3"><div class="col-6"><label class="form-label">{{ __('نوع انتهاء الخدمة') }}</label><select name="termination_type" id="employeeListTerminationType" class="form-select"><option value="">—</option><option value="resignation">{{ __('استقالة') }}</option><option value="dismissal">{{ __('فصل') }}</option></select></div><div class="col-6"><label class="form-label">{{ __('تاريخ الحالة') }}</label><input type="date" name="termination_date" id="employeeListTerminationDate" class="form-control" value="{{ now()->toDateString() }}"></div></div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ الحالة') }}</button></div>
 </form></div></div></div>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElementById('employeeListStatusModal'),form=document.getElementById('employeeListStatusForm'),date=document.getElementById('employeeListTerminationDate'),type=document.getElementById('employeeListTerminationType');document.querySelectorAll('.employee-status-action').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();const row=link.closest('tr');form.action=link.dataset.employeeUrl;document.getElementById('employeeListStatusId').value=link.dataset.statusId;document.getElementById('employeeListStatusName').value=row?.querySelector('.employee-link')?.textContent.trim()||'';const name=link.dataset.statusName,suspended=['Suspended','موقوف'].includes(name),resigned=['Resigned','Resignation','مستقيل','استقالة'].includes(name);document.getElementById('employeeListStatusLabel').textContent=suspended?'موقوف — حدّد تاريخ الإيقاف':(resigned?'استقالة — حدّد تاريخ الاستقالة':'منتهي الخدمة — حدّد النوع والتاريخ');type.closest('.col-6').classList.toggle('d-none',suspended||resigned);type.value=suspended?'':(resigned?'resignation':'');date.value=new Date().toISOString().slice(0,10);bootstrap.Modal.getOrCreateInstance(modal).show();}));});
@@ -415,19 +415,19 @@ document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElemen
 @php($matMonths = (int) $matRights->policy('maternity_months', '4', auth()->user()?->company_id))
 @php($matMinPost = (int) $matRights->policy('maternity_min_postpartum_days', '45', auth()->user()?->company_id))
 <div class="modal fade" id="employeeMaternityModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="employeeMaternityForm" enctype="multipart/form-data">@csrf
-  <div class="modal-header"><h5 class="modal-title">تسجيل إجازة وضع</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-header"><h5 class="modal-title">{{ __('تسجيل إجازة وضع') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">
-    <div class="alert alert-info mb-3"><strong>التعليمات والإرشادات — م54 من قانون العمل 14 لسنة 2025:</strong><div>{{ \App\Support\LeaveLegalReference::typeRules()['maternity']['text'] ?? '' }}</div><small class="d-block mt-1">يُنشأ طلب إجازة الوضع في صفحة الإجازات بالمدة التقويمية من الإعدادات ({{ $matMonths }} أشهر) على ألا تقل المدة بعد الوضع عن {{ $matMinPost }} يومًا. تتغير حالة الموظفة إلى «اجازة وضع» مع بداية الإجازة وتعود لحالتها السابقة بعد انتهائها. بعد الولادة سجّل تاريخها الفعلي على الإجازة لتُحسب حقوق الرضاعة (م56) ومنع الإضافي بعد الوضع.</small></div>
+    <div class="alert alert-info mb-3"><strong>{{ __('التعليمات والإرشادات — م54 من قانون العمل 14 لسنة 2025:') }}</strong><div>{{ \App\Support\LeaveLegalReference::typeRules()['maternity']['text'] ?? '' }}</div><small class="d-block mt-1">{{ __('يُنشأ طلب إجازة الوضع في صفحة الإجازات بالمدة التقويمية من الإعدادات (') }}{{ $matMonths }} {{ __('أشهر) على ألا تقل المدة بعد الوضع عن') }} {{ $matMinPost }} {{ __('يومًا. تتغير حالة الموظفة إلى «اجازة وضع» مع بداية الإجازة وتعود لحالتها السابقة بعد انتهائها. بعد الولادة سجّل تاريخها الفعلي على الإجازة لتُحسب حقوق الرضاعة (م56) ومنع الإضافي بعد الوضع.') }}</small></div>
     <div class="alert alert-light mb-3" id="employeeMaternityName"></div>
-    <label class="form-label" for="employeeMaternityDate">التاريخ المتوقع للولادة (من الشهادة الطبية)</label>
+    <label class="form-label" for="employeeMaternityDate">{{ __('التاريخ المتوقع للولادة (من الشهادة الطبية)') }}</label>
     <input type="date" name="expected_delivery_date" id="employeeMaternityDate" class="form-control" min="{{ now()->toDateString() }}" required>
-    <label class="form-label mt-3" for="employeeMaternityStart">بداية الإجازة (افتراضيًا اليوم — يجب أن تغطي الإجازة {{ $matMinPost }} يومًا بعد التاريخ المتوقع)</label>
+    <label class="form-label mt-3" for="employeeMaternityStart">{{ __('بداية الإجازة (افتراضيًا اليوم — يجب أن تغطي الإجازة') }} {{ $matMinPost }} {{ __('يومًا بعد التاريخ المتوقع)') }}</label>
     <input type="date" name="start_date" id="employeeMaternityStart" class="form-control" min="{{ now()->toDateString() }}" value="{{ now()->toDateString() }}" required>
-    <label class="form-label mt-3" for="employeeMaternityDocument">الشهادة الطبية (مطلوبة حسب سياسة نوع الإجازة)</label>
+    <label class="form-label mt-3" for="employeeMaternityDocument">{{ __('الشهادة الطبية (مطلوبة حسب سياسة نوع الإجازة)') }}</label>
     <input type="file" name="document" id="employeeMaternityDocument" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
     <small class="text-muted d-block mt-2" id="employeeMaternityPreview"></small>
   </div>
-  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">تسجيل الإجازة وتغيير الحالة</button></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('تسجيل الإجازة وتغيير الحالة') }}</button></div>
 </form></div></div></div>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{const modal=document.getElementById('employeeMaternityModal'),form=document.getElementById('employeeMaternityForm'),date=document.getElementById('employeeMaternityDate'),preview=document.getElementById('employeeMaternityPreview');const months={{ $matMonths }},minPost={{ $matMinPost }};const fmt=(d)=>d.toLocaleDateString('ar-EG',{day:'numeric',month:'numeric',year:'numeric'});const subMonths=(d,m)=>{const day=d.getDate();const r=new Date(d);r.setDate(1);r.setMonth(r.getMonth()-m);const last=new Date(r.getFullYear(),r.getMonth()+1,0).getDate();r.setDate(Math.min(day,last));return r;};const startInput=document.getElementById('employeeMaternityStart');const updatePreview=()=>{if(!date.value||!startInput.value){preview.textContent='';return;}const start=new Date(startInput.value+'T00:00:00');const end=new Date(start);end.setMonth(end.getMonth()+months);end.setDate(end.getDate()-1);const minEnd=new Date(date.value+'T00:00:00');minEnd.setDate(minEnd.getDate()+minPost);preview.textContent='ستُنشأ إجازة الوضع من '+fmt(start)+' إلى '+fmt(end)+' وتظهر في صفحة الإجازات.'+(end<minEnd?' تنبيه: النهاية قبل '+fmt(minEnd)+' — حدّد بداية أقرب للتاريخ المتوقع حتى تستوفي '+minPost+' يومًا بعد الوضع.':'');};date.addEventListener('input',updatePreview);startInput.addEventListener('input',updatePreview);document.querySelectorAll('.employee-maternity-action').forEach(link=>link.addEventListener('click',e=>{e.preventDefault();form.action=link.dataset.employeeUrl;document.getElementById('employeeMaternityName').textContent='الموظفة: '+(link.dataset.employeeName||'');date.value=link.dataset.employeeExpected||'';preview.textContent='';updatePreview();bootstrap.Modal.getOrCreateInstance(modal).show();}));});

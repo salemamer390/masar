@@ -118,12 +118,12 @@ class SalaryController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.',
+                'message' => __('تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.'),
                 'salary' => $salary->fresh(['employee.department', 'employee.job', 'paymentMethod']),
             ]);
         }
 
-        return back()->with('toast', 'تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.');
+        return back()->with('toast', __('تم حفظ هيكل الراتب وحساب التأمينات والضريبة وحصة صاحب العمل بنجاح.'));
     }
 
     public function update(Request $request, Salary $salary, PayrollCalculator $calculator, PayrollRunService $payrollRuns)
@@ -148,12 +148,12 @@ class SalaryController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.',
+                'message' => __('تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.'),
                 'salary' => $salary->fresh(['employee.department', 'employee.job', 'paymentMethod']),
             ]);
         }
 
-        return back()->with('toast', 'تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.');
+        return back()->with('toast', __('تم تعديل الهيكل وإعادة حساب جميع بنود الراتب.'));
     }
 
     public function destroy(Salary $salary, Request $request, PayrollRunService $payrollRuns)
@@ -164,8 +164,8 @@ class SalaryController extends Controller
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $salary->employee_id);
         ActivityLog::record('salary_delete', "تم إيقاف هيكل راتب الموظف ({$employee?->full_name}).", $salary);
         return $request->wantsJson()
-            ? response()->json(['success' => true, 'message' => 'تم إيقاف هيكل الراتب.', 'salary_id' => $salary->id])
-            : back()->with('toast', 'تم إيقاف هيكل الراتب.');
+            ? response()->json(['success' => true, 'message' => __('تم إيقاف هيكل الراتب.'), 'salary_id' => $salary->id])
+            : back()->with('toast', __('تم إيقاف هيكل الراتب.'));
     }
 
     // يعيد حساب وحفظ كل الهياكل السارية بمنطق الضريبة الحالي (مفيد بعد أي تعديل على الشرائح أو النسب).

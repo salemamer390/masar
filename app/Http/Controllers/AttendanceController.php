@@ -267,7 +267,7 @@ class AttendanceController extends Controller
         $this->decorateOvertime($fresh);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance saved.', 'attendance' => $fresh])
-            : back()->with('toast', 'تم حفظ سجل الحضور كمسودة.');
+            : back()->with('toast', __('تم حفظ سجل الحضور كمسودة.'));
     }
 
     public function clockIn(Request $request, PayrollPeriodGuard $periodGuard)
@@ -291,13 +291,13 @@ class AttendanceController extends Controller
         $employee = Employee::findOrFail($validated['employee_id']);
         $attendance = Attendance::firstOrNew(['employee_id' => $employee->id, 'attendance_date' => $date]);
         if ($direction === 'in' && $attendance->check_in) {
-            abort(422, 'تم تسجيل حضور هذا الموظف بالفعل لهذا اليوم.');
+            abort(422, __('تم تسجيل حضور هذا الموظف بالفعل لهذا اليوم.'));
         }
         if ($direction === 'out' && !$attendance->check_in) {
-            abort(422, 'يجب تسجيل الحضور أولًا قبل تسجيل الانصراف.');
+            abort(422, __('يجب تسجيل الحضور أولًا قبل تسجيل الانصراف.'));
         }
         if ($direction === 'out' && $attendance->check_out) {
-            abort(422, 'تم تسجيل انصراف هذا الموظف بالفعل لهذا اليوم.');
+            abort(422, __('تم تسجيل انصراف هذا الموظف بالفعل لهذا اليوم.'));
         }
         $now = now()->format('H:i');
         $checkIn = $direction === 'in' ? $now : $attendance->check_in;
@@ -330,8 +330,8 @@ class AttendanceController extends Controller
             ->where('id', '!=', $attendance->id)->exists();
         if ($duplicate) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.'], 422)
-                : back()->withErrors(['attendance' => 'يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.']);
+                ? response()->json(['message' => __('يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.')], 422)
+                : back()->withErrors(['attendance' => __('يوجد سجل حضور آخر لهذا الموظف في التاريخ المحدد.')]);
         }
 
         $employee = Employee::findOrFail($validated['employee_id']);
@@ -351,7 +351,7 @@ class AttendanceController extends Controller
         $this->decorateOvertime($fresh);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance updated.', 'attendance' => $fresh])
-            : back()->with('toast', 'تم تحديث سجل الحضور وتأكيده فورًا.');
+            : back()->with('toast', __('تم تحديث سجل الحضور وتأكيده فورًا.'));
     }
 
     public function destroy(Attendance $attendance, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -363,7 +363,7 @@ class AttendanceController extends Controller
         ActivityLog::record('attendance_delete', 'Attendance record deleted.', null, $snapshot, null, 'attendance');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Attendance deleted.', 'attendance_id' => $snapshot['id']])
-            : back()->with('toast', 'تم حذف سجل الحضور.');
+            : back()->with('toast', __('تم حذف سجل الحضور.'));
     }
 
     /**

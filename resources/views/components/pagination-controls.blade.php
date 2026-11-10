@@ -6,8 +6,8 @@
         @foreach(request()->except(['page', 'per_page']) as $key => $value)
             @if(is_scalar($value))<input type="hidden" name="{{ $key }}" value="{{ $value }}">@endif
         @endforeach
-        <label class="small text-muted mb-0" for="perPageControl">عدد الصفوف</label>
-        <select id="perPageControl" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="عدد الصفوف في الصفحة">
+        <label class="small text-muted mb-0" for="perPageControl">{{ __('عدد الصفوف') }}</label>
+        <select id="perPageControl" name="per_page" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('عدد الصفوف في الصفحة') }}">
             @foreach([25, 50, 100, 200] as $size)
                 <option value="{{ $size }}" @selected((int) request('per_page', $default) === $size)>{{ $size }}</option>
             @endforeach

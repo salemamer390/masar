@@ -1,37 +1,37 @@
 @extends('layouts.app')
 
-@section('title', 'الأدوار والصلاحيات')
+@section('title', __('الأدوار والصلاحيات'))
 
 @section('content')
 <div class="roles-page">
-  <div class="roles-breadcrumb">الإعدادات <span>‹</span> الأدوار والصلاحيات</div>
+  <div class="roles-breadcrumb">{{ __('الإعدادات') }} <span>‹</span> {{ __('الأدوار والصلاحيات') }}</div>
   <div class="roles-page-title">
     <span class="roles-title-icon"><i class="bi bi-people-fill"></i></span>
-    <div><h1>الأدوار والصلاحيات</h1><p>اختر دورًا لإدارة بياناته والصلاحيات الممنوحة له.</p></div>
+    <div><h1>{{ __('الأدوار والصلاحيات') }}</h1><p>{{ __('اختر دورًا لإدارة بياناته والصلاحيات الممنوحة له.') }}</p></div>
     @if($canCreate = auth()->user()?->hasPermission('roles.create'))
-      <button class="btn btn-primary roles-add-btn" data-bs-toggle="modal" data-bs-target="#createRoleModal"><i class="bi bi-plus-lg"></i> إضافة دور جديد</button>
+      <button class="btn btn-primary roles-add-btn" data-bs-toggle="modal" data-bs-target="#createRoleModal"><i class="bi bi-plus-lg"></i> {{ __('إضافة دور جديد') }}</button>
     @endif
   </div>
 
   <div class="roles-layout">
     <section class="roles-panel roles-editor">
-      <div class="roles-editor-head"><span class="roles-emblem"><i class="bi bi-shield-lock-fill"></i></span><div><h2 id="roleHeading">—</h2><p id="roleSub">—</p></div><span id="roleStatus" class="roles-status"><i class="bi bi-check-circle-fill"></i> دور أساسي</span></div>
-      <div class="roles-tabs"><button class="roles-tab active" data-tab="permissions"><i class="bi bi-shield-check"></i> الصلاحيات</button><button class="roles-tab" data-tab="details"><i class="bi bi-sliders"></i> البيانات الأساسية</button></div>
+      <div class="roles-editor-head"><span class="roles-emblem"><i class="bi bi-shield-lock-fill"></i></span><div><h2 id="roleHeading">—</h2><p id="roleSub">—</p></div><span id="roleStatus" class="roles-status"><i class="bi bi-check-circle-fill"></i> {{ __('دور أساسي') }}</span></div>
+      <div class="roles-tabs"><button class="roles-tab active" data-tab="permissions"><i class="bi bi-shield-check"></i> {{ __('الصلاحيات') }}</button><button class="roles-tab" data-tab="details"><i class="bi bi-sliders"></i> {{ __('البيانات الأساسية') }}</button></div>
       <div id="permissionsView">
-        <div class="roles-fields"><label>اسم الدور <em>*</em><input id="roleName" maxlength="150"></label><label>وصف الدور<input id="roleDescription" maxlength="255"></label></div>
-        <div class="roles-perm-heading"><div><h3><i class="bi bi-gear-wide-connected"></i> الصلاحيات</h3><small>حدد ما يمكن لهذا الدور تنفيذه داخل كل قسم.</small></div><div class="roles-bulk"><button class="btn btn-soft" id="selectAll" type="button">تحديد الكل</button><button class="btn btn-outline-secondary" id="clearAll" type="button">إلغاء تحديد الكل</button></div></div>
+        <div class="roles-fields"><label>{{ __('اسم الدور') }} <em>*</em><input id="roleName" maxlength="150"></label><label>{{ __('وصف الدور') }}<input id="roleDescription" maxlength="255"></label></div>
+        <div class="roles-perm-heading"><div><h3><i class="bi bi-gear-wide-connected"></i> {{ __('الصلاحيات') }}</h3><small>{{ __('حدد ما يمكن لهذا الدور تنفيذه داخل كل قسم.') }}</small></div><div class="roles-bulk"><button class="btn btn-soft" id="selectAll" type="button">{{ __('تحديد الكل') }}</button><button class="btn btn-outline-secondary" id="clearAll" type="button">{{ __('إلغاء تحديد الكل') }}</button></div></div>
         <div id="moduleList" class="roles-module-list"></div>
-        <div class="roles-footer"><span><i class="bi bi-info-circle"></i> راجع الصلاحيات قبل الحفظ.</span><div><button class="btn btn-light" id="cancelChanges" type="button">إلغاء</button><button class="btn btn-primary" id="saveRole" type="button"><i class="bi bi-floppy"></i> حفظ التغييرات</button></div></div>
+        <div class="roles-footer"><span><i class="bi bi-info-circle"></i> {{ __('راجع الصلاحيات قبل الحفظ.') }}</span><div><button class="btn btn-light" id="cancelChanges" type="button">{{ __('إلغاء') }}</button><button class="btn btn-primary" id="saveRole" type="button"><i class="bi bi-floppy"></i> {{ __('حفظ التغييرات') }}</button></div></div>
       </div>
-      <div id="detailsView" class="roles-details-view" hidden><div class="roles-fields roles-fields-single"><label>اسم الدور<input id="detailName" maxlength="150"></label><label>وصف الدور<textarea id="detailDescription" rows="3" maxlength="255"></textarea></label></div><p class="roles-hint">يمكن تعديل اسم ووصف الأدوار المخصصة. الأدوار النظامية محمية من التعديل.</p><button class="btn btn-primary" id="saveDetails" type="button">حفظ البيانات الأساسية</button></div>
+      <div id="detailsView" class="roles-details-view" hidden><div class="roles-fields roles-fields-single"><label>{{ __('اسم الدور') }}<input id="detailName" maxlength="150"></label><label>{{ __('وصف الدور') }}<textarea id="detailDescription" rows="3" maxlength="255"></textarea></label></div><p class="roles-hint">{{ __('يمكن تعديل اسم ووصف الأدوار المخصصة. الأدوار النظامية محمية من التعديل.') }}</p><button class="btn btn-primary" id="saveDetails" type="button">{{ __('حفظ البيانات الأساسية') }}</button></div>
     </section>
 
-    <aside class="roles-panel roles-list-panel"><div class="roles-list-head"><div><h2>قائمة الأدوار</h2><p>اختر دورًا لعرض صلاحياته وتعديلها.</p></div><i class="bi bi-person-gear"></i></div><label class="roles-search"><i class="bi bi-search"></i><input id="roleSearch" placeholder="البحث في الأدوار..."></label><div id="roleList" class="roles-list"></div><div class="roles-list-foot"><span id="roleCount"></span></div></aside>
+    <aside class="roles-panel roles-list-panel"><div class="roles-list-head"><div><h2>{{ __('قائمة الأدوار') }}</h2><p>{{ __('اختر دورًا لعرض صلاحياته وتعديلها.') }}</p></div><i class="bi bi-person-gear"></i></div><label class="roles-search"><i class="bi bi-search"></i><input id="roleSearch" placeholder="{{ __('البحث في الأدوار...') }}"></label><div id="roleList" class="roles-list"></div><div class="roles-list-foot"><span id="roleCount"></span></div></aside>
   </div>
 </div>
 
 @if($canCreate)
-<div class="modal fade" id="createRoleModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('roles.store') }}">@csrf<div class="modal-header"><h5>إضافة دور جديد</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">اسم الدور</label><input name="display_name" class="form-control" required maxlength="150"><label class="form-label mt-3">الوصف</label><textarea name="description" class="form-control" rows="3" maxlength="255"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">إنشاء الدور</button></div></form></div></div></div>
+<div class="modal fade" id="createRoleModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('roles.store') }}">@csrf<div class="modal-header"><h5>{{ __('إضافة دور جديد') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><label class="form-label">{{ __('اسم الدور') }}</label><input name="display_name" class="form-control" required maxlength="150"><label class="form-label mt-3">{{ __('الوصف') }}</label><textarea name="description" class="form-control" rows="3" maxlength="255"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('إنشاء الدور') }}</button></div></form></div></div></div>
 @endif
 @endsection
 

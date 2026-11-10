@@ -376,9 +376,9 @@ class HrRequestController extends Controller
         if ($duplicateWarning) {
             // The layout suppresses the warning alert when a success toast is
             // also flashed, so fold the success wording into the warning.
-            return back()->with('warning', 'تم تسجيل الطلب وتأكيده فورًا. ' . $duplicateWarning);
+            return back()->with('warning', __('تم تسجيل الطلب وتأكيده فورًا.') . $duplicateWarning);
         }
-        return back()->with('toast', 'تم تسجيل الطلب وتأكيده فورًا.');
+        return back()->with('toast', __('تم تسجيل الطلب وتأكيده فورًا.'));
     }
 
     public function update(Request $request, HrRequest $hrRequest, PayrollRunService $payrollRuns)
@@ -450,7 +450,7 @@ class HrRequestController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تعديل الطلب.',
+                'message' => __('تم تعديل الطلب.'),
                 'warning' => $duplicateWarning,
                 'request' => [
                     'id' => $updated->id,
@@ -466,12 +466,12 @@ class HrRequestController extends Controller
             ]);
         }
         if ($request->wantsJson()) {
-            return response()->json(['success' => true, 'message' => 'تم تعديل الطلب.', 'warning' => $duplicateWarning, 'request' => $hrRequest->fresh(['employee', 'requestType'])]);
+            return response()->json(['success' => true, 'message' => __('تم تعديل الطلب.'), 'warning' => $duplicateWarning, 'request' => $hrRequest->fresh(['employee', 'requestType'])]);
         }
         if ($duplicateWarning) {
-            return redirect()->route('requests.index')->with('warning', 'تم تعديل الطلب بنجاح. ' . $duplicateWarning);
+            return redirect()->route('requests.index')->with('warning', __('تم تعديل الطلب بنجاح.') . $duplicateWarning);
         }
-        return redirect()->route('requests.index')->with('toast', 'تم تعديل الطلب بنجاح.');
+        return redirect()->route('requests.index')->with('toast', __('تم تعديل الطلب بنجاح.'));
     }
 
     /**
@@ -607,7 +607,7 @@ class HrRequestController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'HR request approved.', 'request' => $hrRequest->fresh()])
-            : back()->with('toast', 'تم اعتماد الطلب.');
+            : back()->with('toast', __('تم اعتماد الطلب.'));
     }
 
     public function reject(HrRequest $hrRequest, Request $request, PayrollRunService $payrollRuns)
@@ -633,7 +633,7 @@ class HrRequestController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'HR request rejected.', 'request' => $hrRequest->fresh()])
-            : back()->with('toast', 'تم رفض الطلب.');
+            : back()->with('toast', __('تم رفض الطلب.'));
     }
 
     public function destroy(HrRequest $hrRequest, Request $request, PayrollRunService $payrollRuns)
@@ -659,13 +659,13 @@ class HrRequestController extends Controller
         return $request->wantsJson()
             ? response()->json([
                 'success' => true,
-                'message' => 'تم حذف الطلب بنجاح.',
+                'message' => __('تم حذف الطلب بنجاح.'),
                 'request_id' => $snapshot['id'],
                 'employee_id' => $deletedEmployeeId,
                 'request_date' => $deletedRequestDate,
                 'remaining_advance' => $remainingAdvance,
             ])
-            : back()->with('toast', 'تم حذف الطلب.');
+            : back()->with('toast', __('تم حذف الطلب.'));
     }
 
     private function targetEmployees($user)

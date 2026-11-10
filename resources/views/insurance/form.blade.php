@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>نموذج س1 - {{ $insuranceRecord->employee?->full_name }}</title>
+    <title>{{ __('نموذج س1 -') }} {{ $insuranceRecord->employee?->full_name }}</title>
     <style>
         @page { size: A4 portrait; margin: 0; }
         * { box-sizing: border-box; }
@@ -26,7 +26,7 @@
     </style>
 </head>
 <body>
-    <div class="toolbar"><button type="button" onclick="window.print()">طباعة نموذج س1</button><a href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
+    <div class="toolbar"><button type="button" onclick="window.print()">{{ __('طباعة نموذج س1') }}</button><a href="{{ route('insurance.index') }}">{{ __('العودة للتأمينات') }}</a></div>
 
     @php
         $employee = $insuranceRecord->employee;

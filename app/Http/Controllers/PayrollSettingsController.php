@@ -245,7 +245,7 @@ class PayrollSettingsController extends Controller
             }
         });
         ActivityLog::record('leave_policy_update', 'Leave policy settings updated.', null, $before, ['policies' => $data['policies'], 'types' => $data['types'] ?? [], 'below_reference_confirmed' => $request->boolean('confirm_below_reference'), 'warnings' => $warnings, 'contact_pay' => $data['contact_pay'] ?? null, 'contact_active' => $data['contact_active'] ?? false], 'leaves');
-        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', 'تم حفظ إعدادات الإجازات بنجاح.');
+        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', __('تم حفظ إعدادات الإجازات بنجاح.'));
     }
 
     public function updateOperational(Request $request, AttendanceMetricsService $attendanceMetrics, PayrollRunService $payrollRuns, HrOperationalSettingsService $hrSettings)
@@ -362,7 +362,7 @@ class PayrollSettingsController extends Controller
         $draftCount = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Operational settings updated and calculations refreshed.', 'settings' => $data, 'attendance_updated' => $attendanceCount, 'drafts_refreshed' => $draftCount])
-            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.')->with('period_notes', array_values(array_filter(array_merge($transitionNote ? [$transitionNote] : [], array_column($notes, 'text')))));
+            : back()->with('toast', __('تم حفظ إعدادات أوقات الدوام والراحة.'))->with('period_notes', array_values(array_filter(array_merge($transitionNote ? [$transitionNote] : [], array_column($notes, 'text')))));
     }
 
     public function storeHoliday(Request $request)
@@ -374,7 +374,7 @@ class PayrollSettingsController extends Controller
             return response()->json(['success' => true, 'message' => 'Holiday saved.', 'holiday' => $holiday]);
         }
 
-        return back()->with('toast', 'تم حفظ العطلة الرسمية.');
+        return back()->with('toast', __('تم حفظ العطلة الرسمية.'));
     }
 
     public function storeLeaveType(Request $request)
@@ -407,7 +407,7 @@ class PayrollSettingsController extends Controller
             'max_occurrences_service' => $data['max_occurrences_service'] ?? null,
         ]);
         ActivityLog::record('leave_type_create', 'Custom leave type created.', null, null, $type->toArray(), 'leaves');
-        return back()->with('toast', 'تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.');
+        return back()->with('toast', __('تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.'));
     }
 
     /**
@@ -444,7 +444,7 @@ class PayrollSettingsController extends Controller
         DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('id', $holiday)->delete();
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Holiday deleted.', 'holiday_id' => $holiday])
-            : back()->with('toast', 'تم حذف العطلة الرسمية.');
+            : back()->with('toast', __('تم حذف العطلة الرسمية.'));
     }
 
     public function updateHoliday(Request $request, int $holiday)
@@ -468,7 +468,7 @@ class PayrollSettingsController extends Controller
             ]);
         }
 
-        return back()->with('toast', 'تم تحديث العطلة الرسمية.');
+        return back()->with('toast', __('تم تحديث العطلة الرسمية.'));
     }
 
     private function ensureAnnualFixedHolidays(): void
@@ -553,7 +553,7 @@ class PayrollSettingsController extends Controller
         abort_if(array_diff(array_keys($data['settings']), self::SETTING_KEYS) !== [], 422, 'Invalid payroll setting.');
         foreach ($data['settings'] as $value) {
             if ($value !== null && $value !== '' && (!is_numeric($value) || (float) $value < 0)) {
-                return back()->withErrors(['settings' => 'كل قيم الإعدادات يجب أن تكون أرقامًا موجبة.'])->withInput();
+                return back()->withErrors(['settings' => __('كل قيم الإعدادات يجب أن تكون أرقامًا موجبة.')])->withInput();
             }
         }
         // The last allowance (by sort order) takes the remaining share of the
@@ -566,7 +566,7 @@ class PayrollSettingsController extends Controller
         $lastKey = $activeAllowances->last()->allowance_key;
         $othersSum = round(array_sum(array_map('floatval', collect($data['allowances'])->except($lastKey)->all())), 4);
         if ($othersSum - 100 > 0.0001) {
-            return back()->withErrors(['allowances' => 'مجموع البدلات قبل الأخير لا يمكن أن يتجاوز 100%.'])->withInput();
+            return back()->withErrors(['allowances' => __('مجموع البدلات قبل الأخير لا يمكن أن يتجاوز 100%.')])->withInput();
         }
         $data['allowances'][$lastKey] = round(100 - $othersSum, 4);
 
@@ -658,10 +658,10 @@ class PayrollSettingsController extends Controller
             $isLastCategory = $index === count($categories) - 1;
             $max = ($category['max_income'] ?? null) === null || $category['max_income'] === '' ? null : (float) $category['max_income'];
             if ($isLastCategory !== ($max === null)) {
-                return back()->withErrors(['tax' => 'آخر فئة فقط تُترك بدون حد أعلى، وباقي الفئات لازم لها حد أعلى.'])->withInput();
+                return back()->withErrors(['tax' => __('آخر فئة فقط تُترك بدون حد أعلى، وباقي الفئات لازم لها حد أعلى.')])->withInput();
             }
             if ($max !== null && $previousMax !== null && $max <= $previousMax) {
-                return back()->withErrors(['tax' => 'حدود الفئات لازم تكون تصاعدية.'])->withInput();
+                return back()->withErrors(['tax' => __('حدود الفئات لازم تكون تصاعدية.')])->withInput();
             }
             $previousMax = $max;
 

@@ -43,7 +43,7 @@ class SubscriptionRenewalController extends Controller
             ->each(fn (User $admin) => $admin->notify(new SubscriptionRenewalRequestedNotification($renewal)));
         ActivityLog::record('subscription_renewal_request', 'تم إرسال طلب تجديد أو ترقية اشتراك.', $renewal, null, $renewal->toArray(), 'subscriptions');
 
-        return back()->with('toast', 'تم إرسال طلب التجديد للمراجعة. سيتم تفعيل الاشتراك بعد اعتماده.');
+        return back()->with('toast', __('تم إرسال طلب التجديد للمراجعة. سيتم تفعيل الاشتراك بعد اعتماده.'));
     }
 
     public function update(Request $request, SubscriptionRenewalRequest $renewal)

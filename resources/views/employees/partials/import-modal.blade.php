@@ -3,51 +3,51 @@
         <div class="modal-content">
             <div class="modal-header flex-wrap gap-2">
                 <div>
-                    <h5 class="modal-title mb-1" id="employeesImportTitle"><i class="bi bi-file-earmark-excel text-success"></i> استيراد الموظفين من Excel</h5>
+                    <h5 class="modal-title mb-1" id="employeesImportTitle"><i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد الموظفين من Excel') }}</h5>
                     <div class="d-flex flex-wrap gap-3 small" data-import-steps>
-                        <span data-step-id="upload">1. رفع الملف</span>
-                        <span data-step-id="sheets">2. الأوراق وأنواعها</span>
-                        <span data-step-id="preview">3. المراجعة (بدون حفظ)</span>
-                        <span data-step-id="result">4. النتيجة</span>
+                        <span data-step-id="upload">{{ __('1. رفع الملف') }}</span>
+                        <span data-step-id="sheets">{{ __('2. الأوراق وأنواعها') }}</span>
+                        <span data-step-id="preview">{{ __('3. المراجعة (بدون حفظ)') }}</span>
+                        <span data-step-id="result">{{ __('4. النتيجة') }}</span>
                     </div>
                 </div>
-                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="إغلاق" data-import-close></button>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}" data-import-close></button>
             </div>
 
             <div class="modal-body">
                 <div class="alert alert-danger py-2 small" data-import-alert hidden role="alert"></div>
 
                 <div data-import-progress hidden class="mb-3" role="status" aria-live="polite">
-                    <div data-import-progress-label class="small mb-1">جارٍ رفع الملف...</div>
-                    <progress data-import-progress-bar max="100" class="w-100" aria-label="تقدم رفع الملف"></progress>
-                    <small class="text-muted">نسبة الرفع تعكس البيانات المرسلة فقط. فحص الصفوف على الخادم يستمر بعدها دون نسبة تقديرية.</small>
+                    <div data-import-progress-label class="small mb-1">{{ __('جارٍ رفع الملف...') }}</div>
+                    <progress data-import-progress-bar max="100" class="w-100" aria-label="{{ __('تقدم رفع الملف') }}"></progress>
+                    <small class="text-muted">{{ __('نسبة الرفع تعكس البيانات المرسلة فقط. فحص الصفوف على الخادم يستمر بعدها دون نسبة تقديرية.') }}</small>
                 </div>
 
                 {{-- Step 1: upload --}}
                 <div data-import-step="upload">
-                    <p class="text-muted small mb-3">ارفع ملف Excel (xlsx) أو CSV يحتوي على بيانات الموظفين. سيتم فحص الملف أولًا وعرض النتيجة، ولن يُحفظ شيء قبل تأكيدك.</p>
+                    <p class="text-muted small mb-3">{{ __('ارفع ملف Excel (xlsx) أو CSV يحتوي على بيانات الموظفين. سيتم فحص الملف أولًا وعرض النتيجة، ولن يُحفظ شيء قبل تأكيدك.') }}</p>
                     <a class="btn btn-outline-success btn-sm mb-3" href="{{ route('employees.import.template') }}">
-                        <i class="bi bi-download"></i> تحميل نموذج Excel الجاهز
+                        <i class="bi bi-download"></i> {{ __('تحميل نموذج Excel الجاهز') }}
                     </a>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold" for="employeesImportFile">ملف الموظفين</label>
+                        <label class="form-label fw-semibold" for="employeesImportFile">{{ __('ملف الموظفين') }}</label>
                         <input type="file" id="employeesImportFile" class="form-control" accept=".xlsx,.csv">
-                        <div class="form-text">الحد الأقصى 5 ميجابايت و3000 صف. الحقل الوحيد المطلوب هو «الاسم الكامل»، ولا يهم ترتيب الأعمدة.</div>
+                        <div class="form-text">{{ __('الحد الأقصى 5 ميجابايت و3000 صف. الحقل الوحيد المطلوب هو «الاسم الكامل»، ولا يهم ترتيب الأعمدة.') }}</div>
                     </div>
-                    <div class="fw-semibold mb-2">إذا كان الموظف موجودًا مسبقًا (نفس الرقم القومي أو الكود):</div>
+                    <div class="fw-semibold mb-2">{{ __('إذا كان الموظف موجودًا مسبقًا (نفس الرقم القومي أو الكود):') }}</div>
                     <div class="form-check mb-1">
                         <input class="form-check-input" type="radio" name="import_duplicates" id="importDupUpdate" value="update" checked>
-                        <label class="form-check-label" for="importDupUpdate">تحديث بياناته بما في الملف <span class="text-muted">(الخلايا الفارغة لا تمسح بيانات حالية)</span></label>
+                        <label class="form-check-label" for="importDupUpdate">{{ __('تحديث بياناته بما في الملف') }} <span class="text-muted">{{ __('(الخلايا الفارغة لا تمسح بيانات حالية)') }}</span></label>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="import_duplicates" id="importDupSkip" value="skip">
-                        <label class="form-check-label" for="importDupSkip">تخطيه وعدم تعديل بياناته</label>
+                        <label class="form-check-label" for="importDupSkip">{{ __('تخطيه وعدم تعديل بياناته') }}</label>
                     </div>
                 </div>
 
                 {{-- Step 2: sheets and their types --}}
                 <div data-import-step="sheets" hidden>
-                    <p class="text-muted small mb-3">التطبيق يقترح نوع كل ورقة، والاختيار النهائي ليك: غيّر النوع لو القراءة غلط أو اختر «تجاهل». الاختيار هنا هو اللي بيحدد أين تُحفظ بيانات كل ورقة فعلًا — الأوراق المساعدة والمتجاهَلة لا تُستورد نهائيًا.</p>
+                    <p class="text-muted small mb-3">{{ __('التطبيق يقترح نوع كل ورقة، والاختيار النهائي ليك: غيّر النوع لو القراءة غلط أو اختر «تجاهل». الاختيار هنا هو اللي بيحدد أين تُحفظ بيانات كل ورقة فعلًا — الأوراق المساعدة والمتجاهَلة لا تُستورد نهائيًا.') }}</p>
                     <div data-import-sheets-list></div>
                 </div>
 
@@ -59,19 +59,19 @@
                     <div data-import-table-wrap>
                         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                             <div class="btn-group btn-group-sm flex-wrap" role="group" data-import-tabs></div>
-                            <input type="search" class="form-control form-control-sm" style="max-width:220px" placeholder="بحث بالاسم أو رقم الصف" data-import-search>
+                            <input type="search" class="form-control form-control-sm" style="max-width:220px" placeholder="{{ __('بحث بالاسم أو رقم الصف') }}" data-import-search>
                         </div>
                         <div class="table-responsive border rounded" style="max-height:320px;overflow:auto">
                             <table class="table table-sm align-middle mb-0">
                                 <thead class="table-light" style="position:sticky;top:0">
-                                    <tr><th style="width:64px">الصف</th><th>الاسم</th><th style="width:90px">العملية</th><th>ملاحظات</th></tr>
+                                    <tr><th style="width:64px">{{ __('الصف') }}</th><th>{{ __('الاسم') }}</th><th style="width:90px">{{ __('العملية') }}</th><th>{{ __('ملاحظات') }}</th></tr>
                                 </thead>
                                 <tbody data-import-rows></tbody>
                             </table>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-2">
                             <span class="form-text m-0" data-import-count></span>
-                            <button type="button" class="btn btn-link btn-sm" data-import-more hidden>عرض المزيد</button>
+                            <button type="button" class="btn btn-link btn-sm" data-import-more hidden>{{ __('عرض المزيد') }}</button>
                         </div>
                     </div>
                 </div>
@@ -80,23 +80,23 @@
                 <div data-import-step="result" hidden>
                     <div class="text-center py-3">
                         <i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i>
-                        <h5 class="mt-2 mb-1">اكتمل الاستيراد</h5>
+                        <h5 class="mt-2 mb-1">{{ __('اكتمل الاستيراد') }}</h5>
                         <div class="text-muted" data-import-result-text></div>
                     </div>
                     <div data-import-result-extra></div>
                     <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
-                        <a class="btn btn-outline-primary btn-sm" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> عرض الموظفين</a>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-import-another><i class="bi bi-arrow-repeat"></i> استيراد ملف آخر</button>
+                        <a class="btn btn-outline-primary btn-sm" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> {{ __('عرض الموظفين') }}</a>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-import-another><i class="bi bi-arrow-repeat"></i> {{ __('استيراد ملف آخر') }}</button>
                     </div>
                 </div>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" data-import-cancel>إلغاء</button>
-                <button type="button" class="btn btn-light" data-import-back hidden>رجوع</button>
-                <button type="button" class="btn btn-primary" data-import-preview><i class="bi bi-search"></i> <span>فحص الملف</span></button>
-                <button type="button" class="btn btn-success" data-import-commit hidden><i class="bi bi-check2-circle"></i> <span>تأكيد الاستيراد</span></button>
-                <button type="button" class="btn btn-primary" data-import-finish hidden>إغلاق وتحديث الصفحة</button>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal" data-import-cancel>{{ __('إلغاء') }}</button>
+                <button type="button" class="btn btn-light" data-import-back hidden>{{ __('رجوع') }}</button>
+                <button type="button" class="btn btn-primary" data-import-preview><i class="bi bi-search"></i> <span>{{ __('فحص الملف') }}</span></button>
+                <button type="button" class="btn btn-success" data-import-commit hidden><i class="bi bi-check2-circle"></i> <span>{{ __('تأكيد الاستيراد') }}</span></button>
+                <button type="button" class="btn btn-primary" data-import-finish hidden>{{ __('إغلاق وتحديث الصفحة') }}</button>
             </div>
         </div>
     </div>

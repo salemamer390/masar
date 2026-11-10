@@ -186,12 +186,12 @@ class MasterDataController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تمت إضافة العنصر بنجاح',
+                'message' => __('تمت إضافة العنصر بنجاح'),
                 'item' => $model,
             ]);
         }
 
-        return redirect()->route('master.index', ['type' => $type])->with('toast', 'تمت إضافة العنصر بنجاح');
+        return redirect()->route('master.index', ['type' => $type])->with('toast', __('تمت إضافة العنصر بنجاح'));
     }
 
     public function updateDocument(Request $request, DocumentType $documentType)
@@ -216,12 +216,12 @@ class MasterDataController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تعديل نوع المستند بنجاح.',
+                'message' => __('تم تعديل نوع المستند بنجاح.'),
                 'item' => $documentType->fresh(),
             ]);
         }
 
-        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم تعديل نوع المستند بنجاح');
+        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', __('تم تعديل نوع المستند بنجاح'));
     }
 
     public function update(Request $request, string $type, int $item)
@@ -241,7 +241,7 @@ class MasterDataController extends Controller
         if ($type === 'leavetypes') $data['default_days'] = $validated['code'] === '' ? null : (float) $validated['code'];
         $model->update($data);
         ActivityLog::record('master_update', "تم تعديل عنصر من قائمة {$currentMeta['title']}: {$validated['name']}", $model);
-        return redirect()->route('master.index', ['type' => $type])->with('toast', 'تم حفظ التعديل بنجاح');
+        return redirect()->route('master.index', ['type' => $type])->with('toast', __('تم حفظ التعديل بنجاح'));
     }
 
     public function destroy(Request $request, string $type, int $item)
@@ -260,7 +260,7 @@ class MasterDataController extends Controller
                 $model->delete();
                 $message = 'تم حذف العنصر بنجاح';
             } catch (\Throwable) {
-                return back()->withErrors(['master' => 'لا يمكن حذف هذا العنصر لأنه مستخدم في بيانات أخرى.']);
+                return back()->withErrors(['master' => __('لا يمكن حذف هذا العنصر لأنه مستخدم في بيانات أخرى.')]);
             }
         }
         ActivityLog::record('master_delete', "تم حذف/إيقاف عنصر من قائمة {$currentMeta['title']}: {$name}", $model);
@@ -273,12 +273,12 @@ class MasterDataController extends Controller
         if ($documentType->documents()->exists()) {
             if ($request->wantsJson()) {
                 return response()->json([
-                    'message' => 'لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.',
+                    'message' => __('لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.'),
                 ], 422);
             }
 
             return redirect()->route('master.index', ['type' => 'documents'])
-                ->with('error', 'لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.');
+                ->with('error', __('لا يمكن حذف نوع مستند مستخدم في مسوغات الموظفين. يمكنك نقله لقسم آخر أو إلغاء كونه مطلوبًا.'));
         }
 
         $name = $documentType->name;
@@ -288,11 +288,11 @@ class MasterDataController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم حذف نوع المستند بنجاح.',
+                'message' => __('تم حذف نوع المستند بنجاح.'),
                 'item_id' => $documentType->id,
             ]);
         }
 
-        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', 'تم حذف نوع المستند بنجاح');
+        return redirect()->route('master.index', ['type' => 'documents'])->with('toast', __('تم حذف نوع المستند بنجاح'));
     }
 }

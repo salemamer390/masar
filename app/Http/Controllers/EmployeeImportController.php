@@ -121,7 +121,7 @@ class EmployeeImportController extends Controller
         // Import lineage tables come from migrations; never expose a raw SQL error.
         foreach (['employee_import_batches', 'employee_import_rows', 'employee_import_row_revisions', 'attendance_import_batches', 'attendance_import_days', 'attendance_punch_revisions'] as $table) {
             if (!Schema::hasTable($table)) {
-                return response()->json(['success' => false, 'message' => 'قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل الاستيراد. لم يُحفظ أي شيء.'], 500);
+                return response()->json(['success' => false, 'message' => __('قاعدة البيانات تحتاج تشغيل الترحيلات (php artisan migrate) قبل الاستيراد. لم يُحفظ أي شيء.')], 500);
             }
         }
 
@@ -132,7 +132,7 @@ class EmployeeImportController extends Controller
         // a kind, or a mapping - fails closed and forces a fresh preview.
         $token = (string) $request->input('review_token', '');
         if ($token === '' || !hash_equals($this->reviewToken($request, $analysis, $companyId), $token)) {
-            return response()->json(['success' => false, 'message' => 'التأكيد يتطلب مراجعة حديثة: أعد فحص الملف ثم أكّد الاستيراد.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('التأكيد يتطلب مراجعة حديثة: أعد فحص الملف ثم أكّد الاستيراد.')] + $payload, 422);
         }
 
         // Reject unknown sheet-kind values outright instead of silently
@@ -141,7 +141,7 @@ class EmployeeImportController extends Controller
         $allowedKinds = array_merge(array_keys(EmployeeImportService::kindLabels()), ['ignore']);
         foreach ((is_array($rawKinds) ? $rawKinds : []) as $rawKind) {
             if (!in_array((string) $rawKind, $allowedKinds, true)) {
-                return response()->json(['success' => false, 'message' => 'قيمة نوع ورقة غير معروفة. أعد فحص الملف وراجع أنواع الأوراق.'] + $payload, 422);
+                return response()->json(['success' => false, 'message' => __('قيمة نوع ورقة غير معروفة. أعد فحص الملف وراجع أنواع الأوراق.')] + $payload, 422);
             }
         }
 
@@ -153,20 +153,20 @@ class EmployeeImportController extends Controller
         }
 
         if ($analysis['needs_mapping']) {
-            return response()->json(['success' => false, 'message' => 'اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.')] + $payload, 422);
         }
         if (!empty($analysis['capacity']['exceeded'])) {
-            return response()->json(['success' => false, 'message' => 'عدد الموظفين بعد الاستيراد يتجاوز حد باقتك. عدّل الملف أو رقّ الباقة.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('عدد الموظفين بعد الاستيراد يتجاوز حد باقتك. عدّل الملف أو رقّ الباقة.')] + $payload, 422);
         }
         if (($analysis['summary']['create'] + $analysis['summary']['update']) === 0) {
-            return response()->json(['success' => false, 'message' => 'لا توجد صفوف صالحة للاستيراد.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('لا توجد صفوف صالحة للاستيراد.')] + $payload, 422);
         }
         if ($analysis['summary']['defaulted_dates'] > 0 && !$request->boolean('ack_dates')) {
-            return response()->json(['success' => false, 'message' => 'أكّد موافقتك على اعتماد تاريخ اليوم كتاريخ انتهاء خدمة للموظفين غير المحدَّد لهم تاريخ.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('أكّد موافقتك على اعتماد تاريخ اليوم كتاريخ انتهاء خدمة للموظفين غير المحدَّد لهم تاريخ.')] + $payload, 422);
         }
 
         if (($analysis['summary']['update'] ?? 0) > 0 && !$request->boolean('ack_updates')) {
-            return response()->json(['success' => false, 'message' => 'يجب تأكيد تحديث بيانات الموظفين الموجودين مسبقًا.'] + $payload, 422);
+            return response()->json(['success' => false, 'message' => __('يجب تأكيد تحديث بيانات الموظفين الموجودين مسبقًا.')] + $payload, 422);
         }
 
         // One atomic unit: employees, workbook domains and the lineage batch all
@@ -212,7 +212,7 @@ class EmployeeImportController extends Controller
         [$analysis] = $prepared;
 
         if (($analysis['summary']['error'] ?? 0) === 0) {
-            return response()->json(['success' => false, 'message' => 'لا توجد صفوف مرفوضة.'], 422);
+            return response()->json(['success' => false, 'message' => __('لا توجد صفوف مرفوضة.')], 422);
         }
 
         [$headers, $rows] = $this->service->rejectedSheet($analysis);
@@ -526,7 +526,7 @@ class EmployeeImportController extends Controller
         if (!in_array($extension, ['xlsx', 'csv'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'يجب أن يكون الملف بصيغة xlsx أو csv. لتحويل ملف xls قديم: افتحه في Excel ثم احفظه باسم «Excel Workbook (.xlsx)».',
+                'message' => __('يجب أن يكون الملف بصيغة xlsx أو csv. لتحويل ملف xls قديم: افتحه في Excel ثم احفظه باسم «Excel Workbook (.xlsx)».'),
             ], 422);
         }
 
@@ -534,7 +534,7 @@ class EmployeeImportController extends Controller
         // first company in the database can mix tenants' employee data.
         $companyId = (int) auth()->user()->company_id;
         if ($companyId <= 0) {
-            return response()->json(['success' => false, 'message' => 'لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.'], 422);
+            return response()->json(['success' => false, 'message' => __('لا توجد شركة مرتبطة بالحساب لاستيراد الموظفين إليها.')], 422);
         }
 
         $mappings = json_decode((string) $request->input('mappings', '{}'), true);

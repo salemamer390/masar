@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+@php($isRtlInterface = \App\Http\Middleware\SetLocale::isRtl())
+<html lang="{{ app()->getLocale() }}" dir="{{ $isRtlInterface ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,13 +8,17 @@
   <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
   <link rel="shortcut icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
   <link rel="apple-touch-icon" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', 'إدارة الموارد البشرية')</title>
+  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', __('إدارة الموارد البشرية'))</title>
   
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  @if($isRtlInterface)
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" integrity="sha384-dpuaG1suU0eT09tx5plTaGMLBsfDLzUCCUXOY2j/LSvXYuG6Bqs43ALlhIqAJVRb" crossorigin="anonymous">
+  @else
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  @endif
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/lucide@1.70.0/dist/umd/lucide.min.js" integrity="sha384-64z4N640tVzhAicQVGzxE/48VNN9yS53U5kv9UH8ca7xGU4KSJ9zz8nD4C2BEerP" crossorigin="anonymous"></script>
   
@@ -22,6 +27,9 @@
   
   @stack('styles')
   <link href="{{ asset('dark-mode.css') }}?v={{ @filemtime(public_path('dark-mode.css')) }}" rel="stylesheet">
+  @unless($isRtlInterface)
+  <link href="{{ asset('ltr.css') }}?v={{ @filemtime(public_path('ltr.css')) }}" rel="stylesheet">
+  @endunless
 </head>
 <body>
 <div class="app-shell">
@@ -41,7 +49,7 @@
         <div class="global-alert global-alert-{{ $persistentAlertType }}" role="alert">
           <i class="bi {{ $persistentAlertType === 'danger' ? 'bi-exclamation-triangle-fill' : ($persistentAlertType === 'warning' ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill') }}"></i>
           <span>{{ $persistentAlertMessage }}</span>
-          <button type="button" class="global-alert-close" aria-label="إغلاق" onclick="this.closest('.global-alert')?.remove()"><i class="bi bi-x-lg"></i></button>
+          <button type="button" class="global-alert-close" aria-label="{{ __('إغلاق') }}" onclick="this.closest('.global-alert')?.remove()"><i class="bi bi-x-lg"></i></button>
         </div>
       @endif
       @yield('content')
@@ -54,16 +62,16 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="genericActionTitle">إجراء</h5>
+        <h5 class="modal-title" id="genericActionTitle">{{ __('إجراء') }}</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label">البيان</label>
-        <input class="form-control" id="genericActionInput" placeholder="اكتب القيمة...">
+        <label class="form-label">{{ __('البيان') }}</label>
+        <input class="form-control" id="genericActionInput" placeholder="{{ __('اكتب القيمة...') }}">
       </div>
       <div class="modal-footer">
-        <button class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
-        <button class="btn btn-primary" id="genericActionSubmit">حفظ</button>
+        <button class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>
+        <button class="btn btn-primary" id="genericActionSubmit">{{ __('حفظ') }}</button>
       </div>
     </div>
   </div>
@@ -90,6 +98,8 @@
 
   // Convert internal English values to Arabic at presentation time only.
   // Stored codes remain unchanged because application logic relies on them.
+  // Runs only while the interface is Arabic; other locales keep the codes.
+  const isArabicInterface = document.documentElement.lang === 'ar';
   const arabicUiLabels = {
     'Active':'نشط', 'Inactive':'غير نشط', 'Pending':'قيد الانتظار',
     'Manager Approved':'بانتظار اعتماد الموارد البشرية', 'Approved':'معتمد',
@@ -111,6 +121,7 @@
     'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.'
   };
   function translateInterfaceText(root = document.body) {
+    if (!isArabicInterface) return;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -184,7 +195,7 @@
     const textEl = document.getElementById('toastText');
     const toastEl = document.getElementById('liveToast');
     if (textEl && toastEl) {
-      textEl.textContent = arabicUiLabels[msg] || msg;
+      textEl.textContent = isArabicInterface ? (arabicUiLabels[msg] || msg) : msg;
       const existingToast = bootstrap.Toast.getInstance(toastEl);
       existingToast?.dispose();
       const toast = new bootstrap.Toast(toastEl, { delay: 2200, autohide: true });

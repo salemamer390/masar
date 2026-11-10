@@ -110,7 +110,7 @@ class EmployeeImportReviewController extends Controller
                 'created_at' => now(),
             ]);
 
-            return redirect()->route('employees.import-rows.show', $row)->with('toast', 'تم حفظ الصف بعد التصحيح وربطه بالموظف.');
+            return redirect()->route('employees.import-rows.show', $row)->with('toast', __('تم حفظ الصف بعد التصحيح وربطه بالموظف.'));
         });
     }
 
@@ -145,6 +145,6 @@ class EmployeeImportReviewController extends Controller
             ]);
         });
 
-        return redirect()->route('employees.import-batches.index')->with('toast', 'تم استبعاد الصف مع الاحتفاظ بالأصل وسجل السبب.');
+        return redirect()->route('employees.import-batches.index')->with('toast', __('تم استبعاد الصف مع الاحتفاظ بالأصل وسجل السبب.'));
     }
 }

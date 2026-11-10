@@ -126,7 +126,7 @@ class JobDataController extends Controller
             ['rows' => $rows, 'employee_count' => count($rows), 'created_by' => $createdBy ?? auth()->id()]
         );
 
-        return back()->with('toast', 'تم حفظ سجل ملخص الشهر.');
+        return back()->with('toast', __('تم حفظ سجل ملخص الشهر.'));
     }
 
     /** Legacy endpoint kept for cached clients; the UI no longer exposes manual saving. */
@@ -134,7 +134,7 @@ class JobDataController extends Controller
     {
         $data = $request->validate(['month' => ['required', 'date_format:Y-m']]);
         $this->captureSnapshot(Carbon::createFromFormat('Y-m', $data['month']), auth()->id());
-        return back()->with('toast', 'تم حفظ سجل ملخص الشهر.');
+        return back()->with('toast', __('تم حفظ سجل ملخص الشهر.'));
     }
 
     public function export(Request $request)

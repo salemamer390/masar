@@ -25,7 +25,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>س٦ - {{ $d['name'] }}</title>
+    <title>{{ __('س٦ -') }} {{ $d['name'] }}</title>
     <style>
         @font-face {
             font-family: 'Mudir MT';
@@ -337,85 +337,72 @@
 </head>
 
 <body class="{{ request()->boolean('pdf') ? 'pdf-output' : '' }}">
-    <div class="tools"><button type="button" onclick="window.print()">طباعة نموذج س٦</button><a
-            href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
+    <div class="tools"><button type="button" onclick="window.print()">{{ __('طباعة نموذج س٦') }}</button><a
+            href="{{ route('insurance.index') }}">{{ __('العودة للتأمينات') }}</a></div>
     <section class="page">
         <div class="header">
-            <div class="office">الهيئة القومية للتأمين الاجتماعي<br>مكتب: <span class="line"
+            <div class="office">{{ __('الهيئة القومية للتأمين الاجتماعي') }}<br>{{ __('مكتب:') }} <span class="line"
                     style="display:inline-block;min-width:150pt">{{ $d['office'] }}</span></div><img
                 src="{{ $logoImage }}" alt="">
-            <div class="no">نموذج رقم ( ٦ )</div>
+            <div class="no">{{ __('نموذج رقم ( ٦ )') }}</div>
         </div>
-        <div class="title">إخطار بانتهاء اشتراك مؤمن عليه</div>
-        <div class="section"><span>بيانات مقدم الطلب</span></div>
-        <div class="row"><span class="label-wide">مقدم الطلب:</span><span
-                class="line">{{ $d['applicant_name'] }}</span><span class="gap"></span><span class="label">صفة
-                مقدم الطلب:</span><span class="line">{{ $d['applicant_role'] }}</span></div>
-        <div class="row"><span class="label-wide">رقم تأميني:</span>{!! $boxes($d['applicant_ins_no'], 9) !!}<span
-                class="gap"></span><span class="label">رقم التليفون:</span><span
+        <div class="title">{{ __('إخطار بانتهاء اشتراك مؤمن عليه') }}</div>
+        <div class="section"><span>{{ __('بيانات مقدم الطلب') }}</span></div>
+        <div class="row"><span class="label-wide">{{ __('مقدم الطلب:') }}</span><span
+                class="line">{{ $d['applicant_name'] }}</span><span class="gap"></span><span class="label">{{ __('صفة مقدم الطلب:') }}</span><span class="line">{{ $d['applicant_role'] }}</span></div>
+        <div class="row"><span class="label-wide">{{ __('رقم تأميني:') }}</span>{!! $boxes($d['applicant_ins_no'], 9) !!}<span
+                class="gap"></span><span class="label">{{ __('رقم التليفون:') }}</span><span
                 class="line">{{ $d['applicant_phone'] }}</span></div>
-        <div class="row"><span class="label-wide">رقم قومي:</span>{!! $boxes($d['applicant_nid'], 14) !!}</div>
-        <div class="section"><span>بيانات المؤمن عليه</span></div>
-        <div class="row"><span class="label-wide">الرقم التأميني:</span>{!! $boxes($d['ins_no'], 9) !!}<span
-                class="gap"></span><span class="label">الاسم:</span><span class="line"
+        <div class="row"><span class="label-wide">{{ __('رقم قومي:') }}</span>{!! $boxes($d['applicant_nid'], 14) !!}</div>
+        <div class="section"><span>{{ __('بيانات المؤمن عليه') }}</span></div>
+        <div class="row"><span class="label-wide">{{ __('الرقم التأميني:') }}</span>{!! $boxes($d['ins_no'], 9) !!}<span
+                class="gap"></span><span class="label">{{ __('الاسم:') }}</span><span class="line"
                 style="font-size:{{ $font($d['name']) }}">{{ $d['name'] }}</span></div>
-        <div class="row"><span class="label-wide">الرقم القومي:</span>{!! $boxes($d['nid'], 14) !!}</div>
-        <div class="row"><span class="label-wide">رقم المنشأة:</span>{!! $boxes($d['est_no'], 9, true) !!}<span
-                class="gap"></span><span class="label">اسم المنشأة:</span><span class="line"
+        <div class="row"><span class="label-wide">{{ __('الرقم القومي:') }}</span>{!! $boxes($d['nid'], 14) !!}</div>
+        <div class="row"><span class="label-wide">{{ __('رقم المنشأة:') }}</span>{!! $boxes($d['est_no'], 9, true) !!}<span
+                class="gap"></span><span class="label">{{ __('اسم المنشأة:') }}</span><span class="line"
                 style="font-size:{{ $font($d['est_name']) }}">{{ $d['est_name'] }}</span></div>
-        <div class="row"><span class="label-wide">تاريخ انتهاء الاشتراك:</span>{!! $boxes($d['end_day'], 2) !!}<span
+        <div class="row"><span class="label-wide">{{ __('تاريخ انتهاء الاشتراك:') }}</span>{!! $boxes($d['end_day'], 2) !!}<span
                 class="slash">/</span>{!! $boxes($d['end_month'], 2) !!}<span class="slash">/</span>{!! $boxes($d['end_year'], 4) !!}<span
-                class="gap"></span><span class="label">سبب انتهاء الاشتراك:</span><span
+                class="gap"></span><span class="label">{{ __('سبب انتهاء الاشتراك:') }}</span><span
                 class="line">{{ $d['end_reason'] }}</span></div>
-        <div class="section"><span>إقرار المؤمن عليه والمدير المسؤول</span></div>
-        <div class="declaration">أقر أن البيانات بعاليه صحيحة وأن المؤمن عليه تسلم صورة من هذا الإخطار.</div>
-        <div class="row"><span class="label-wide bold-label">توقيع المؤمن عليه:</span><span class="line"></span><span
-                class="gap"></span><span class="label">توقيع المدير المسؤول:</span><span class="line"></span>
+        <div class="section"><span>{{ __('إقرار المؤمن عليه والمدير المسؤول') }}</span></div>
+        <div class="declaration">{{ __('أقر أن البيانات بعاليه صحيحة وأن المؤمن عليه تسلم صورة من هذا الإخطار.') }}</div>
+        <div class="row"><span class="label-wide bold-label">{{ __('توقيع المؤمن عليه:') }}</span><span class="line"></span><span
+                class="gap"></span><span class="label">{{ __('توقيع المدير المسؤول:') }}</span><span class="line"></span>
         </div>
-        <div class="row"><span class="label-wide">تم مطابقة التوقيع بمعرفتي /</span><span class="line"></span>
+        <div class="row"><span class="label-wide">{{ __('تم مطابقة التوقيع بمعرفتي /') }}</span><span class="line"></span>
         </div>
-        <div class="section"><span>إقرار المدير المسؤول في حالة وجود نزاع</span></div>
-        <div class="declaration">أقر أن البيانات بعاليه صحيحة وأنني أرسلت صورة من هذا الإخطار إلى المؤمن عليه بخطاب موصى
-            عليه بعلم الوصول برقم ........................................ بتاريخ&nbsp; {{ $d['issue_date'] }}</div>
-        <div class="row"><span class="label-wide">تم مطابقة التوقيع بمعرفتي</span></div>
-        <div class="row"><span class="label-wide">توقيع المدير المسؤول:</span><span class="line"></span></div>
-        <div class="section"><span>إقرار المؤمن عليه في حالة وجود نزاع</span></div>
-        <div class="declaration">أقر أن البيانات بعاليه صحيحة وأن صاحب العمل امتنع عن ( توقيع / تقديم ) نموذج انتهاء
-            الخدمة.</div>
-        <div class="row"><span class="label-wide bold-label">توقيع المؤمن عليه:</span><span class="line"></span><span
-                class="gap"></span><span class="label">التاريخ:</span><span
+        <div class="section"><span>{{ __('إقرار المدير المسؤول في حالة وجود نزاع') }}</span></div>
+        <div class="declaration">{{ __('أقر أن البيانات بعاليه صحيحة وأنني أرسلت صورة من هذا الإخطار إلى المؤمن عليه بخطاب موصى عليه بعلم الوصول برقم ........................................ بتاريخ&nbsp;') }} {{ $d['issue_date'] }}</div>
+        <div class="row"><span class="label-wide">{{ __('تم مطابقة التوقيع بمعرفتي') }}</span></div>
+        <div class="row"><span class="label-wide">{{ __('توقيع المدير المسؤول:') }}</span><span class="line"></span></div>
+        <div class="section"><span>{{ __('إقرار المؤمن عليه في حالة وجود نزاع') }}</span></div>
+        <div class="declaration">{{ __('أقر أن البيانات بعاليه صحيحة وأن صاحب العمل امتنع عن ( توقيع / تقديم ) نموذج انتهاء الخدمة.') }}</div>
+        <div class="row"><span class="label-wide bold-label">{{ __('توقيع المؤمن عليه:') }}</span><span class="line"></span><span
+                class="gap"></span><span class="label">{{ __('التاريخ:') }}</span><span
                 class="line">{{ $d['issue_date'] }}</span></div>
-        <div class="note"><span class="bold-label">ملحوظــة</span>: يلزم التأكد من توقيع كل من العامل وأصحاب العمل على الإقرار الموضح خلف النموذج.</div>
-        <div class="row" style="margin-top:15pt"><span class="label-wide">توقيع مقدم الطلب:</span><span
-                class="line"></span><span class="gap"></span><span class="label">التاريخ:</span><span
+        <div class="note"><span class="bold-label">{{ __('ملحوظــة') }}</span>{{ __(': يلزم التأكد من توقيع كل من العامل وأصحاب العمل على الإقرار الموضح خلف النموذج.') }}</div>
+        <div class="row" style="margin-top:15pt"><span class="label-wide">{{ __('توقيع مقدم الطلب:') }}</span><span
+                class="line"></span><span class="gap"></span><span class="label">{{ __('التاريخ:') }}</span><span
                 class="line">{{ $d['issue_date'] }}</span></div>
-        <div class="back-note">(انظر خلفه)</div>
+        <div class="back-note">{{ __('(انظر خلفه)') }}</div>
     </section>
     <section class="page">
-        <div class="subtitle">إرشادات</div>
-        <div class="instruction">١. يحرر هذا النموذج ويرسل للهيئة خلال أسبوع من تاريخ تحقق إحدى الوقائع الآتية:<br>أ.
-            انتهاء خدمة المؤمن عليه.<br>ب. انتهاء مدة التلمذة الصناعية أو التدرج.<br>ج. انتهاء العمل بالمشروع الصيفي
-            للطلبة.<br><br>٢. في حالة إخلال صاحب العمل بالإخطار في الموعد المشار إليه، يلتزم بأداء مبلغ إضافي يقدر بنسبة
-            من قيمة الاشتراك المستحق عن المدة وفقاً للقواعد المنظمة.</div>
-        <div class="subtitle" style="margin-top:22pt">إقرار</div>
-        <div class="row"><span class="label-wide">اسم المنشأة:</span><span
-                class="line">{{ $d['est_name'] }}</span><span class="gap"></span><span class="label">رقمها
-                التأميني:</span>{!! $boxes($d['est_no'], 9, true) !!}</div>
-        <div class="row"><span class="label-wide">العنوان:</span><span class="line">{{ $d['address'] }}</span>
+        <div class="subtitle">{{ __('إرشادات') }}</div>
+        <div class="instruction">{{ __('١. يحرر هذا النموذج ويرسل للهيئة خلال أسبوع من تاريخ تحقق إحدى الوقائع الآتية:') }}<br>{{ __('أ. انتهاء خدمة المؤمن عليه.') }}<br>{{ __('ب. انتهاء مدة التلمذة الصناعية أو التدرج.') }}<br>{{ __('ج. انتهاء العمل بالمشروع الصيفي للطلبة.') }}<br><br>{{ __('٢. في حالة إخلال صاحب العمل بالإخطار في الموعد المشار إليه، يلتزم بأداء مبلغ إضافي يقدر بنسبة من قيمة الاشتراك المستحق عن المدة وفقاً للقواعد المنظمة.') }}</div>
+        <div class="subtitle" style="margin-top:22pt">{{ __('إقرار') }}</div>
+        <div class="row"><span class="label-wide">{{ __('اسم المنشأة:') }}</span><span
+                class="line">{{ $d['est_name'] }}</span><span class="gap"></span><span class="label">{{ __('رقمها التأميني:') }}</span>{!! $boxes($d['est_no'], 9, true) !!}</div>
+        <div class="row"><span class="label-wide">{{ __('العنوان:') }}</span><span class="line">{{ $d['address'] }}</span>
         </div>
-        <div class="row"><span class="label-wide">اسم المؤمن عليه:</span><span
-                class="line">{{ $d['name'] }}</span><span class="gap"></span><span class="label">رقمه
-                التأميني:</span>{!! $boxes($d['ins_no'], 9) !!}</div>
-        <div class="instruction" style="margin-top:18pt">٣. أقر أنا الموقع أدناه بأنني قد قمت بسحب البطاقة العلاجية من
-            المؤمن عليه وتم تسليمها لفرع الهيئة المعنية بالتأمين الصحي، وفي حالة ظهور ما يخالف ذلك أكون مسؤولاً بالتضامن
-            مع العامل في مواجهة الهيئة عن كافة مصاريف العلاج والرعاية الطبية وتعويض الانتفاع حتى بعد انتهاء الخدمة.
+        <div class="row"><span class="label-wide">{{ __('اسم المؤمن عليه:') }}</span><span
+                class="line">{{ $d['name'] }}</span><span class="gap"></span><span class="label">{{ __('رقمه التأميني:') }}</span>{!! $boxes($d['ins_no'], 9) !!}</div>
+        <div class="instruction" style="margin-top:18pt">{{ __('٣. أقر أنا الموقع أدناه بأنني قد قمت بسحب البطاقة العلاجية من المؤمن عليه وتم تسليمها لفرع الهيئة المعنية بالتأمين الصحي، وفي حالة ظهور ما يخالف ذلك أكون مسؤولاً بالتضامن مع العامل في مواجهة الهيئة عن كافة مصاريف العلاج والرعاية الطبية وتعويض الانتفاع حتى بعد انتهاء الخدمة.') }}
         </div>
-        <div class="signature"><span class="bold-label">توقيع المؤمن عليه<br><br>(　　　　　　　　　)</span><span class="bold-label">توقيع صاحب
-                العمل<br><br>(　　　　　　　　　)</span></div>
-        <div class="instruction" style="margin-top:38pt">٤. أقر أنا الموقع أدناه بأن المؤمن عليه محل هذا النموذج قد
-            رفض تسليم البطاقة العلاجية، وقمت بإخطار الهيئة المعنية بالتأمين الصحي ببيانات المؤمن عليه لإيقاف التعامل
-            معه.</div>
-        <div class="signature"><span class="bold-label">توقيع صاحب العمل<br><br>(　　　　　　　　　)</span></div>
+        <div class="signature"><span class="bold-label">{{ __('توقيع المؤمن عليه') }}<br><br>(　　　　　　　　　)</span><span class="bold-label">{{ __('توقيع صاحب العمل') }}<br><br>(　　　　　　　　　)</span></div>
+        <div class="instruction" style="margin-top:38pt">{{ __('٤. أقر أنا الموقع أدناه بأن المؤمن عليه محل هذا النموذج قد رفض تسليم البطاقة العلاجية، وقمت بإخطار الهيئة المعنية بالتأمين الصحي ببيانات المؤمن عليه لإيقاف التعامل معه.') }}</div>
+        <div class="signature"><span class="bold-label">{{ __('توقيع صاحب العمل') }}<br><br>(　　　　　　　　　)</span></div>
     </section>
 </body>
 

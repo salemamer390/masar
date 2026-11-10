@@ -94,12 +94,12 @@ class PenaltyController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تسجيل الإجراء التأديبي',
+                'message' => __('تم تسجيل الإجراء التأديبي'),
                 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType']),
             ]);
         }
 
-        return back()->with('toast', 'تم تسجيل الإجراء التأديبي');
+        return back()->with('toast', __('تم تسجيل الإجراء التأديبي'));
     }
 
     public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request, PayrollRunService $payrollRuns)
@@ -116,7 +116,7 @@ class PenaltyController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty approved.', 'penalty' => $penalty->fresh()])
-            : back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
+            : back()->with('toast', __('تم إغلاق الإجراء التأديبي بنجاح'));
     }
 
     public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -152,7 +152,7 @@ class PenaltyController extends Controller
         ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty updated.', 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType'])])
-            : back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
+            : back()->with('toast', __('تم تحديث الإجراء وإعادته للمراجعة.'));
     }
 
     public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -164,6 +164,6 @@ class PenaltyController extends Controller
         ActivityLog::record('penalty_delete', 'تم حذف إجراء تأديبي.', null, $snapshot, null, 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty deleted.', 'penalty_id' => $snapshot['id']])
-            : back()->with('toast', 'تم حذف السجل');
+            : back()->with('toast', __('تم حذف السجل'));
     }
 }

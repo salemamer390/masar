@@ -1,0 +1,51 @@
+/* LTR overrides — loaded only when the interface language is left-to-right (English).
+   The application styles are authored RTL; these rules flip the physical
+   properties that have no logical equivalent in the existing stylesheets. */
+
+html[dir="ltr"] .sidebar { right: auto; left: 0; }
+html[dir="ltr"] .main { margin-right: 0; margin-left: 285px; }
+
+html[dir="ltr"] .nav-item,
+html[dir="ltr"] .master-menu,
+html[dir="ltr"] .report-card,
+html[dir="ltr"] .doc-name,
+html[dir="ltr"] .doc-card-title button,
+html[dir="ltr"] .stat-grid.compact .stat-card > div:last-child,
+html[dir="ltr"] .payroll-kpi-card > div:last-child,
+html[dir="ltr"] .request-kpi-card > div:last-child,
+html[dir="ltr"] .payroll-mobile-card { text-align: left; }
+
+html[dir="ltr"] .system-status span { margin-left: 0; margin-right: 6px; }
+html[dir="ltr"] .notification-dot { right: auto; left: 10px; }
+html[dir="ltr"] .user-menu { padding-right: 0; padding-left: 8px; }
+html[dir="ltr"] .activity-list time { margin-right: 0; margin-left: auto; }
+html[dir="ltr"] .attendance-breakdown b { margin-right: 0; margin-left: auto; }
+html[dir="ltr"] .search-table input { padding-right: 0; padding-left: 8px; }
+
+html[dir="ltr"] .timeline > div { border-right: 0; border-left: 2px solid #dce7f7; }
+html[dir="ltr"] .timeline > div::before { right: auto; left: -7px; }
+
+html[dir="ltr"] .attention-card { border-right: 0; border-left: 4px solid #edb340; }
+html[dir="ltr"] .attention-card.danger { border-left-color: #df6673; }
+html[dir="ltr"] .attention-card.warning { border-left-color: #edb340; }
+
+html[dir="ltr"] .topbar-reference .topbar-date { margin-right: 0; margin-left: auto; }
+
+html[dir="ltr"] .app-shell .sidebar { border-left: 0; border-right: 1px solid #e5eaf2; }
+
+@media(min-width:801px) {
+  html[dir="ltr"] .app-shell .main { transition: margin-left .24s ease, width .24s ease; }
+  html[dir="ltr"] .app-shell.sidebar-collapsed .main { margin-right: 0 !important; margin-left: 76px !important; }
+  html[dir="ltr"] .topbar .notification-menu { right: auto !important; left: 300px !important; }
+  html[dir="ltr"] .app-shell.sidebar-collapsed .topbar .notification-menu { right: auto !important; left: 88px !important; }
+}
+
+@media(max-width:1100px) {
+  html[dir="ltr"] .main { margin-right: 0; margin-left: 245px; }
+}
+
+@media(max-width:800px) {
+  html[dir="ltr"] .sidebar { right: auto; left: -285px; }
+  html[dir="ltr"] .sidebar.open { right: auto; left: 0; }
+  html[dir="ltr"] .main { margin-right: 0; margin-left: 0; }
+}

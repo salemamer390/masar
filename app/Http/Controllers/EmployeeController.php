@@ -282,12 +282,12 @@ class EmployeeController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تمت إضافة الموظف بنجاح.',
+                'message' => __('تمت إضافة الموظف بنجاح.'),
                 'employee' => $employee->load(['department', 'job', 'status']),
             ]);
         }
 
-        return redirect()->route('employees.show', $employee)->with('toast', 'تمت إضافة الموظف بنجاح.');
+        return redirect()->route('employees.show', $employee)->with('toast', __('تمت إضافة الموظف بنجاح.'));
     }
 
     public function update(Request $request, Employee $employee)
@@ -770,7 +770,7 @@ class EmployeeController extends Controller
     {
         $disk = $employee->profilePhotoDisk();
         if (!$employee->profile_photo_path || !Storage::disk($disk)->exists($employee->profile_photo_path)) {
-            abort(404, 'الصورة غير موجودة.');
+            abort(404, __('الصورة غير موجودة.'));
         }
 
         return Storage::disk($disk)->response($employee->profile_photo_path);
@@ -780,18 +780,18 @@ class EmployeeController extends Controller
     {
         $request->validate(['profile_photo' => ['nullable', 'image', 'max:5120', 'mimes:jpg,jpeg,png,webp']]);
         if (!$request->hasFile('profile_photo')) {
-            return back()->with('toast', 'لم يتم اختيار صورة جديدة.');
+            return back()->with('toast', __('لم يتم اختيار صورة جديدة.'));
         }
         if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
         $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
-        return back()->with('toast', 'تم تحديث صورة الموظف.');
+        return back()->with('toast', __('تم تحديث صورة الموظف.'));
     }
 
     public function deletePhoto(Employee $employee)
     {
         if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
         $employee->update(['profile_photo_path' => null]);
-        return back()->with('toast', 'تم حذف صورة الموظف.');
+        return back()->with('toast', __('تم حذف صورة الموظف.'));
     }
 
     private function applyNationalIdData(array $validated): array

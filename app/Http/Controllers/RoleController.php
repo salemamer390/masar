@@ -53,13 +53,13 @@ class RoleController extends Controller
         $companyId = auth()->user()->company_id;
         abort_if(!$companyId, 403, 'لا يمكن إنشاء دور دون شركة.');
         Role::create(['name' => 'custom_'.str()->slug($data['display_name']).'_'.str()->random(6), 'display_name' => $data['display_name'], 'description' => $data['description'] ?? null, 'company_id' => $companyId]);
-        return redirect()->route('roles.index')->with('toast', 'تم إنشاء الدور بنجاح.');
+        return redirect()->route('roles.index')->with('toast', __('تم إنشاء الدور بنجاح.'));
     }
 
     public function update(Request $request, Role $role)
     {
         if (auth()->user()->company_id && (int) $role->company_id !== (int) auth()->user()->company_id) abort(403);
-        if ($role->id === 1) return $request->wantsJson() ? response()->json(['success' => false, 'message' => 'لا يمكن تعديل صلاحيات مدير النظام.'], 422) : back()->with('toast', 'لا يمكن تعديل صلاحيات مدير النظام.');
+        if ($role->id === 1) return $request->wantsJson() ? response()->json(['success' => false, 'message' => __('لا يمكن تعديل صلاحيات مدير النظام.')], 422) : back()->with('toast', __('لا يمكن تعديل صلاحيات مدير النظام.'));
         $data = $request->validate(['display_name' => ['nullable', 'string', 'max:150'], 'description' => ['nullable', 'string', 'max:255'], 'permissions' => ['nullable', 'array'], 'permissions.*' => ['integer', 'exists:permissions,id']]);
         $permissions = $data['permissions'] ?? [];
         if ($role->name === 'company_manager') $permissions = Permission::query()->pluck('id')->all();
@@ -68,7 +68,7 @@ class RoleController extends Controller
         $role->save();
         $role->permissions()->sync($permissions);
         ActivityLog::record('role_update', "تم تحديث صلاحيات الدور: {$role->display_name}.", $role);
-        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'تم تحديث صلاحيات الدور.', 'role_id' => $role->id]) : back()->with('toast', 'تم تحديث صلاحيات الدور بنجاح.');
+        return $request->wantsJson() ? response()->json(['success' => true, 'message' => __('تم تحديث صلاحيات الدور.'), 'role_id' => $role->id]) : back()->with('toast', __('تم تحديث صلاحيات الدور بنجاح.'));
     }
 
     public function destroy(Request $request, Role $role)

@@ -33,6 +33,6 @@ class NotificationController extends Controller
             ]);
         }
 
-        return back()->with('toast', 'تم تعليم جميع الإشعارات كمقروءة.');
+        return back()->with('toast', __('تم تعليم جميع الإشعارات كمقروءة.'));
     }
 }

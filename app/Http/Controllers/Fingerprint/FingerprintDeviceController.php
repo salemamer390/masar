@@ -39,7 +39,7 @@ class FingerprintDeviceController extends Controller
     {
         $device = $this->service->create($request->validated());
 
-        return redirect()->route('fingerprint.devices.show', $device)->with('success', 'تم إنشاء جهاز البصمة بنجاح.');
+        return redirect()->route('fingerprint.devices.show', $device)->with('success', __('تم إنشاء جهاز البصمة بنجاح.'));
     }
 
     public function show(FingerprintDevice $fingerprintDevice): View
@@ -62,14 +62,14 @@ class FingerprintDeviceController extends Controller
     {
         $this->service->update($fingerprintDevice, $request->validated());
 
-        return redirect()->route('fingerprint.devices.show', $fingerprintDevice)->with('success', 'تم تحديث جهاز البصمة بنجاح.');
+        return redirect()->route('fingerprint.devices.show', $fingerprintDevice)->with('success', __('تم تحديث جهاز البصمة بنجاح.'));
     }
 
     public function destroy(FingerprintDevice $fingerprintDevice): RedirectResponse
     {
         $this->service->delete($fingerprintDevice);
 
-        return redirect()->route('fingerprint.devices.index')->with('success', 'تم حذف جهاز البصمة بنجاح.');
+        return redirect()->route('fingerprint.devices.index')->with('success', __('تم حذف جهاز البصمة بنجاح.'));
     }
 
     public function testConnection(FingerprintDevice $fingerprintDevice): RedirectResponse
@@ -99,7 +99,7 @@ class FingerprintDeviceController extends Controller
 
         // The sync runs synchronously inside this request, so report its real outcome.
         if ($log->status !== FingerprintSyncStatus::Success) {
-            return back()->with('error', 'فشلت المزامنة: '.$log->error_message);
+            return back()->with('error', __('فشلت المزامنة:').$log->error_message);
         }
 
         $unresolved = (int) ($log->metadata['unresolved_count'] ?? 0);

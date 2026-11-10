@@ -74,6 +74,16 @@ Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name(
 Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 
+// Interface language switch (Arabic / English). Stored in the session and a
+// long-lived cookie so the choice survives new sessions and works for guests.
+Route::get('/locale/{locale}', function (string $locale) {
+    abort_unless(in_array($locale, ['ar', 'en'], true), 404);
+
+    session(['locale' => $locale]);
+
+    return redirect()->back()->withCookie(cookie()->forever('masar_locale', $locale));
+})->name('locale.switch');
+
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');

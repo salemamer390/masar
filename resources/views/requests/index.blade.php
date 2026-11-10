@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'الطلبات')
+@section('title', __('الطلبات'))
 
 @section('content')
 <script>
@@ -89,47 +89,47 @@ document.addEventListener('DOMContentLoaded', () => {
 @endpush
 <div class="page-head">
     <div>
-        <h1>طلبات الموارد البشرية</h1>
-        <p>طلبات السلف والأذونات والمأموريات وطلبات المستندات والطلبات الأخرى، مرتبطة مباشرة بقاعدة البيانات.</p>
+        <h1>{{ __('طلبات الموارد البشرية') }}</h1>
+        <p>{{ __('طلبات السلف والأذونات والمأموريات وطلبات المستندات والطلبات الأخرى، مرتبطة مباشرة بقاعدة البيانات.') }}</p>
     </div>
     @if(auth()->user()?->hasPermission('requests.create'))
-        <a href="{{ route('requests.index', ['create' => 1]) }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> طلب جديد</a>
+        <a href="{{ route('requests.index', ['create' => 1]) }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> {{ __('طلب جديد') }}</a>
     @endif
 </div>
 
-<div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">تفاصيل الطلبات</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
+<div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">{{ __('تفاصيل الطلبات') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 
 <div class="stat-grid compact">
     @foreach([
-        ['إجمالي الطلبات', $stats['all'], 'blue', 'file-earmark-text'],
+        [__('إجمالي الطلبات'), $stats['all'], 'blue', 'file-earmark-text'],
 
-        ['طلبات مؤكدة', $stats['approved'], 'green', 'check-circle'],
-        ['طلبات ملغاة', $stats['rejected'], 'red', 'x-circle'],
+        [__('طلبات مؤكدة'), $stats['approved'], 'green', 'check-circle'],
+        [__('طلبات ملغاة'), $stats['rejected'], 'red', 'x-circle'],
     ] as $statIndex => $stat)
         <div class="stat-card clickable-card request-kpi-card" data-request-kpi="{{ $statIndex }}">
             <div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div>
-            <div><span>{{ $stat[0] }}</span><b>{{ format_number($stat[1]) }}</b><small>حسب النطاق المسموح لك</small></div>
+            <div><span>{{ $stat[0] }}</span><b>{{ format_number($stat[1]) }}</b><small>{{ __('حسب النطاق المسموح لك') }}</small></div>
         </div>
     @endforeach
 </div>
 
 <form class="filter-bar" method="GET">
-    <div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="ابحث بالموظف أو عنوان الطلب..."></div>
+    <div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="{{ __('ابحث بالموظف أو عنوان الطلب...') }}"></div>
     <select name="type" onchange="this.form.submit()">
-        <option value="">كل الأنواع</option>
+        <option value="">{{ __('كل الأنواع') }}</option>
         @foreach($requestTypes as $type)
             <option value="{{ $type->code }}" @selected(request('type') === $type->code)>{{ $type->display_name }}</option>
         @endforeach
     </select>
     <select name="status" onchange="this.form.submit()">
-        <option value="">كل الحالات</option>
-        @foreach(['Approved'=>'مؤكد','Rejected'=>'ملغى'] as $value => $label)
+        <option value="">{{ __('كل الحالات') }}</option>
+        @foreach(['Approved'=>__('مؤكد'),'Rejected'=>__('ملغى')] as $value => $label)
             <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
         @endforeach
     </select>
-    <button class="btn btn-light">بحث</button>
+    <button class="btn btn-light">{{ __('بحث') }}</button>
     @if(request()->hasAny(['search','type','status']))
-        <a class="btn btn-outline-secondary" href="{{ route('requests.index') }}">مسح</a>
+        <a class="btn btn-outline-secondary" href="{{ route('requests.index') }}">{{ __('مسح') }}</a>
     @endif
 </form>
 
@@ -137,28 +137,28 @@ document.addEventListener('DOMContentLoaded', () => {
 <div class="panel mb-3">
     <div class="panel-head">
         <div>
-            <h3><i class="bi {{ $selectedRequest->requestType?->icon ?? 'bi-file-earmark-text' }}"></i> تفاصيل الطلب</h3>
+            <h3><i class="bi {{ $selectedRequest->requestType?->icon ?? 'bi-file-earmark-text' }}"></i> {{ __('تفاصيل الطلب') }}</h3>
             <span>{{ $selectedRequest->requestType?->display_name ?? $selectedRequest->request_type }}</span>
         </div>
-        <a class="btn btn-sm btn-light" href="{{ route('requests.index', request()->except('request')) }}">إغلاق</a>
+        <a class="btn btn-sm btn-light" href="{{ route('requests.index', request()->except('request')) }}">{{ __('إغلاق') }}</a>
     </div>
     <div class="details-grid p-3">
-        <div><label>الموظف</label><b>{{ $selectedRequest->employee?->full_name ?? '—' }}</b></div>
-        <div><label>القسم</label><b>{{ $selectedRequest->employee?->department?->name ?? '—' }}</b></div>
-        <div><label>نوع الطلب</label><b>{{ $selectedRequest->requestType?->display_name ?? $selectedRequest->request_type }}</b></div>
-        <div><label>الحالة</label><b><span class="badge-soft {{ $selectedRequest->status_badge_class }}">{{ $selectedRequest->status_label }}</span></b></div>
-        <div><label>العنوان</label><b>{{ $selectedRequest->title }}</b></div>
-        <div><label>تاريخ الإنشاء</label><b>{{ $selectedRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</b></div>
-        <div class="details-grid-full"><label>التفاصيل</label><p class="mb-0">{{ $selectedRequest->details ?: 'لا توجد تفاصيل إضافية.' }}</p></div>
+        <div><label>{{ __('الموظف') }}</label><b>{{ $selectedRequest->employee?->full_name ?? '—' }}</b></div>
+        <div><label>{{ __('القسم') }}</label><b>{{ $selectedRequest->employee?->department?->name ?? '—' }}</b></div>
+        <div><label>{{ __('نوع الطلب') }}</label><b>{{ $selectedRequest->requestType?->display_name ?? $selectedRequest->request_type }}</b></div>
+        <div><label>{{ __('الحالة') }}</label><b><span class="badge-soft {{ $selectedRequest->status_badge_class }}">{{ $selectedRequest->status_label }}</span></b></div>
+        <div><label>{{ __('العنوان') }}</label><b>{{ $selectedRequest->title }}</b></div>
+        <div><label>{{ __('تاريخ الإنشاء') }}</label><b>{{ $selectedRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</b></div>
+        <div class="details-grid-full"><label>{{ __('التفاصيل') }}</label><p class="mb-0">{{ $selectedRequest->details ?: 'لا توجد تفاصيل إضافية.' }}</p></div>
         @if($selectedRequest->rejection_reason)
-            <div class="details-grid-full"><label>سبب الرفض</label><p class="mb-0 text-danger">{{ $selectedRequest->rejection_reason }}</p></div>
+            <div class="details-grid-full"><label>{{ __('سبب الرفض') }}</label><p class="mb-0 text-danger">{{ $selectedRequest->rejection_reason }}</p></div>
         @endif
     </div>
     @if(false)
         @if(auth()->user()?->hasPermission('requests.approve'))
             <div class="d-flex gap-2 px-3 pb-3">
-                <form method="POST" action="{{ route('requests.approve', $selectedRequest) }}">@csrf @method('PATCH')<button class="btn btn-success"><i class="bi bi-check-lg"></i> اعتماد</button></form>
-                <form method="POST" action="{{ route('requests.reject', $selectedRequest) }}" class="d-flex gap-2 flex-grow-1"><input type="text" name="rejection_reason" class="form-control" placeholder="سبب الرفض (اختياري)">@csrf @method('PATCH')<button class="btn btn-outline-danger">رفض</button></form>
+                <form method="POST" action="{{ route('requests.approve', $selectedRequest) }}">@csrf @method('PATCH')<button class="btn btn-success"><i class="bi bi-check-lg"></i> {{ __('اعتماد') }}</button></form>
+                <form method="POST" action="{{ route('requests.reject', $selectedRequest) }}" class="d-flex gap-2 flex-grow-1"><input type="text" name="rejection_reason" class="form-control" placeholder="{{ __('سبب الرفض (اختياري)') }}">@csrf @method('PATCH')<button class="btn btn-outline-danger">{{ __('رفض') }}</button></form>
             </div>
         @endif
     @endif
@@ -290,7 +290,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
 <div class="panel table-panel">
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th>الطلب</th><th>الموظف</th><th>النوع</th><th>التاريخ</th><th>الإجراء</th></tr></thead>
+            <thead><tr><th>{{ __('الطلب') }}</th><th>{{ __('الموظف') }}</th><th>{{ __('النوع') }}</th><th>{{ __('التاريخ') }}</th><th>{{ __('الإجراء') }}</th></tr></thead>
             <tbody>
             @forelse($requests as $hrRequest)
                 <tr data-request-id="{{ $hrRequest->id }}" data-employee-id="{{ $hrRequest->employee_id }}" data-request-date="{{ data_get($hrRequest->payload, 'request_date') ?: $hrRequest->created_at?->toIso8601String() }}">
@@ -303,19 +303,19 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
                     <td>{{ $hrRequest->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
                     <td>
                         <div class="d-flex gap-1 align-items-center">
-                            <a class="btn btn-sm btn-light" href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" title="التفاصيل"><i class="bi bi-eye"></i></a>
+                            <a class="btn btn-sm btn-light" href="{{ route('requests.index', array_merge(request()->except('page'), ['request' => $hrRequest->id])) }}" title="{{ __('التفاصيل') }}"><i class="bi bi-eye"></i></a>
                             @if(false)
-                                <form method="POST" action="{{ route('requests.approve', $hrRequest) }}">@csrf @method('PATCH')<button class="btn btn-sm btn-outline-success" title="اعتماد"><i class="bi bi-check-lg"></i></button></form>
-                                <form method="POST" action="{{ route('requests.reject', $hrRequest) }}">@csrf @method('PATCH')<input type="hidden" name="rejection_reason" value="تم الرفض من شاشة الطلبات"><button class="btn btn-sm btn-outline-danger" title="رفض"><i class="bi bi-x-lg"></i></button></form>
+                                <form method="POST" action="{{ route('requests.approve', $hrRequest) }}">@csrf @method('PATCH')<button class="btn btn-sm btn-outline-success" title="{{ __('اعتماد') }}"><i class="bi bi-check-lg"></i></button></form>
+                                <form method="POST" action="{{ route('requests.reject', $hrRequest) }}">@csrf @method('PATCH')<input type="hidden" name="rejection_reason" value="تم الرفض من شاشة الطلبات"><button class="btn btn-sm btn-outline-danger" title="{{ __('رفض') }}"><i class="bi bi-x-lg"></i></button></form>
                             @endif
                             @if($hrRequest->status === 'Pending' && auth()->user()?->hasPermission('requests.delete'))
-                                <form method="POST" action="{{ route('requests.destroy', $hrRequest) }}" onsubmit="return confirm('هل تريد حذف الطلب المعلق؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button></form>
+                                <form method="POST" action="{{ route('requests.destroy', $hrRequest) }}" onsubmit="return confirm('هل تريد حذف الطلب المعلق؟')">@csrf @method('DELETE')<button class="btn btn-sm btn-outline-danger" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button></form>
                             @endif
                         </div>
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="text-center py-5"><div class="empty-icon"><i class="bi bi-inbox"></i></div><h2 class="h5 mt-2">لا توجد طلبات</h2><p class="text-muted mb-0">لا توجد طلبات مطابقة للفلاتر الحالية.</p></td></tr>
+                <tr><td colspan="6" class="text-center py-5"><div class="empty-icon"><i class="bi bi-inbox"></i></div><h2 class="h5 mt-2">{{ __('لا توجد طلبات') }}</h2><p class="text-muted mb-0">{{ __('لا توجد طلبات مطابقة للفلاتر الحالية.') }}</p></td></tr>
             @endforelse
             </tbody>
         </table>

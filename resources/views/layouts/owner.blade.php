@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', 'لوحة تحكم المالك')</title>
+  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', __('لوحة تحكم المالك'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -39,14 +39,14 @@
   <header class="owner-topbar">
     <div class="brand">
       <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
-      <span>مسار</span>
-      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> وصول خاص</span>
+      <span>{{ __('مسار') }}</span>
+      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> {{ __('وصول خاص') }}</span>
     </div>
     <div class="owner-user">
       <span><i class="bi bi-person-circle"></i> {{ auth()->guard('owner')->user()?->name }}</span>
       <form method="POST" action="{{ route('owner.logout') }}">
         @csrf
-        <button type="submit" class="btn-logout"><i class="bi bi-box-arrow-left"></i> خروج</button>
+        <button type="submit" class="btn-logout"><i class="bi bi-box-arrow-left"></i> {{ __('خروج') }}</button>
       </form>
     </div>
   </header>
