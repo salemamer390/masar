@@ -18,6 +18,10 @@
   const config = window.masarGuidedTour;
   if (!config || !config.active || !Array.isArray(config.steps)) return;
 
+  // Preview mode (owner only): same rendering, but nothing is written to the
+  // server, the tour can be closed, and page navigation keeps the preview
+  // query parameters instead of saving progress.
+  const preview = !!config.preview;
   const labels = config.labels || {};
   let steps = [];
   let index = 0;
@@ -241,6 +245,14 @@
     const actions = document.createElement('div');
     actions.className = 'tour-actions';
 
+    if (preview) {
+      const badge = document.createElement('span');
+      badge.className = 'tour-preview-badge';
+      badge.textContent = labels.previewBadge || 'Preview';
+      popoverEl.appendChild(badge);
+      actions.appendChild(button(labels.endPreview || 'End preview', 'tour-btn-secondary', teardown));
+    }
+
     const backBtn = button(labels.back || 'Back', 'tour-btn-secondary', onBack);
     backBtn.disabled = index === 0 && phase === 'page';
 
@@ -269,9 +281,20 @@
     nextBtn.focus({ preventScroll: true });
   }
 
+  function previewUrl(step) {
+    const url = new URL(step.url, window.location.origin);
+    url.searchParams.set('tour_preview', '1');
+    url.searchParams.set('tour_step', step.key);
+    return url.toString();
+  }
+
   function navigateTo(step) {
     if (navigating) return;
     navigating = true;
+    if (preview) {
+      window.location.href = previewUrl(step);
+      return;
+    }
     // Persist where we are heading before leaving the page; the next page
     // boots straight into this stop.
     post(config.progressUrl, { step: step.key }).then(() => {
@@ -289,7 +312,7 @@
     if (samePage(step.url)) {
       index = i;
       phase = 'page';
-      post(config.progressUrl, { step: step.key });
+      if (!preview) post(config.progressUrl, { step: step.key });
       render();
       return;
     }
@@ -329,6 +352,10 @@
 
   function finish() {
     navigating = true;
+    if (preview) {
+      teardown();
+      return;
+    }
     post(config.completeUrl).then(() => teardown());
   }
 
@@ -344,11 +371,13 @@
   }
 
   // No Escape, no clicking outside: the tour stays until it is finished.
+  // Preview mode is the exception: the owner can close it any time.
   function onKeydown(event) {
     if (!active || !popoverEl) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
+      if (preview) teardown();
       return;
     }
     if (event.key === 'Tab') {
@@ -401,7 +430,7 @@
     if (!samePage(step.url)) {
       start(startIndex, 'page');
       navigating = true;
-      window.location.replace(step.url);
+      window.location.replace(preview ? previewUrl(step) : step.url);
       return;
     }
     start(startIndex, 'page');
