@@ -25,7 +25,7 @@ class WorkbookRequestImporter
     {
         foreach ($rows as $number => $row) {
             $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
-            if ($this->looksLikeHeader($key)) {
+            if ($this->looksLikeHeader($key, $row)) {
                 return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
             }
         }
@@ -165,16 +165,22 @@ class WorkbookRequestImporter
         return round($minutes / 60, 2);
     }
 
-    private function splitHeader(array $rows): array { foreach ($rows as $number => $row) { $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row))); if ($this->looksLikeHeader($key)) return [$row, array_filter($rows, fn ($unused, $line) => $line > $number, ARRAY_FILTER_USE_BOTH)]; } return [[], []]; }
+    private function splitHeader(array $rows): array { foreach ($rows as $number => $row) { $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row))); if ($this->looksLikeHeader($key, $row)) return [$row, array_filter($rows, fn ($unused, $line) => $line > $number, ARRAY_FILTER_USE_BOTH)]; } return [[], []]; }
 
     /** A request sheet header row carries the employee code and a date, in either language. */
-    private function looksLikeHeader(string $key): bool
+    private function looksLikeHeader(string $key, array $row = []): bool
     {
-        return (str_contains($key, 'كودالموظف') || str_contains($key, 'employeecode'))
-            && (str_contains($key, 'تاريخ') || str_contains($key, 'date'));
+        $hasCode = str_contains($key, 'كودالموظف') || str_contains($key, 'employeecode');
+        if (!$hasCode) {
+            // A standalone «الكود»/«كود» header cell also marks the code column.
+            foreach ($row as $value) {
+                if (in_array($this->normalise($value), ['الكود', 'كود'], true)) { $hasCode = true; break; }
+            }
+        }
+        return $hasCode && (str_contains($key, 'تاريخ') || str_contains($key, 'date'));
     }
 
-    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','employee code','code','emp code','employee id'], 'name' => ['اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ الإضافي','التاريخ','date','request date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value'], 'hours' => ['عدد الساعات','الساعات','hours','total hours'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
+    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','الكود','كود','employee code','code','emp code','employee id'], 'name' => ['اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ طلب السلفة','تاريخ الإضافي','التاريخ','date','request date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value'], 'hours' => ['عدد الساعات','الساعات','hours','total hours'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
     private function source(array $row, array $map, array $headers): ?string
     {
         $value = $map['type'] ?? null;

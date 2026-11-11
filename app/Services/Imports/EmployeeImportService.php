@@ -49,9 +49,9 @@ class EmployeeImportService
      * key => [Arabic label (also the template header), accepted header aliases]
      */
     public const COLUMNS = [
-        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code']],
-        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'staff name', 'worker name', 'employee full name']],
-        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'رقم الهوية', 'الرقم القومي للموظف', 'رقم البطاقة الشخصية', 'national id', 'national_id', 'nid', 'national number', 'national no', 'id number']],
+        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code', 'الرقم']],
+        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'الاسم الرباعي', 'staff name', 'worker name', 'employee full name']],
+        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'رقم الهوية', 'الرقم القومي للموظف', 'رقم البطاقة الشخصية', 'البطاقة', 'national id', 'national_id', 'nid', 'national number', 'national no', 'id number']],
         'insurance_number' => ['الرقم التأميني', [
             // Arabic variants used by personnel/insurance spreadsheets.
             'رقم التأمين', 'الرقم التامينى', 'رقم التأمين الاجتماعي', 'رقم التأمينات',

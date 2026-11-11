@@ -28,7 +28,7 @@ class WorkbookLeavePenaltyImporter
     {
         foreach ($rows as $number => $row) {
             $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
-            if (str_contains($key, 'كودالموظف') && (str_contains($key, 'نوعالإجازة') || str_contains($key, 'نوعالجزاء'))) {
+            if ((str_contains($key, 'كودالموظف') || $this->hasBareCodeCell($row)) && (str_contains($key, 'نوعالإجازة') || str_contains($key, 'نوعالجزاء'))) {
                 return ['header_row' => (int) $number, 'headers' => array_map(static fn ($v) => (string) $v, $row), 'map' => $this->mapHeaders($row)];
             }
         }
@@ -65,6 +65,15 @@ class WorkbookLeavePenaltyImporter
             }
         }
         return $result;
+    }
+
+    /** A standalone «الكود»/«كود» header cell also marks the employee-code column. */
+    private function hasBareCodeCell(array $row): bool
+    {
+        foreach ($row as $value) {
+            if (in_array($this->normalise($value), ['الكود', 'كود'], true)) return true;
+        }
+        return false;
     }
 
     private function importLeaves(string $sheet, array $rows, array $map, PayrollPeriodGuard $guard, PayrollRunService $payrollRuns, array &$result, array $headers = []): void
@@ -133,14 +142,14 @@ class WorkbookLeavePenaltyImporter
     {
         foreach ($rows as $number => $row) {
             $key = $this->normalise(implode(' ', array_map(static fn ($value) => (string) $value, $row)));
-            if (str_contains($key, 'كودالموظف') && (str_contains($key, 'نوعالإجازة') || str_contains($key, 'نوعالجزاء'))) return [$row, array_filter($rows, fn ($unused, $line) => $line > $number, ARRAY_FILTER_USE_BOTH)];
+            if ((str_contains($key, 'كودالموظف') || $this->hasBareCodeCell($row)) && (str_contains($key, 'نوعالإجازة') || str_contains($key, 'نوعالجزاء'))) return [$row, array_filter($rows, fn ($unused, $line) => $line > $number, ARRAY_FILTER_USE_BOTH)];
         }
         return [[], []];
     }
 
     private function mapHeaders(array $headers): array
     {
-        $aliases = ['code' => ['كود الموظف', 'employee code', 'code'], 'name' => ['اسم الموظف', 'employee name', 'name'], 'leave_type' => ['نوع الإجازة', 'leave type'], 'start' => ['من تاريخ', 'start date'], 'end' => ['إلى تاريخ', 'end date'], 'days' => ['عدد الأيام', 'days'], 'status' => ['حالة الطلب', 'حالة القرار', 'status'], 'reason' => ['ملاحظات', 'السبب', 'reason'], 'penalty_type' => ['نوع الجزاء', 'penalty type'], 'date' => ['تاريخ القرار', 'penalty date'], 'deduction' => ['أيام الخصم المطبقة', 'تعديل يدوي لأيام الخصم', 'أيام الخصم', 'deduction days']];
+        $aliases = ['code' => ['كود الموظف', 'الكود', 'كود', 'employee code', 'code'], 'name' => ['اسم الموظف', 'employee name', 'name'], 'leave_type' => ['نوع الإجازة', 'leave type'], 'start' => ['من تاريخ', 'start date'], 'end' => ['إلى تاريخ', 'end date'], 'days' => ['عدد الأيام', 'days'], 'status' => ['حالة الطلب', 'حالة القرار', 'status'], 'reason' => ['ملاحظات', 'السبب', 'reason'], 'penalty_type' => ['نوع الجزاء', 'penalty type'], 'date' => ['تاريخ القرار', 'التاريخ', 'penalty date'], 'deduction' => ['أيام الخصم المطبقة', 'تعديل يدوي لأيام الخصم', 'أيام الخصم', 'deduction days']];
         $map = []; foreach ($headers as $index => $header) { $key = $this->normalise($header); foreach ($aliases as $field => $values) if (in_array($key, array_map(fn ($value) => $this->normalise($value), $values), true)) { $map[$field] = $index; break; } } return $map;
     }
 
