@@ -146,10 +146,9 @@
     </div>
     @endforeach
 
-    <div class="alert alert-info small py-2 d-none" id="stalePreviewNote"><i class="bi bi-info-circle me-1"></i>{{ __('غيّرت الورقة أو التعيين — اضغط «تحديث المعاينة» ثم راجع النتيجة قبل الاعتماد.') }}</div>
+    <div class="alert alert-info small py-2 d-none" id="stalePreviewNote"><i class="bi bi-arrow-repeat me-1"></i>{{ __('جاري تحديث المعاينة بعد تغيير الورقة أو التعيين…') }}</div>
     <div class="d-flex gap-2 justify-content-end">
       <a href="{{ route('attendance.index') }}" class="btn btn-light">{{ __('إلغاء') }}</a>
-      <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-clockwise"></i> {{ __('تحديث المعاينة') }}</button>
       <button type="submit" class="btn btn-primary" id="confirmImport" formaction="{{ route('attendance.import') }}"><i class="bi bi-check2-circle"></i> {{ __('اعتماد واستيراد') }}</button>
     </div>
   </form>
@@ -159,17 +158,9 @@
 (() => {
   const form = document.querySelector('form[action$="/import/preview"]');
   if (!form) return;
-  const keyInput = document.getElementById('previewKey');
   const confirmBtn = document.getElementById('confirmImport');
   const note = document.getElementById('stalePreviewNote');
-  const markStale = () => {
-    keyInput.value = '';
-    confirmBtn.disabled = true;
-    note.classList.remove('d-none');
-  };
-  form.querySelectorAll('.map-select, .options-select, .options-check, .unit-radio').forEach((el) => {
-    el.addEventListener('change', markStale);
-  });
+  let refreshing = false;
   form.addEventListener('submit', () => {
     // Only the checked unit's fields are submitted, renamed to map[field]/options[field].
     form.querySelectorAll('.map-select, .options-select, .options-check').forEach((el) => { el.disabled = true; });
@@ -184,6 +175,18 @@
       overwrite.disabled = false;
       overwrite.name = 'options[overwrite]';
     }
+  });
+  // Interpretation changes (sheet, column mapping, date format) refresh the preview
+  // automatically. The overwrite acknowledgement (.options-check) is commit-time consent
+  // only: it never changes the interpretation, so it must not invalidate the preview.
+  form.querySelectorAll('.map-select, .options-select, .unit-radio').forEach((el) => {
+    el.addEventListener('change', () => {
+      if (refreshing) return;
+      refreshing = true;
+      confirmBtn.disabled = true;
+      note.classList.remove('d-none');
+      form.requestSubmit();
+    });
   });
 })();
 </script>
