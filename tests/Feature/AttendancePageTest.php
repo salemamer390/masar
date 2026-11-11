@@ -303,7 +303,8 @@ class AttendancePageTest extends TestCase
         // Static toolbar: create button opens the modal, export is a plain link, import opens its modal.
         $this->assertStringContainsString('data-bs-target="#attendanceModal"', $html);
         $this->assertStringContainsString('data-bs-target="#attendanceImportModal"', $html);
-        $this->assertMatchesRegularExpression('/<a class="btn btn-light" href="[^"]*attendance\\/export[^"]*"/', $html);
+        $this->assertMatchesRegularExpression('/<a class="btn btn-success" href="[^"]*attendance\\/export[^"]*"/', $html);
+        $this->assertMatchesRegularExpression('/<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceImportModal"/', $html);
     }
 
     public function test_export_link_carries_the_current_filters(): void
