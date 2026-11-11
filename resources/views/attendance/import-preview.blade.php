@@ -149,7 +149,6 @@
     <div class="alert alert-info small py-2 d-none" id="stalePreviewNote"><i class="bi bi-arrow-repeat me-1"></i>{{ __('جاري تحديث المعاينة بعد تغيير الورقة أو التعيين…') }}</div>
     <div class="d-flex gap-2 justify-content-end">
       <a href="{{ route('attendance.index') }}" class="btn btn-light">{{ __('إلغاء') }}</a>
-      <button type="submit" class="btn btn-outline-primary"><i class="bi bi-arrow-clockwise"></i> {{ __('تحديث المعاينة') }}</button>
       <button type="submit" class="btn btn-primary" id="confirmImport" formaction="{{ route('attendance.import') }}"><i class="bi bi-check2-circle"></i> {{ __('اعتماد واستيراد') }}</button>
     </div>
   </form>
