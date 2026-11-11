@@ -108,7 +108,28 @@
     'Insurance record updated.':'تم تحديث بيانات التأمين بنجاح.',
     'Payroll run generated in Draft status.':'تم إنشاء مسير الرواتب كمسودة.',
     'Payroll run approved.':'تم اعتماد مسير الرواتب.',
-    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.'
+    'Payroll run locked.':'تم قفل مسير الرواتب نهائيًا.',
+    'Leave request updated.':'تم تحديث طلب الإجازة بنجاح.',
+    'Leave policy saved.':'تم حفظ سياسة الإجازات.',
+    'Operational settings updated and calculations refreshed.':'تم تحديث الإعدادات وإعادة حساب النتائج.',
+    'Holiday saved.':'تم حفظ الإجازة الرسمية.',
+    'Holiday deleted.':'تم حذف الإجازة الرسمية.',
+    'Holiday updated.':'تم تحديث الإجازة الرسمية.',
+    'HR request created.':'تم إنشاء الطلب بنجاح.',
+    'HR request approved.':'تم اعتماد الطلب.',
+    'HR request rejected.':'تم رفض الطلب.',
+    'Attendance updated.':'تم تحديث الحضور بنجاح.',
+    'Attendance deleted.':'تم حذف سجل الحضور.',
+    'Organization insurance settings saved.':'تم حفظ إعدادات تأمينات المنشأة.',
+    'User created.':'تم إنشاء المستخدم بنجاح.',
+    'User updated.':'تم تحديث المستخدم بنجاح.',
+    'Penalty approved.':'تم اعتماد الجزاء.',
+    'Penalty updated.':'تم تحديث الجزاء.',
+    'Penalty deleted.':'تم حذف الجزاء.',
+    'Payroll inputs recalculated.':'تمت إعادة حساب بنود المسير.',
+    'Notifications marked as read.':'تم تعليم الإشعارات كمقروءة.',
+    'Attendance saved.':'تم حفظ الحضور بنجاح.',
+    'Attendance record saved.':'تم حفظ سجل الحضور بنجاح.'
   };
   function translateInterfaceText(root = document.body) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -121,7 +142,24 @@
       node.nodeValue = source.replace(compact, arabicUiLabels[compact]);
     });
   }
-  document.addEventListener('DOMContentLoaded', () => translateInterfaceText());
+  // Calendar date (Africa/Cairo) of a date or ISO timestamp, so UTC timestamps never shift the day.
+  window.masarYmd = function (value) {
+    const text = String(value || '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const date = new Date(text);
+    if (isNaN(date)) return text.slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', {timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit'}).format(date);
+  };
+  document.addEventListener('DOMContentLoaded', () => {
+    translateInterfaceText();
+    // Re-translate text injected later by AJAX (alerts, toasts, rebuilt rows).
+    let pending = false;
+    new MutationObserver(() => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; translateInterfaceText(); });
+    }).observe(document.body, {childList: true, subtree: true, characterData: true});
+  });
 
   // استخراج تاريخ الميلاد والنوع من الرقم القومي، بما في ذلك النماذج التي تُحقن داخل نافذة منبثقة.
   document.addEventListener('input', (event) => {

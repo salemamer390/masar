@@ -106,7 +106,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     Present: ['حاضر', 'success'], Late: ['متأخر', 'warning'], Absent: ['غائب', 'danger'], Leave: ['إجازة', 'info'],
   }[status] || [status || '—', 'secondary']);
   const attendanceDate = (value) => {
-    const parts = String(value || '').slice(0, 10).split('-');
+    const parts = window.masarYmd(value).split('-');
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—';
   };
   const attendanceLate = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, '0')}:${String(Number(minutes || 0) % 60).padStart(2, '0')}`;
@@ -121,7 +121,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
       <td>${escapeAttendanceHtml(attendance.check_in)}</td><td>${escapeAttendanceHtml(attendance.check_out)}</td>
       <td>${attendanceLate(attendance.late_minutes)}</td><td>${escapeAttendanceHtml(attendance.source || 'manual')}</td>
       <td><span class="badge-soft ${statusClass}">${statusLabel}</span></td>
-      <td><div class="attendance-row-actions"><button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${String(attendance.attendance_date || '').slice(0, 10)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form></div></td>
+      <td><div class="attendance-row-actions"><button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${window.masarYmd(attendance.attendance_date)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form></div></td>
     </tr>`;
   };
   const wireAttendanceAjaxForms = (root = document) => {
@@ -174,7 +174,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const upsertAttendanceRow = (attendance) => {
     if (!attendanceTableBody || !attendance?.id) return;
     const savedEmployeeId = attendance.employee?.id ?? attendance.employee_id;
-    const savedDate = String(attendance.attendance_date || '').slice(0, 10);
+    const savedDate = window.masarYmd(attendance.attendance_date);
     const oldRow = attendanceTableBody.querySelector(`tr[data-attendance-id="${attendance.id}"]`);
     if (oldRow) oldRow.outerHTML = attendanceRow(attendance);
     else {

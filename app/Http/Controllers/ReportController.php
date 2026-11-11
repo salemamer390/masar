@@ -92,6 +92,8 @@ class ReportController extends Controller
                 $items = Attendance::with(['employee.department', 'employee.job'])
                     ->when($request?->filled('from_date'), fn ($q) => $q->whereDate('attendance_date', '>=', $request->from_date))
                     ->when($request?->filled('to_date'), fn ($q) => $q->whereDate('attendance_date', '<=', $request->to_date))
+                    ->when($request?->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+                    ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
                     ->latest('attendance_date')->take(200)->get();
                 return [
                     'title' => 'تقرير الحضور والانصراف',
@@ -114,8 +116,8 @@ class ReportController extends Controller
                     ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))->get();
                 return [
                     'title' => 'تقرير الرواتب',
-                    'subtitle' => 'الصافي المتفق عليه وGross والتأمينات والضريبة وتكلفة الموظف',
-                    'columns' => ['الموظف', 'الوظيفة', 'القسم', 'Net المتفق عليه', 'الأجر الأساسي', 'البدلات', 'Gross', 'تأمين الموظف', 'الضريبة', 'Net النهائي', 'تكلفة الموظف'],
+                    'subtitle' => 'الصافي المتفق عليه والإجمالي والتأمينات والضريبة وتكلفة الموظف',
+                    'columns' => ['الموظف', 'الوظيفة', 'القسم', 'الصافي المتفق عليه', 'الأجر الأساسي', 'البدلات', 'الإجمالي', 'تأمين الموظف', 'الضريبة', 'الصافي النهائي', 'تكلفة الموظف'],
                     'rows' => $items->map(fn($s) => [
                         $s->employee?->full_name ?? '—',
                         $s->employee?->job?->title ?? '—',
@@ -136,6 +138,8 @@ class ReportController extends Controller
                 $items = Leave::with(['employee.department', 'leaveType'])
                     ->when($request?->filled('from_date'), fn ($q) => $q->whereDate('start_date', '>=', $request->from_date))
                     ->when($request?->filled('to_date'), fn ($q) => $q->whereDate('end_date', '<=', $request->to_date))
+                    ->when($request?->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+                    ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
                     ->latest('start_date')->take(200)->get();
                 return [
                     'title' => 'تقرير الإجازات',
@@ -176,14 +180,16 @@ class ReportController extends Controller
                     ? Carbon::parse($request->input('month'))->startOfMonth()
                     : now()->startOfMonth();
                 $items = PayrollRecord::with(['employee.department', 'employee.job'])
-                    ->whereIn('status', ['Approved', 'Locked'])
+                    ->when($request?->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
+                    ->when($request?->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
+                    ->whereIn('status', in_array($request?->input('status'), ['Approved', 'Locked'], true) ? [$request->input('status')] : ['Approved', 'Locked'])
                     ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
                     ->whereDate('payroll_month', $reportMonth->toDateString())
                     ->latest('payroll_month')->get();
                 return [
-                    'title' => 'Monthly Payroll Report',
-                    'subtitle' => 'Approved and locked payroll records only.',
-                    'columns' => ['Month', 'Employee', 'Department', 'Gross', 'Net', 'Employer Cost', 'Status'],
+                    'title' => 'تقرير مسير الرواتب الشهري',
+                    'subtitle' => 'سجلات المسير المعتمدة والمقفلة فقط.',
+                    'columns' => ['الشهر', 'الموظف', 'القسم', 'الإجمالي', 'الصافي', 'تكلفة الشركة', 'الحالة'],
                     'rows' => $items->map(fn ($record) => [
                         $record->payroll_month?->format('Y-m'), $record->employee?->full_name ?? '—',
                         $record->employee?->department?->name ?? '—', format_money($record->gross_salary),
