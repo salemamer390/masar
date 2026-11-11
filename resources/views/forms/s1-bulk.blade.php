@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>طباعة جميع نماذج س1</title>
+    <title>{{ __('طباعة جميع نماذج س1') }}</title>
     <style>
         .bulk-tools { width: 210mm; margin: 12px auto; display: flex; gap: 8px; direction: rtl; }
         .bulk-tools button, .bulk-tools a { padding: 9px 16px; border: 0; border-radius: 5px; background: #145ec8; color: #fff; font: inherit; cursor: pointer; text-decoration: none; }
@@ -15,14 +15,14 @@
 </head>
 <body>
     <div class="bulk-tools">
-        <button type="button" onclick="window.print()">طباعة جميع النماذج</button>
-        <a href="{{ route('insurance.index') }}">العودة للتأمينات</a>
+        <button type="button" onclick="window.print()">{{ __('طباعة جميع النماذج') }}</button>
+        <a href="{{ route('insurance.index') }}">{{ __('العودة للتأمينات') }}</a>
     </div>
 
     @forelse($forms as $d)
         <div class="s1-bulk">@include('forms.s1-editable', ['d' => $d, 'bulk' => true])</div>
     @empty
-        <div class="empty-state">لا يوجد موظفون لإنشاء نماذج س1.</div>
+        <div class="empty-state">{{ __('لا يوجد موظفون لإنشاء نماذج س1.') }}</div>
     @endforelse
 </body>
 </html>

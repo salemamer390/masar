@@ -37,7 +37,7 @@ class SettlementController extends Controller
                 ->latest('id')
                 ->first();
             if ($active) {
-                return redirect()->route('settlements.show', $active)->with('toast', 'توجد تسوية نشطة لهذا الموظف بالفعل.');
+                return redirect()->route('settlements.show', $active)->with('toast', __('توجد تسوية نشطة لهذا الموظف بالفعل.'));
             }
         }
 
@@ -60,7 +60,7 @@ class SettlementController extends Controller
         $employee = Employee::findOrFail((int) $data['employee_id']);
         $settlement = $this->service->start($employee, $data);
 
-        return redirect()->route('settlements.show', $settlement)->with('toast', 'تم إنشاء مسودة التسوية. راجع القرارات المطلوبة قبل الاعتماد.');
+        return redirect()->route('settlements.show', $settlement)->with('toast', __('تم إنشاء مسودة التسوية. راجع القرارات المطلوبة قبل الاعتماد.'));
     }
 
     public function show(Settlement $settlement)
@@ -88,7 +88,7 @@ class SettlementController extends Controller
 
         $this->service->updateDraft($settlement, $data);
 
-        return back()->with('toast', 'تم حفظ قرارات التسوية.');
+        return back()->with('toast', __('تم حفظ قرارات التسوية.'));
     }
 
     public function approve(Settlement $settlement)
@@ -97,8 +97,8 @@ class SettlementController extends Controller
 
         $settlement->refresh();
         $message = $settlement->reconciliation === 'draft_run'
-            ? 'تم اعتماد التسوية وإضافتها إلى مسير الرواتب المفتوح للمراجعة.'
-            : 'تم اعتماد التسوية كصرف مستقل (لا يوجد مسير مفتوح للفترة).';
+            ? __('تم اعتماد التسوية وإضافتها إلى مسير الرواتب المفتوح للمراجعة.')
+            : __('تم اعتماد التسوية كصرف مستقل (لا يوجد مسير مفتوح للفترة).');
 
         return back()->with('toast', $message);
     }
@@ -107,13 +107,13 @@ class SettlementController extends Controller
     {
         $this->service->markPaid($settlement);
 
-        return back()->with('toast', 'تم صرف التسوية وقفلها نهائيًا.');
+        return back()->with('toast', __('تم صرف التسوية وقفلها نهائيًا.'));
     }
 
     public function cancel(Settlement $settlement)
     {
         $this->service->cancel($settlement);
 
-        return redirect()->route('settlements.index')->with('toast', 'تم إلغاء مسودة التسوية.');
+        return redirect()->route('settlements.index')->with('toast', __('تم إلغاء مسودة التسوية.'));
     }
 }

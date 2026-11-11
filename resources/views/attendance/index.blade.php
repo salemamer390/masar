@@ -1,20 +1,20 @@
 @extends('layouts.app')
-@section('title','الحضور والانصراف')
+@section('title',__('الحضور والانصراف'))
 @section('content')
 @if(session('attendance_import_errors'))
-<div class="alert alert-warning mt-3"><strong>مراجعة استيراد الحضور:</strong><ul class="mb-0 mt-2">@foreach(session('attendance_import_errors') as $importError)<li>{{ $importError }}</li>@endforeach</ul></div>
+<div class="alert alert-warning mt-3"><strong>{{ __('مراجعة استيراد الحضور:') }}</strong><ul class="mb-0 mt-2">@foreach(session('attendance_import_errors') as $importError)<li>{{ $importError }}</li>@endforeach</ul></div>
 @endif
-<div class="attendance-today-label"><i class="bi bi-calendar-day"></i> اليوم — {{ today()->locale('ar')->translatedFormat('l d/m/Y') }}</div>
-<div class="attendance-stat-grid">@foreach([['حاضر اليوم',$presentToday,'green','person-check'],['غياب اليوم',$absentToday,'red','person-x'],['متأخرون',$lateToday,'orange','clock-history'],['متوسط الحضور',$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>اليوم</small></div></div>@endforeach</div>
+<div class="attendance-today-label"><i class="bi bi-calendar-day"></i> {{ __('اليوم —') }} {{ today()->locale(app()->getLocale())->translatedFormat('l d/m/Y') }}</div>
+<div class="attendance-stat-grid">@foreach([[__('حاضر اليوم'),$presentToday,'green','person-check'],[__('غياب اليوم'),$absentToday,'red','person-x'],[__('متأخرون'),$lateToday,'orange','clock-history'],[__('متوسط الحضور'),$avgCheckIn,'blue','clock']] as $stat)<div class="stat-card"><div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div><div><span>{{ $stat[0] }}</span><b>{{ $stat[1] }}</b><small>{{ __('اليوم') }}</small></div></div>@endforeach</div>
 <div class="attendance-toolbar">
-<nav class="attendance-tabs" aria-label="أقسام الحضور"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> الفترة الحالية</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> الشهور السابقة</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">استثناءات البصمات <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
+<nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">{{ __('استثناءات البصمات') }} <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
 
 </div>
 @if(\App\Models\AttendanceImportDay::where('resolution','pending')->exists())
-<div class="alert alert-warning">توجد بصمات تحتاج مراجعة قبل قفل الفترة. <a href="{{ route('attendance.exceptions.index') }}">فتح الاستثناءات</a></div>
+<div class="alert alert-warning">{{ __('توجد بصمات تحتاج مراجعة قبل قفل الفترة.') }} <a href="{{ route('attendance.exceptions.index') }}">{{ __('فتح الاستثناءات') }}</a></div>
 @endif
-@foreach($pendingPeriods as $pending)<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-hourglass-split"></i> الفترة السابقة {{ $pending->period_start->format('d/m/Y') }} - {{ $pending->period_end->format('d/m/Y') }} ما زالت متاحة للتصحيح حتى {{ $pending->closes_on->copy()->subDay()->format('d/m/Y') }}، وبعدها تتقفل وتتحفظ في «الشهور السابقة». <a href="{{ route('attendance.index', ['from_date' => $pending->period_start->toDateString(), 'to_date' => $pending->period_end->toDateString()]) }}">عرض حضور الفترة</a></div>@endforeach
-<p class="text-muted small mb-2">الفترة الحالية: من {{ \Carbon\Carbon::parse($periodStart)->format('d/m/Y') }} إلى {{ \Carbon\Carbon::parse($periodEnd)->format('d/m/Y') }}</p>
+@foreach($pendingPeriods as $pending)<div class="alert alert-warning py-2 small mb-2"><i class="bi bi-hourglass-split"></i> {{ __('الفترة السابقة') }} {{ $pending->period_start->format('d/m/Y') }} - {{ $pending->period_end->format('d/m/Y') }} {{ __('ما زالت متاحة للتصحيح حتى') }} {{ $pending->closes_on->copy()->subDay()->format('d/m/Y') }}{{ __('، وبعدها تتقفل وتتحفظ في «الشهور السابقة».') }} <a href="{{ route('attendance.index', ['from_date' => $pending->period_start->toDateString(), 'to_date' => $pending->period_end->toDateString()]) }}">{{ __('عرض حضور الفترة') }}</a></div>@endforeach
+<p class="text-muted small mb-2">{{ __('الفترة الحالية: من') }} {{ \Carbon\Carbon::parse($periodStart)->format('d/m/Y') }} {{ __('إلى') }} {{ \Carbon\Carbon::parse($periodEnd)->format('d/m/Y') }}</p>
 @if($errors->any())
 <div class="alert alert-danger py-2 px-3 small mb-2">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>
 @endif
@@ -24,45 +24,45 @@ $advancedFilters = request()->filled('from_date') || request()->filled('to_date'
 <form class="filter-bar attendance-filters" method="GET" data-server-live-search="true">
 <div class="attendance-filter-main">
 <div class="attendance-filter-controls">
-<div class="search-table attendance-filter-search"><i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="ابحث باسم الموظف أو الكود" value="{{ request('search') }}"></div>
-<select name="state" class="form-select" title="الحالة"><option value="">كل الحالات</option><option value="present" @selected(request('state')==='present')>حاضر</option><option value="late" @selected(request('state')==='late')>متأخر</option><option value="absent" @selected(request('state')==='absent')>غائب</option></select>
+<div class="search-table attendance-filter-search"><i class="bi bi-search"></i><input type="search" name="search" class="form-control" placeholder="{{ __('ابحث باسم الموظف أو الكود') }}" value="{{ request('search') }}"></div>
+<select name="state" class="form-select" title="{{ __('الحالة') }}"><option value="">{{ __('كل الحالات') }}</option><option value="present" @selected(request('state')==='present')>{{ __('حاضر') }}</option><option value="late" @selected(request('state')==='late')>{{ __('متأخر') }}</option><option value="absent" @selected(request('state')==='absent')>{{ __('غائب') }}</option></select>
 
-<button type="button" class="attendance-more-filters{{ $advancedFilters ? ' active' : '' }}" data-target="attendanceFilterExtra" aria-expanded="{{ $advancedFilters ? 'true' : 'false' }}"><i class="bi bi-sliders"></i> فلاتر متقدمة</button>
+<button type="button" class="attendance-more-filters{{ $advancedFilters ? ' active' : '' }}" data-target="attendanceFilterExtra" aria-expanded="{{ $advancedFilters ? 'true' : 'false' }}"><i class="bi bi-sliders"></i> {{ __('فلاتر متقدمة') }}</button>
 </div>
-<div class="attendance-filter-actions">@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceModal"><i class="bi bi-plus-lg"></i> تسجيل حضور</button>@endif<a class="btn btn-light" href="{{ route('attendance.export') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" title="تصدير النتائج الحالية"><i class="bi bi-file-earmark-spreadsheet"></i> تصدير CSV</a>@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#attendanceImportModal"><i class="bi bi-file-earmark-arrow-up"></i> استيراد</button>@endif</div>
+<div class="attendance-filter-actions">@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#attendanceModal"><i class="bi bi-plus-lg"></i> {{ __('تسجيل حضور') }}</button>@endif<a class="btn btn-light" href="{{ route('attendance.export') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}" title="{{ __('تصدير النتائج الحالية') }}"><i class="bi bi-file-earmark-spreadsheet"></i> {{ __('تصدير CSV') }}</a>@if(auth()->user()?->hasPermission('attendance.create'))<button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#attendanceImportModal"><i class="bi bi-file-earmark-arrow-up"></i> {{ __('استيراد') }}</button>@endif</div>
 </div>
 <div class="attendance-filter-extra" id="attendanceFilterExtra"{{ $advancedFilters ? '' : ' hidden' }}>
-<input type="date" name="from_date" class="form-control" value="{{ request('from_date') }}" title="من تاريخ"><input type="date" name="to_date" class="form-control" value="{{ request('to_date') }}" title="إلى تاريخ"><select name="employee_id" class="form-select"><option value="">كل الموظفين</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected(request('employee_id')==$employee->id)>{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><select name="department_id" class="form-select"><option value="">كل الأقسام</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id')==$department->id)>{{ $department->name }}</option>@endforeach</select>
+<input type="date" name="from_date" class="form-control" value="{{ request('from_date') }}" title="{{ __('من تاريخ') }}"><input type="date" name="to_date" class="form-control" value="{{ request('to_date') }}" title="{{ __('إلى تاريخ') }}"><select name="employee_id" class="form-select"><option value="">{{ __('كل الموظفين') }}</option>@foreach($employees as $employee)<option value="{{ $employee->id }}" @selected(request('employee_id')==$employee->id)>{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select><select name="department_id" class="form-select"><option value="">{{ __('كل الأقسام') }}</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id')==$department->id)>{{ $department->name }}</option>@endforeach</select>
 </div>
 </form>
 <div class="attendance-period-totals">
-<span class="totals-title">إجمالي الفترة حتى {{ $classifyTo->format('d/m/Y') }}:</span>
-<span><i class="bi bi-person-check text-success"></i> حضور <b>{{ $periodTotals['present'] }}</b> يوم</span>
-<span><i class="bi bi-clock-history" style="color:#b9780b"></i> تأخير <b>{{ $periodTotals['late'] }}</b> يوم</span>
-<span><i class="bi bi-person-x text-danger"></i> غياب <b>{{ $periodTotals['absent'] }}</b> يوم</span>
+<span class="totals-title">{{ __('إجمالي الفترة حتى') }} {{ $classifyTo->format('d/m/Y') }}:</span>
+<span><i class="bi bi-person-check text-success"></i> {{ __('حضور') }} <b>{{ $periodTotals['present'] }}</b> {{ __('يوم') }}</span>
+<span><i class="bi bi-clock-history" style="color:#b9780b"></i> {{ __('تأخير') }} <b>{{ $periodTotals['late'] }}</b> {{ __('يوم') }}</span>
+<span><i class="bi bi-person-x text-danger"></i> {{ __('غياب') }} <b>{{ $periodTotals['absent'] }}</b> {{ __('يوم') }}</span>
 </div>
 <div class="attendance-legend small text-muted">
-<span><span class="legend-swatch legend-late"></span> سجل به تأخير</span>
-<span><span class="legend-swatch legend-absent"></span> سجل غياب مسجَّل</span>
-<span><span class="legend-swatch legend-rejected"></span> سجل مرفوض (لا يُحتسب)</span>
+<span><span class="legend-swatch legend-late"></span> {{ __('سجل به تأخير') }}</span>
+<span><span class="legend-swatch legend-absent"></span> {{ __('سجل غياب مسجَّل') }}</span>
+<span><span class="legend-swatch legend-rejected"></span> {{ __('سجل مرفوض (لا يُحتسب)') }}</span>
 </div>
-<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>التاريخ</th><th>الموظف</th><th>القسم</th><th>الحضور</th><th>الانصراف</th><th>التأخير</th><th>المصدر</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>
+<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('الموظف') }}</th><th>{{ __('القسم') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th><th>{{ __('التأخير') }}</th><th>{{ __('المصدر') }}</th><th>{{ __('الحالة') }}</th><th>{{ __('الإجراءات') }}</th></tr></thead><tbody>
 @forelse($attendances as $row)
 <tr class="{{ $row['row_class'] }}" data-attendance-id="{{ $row['model']->id }}"><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
 @if(auth()->user()?->hasPermission('attendance.edit') || auth()->user()?->hasPermission('attendance.delete'))
-<div class="attendance-row-actions">@if(auth()->user()?->hasPermission('attendance.edit'))<button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $row['model']->id }}" data-employee-id="{{ $row['model']->employee_id }}" data-date="{{ $row['model']->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $row['model']->check_in }}" data-check-out="{{ $row['model']->check_out }}" data-status="{{ $row['model']->status }}" data-source="{{ $row['model']->source ?? 'manual' }}" title="تعديل"><i class="bi bi-pencil"></i></button>@endif @if(auth()->user()?->hasPermission('attendance.delete'))<form method="POST" action="{{ route('attendance.destroy', $row['model']) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form>@endif</div>
+<div class="attendance-row-actions">@if(auth()->user()?->hasPermission('attendance.edit'))<button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $row['model']->id }}" data-employee-id="{{ $row['model']->employee_id }}" data-date="{{ $row['model']->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $row['model']->check_in }}" data-check-out="{{ $row['model']->check_out }}" data-status="{{ $row['model']->status }}" data-source="{{ $row['model']->source ?? 'manual' }}" title="{{ __('تعديل') }}"><i class="bi bi-pencil"></i></button>@endif @if(auth()->user()?->hasPermission('attendance.delete'))<form method="POST" action="{{ route('attendance.destroy', $row['model']) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="attendance-row-btn attendance-row-delete" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button></form>@endif</div>
 @endif
 </td></tr>
 @empty
-<tr><td colspan="9" class="text-center py-5">لا توجد سجلات ضمن الفترة المحددة.</td></tr>
+<tr><td colspan="9" class="text-center py-5">{{ __('لا توجد سجلات ضمن الفترة المحددة.') }}</td></tr>
 @endforelse
 </tbody></table></div></div>
 <x-pagination-controls :paginator="$attendances" />
 @php
 $recordModels = $attendances->getCollection()->pluck('model')->filter()->values();
 @endphp
-<div class="modal fade" id="attendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>تسجيل حضور</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input class="form-control" type="date" name="attendance_date" value="{{ date('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">الحضور <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_in" required></div><div class="col-6"><label class="form-label">الانصراف <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_out" required></div><div class="col-6"><label class="form-label">دقائق التأخير</label><input class="form-control" type="number" min="0" name="late_minutes" value="0"></div><div class="col-6"><label class="form-label">المصدر</label><select class="form-select" name="source"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل API</option></select></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ كمسودة</button></div></form></div></div></div>
-<div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>تعديل سجل الحضور</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">الموظف</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">التاريخ</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الحضور</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">وقت الانصراف</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">المصدر</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">إدخال يدوي</option><option value="device">جهاز حضور</option><option value="api">تكامل نظامي</option></select></div></div><p class="small text-muted mt-3 mb-0">سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div></form></div></div></div>
+<div class="modal fade" id="attendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" action="{{ route('attendance.store') }}">@csrf<div class="modal-header"><h5>{{ __('تسجيل حضور') }}</h5><button class="btn-close" data-bs-dismiss="modal" type="button"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">{{ __('الموظف') }}</label><select name="employee_id" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">{{ __('التاريخ') }}</label><input class="form-control" type="date" name="attendance_date" value="{{ date('Y-m-d') }}" required></div><div class="col-6"><label class="form-label">{{ __('الحضور') }} <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_in" required></div><div class="col-6"><label class="form-label">{{ __('الانصراف') }} <span class="text-danger">*</span></label><input class="form-control" type="time" name="check_out" required></div><div class="col-6"><label class="form-label">{{ __('دقائق التأخير') }}</label><input class="form-control" type="number" min="0" name="late_minutes" value="0"></div><div class="col-6"><label class="form-label">{{ __('المصدر') }}</label><select class="form-select" name="source"><option value="manual">{{ __('إدخال يدوي') }}</option><option value="device">{{ __('جهاز حضور') }}</option><option value="api">{{ __('تكامل API') }}</option></select></div></div></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ كمسودة') }}</button></div></form></div></div></div>
+<div class="modal fade" id="editAttendanceModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="editAttendanceForm">@csrf @method('PUT')<div class="modal-header"><h5>{{ __('تعديل سجل الحضور') }}</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label">{{ __('الموظف') }}</label><select name="employee_id" id="editAttendanceEmployee" class="form-select" required>@foreach($employees as $employee)<option value="{{ $employee->id }}">{{ $employee->full_name }} — #{{ $employee->employee_code }}</option>@endforeach</select></div><div class="row g-2"><div class="col-6"><label class="form-label">{{ __('التاريخ') }}</label><input name="attendance_date" id="editAttendanceDate" type="date" class="form-control" required></div><div class="col-6"><label class="form-label">{{ __('وقت الحضور') }}</label><input name="check_in" id="editAttendanceCheckIn" type="time" class="form-control" required></div><div class="col-6"><label class="form-label">{{ __('وقت الانصراف') }}</label><input name="check_out" id="editAttendanceCheckOut" type="time" class="form-control" required></div><div class="col-12"><label class="form-label">{{ __('المصدر') }}</label><select name="source" id="editAttendanceSource" class="form-select"><option value="manual">{{ __('إدخال يدوي') }}</option><option value="device">{{ __('جهاز حضور') }}</option><option value="api">{{ __('تكامل نظامي') }}</option></select></div></div><p class="small text-muted mt-3 mb-0">{{ __('سيُعاد السجل إلى المسودة للمراجعة بعد حفظ التعديل.') }}</p></div><div class="modal-footer"><button class="btn btn-light" type="button" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ التعديل') }}</button></div></form></div></div></div>
 @push('styles')<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-01.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-01.css')) }}">@endpush
 @push('styles')<link rel="stylesheet" href="{{ asset('css/pages/attendance-index-02.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-02.css')) }}">@endpush
 @push('scripts')
@@ -103,7 +103,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const attendanceTableBody = document.querySelector('.table-panel table tbody');
   const escapeAttendanceHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   const attendanceStatus = (status) => ({
-    Present: ['حاضر', 'success'], Late: ['متأخر', 'warning'], Absent: ['غائب', 'danger'], Leave: ['إجازة', 'info'],
+    Present: [window.masarT('حاضر'), 'success'], Late: [window.masarT('متأخر'), 'warning'], Absent: [window.masarT('غائب'), 'danger'], Leave: [window.masarT('إجازة'), 'info'],
   }[status] || [status || '—', 'secondary']);
   const attendanceDate = (value) => {
     const parts = window.masarYmd(value).split('-');
@@ -121,20 +121,20 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
       <td>${escapeAttendanceHtml(attendance.check_in)}</td><td>${escapeAttendanceHtml(attendance.check_out)}</td>
       <td>${attendanceLate(attendance.late_minutes)}</td><td>${escapeAttendanceHtml(attendance.source || 'manual')}</td>
       <td><span class="badge-soft ${statusClass}">${statusLabel}</span></td>
-      <td><div class="attendance-row-actions"><button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${window.masarYmd(attendance.attendance_date)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="تعديل"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="attendance-row-btn attendance-row-delete" title="حذف"><i class="bi bi-trash"></i></button></form></div></td>
+      <td><div class="attendance-row-actions"><button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="${id}" data-employee-id="${employee.id || ''}" data-date="${window.masarYmd(attendance.attendance_date)}" data-check-in="${escapeAttendanceHtml(attendance.check_in)}" data-check-out="${escapeAttendanceHtml(attendance.check_out)}" data-status="${escapeAttendanceHtml(attendance.status)}" data-source="${escapeAttendanceHtml(attendance.source || 'manual')}" title="${window.masarT("تعديل")}"><i class="bi bi-pencil"></i></button><form method="POST" action="${attendanceBaseUrl}/${id}" onsubmit="return confirm('${window.masarT("هل تريد حذف سجل الحضور؟")}')"><input type="hidden" name="_token" value="${escapeAttendanceHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="attendance-row-btn attendance-row-delete" title="${window.masarT("حذف")}"><i class="bi bi-trash"></i></button></form></div></td>
     </tr>`;
   };
   const wireAttendanceAjaxForms = (root = document) => {
     root.querySelectorAll('#attendanceModal form, #editAttendanceForm').forEach((form) => {
       form.dataset.ajax = 'true';
-      form.dataset.ajaxLabel = 'جارٍ الحفظ';
+      form.dataset.ajaxLabel = window.masarT('جارٍ الحفظ');
     });
     root.querySelectorAll('form[action*="/attendance/"] input[name="_method"][value="DELETE"]').forEach((methodInput) => {
       const form = methodInput.form;
       if (!form) return;
       form.dataset.ajax = 'true';
-      form.dataset.ajaxLabel = 'جارٍ الحذف';
-      form.dataset.ajaxConfirm = 'هل تريد حذف سجل الحضور؟';
+      form.dataset.ajaxLabel = window.masarT('جارٍ الحذف');
+      form.dataset.ajaxConfirm = window.masarT('هل تريد حذف سجل الحضور؟');
       form.removeAttribute('onsubmit');
     });
   };
@@ -214,8 +214,8 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     const byId = new Map(employees.map((employee) => [String(employee.id), employee]));
     const employeeSearch = document.createElement('input');
     employeeSearch.type = 'search'; employeeSearch.className = 'attendance-employee-search';
-    employeeSearch.placeholder = 'ابحث باسم الموظف أو الكود';
-    employeeSearch.setAttribute('aria-label', 'البحث عن الموظف بالاسم أو الكود');
+    employeeSearch.placeholder = window.masarT('ابحث باسم الموظف أو الكود');
+    employeeSearch.setAttribute('aria-label', window.masarT('البحث عن الموظف بالاسم أو الكود'));
     const employeeSearchBox = document.createElement('div');
     employeeSearchBox.className = 'search-table attendance-employee-search-box mb-2';
     employeeSearchBox.innerHTML = '<i class="bi bi-search"></i>';
@@ -253,7 +253,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     document.addEventListener('click', (event) => {
       if (!employeeSearchBox.contains(event.target) && !suggestions.contains(event.target)) suggestions.hidden = true;
     });
-    employeeSelect.title = 'يمكنك البحث بالاسم أو كود الموظف';
+    employeeSelect.title = window.masarT('يمكنك البحث بالاسم أو كود الموظف');
   }
   if (lateMinutes) lateMinutes.closest('.col-6')?.remove();
   const resetDefaults = () => {
@@ -282,15 +282,15 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     // Keep the dynamically added cells aligned with the static header order:
     // late, day overtime, night overtime, source, status, actions.
     const insertBefore = cells[cells.length - 3];
-    const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = 'الإضافي النهاري';
-    const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = 'الإضافي الليلي';
+    const day = document.createElement('td'); day.textContent = overtime ? formatMinutes(overtime.day) : '—'; day.dataset.label = @js(__('الإضافي النهاري'));
+    const night = document.createElement('td'); night.textContent = overtime ? formatMinutes(overtime.night) : '—'; night.dataset.label = @js(__('الإضافي الليلي'));
     row.insertBefore(day, insertBefore); row.insertBefore(night, insertBefore);
     row.dataset.overtimeColumns = '1';
   };
   const head = table.tHead?.rows[0];
   if (head && !head.dataset.overtimeColumns) {
     const sourceHead = head.cells[6];
-    if (sourceHead) { const day = document.createElement('th'); day.textContent = 'الإضافي النهاري'; const night = document.createElement('th'); night.textContent = 'الإضافي الليلي'; head.insertBefore(day, sourceHead); head.insertBefore(night, sourceHead); }
+    if (sourceHead) { const day = document.createElement('th'); day.textContent = @js(__('الإضافي النهاري')); const night = document.createElement('th'); night.textContent = @js(__('الإضافي الليلي')); head.insertBefore(day, sourceHead); head.insertBefore(night, sourceHead); }
     head.dataset.overtimeColumns = '1';
   }
   table.tBodies[0]?.querySelectorAll('tr').forEach(addOvertimeColumns);
@@ -336,7 +336,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 @push('scripts')
 <script>
 (() => {
-  document.querySelector('#attendanceModal button.btn-primary')?.replaceChildren(document.createTextNode('حفظ السجل'));
+  document.querySelector('#attendanceModal button.btn-primary')?.replaceChildren(document.createTextNode(window.masarT('حفظ السجل')));
 })();
 </script>
 @endpush
@@ -361,7 +361,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
             <input class="form-control" id="attendanceImportFile" type="file" name="file" accept=".xlsx,.csv,.txt" required>
             <div class="form-text">الحد الأقصى 20MB. السجلات المكررة لنفس الموظف والتاريخ يتم تحديثها.</div>
           </div>
-          <div class="px-3 pb-2" data-att-progress hidden role="status" aria-live="polite"><div class="small mb-1" data-att-progress-label>جارٍ رفع الملف...</div><progress class="w-100" max="100" data-att-progress-bar aria-label="تقدم رفع الملف"></progress></div>
+          <div class="px-3 pb-2" data-att-progress hidden role="status" aria-live="polite"><div class="small mb-1" data-att-progress-label>{{ __('جارٍ رفع الملف...') }}</div><progress class="w-100" max="100" data-att-progress-bar aria-label="{{ __('تقدم رفع الملف') }}"></progress></div>
           <div class="alert alert-danger small mx-3" data-att-error hidden role="alert"></div>
           <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" type="submit"><i class="bi bi-upload"></i> بدء الاستيراد</button></div>
         </form>
@@ -370,7 +370,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
   const modal = document.getElementById('attendanceImportModal');
   const form = modal.querySelector('form');
   const input = modal.querySelector('#attendanceImportFile');
-  window.MasarImportDropzone?.init(input, { maxBytes: 20 * 1024 * 1024 });
+  window.MasarImportDropzone?.init(input, { maxBytes: 20 * 1024 * 1024, i18n: { title: @js(__('اسحب الملف وأفلته هنا، أو اضغط للاختيار')), badType: @js(__('نوع الملف غير مدعوم. المسموح: ')), tooBig: @js(__('الملف أكبر من الحجم المسموح (')), oneFile: @js(__('ارفع ملفًا واحدًا فقط.')) } });
   const panel = modal.querySelector('[data-att-progress]');
   const bar = modal.querySelector('[data-att-progress-bar]');
   const label = modal.querySelector('[data-att-progress-label]');
@@ -381,22 +381,22 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     if (!window.XMLHttpRequest || !window.FormData) return;
     e.preventDefault();
     showErr('');
-    if (!input.files.length) { showErr('اختر ملفًا أولًا.'); return; }
+    if (!input.files.length) { showErr(@js(__('اختر ملفًا أولًا.'))); return; }
     const xhr = new XMLHttpRequest();
     xhr.open('POST', form.action);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.setRequestHeader('X-Import-Upload', '1');
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     panel.hidden = false; submitBtn.disabled = true;
-    bar.removeAttribute('value'); label.textContent = 'جارٍ رفع الملف...';
+    bar.removeAttribute('value'); label.textContent = @js(__('جارٍ رفع الملف...'));
     xhr.upload.onprogress = (ev) => {
       if (!ev.lengthComputable) return;
       const p = Math.min(100, Math.floor(ev.loaded / ev.total * 100));
-      bar.value = p; label.textContent = 'رفع الملف: ' + p + '٪';
+      bar.value = p; label.textContent = @js(__('رفع الملف: ')) + p + @js(__('٪'));
     };
-    xhr.upload.onload = () => { bar.removeAttribute('value'); label.textContent = 'اكتمل الرفع. جارٍ فحص الملف على الخادم...'; };
+    xhr.upload.onload = () => { bar.removeAttribute('value'); label.textContent = @js(__('اكتمل الرفع. جارٍ فحص الملف على الخادم...')); };
     const done = () => { panel.hidden = true; submitBtn.disabled = false; };
-    xhr.onerror = xhr.onabort = xhr.ontimeout = () => { done(); showErr('تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.'); };
+    xhr.onerror = xhr.onabort = xhr.ontimeout = () => { done(); showErr(@js(__('تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.'))); };
     xhr.onload = () => {
       done();
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -415,9 +415,9 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
       }
       let msg = '';
       try { const d = JSON.parse(xhr.responseText); msg = d.errors ? Object.values(d.errors).flat()[0] : d.message; } catch (x) {}
-      if (xhr.status === 419) msg = 'انتهت صلاحية الجلسة. أعد تحميل الصفحة وحاول مرة أخرى.';
-      if (xhr.status === 413) msg = 'الملف أكبر من الحجم المسموح به على الخادم.';
-      showErr(msg || 'حدث خطأ غير متوقع أثناء معالجة الملف.');
+      if (xhr.status === 419) msg = @js(__('انتهت صلاحية الجلسة. أعد تحميل الصفحة وحاول مرة أخرى.'));
+      if (xhr.status === 413) msg = @js(__('الملف أكبر من الحجم المسموح به على الخادم.'));
+      showErr(msg || @js(__('حدث خطأ غير متوقع أثناء معالجة الملف.')));
     };
     xhr.send(new FormData(form));
   });
@@ -453,9 +453,9 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     })->all();
   @endphp
   const details = @json($attendanceDetails);
-  const labels = {employee:'الموظف', code:'كود الموظف', department:'القسم', date:'التاريخ', check_in:'الحضور', check_out:'الانصراف', late:'التأخير', early:'الانصراف المبكر', worked:'ساعات العمل', day_overtime:'الإضافي النهاري', night_overtime:'الإضافي الليلي', status:'الحالة', source:'المصدر'};
+  const labels = {employee:window.masarT('الموظف'), code:window.masarT('كود الموظف'), department:window.masarT('القسم'), date:window.masarT('التاريخ'), check_in:window.masarT('الحضور'), check_out:window.masarT('الانصراف'), late:window.masarT('التأخير'), early:window.masarT('الانصراف المبكر'), worked:window.masarT('ساعات العمل'), day_overtime:window.masarT('الإضافي النهاري'), night_overtime:window.masarT('الإضافي الليلي'), status:window.masarT('الحالة'), source:window.masarT('المصدر')};
   const esc = (value) => String(value ?? '—').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-  document.body.insertAdjacentHTML('beforeend', `<div class="offcanvas offcanvas-end" tabindex="-1" id="attendanceDetailsPanel" aria-labelledby="attendanceDetailsTitle"><div class="offcanvas-header"><h5 id="attendanceDetailsTitle">تفاصيل سجل الحضور</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="إغلاق"></button></div><div class="offcanvas-body"><div class="attendance-detail-list" id="attendanceDetailList"></div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div class="offcanvas offcanvas-end" tabindex="-1" id="attendanceDetailsPanel" aria-labelledby="attendanceDetailsTitle"><div class="offcanvas-header"><h5 id="attendanceDetailsTitle">${window.masarT("تفاصيل سجل الحضور")}</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="${window.masarT("إغلاق")}"></button></div><div class="offcanvas-body"><div class="attendance-detail-list" id="attendanceDetailList"></div></div></div>`);
   const panel = document.getElementById('attendanceDetailsPanel');
   const list = document.getElementById('attendanceDetailList');
   table.querySelectorAll('tbody tr[data-attendance-id], tbody tr').forEach((row) => {
@@ -465,9 +465,9 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     row.addEventListener('click', (event) => {
       if (event.target.closest('a,button,form,input,select,textarea')) return;
       const groups = [
-        {title:'أوقات الدوام', icon:'bi-clock', keys:['date','check_in','check_out','worked']},
-        {title:'التأخير والانصراف المبكر', icon:'bi-exclamation-triangle', className:'attendance-detail-group--late', keys:['late','early']},
-        {title:'الساعات الإضافية', icon:'bi-plus-circle', className:'attendance-detail-group--overtime', keys:['day_overtime','night_overtime']},
+        {title:window.masarT('أوقات الدوام'), icon:'bi-clock', keys:['date','check_in','check_out','worked']},
+        {title:window.masarT('التأخير والانصراف المبكر'), icon:'bi-exclamation-triangle', className:'attendance-detail-group--late', keys:['late','early']},
+        {title:window.masarT('الساعات الإضافية'), icon:'bi-plus-circle', className:'attendance-detail-group--overtime', keys:['day_overtime','night_overtime']},
       ];
       list.innerHTML = groups.map((group) => `<section class="attendance-detail-group ${group.className || ''}"><h6 class="attendance-detail-group-title"><i class="bi ${group.icon}"></i>${group.title}</h6><div class="attendance-detail-list">${group.keys.filter((key) => Object.prototype.hasOwnProperty.call(details[id], key)).map((key) => { const value = details[id][key]; const zero = ['00:00','0','0.00',0,null,'—'].includes(value); return `<div class="attendance-detail-item attendance-detail-item--${key} ${zero ? 'is-zero' : ''}"><small>${labels[key] || key}</small><strong>${esc(value)}</strong></div>`; }).join('')}</div></section>`).join('');
       bootstrap.Offcanvas.getOrCreateInstance(panel).show();

@@ -344,7 +344,7 @@ class PayrollController extends Controller
 
                 return [
                     'month' => $date->format('Y-m-01'),
-                    'label' => $arabicMonths[$date->month - 1] . ' ' . $date->year,
+                    'label' => $date->locale(app()->getLocale())->translatedFormat('F Y'),
                     'status' => $status,
                     'status_label' => $status ? ($statusLabels[$status] ?? $status) : '—',
                     'employees' => (int) $row->employees,
@@ -502,7 +502,7 @@ class PayrollController extends Controller
     private function requireCompany(): int
     {
         $companyId = auth()->user()?->company_id;
-        abort_if(!$companyId, 403, 'حساب بدون شركة لا يمكنه إنشاء مسير رواتب.');
+        abort_if(!$companyId, 403, __('حساب بدون شركة لا يمكنه إنشاء مسير رواتب.'));
 
         return (int) $companyId;
     }
@@ -523,10 +523,10 @@ class PayrollController extends Controller
         $targetMonth = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $existing = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $targetMonth->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
-            return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا. أنشئ مسيرًا للشهر التالي أو راجع المسير الحالي.']);
+            return back()->withErrors(['payroll' => __('لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا. أنشئ مسيرًا للشهر التالي أو راجع المسير الحالي.')]);
         }
         $service->generate($targetMonth, null, $companyId);
-        return back()->with('toast', 'تم إنشاء/تحديث مسودة مسير ' . $targetMonth->translatedFormat('F Y') . ' وحفظ لقطة القواعد المستخدمة.');
+        return back()->with('toast', __('تم إنشاء/تحديث مسودة مسير') . $targetMonth->translatedFormat('F Y') . ' وحفظ لقطة القواعد المستخدمة.');
     }
 
     public function generateRun(Request $request, PayrollRunService $service)
@@ -535,10 +535,10 @@ class PayrollController extends Controller
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $existing = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
-            return back()->withErrors(['payroll' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.']);
+            return back()->withErrors(['payroll' => __('لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.')]);
         }
         $service->generate($month, null, $companyId);
-        return back()->with('toast', 'تم إنشاء مسير الرواتب كمسودة.');
+        return back()->with('toast', __('تم إنشاء مسير الرواتب كمسودة.'));
     }
 
     public function startGeneration(Request $request, PayrollRunService $service)
@@ -548,7 +548,7 @@ class PayrollController extends Controller
         $existing = PayrollRun::where('company_id', $companyId)
             ->whereDate('payroll_month', $month->toDateString())->first();
         if ($existing && in_array($existing->status, ['Approved', 'Locked'], true)) {
-            return response()->json(['message' => 'لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.'], 422);
+            return response()->json(['message' => __('لا يمكن تحديث مسير تم اعتماده أو قفله نهائيًا.')], 422);
         }
 
         $run = DB::transaction(function () use ($month, $existing, $companyId) {
@@ -573,7 +573,7 @@ class PayrollController extends Controller
         $batchSize = (int) ($data['batch_size'] ?? 25);
         $ids = $allIds->slice($offset, $batchSize)->values()->all();
         $run = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->firstOrFail();
-        abort_unless($run->status === 'Generating', 422, 'لا توجد عملية إنشاء نشطة لهذا الشهر.');
+        abort_unless($run->status === 'Generating', 422, __('لا توجد عملية إنشاء نشطة لهذا الشهر.'));
         if ($ids) $service->generate($month, $ids, $companyId);
         $processed = min($offset + count($ids), $allIds->count());
         $complete = $processed >= $allIds->count();
@@ -595,7 +595,7 @@ class PayrollController extends Controller
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return back()->withErrors(['payroll' => $e->getMessage()]);
         }
-        return back()->with('toast', 'تم اعتماد مسير الرواتب.');
+        return back()->with('toast', __('تم اعتماد مسير الرواتب.'));
     }
 
     public function lockRun(PayrollRun $payrollRun, PayrollRunService $service)
@@ -606,7 +606,7 @@ class PayrollController extends Controller
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return back()->withErrors(['payroll' => $e->getMessage()]);
         }
-        return back()->with('toast', 'تم قفل مسير الرواتب نهائيًا.');
+        return back()->with('toast', __('تم قفل مسير الرواتب نهائيًا.'));
     }
 
     /**
@@ -630,25 +630,25 @@ class PayrollController extends Controller
         } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
             return back()->withErrors(['payroll' => $e->getMessage()]);
         }
-        return back()->with('toast', 'تم قفل الفترة نهائيًا: الحضور والملخص المحفوظ والمسير وسجلاته اتثبتوا ومش هيقبلوا تعديل.');
+        return back()->with('toast', __('تم قفل الفترة نهائيًا: الحضور والملخص المحفوظ والمسير وسجلاته اتثبتوا ومش هيقبلوا تعديل.'));
     }
 
     public function approve(PayrollRecord $payrollRecord)
     {
         $this->assertSameCompanyRecord($payrollRecord);
         if ($payrollRecord->is_locked || $payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid', 'Locked', 'Approved', 'معتمدة'], true)) {
-            return back()->with('toast', 'لا يمكن تغيير حالة هذا الراتب لأنه معتمد أو مقفل أو مصروف.');
+            return back()->with('toast', __('لا يمكن تغيير حالة هذا الراتب لأنه معتمد أو مقفل أو مصروف.'));
         }
         $payrollRecord->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
         ActivityLog::record('payroll_approve', "تم اعتماد راتب {$payrollRecord->employee?->full_name}.", $payrollRecord);
-        return back()->with('toast', 'تم اعتماد الراتب.');
+        return back()->with('toast', __('تم اعتماد الراتب.'));
     }
 
     /** Update variable monthly inputs without changing the employee's fixed salary structure. */
     public function updateInputs(Request $request, PayrollRecord $payrollRecord, PayrollRunService $service)
     {
         $this->assertSameCompanyRecord($payrollRecord);
-        abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, 'لا يمكن تعديل مدخلات مسير معتمد أو مقفل.');
+        abort_if($payrollRecord->is_locked || !in_array($payrollRecord->status, ['Draft', 'قيد الإعداد'], true), 422, __('لا يمكن تعديل مدخلات مسير معتمد أو مقفل.'));
         $data = $request->validate([
             'ot_day_hours'=>['nullable','numeric','min:0'], 'ot_night_hours'=>['nullable','numeric','min:0'],
             'bonus'=>['nullable','numeric','min:0'], 'loans'=>['nullable','numeric','min:0'],
@@ -656,17 +656,17 @@ class PayrollController extends Controller
             'other_earnings'=>['nullable','numeric','min:0'], 'other_deductions'=>['nullable','numeric','min:0'],
         ]);
         $salary = $payrollRecord->salary ?? Salary::find($payrollRecord->salary_id);
-        abort_unless($salary, 422, 'لا يوجد هيكل راتب مرتبط بهذا السجل.');
+        abort_unless($salary, 422, __('لا يوجد هيكل راتب مرتبط بهذا السجل.'));
         $snapshot = $payrollRecord->calculation_snapshot ?? [];
         $advanceDetails = (array) ($snapshot['advance_details'] ?? []);
         $advanceAvailable = round(collect($advanceDetails)->sum(fn ($detail) => (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0)), 2);
         $advanceRate = $request->filled('advance_rate') ? (float) $data['advance_rate'] : null;
         $advanceAmount = $advanceRate !== null ? round((float) $payrollRecord->gross_salary * $advanceRate / 100, 2) : (float) ($data['loans'] ?? 0);
         if ($advanceDetails && $advanceAmount > $advanceAvailable) {
-            return back()->withErrors(['advance_rate' => 'قيمة خصم السلفة تتجاوز الرصيد المتبقي منها.']);
+            return back()->withErrors(['advance_rate' => __('قيمة خصم السلفة تتجاوز الرصيد المتبقي منها.')]);
         }
         if (!$advanceDetails && $advanceRate !== null && $advanceAmount > 0) {
-            return back()->withErrors(['advance_rate' => 'لا توجد سلفة مجدولة لهذا الموظف في هذا المسير.']);
+            return back()->withErrors(['advance_rate' => __('لا توجد سلفة مجدولة لهذا الموظف في هذا المسير.')]);
         }
         $remainingToAllocate = $advanceAmount;
         $updatedAdvanceDetails = array_map(function (array $detail) use (&$remainingToAllocate): array {
@@ -699,7 +699,7 @@ class PayrollController extends Controller
                 + (float) $updatedRecord->profit_share + (float) $updatedRecord->other_earnings);
             return response()->json(['success' => true, 'message' => 'Payroll inputs recalculated.', 'record' => $updatedRecord]);
         }
-        return back()->with('toast', 'تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.');
+        return back()->with('toast', __('تمت إعادة حساب راتب الموظف من المدخلات المتغيرة.'));
     }
 
     private function insuranceDueForExistingRecord(PayrollRecord $record): bool
@@ -716,24 +716,24 @@ class PayrollController extends Controller
     public function destroyRun(PayrollRun $payrollRun, PayrollRunService $service)
     {
         $this->assertSameCompany($payrollRun);
-        abort_unless(auth()->user()?->hasPermission('payroll.delete'), 403, 'حذف المسير متاح لمدير الشركة أو لدور مُنح هذه الصلاحية.');
+        abort_unless(auth()->user()?->hasPermission('payroll.delete'), 403, __('حذف المسير متاح لمدير الشركة أو لدور مُنح هذه الصلاحية.'));
         $service->destroy($payrollRun);
-        return back()->with('toast', 'تم حذف المسير وسجلاته.');
+        return back()->with('toast', __('تم حذف المسير وسجلاته.'));
     }
 
     public function pay(PayrollRecord $payrollRecord)
     {
         $this->assertSameCompanyRecord($payrollRecord);
         if ($payrollRecord->paid_at !== null || in_array($payrollRecord->status, ['تم الصرف', 'Paid'], true)) {
-            return back()->with('toast', 'هذا الراتب تم صرفه بالفعل.');
+            return back()->with('toast', __('هذا الراتب تم صرفه بالفعل.'));
         }
         if (!in_array($payrollRecord->status, ['Approved', 'Locked', 'معتمدة'], true)) {
-            return back()->withErrors(['payroll' => 'يجب اعتماد الراتب قبل تسجيل الصرف.']);
+            return back()->withErrors(['payroll' => __('يجب اعتماد الراتب قبل تسجيل الصرف.')]);
         }
         // A locked record keeps its Locked status; paid_at marks the payment.
         $payrollRecord->update(['paid_at' => now(), 'status' => $payrollRecord->is_locked ? $payrollRecord->status : 'Paid']);
         ActivityLog::record('payroll_pay', "تم صرف راتب الموظف ({$payrollRecord->employee?->full_name}) لشهر {$payrollRecord->payroll_month->format('m/Y')}.", $payrollRecord);
-        return back()->with('toast', 'تم تسجيل صرف الراتب بنجاح.');
+        return back()->with('toast', __('تم تسجيل صرف الراتب بنجاح.'));
     }
 
     public function export(Request $request)

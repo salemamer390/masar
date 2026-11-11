@@ -16,7 +16,7 @@ class EnsureActiveCompanySubscription
             \Illuminate\Support\Facades\Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            abort(403, 'هذا الحساب معطل حاليًا.');
+            abort(403, __('هذا الحساب معطل حاليًا.'));
         }
         if ($user->isSuperAdmin()) return $next($request);
 
@@ -24,18 +24,18 @@ class EnsureActiveCompanySubscription
         if ($request->routeIs('logout', 'company.account', 'company.renewals.store')) return $next($request);
 
         if (!$user->company_id || !$user->company || $user->company->status !== 'active') {
-            abort(403, 'حساب الشركة غير نشط حاليًا. يرجى التواصل مع مدير المنصة.');
+            abort(403, __('حساب الشركة غير نشط حاليًا. يرجى التواصل مع مدير المنصة.'));
         }
 
         $subscription = CompanySubscription::where('company_id', $user->company_id)
             ->whereIn('status', ['trial', 'active'])->latest('id')->first();
         if (!$subscription) {
-            abort(403, 'لا يوجد اشتراك نشط لهذه الشركة. يرجى التواصل لتفعيل الاشتراك.');
+            abort(403, __('لا يوجد اشتراك نشط لهذه الشركة. يرجى التواصل لتفعيل الاشتراك.'));
         }
 
         if ($subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) {
             $subscription->update(['status' => 'expired']);
-            abort(403, 'انتهت مدة التجربة أو الاشتراك. يرجى التواصل مع مدير المنصة لتجديده.');
+            abort(403, __('انتهت مدة التجربة أو الاشتراك. يرجى التواصل مع مدير المنصة لتجديده.'));
         }
 
         return $next($request);

@@ -48,9 +48,9 @@ class PenaltyController extends Controller
             'amount' => ['nullable', 'numeric', 'min:0'],
             'deduction_days' => ['nullable', 'numeric', 'min:0'],
         ], [
-            'employee_id.required' => 'الموظف مطلوب.',
-            'penalty_date.required' => 'تاريخ الجزاء مطلوب.',
-            'reason.required' => 'سبب المخالفة مطلوب.',
+            'employee_id.required' => __('الموظف مطلوب.'),
+            'penalty_date.required' => __('تاريخ الجزاء مطلوب.'),
+            'reason.required' => __('سبب المخالفة مطلوب.'),
         ]);
         $periodGuard->ensureOpen($validated['penalty_date']);
         $employee = Employee::findOrFail($validated['employee_id']);
@@ -61,7 +61,7 @@ class PenaltyController extends Controller
             if (!$type) {
                 // No usable penalty type: report it clearly instead of falling back
                 // to a hard-coded id that may not exist (foreign-key failure).
-                $message = 'لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.';
+                $message = __('لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.');
                 return $request->wantsJson()
                     ? response()->json(['message' => $message, 'errors' => ['penalty_type_id' => [$message]]], 422)
                     : back()->withErrors(['penalty_type_id' => $message])->withInput();
@@ -94,18 +94,18 @@ class PenaltyController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم تسجيل الإجراء التأديبي',
+                'message' => __('تم تسجيل الإجراء التأديبي'),
                 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType']),
             ]);
         }
 
-        return back()->with('toast', 'تم تسجيل الإجراء التأديبي');
+        return back()->with('toast', __('تم تسجيل الإجراء التأديبي'));
     }
 
     public function close(Penalty $penalty, PayrollPeriodGuard $periodGuard, Request $request, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureOpen($penalty->penalty_date);
-        abort_if(in_array($penalty->status, Penalty::inactiveStatuses(), true), 422, 'الجزاء ملغى.');
+        abort_if(in_array($penalty->status, Penalty::inactiveStatuses(), true), 422, __('الجزاء ملغى.'));
         $penalty->update([
             'status' => 'Approved',
             'closed_at' => now(),
@@ -116,7 +116,7 @@ class PenaltyController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty approved.', 'penalty' => $penalty->fresh()])
-            : back()->with('toast', 'تم إغلاق الإجراء التأديبي بنجاح');
+            : back()->with('toast', __('تم إغلاق الإجراء التأديبي بنجاح'));
     }
 
     public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -152,7 +152,7 @@ class PenaltyController extends Controller
         ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty updated.', 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType'])])
-            : back()->with('toast', 'تم تحديث الإجراء وإعادته للمراجعة.');
+            : back()->with('toast', __('تم تحديث الإجراء وإعادته للمراجعة.'));
     }
 
     public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -164,6 +164,6 @@ class PenaltyController extends Controller
         ActivityLog::record('penalty_delete', 'تم حذف إجراء تأديبي.', null, $snapshot, null, 'discipline');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty deleted.', 'penalty_id' => $snapshot['id']])
-            : back()->with('toast', 'تم حذف السجل');
+            : back()->with('toast', __('تم حذف السجل'));
     }
 }

@@ -18,7 +18,7 @@ class CompanyAccountController extends Controller
             return redirect()->route('subscriptions.index');
         }
 
-        abort_unless($user->company_id, 403, 'الحساب غير مرتبط بشركة.');
+        abort_unless($user->company_id, 403, __('الحساب غير مرتبط بشركة.'));
 
         // Every query below is explicitly scoped to the authenticated company.
         $companyId = $user->company_id;

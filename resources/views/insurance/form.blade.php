@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>نموذج س1 - {{ $insuranceRecord->employee?->full_name }}</title>
+    <title>{{ __('نموذج س1 -') }} {{ $insuranceRecord->employee?->full_name }}</title>
     <style>
         @page { size: A4 portrait; margin: 0; }
         * { box-sizing: border-box; }
@@ -26,7 +26,7 @@
     </style>
 </head>
 <body>
-    <div class="toolbar"><button type="button" onclick="window.print()">طباعة نموذج س1</button><a href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
+    <div class="toolbar"><button type="button" onclick="window.print()">{{ __('طباعة نموذج س1') }}</button><a href="{{ route('insurance.index') }}">{{ __('العودة للتأمينات') }}</a></div>
 
     @php
         $employee = $insuranceRecord->employee;
@@ -53,10 +53,10 @@
         <span class="field" style="top:76.7mm;right:73mm">{{ $employee?->full_name ?: '' }}</span>
         <span class="field digits" style="top:77.5mm;right:55mm">@foreach(str_split($insuranceNumber) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
         <span class="field digits" style="top:87.8mm;right:55mm">@foreach(str_split($nationalId) as $d)<span class="digit">{{ trim($d) !== '' ? $arabicDigits($d) : '' }}</span>@endforeach</span>
-        <span class="field" style="top:98.2mm;right:81mm">{{ $employee?->gender === 'female' ? 'أنثى' : 'ذكر' }}</span>
+        <span class="field" style="top:98.2mm;right:81mm">{{ $employee?->gender === 'female' ? __('أنثى') : __('ذكر') }}</span>
         <span class="field" style="top:98.2mm;right:52mm">{{ $employee?->job?->title ?: '' }}</span>
         <span class="field ltr" style="top:108.7mm;right:39mm">{{ $start ? $arabicDigits($start) : '' }}</span>
-        <span class="field" style="top:119.5mm;right:60mm">{{ $insuranceRecord->insurance_category ?: 'العاملون لدى الغير' }}</span>
+        <span class="field" style="top:119.5mm;right:60mm">{{ $insuranceRecord->insurance_category ?: __('العاملون لدى الغير') }}</span>
         <span class="field ltr" style="top:136.3mm;right:119mm">{{ $insuranceRecord->insured_salary !== null ? $arabicDigits(number_format((float) $insuranceRecord->insured_salary, 2)) : '' }}</span>
         <span class="field ltr" style="top:136.3mm;right:61mm">{{ $insuranceRecord->insured_salary !== null ? $arabicDigits(number_format((float) $insuranceRecord->insured_salary, 2)) : '' }}</span>
         <span class="field" style="top:184.7mm;right:79mm">{{ $organization?->organization_name ?: '' }}</span>

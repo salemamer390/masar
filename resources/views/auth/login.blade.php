@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
   <link rel="shortcut icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>تسجيل الدخول — MASAR HR</title>
+  <title>{{ __('تسجيل الدخول — MASAR HR') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -59,8 +59,8 @@
     <div class="login-brand-icon login-brand-logo">
       <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
     </div>
-    <h1 class="h4 fw-bold mb-1">مسار — MASAR HR</h1>
-    <p class="text-muted small mb-0">نظام إدارة الموارد البشرية وشؤون العاملين</p>
+    <h1 class="h4 fw-bold mb-1">{{ __('مسار — MASAR HR') }}</h1>
+    <p class="text-muted small mb-0">{{ __('نظام إدارة الموارد البشرية وشؤون العاملين') }}</p>
   </div>
 
   @if($errors->any())
@@ -72,37 +72,37 @@
   <form action="{{ route('login.attempt') }}" method="POST">
     @csrf
     <div class="mb-3">
-      <label class="form-label small fw-bold">البريد الإلكتروني</label>
+      <label class="form-label small fw-bold">{{ __('البريد الإلكتروني') }}</label>
       <div class="input-group">
         <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-muted"></i></span>
-        <input type="email" name="email" class="form-control border-start-0" placeholder="أدخل البريد الإلكتروني" value="{{ old('email') }}" required autofocus autocomplete="username">
+        <input type="email" name="email" class="form-control border-start-0" placeholder="{{ __('أدخل البريد الإلكتروني') }}" value="{{ old('email') }}" required autofocus autocomplete="username">
       </div>
     </div>
 
     <div class="mb-3">
-      <label class="form-label small fw-bold">كلمة المرور</label>
+      <label class="form-label small fw-bold">{{ __('كلمة المرور') }}</label>
       <div class="input-group">
         <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-muted"></i></span>
-        <input type="password" name="password" class="form-control border-start-0" placeholder="أدخل كلمة المرور" required autocomplete="current-password">
+        <input type="password" name="password" class="form-control border-start-0" placeholder="{{ __('أدخل كلمة المرور') }}" required autocomplete="current-password">
       </div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div class="form-check">
         <input class="form-check-input" type="checkbox" name="remember" id="rememberMe" checked>
-        <label class="form-check-label small text-muted" for="rememberMe">تذكرني</label>
+        <label class="form-check-label small text-muted" for="rememberMe">{{ __('تذكرني') }}</label>
       </div>
-      <small class="text-muted">استخدم بيانات الحساب المخصصة لك</small>
+      <small class="text-muted">{{ __('استخدم بيانات الحساب المخصصة لك') }}</small>
     </div>
 
     <button type="submit" class="btn btn-primary w-100 py-2 fw-bold d-flex justify-content-center align-items-center gap-2">
-      <i class="bi bi-box-arrow-in-left"></i> تسجيل الدخول
+      <i class="bi bi-box-arrow-in-left"></i> {{ __('تسجيل الدخول') }}
     </button>
   </form>
 
   <div class="text-center mt-3">
     <button type="button" class="btn btn-link text-decoration-none" data-bs-toggle="modal" data-bs-target="#companyRegistrationModal">
-      <i class="bi bi-building-add me-1"></i> تسجيل شركة جديدة
+      <i class="bi bi-building-add me-1"></i> {{ __('تسجيل شركة جديدة') }}
     </button>
   </div>
 
@@ -110,22 +110,22 @@
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
       <form action="{{ route('register.company') }}" method="POST">
         @csrf
-        <div class="modal-header"><h5 class="modal-title">تسجيل شركة جديدة</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button></div>
+        <div class="modal-header"><h5 class="modal-title">{{ __('تسجيل شركة جديدة') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}"></button></div>
         <div class="modal-body">
-          <p class="text-muted small">سيتم إنشاء حساب مدير الشركة وتفعيل باقة 20 موظف تلقائيًا.</p>
-          <div class="mb-3"><label class="form-label">اسم الشركة</label><input name="company_name" class="form-control" value="{{ old('company_name') }}" required></div>
-          <div class="mb-3"><label class="form-label">اسم مدير الشركة</label><input name="owner_name" class="form-control" value="{{ old('owner_name') }}" required></div>
-          <div class="mb-3"><label class="form-label">البريد الإلكتروني</label><input type="email" name="email" class="form-control" value="{{ old('email') }}" required autocomplete="email"></div>
-          <div class="mb-3"><label class="form-label">رقم الهاتف <small class="text-muted">(اختياري)</small></label><input name="phone" class="form-control" value="{{ old('phone') }}"></div>
-          <div class="row g-2"><div class="col-md-6"><label class="form-label">كلمة المرور</label><input type="password" name="password" class="form-control" required minlength="8" autocomplete="new-password"></div><div class="col-md-6"><label class="form-label">تأكيد كلمة المرور</label><input type="password" name="password_confirmation" class="form-control" required minlength="8" autocomplete="new-password"></div></div>
+          <p class="text-muted small">{{ __('سيتم إنشاء حساب مدير الشركة وتفعيل باقة 20 موظف تلقائيًا.') }}</p>
+          <div class="mb-3"><label class="form-label">{{ __('اسم الشركة') }}</label><input name="company_name" class="form-control" value="{{ old('company_name') }}" required></div>
+          <div class="mb-3"><label class="form-label">{{ __('اسم مدير الشركة') }}</label><input name="owner_name" class="form-control" value="{{ old('owner_name') }}" required></div>
+          <div class="mb-3"><label class="form-label">{{ __('البريد الإلكتروني') }}</label><input type="email" name="email" class="form-control" value="{{ old('email') }}" required autocomplete="email"></div>
+          <div class="mb-3"><label class="form-label">{{ __('رقم الهاتف') }} <small class="text-muted">{{ __('(اختياري)') }}</small></label><input name="phone" class="form-control" value="{{ old('phone') }}"></div>
+          <div class="row g-2"><div class="col-md-6"><label class="form-label">{{ __('كلمة المرور') }}</label><input type="password" name="password" class="form-control" required minlength="8" autocomplete="new-password"></div><div class="col-md-6"><label class="form-label">{{ __('تأكيد كلمة المرور') }}</label><input type="password" name="password_confirmation" class="form-control" required minlength="8" autocomplete="new-password"></div></div>
         </div>
-        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i> إنشاء الحساب</button></div>
+        <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i> {{ __('إنشاء الحساب') }}</button></div>
       </form>
     </div></div>
   </div>
 
   <div class="mt-4 pt-3 border-top text-center">
-    <small class="text-muted">نظام إدارة الموارد البشرية MASAR HR</small>
+    <small class="text-muted">{{ __('نظام إدارة الموارد البشرية MASAR HR') }}</small>
   </div>
 </div>
 

@@ -19,7 +19,7 @@ class GlobalSuperAdminOnly
     public function handle(Request $request, Closure $next)
     {
         if (!OwnerGate::allows($request->user())) {
-            return redirect()->route('dashboard')->with('error', 'إدارة كل الشركات والاشتراكات مخصصة لحساب مالك المنصة المنفصل فقط.');
+            return redirect()->route('dashboard')->with('error', __('إدارة كل الشركات والاشتراكات مخصصة لحساب مالك المنصة المنفصل فقط.'));
         }
 
         return $next($request);

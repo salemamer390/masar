@@ -82,7 +82,7 @@ class LeaveController extends Controller
         $end = Carbon::parse($data['end_date']);
         $this->ensureOwnedReferences($data);
         if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
-            abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
+            abort(403, __('لا يملك المستخدم صلاحية منح إجازة استثنائية.'));
         }
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $periodGuard->ensureRangeOpen($start, $end);
@@ -91,14 +91,14 @@ class LeaveController extends Controller
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
         if ($overlap) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'يوجد طلب إجازة متداخل مع هذه المدة.'], 422)
-                : back()->withErrors(['leave' => 'يوجد طلب إجازة متداخل مع هذه المدة.'])->withInput();
+                ? response()->json(['message' => __('يوجد طلب إجازة متداخل مع هذه المدة.')], 422)
+                : back()->withErrors(['leave' => __('يوجد طلب إجازة متداخل مع هذه المدة.')])->withInput();
         }
         $days = $this->workingDays($start, $end);
         if ($days < 1) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'الفترة المحددة لا تحتوي على أيام عمل.'], 422)
-                : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل.'])->withInput();
+                ? response()->json(['message' => __('الفترة المحددة لا تحتوي على أيام عمل.')], 422)
+                : back()->withErrors(['leave' => __('الفترة المحددة لا تحتوي على أيام عمل.')])->withInput();
         }
         $previousEmployee = $leave->employee;
         $previousStart = $leave->start_date->copy();
@@ -141,7 +141,7 @@ class LeaveController extends Controller
         ActivityLog::record('leave_update', 'Leave request updated.', $leave, $oldValues, $leave->only(['employee_id', 'leave_type_id', 'start_date', 'end_date', 'days', 'status']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request updated.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
-            : back()->with('toast', 'تم تحديث طلب الإجازة بنجاح.');
+            : back()->with('toast', __('تم تحديث طلب الإجازة بنجاح.'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -164,21 +164,21 @@ class LeaveController extends Controller
         $end = Carbon::parse($data['end_date']);
         $this->ensureOwnedReferences($data);
         if (!empty($data['is_early_grant']) && !auth()->user()?->hasPermission('leaves.approve')) {
-            abort(403, 'لا يملك المستخدم صلاحية منح إجازة استثنائية.');
+            abort(403, __('لا يملك المستخدم صلاحية منح إجازة استثنائية.'));
         }
         $periodGuard->ensureRangeOpen($start, $end);
         $overlap = Leave::where('employee_id', $data['employee_id'])->effective()
             ->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
         if ($overlap) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.'], 422)
-                : back()->withErrors(['leave' => 'يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.'])->withInput();
+                ? response()->json(['message' => __('يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.')], 422)
+                : back()->withErrors(['leave' => __('يوجد طلب إجازة غير مرفوض يتداخل مع هذه المدة.')])->withInput();
         }
         $days = $this->workingDays($start, $end);
         if ($days < 1) {
             return $request->wantsJson()
-                ? response()->json(['message' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'], 422)
-                : back()->withErrors(['leave' => 'الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.'])->withInput();
+                ? response()->json(['message' => __('الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.')], 422)
+                : back()->withErrors(['leave' => __('الفترة المحددة لا تحتوي على أيام عمل وفق تقويم الشركة.')])->withInput();
         }
         $leave = new Leave(array_merge($data, [
             'start_date' => $start->toDateString(), 'end_date' => $end->toDateString(),
@@ -200,14 +200,14 @@ class LeaveController extends Controller
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request created.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
-            : back()->with('toast', 'تم إنشاء طلب الإجازة بنجاح.');
+            : back()->with('toast', __('تم إنشاء طلب الإجازة بنجاح.'));
     }
 
     public function approve(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
         $periodGuard->ensureRangeOpen($leave->start_date, $leave->end_date);
         $oldValues = $leave->only(['status', 'manager_approved_by', 'manager_approved_at', 'approved_by', 'approved_at']);
-        abort_if(in_array($leave->status, Leave::inactiveStatuses(), true), 422, 'لا يمكن إعادة تفعيل إجازة ملغاة من رابط اعتماد قديم.');
+        abort_if(in_array($leave->status, Leave::inactiveStatuses(), true), 422, __('لا يمكن إعادة تفعيل إجازة ملغاة من رابط اعتماد قديم.'));
         $this->leaveBalances->validateForApproval($leave, $leave->id);
         $leave->update(['status' => 'Approved', 'approved_by' => auth()->id(), 'approved_at' => now(), 'early_grant_approved_by' => $leave->is_early_grant ? auth()->id() : null, 'early_grant_approved_at' => $leave->is_early_grant ? now() : null]);
         $this->leaveStatus->sync();
@@ -215,7 +215,7 @@ class LeaveController extends Controller
         ActivityLog::record('leave_approve', 'Leave request approved by HR.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request approved.', 'leave' => $leave->fresh()])
-            : back()->with('toast', 'تم اعتماد طلب الإجازة بنجاح.');
+            : back()->with('toast', __('تم اعتماد طلب الإجازة بنجاح.'));
     }
 
     public function reject(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -233,7 +233,7 @@ class LeaveController extends Controller
         ActivityLog::record('leave_reject', 'Leave request rejected.', $leave, $oldValues, $leave->only(['status', 'approved_by', 'approved_at', 'rejection_reason']), 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request rejected.', 'leave' => $leave->fresh()])
-            : back()->with('toast', 'تم رفض طلب الإجازة.');
+            : back()->with('toast', __('تم رفض طلب الإجازة.'));
     }
 
     public function destroy(Leave $leave, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
@@ -252,7 +252,7 @@ class LeaveController extends Controller
         ActivityLog::record('leave_delete', 'Leave request deleted.', null, $snapshot, null, 'leaves');
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request deleted.', 'leave_id' => $snapshot['id']])
-            : back()->with('toast', 'تم حذف طلب الإجازة.');
+            : back()->with('toast', __('تم حذف طلب الإجازة.'));
     }
 
     /**

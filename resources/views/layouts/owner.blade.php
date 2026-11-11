@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', 'لوحة تحكم المالك')</title>
+  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', __('لوحة تحكم المالك'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -34,25 +34,28 @@
     .owner-content { padding: 24px; }
   </style>
   @stack('styles')
+@if(app()->getLocale() === 'en')<link href="{{ asset('ltr.css') }}" rel="stylesheet">@endif
+@include('components.interface-i18n')
 </head>
 <body>
   <header class="owner-topbar">
     <div class="brand">
       <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
-      <span>مسار</span>
-      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> وصول خاص</span>
+      <span>{{ __('مسار') }}</span>
+      <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> {{ __('وصول خاص') }}</span>
     </div>
     <div class="owner-user">
       <span><i class="bi bi-person-circle"></i> {{ auth()->guard('owner')->user()?->name }}</span>
       <form method="POST" action="{{ route('owner.logout') }}">
         @csrf
-        <button type="submit" class="btn-logout"><i class="bi bi-box-arrow-left"></i> خروج</button>
+        <button type="submit" class="btn-logout"><i class="bi bi-box-arrow-left"></i> {{ __('خروج') }}</button>
       </form>
     </div>
   </header>
 
   <main class="owner-content">
-    @yield('content')
+    <nav aria-label="{{ __('اللغة') }}"><a href="{{ route('locale.switch','ar') }}">العربية</a> | <a href="{{ route('locale.switch','en') }}">English</a></nav>
+@yield('content')
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>

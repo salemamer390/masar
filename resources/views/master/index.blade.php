@@ -1,44 +1,44 @@
 @extends('layouts.app')
-@section('title','القوائم الأساسية')
+@section('title',__('القوائم الأساسية'))
 @section('content')
-<div class="page-head"><div><h1>القوائم الأساسية</h1><p>إدارة البيانات المرجعية المستخدمة في نماذج النظام.</p></div></div>
+<div class="page-head"><div><h1>{{ __('القوائم الأساسية') }}</h1><p>{{ __('إدارة البيانات المرجعية المستخدمة في نماذج النظام.') }}</p></div></div>
 <div class="master-layout">
     <aside class="master-sidebar">
-        <div class="master-menu-title">القوائم</div>
+        <div class="master-menu-title">{{ __('القوائم') }}</div>
         @foreach($meta as $key=>$m)
-            <a class="master-menu text-decoration-none {{$type===$key?'active':''}}" href="{{route('master.index',['type'=>$key])}}"><span>{{$m['title']}}</span><span>{{$counts[$key]??0}}</span></a>
+            <a class="master-menu text-decoration-none {{$type===$key?'active':''}}" href="{{route('master.index',['type'=>$key])}}"><span>{{__($m['title'])}}</span><span>{{$counts[$key]??0}}</span></a>
         @endforeach
     </aside>
     <section class="panel master-data-panel">
         <div class="panel-head">
-            <div><h3>{{$currentMeta['title']}}</h3><span>{{$currentMeta['desc']}}</span></div>
+            <div><h3>{{__($currentMeta['title'])}}</h3><span>{{__($currentMeta['desc'])}}</span></div>
             <div class="d-flex gap-2">
-                @if(auth()->user()?->hasPermission('roles.edit'))<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#masterModal"><i class="bi bi-plus-lg"></i> إضافة</button>@endif
+                @if(auth()->user()?->hasPermission('roles.edit'))<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#masterModal"><i class="bi bi-plus-lg"></i> {{ __('إضافة') }}</button>@endif
             </div>
         </div>
-        <div class="p-3"><div class="search-table master-search"><i class="bi bi-search"></i><input id="masterSearch" placeholder="بحث..."></div></div>
+        <div class="p-3"><div class="search-table master-search"><i class="bi bi-search"></i><input id="masterSearch" placeholder="{{ __('بحث...') }}"></div></div>
         <div class="master-rows" id="masterRows">
             @if($type === 'documents')
-                @php($documentGroups=['basic'=>'مستندات أساسية','job'=>'مستندات خاصة بالوظيفة','workplace'=>'مستندات خاصة بمكتب العمل'])
+                @php($documentGroups=['basic'=>__('مستندات أساسية'),'job'=>__('مستندات خاصة بالوظيفة'),'workplace'=>__('مستندات خاصة بمكتب العمل')])
                 @foreach($documentGroups as $groupKey=>$groupLabel)
                     <div class="master-group-title">{{$groupLabel}}</div>
                     @forelse($items->where('category',$groupKey) as $item)
                         <div class="master-row master-document-row document-type-card">
                             <b>{{$item->name}}</b>
-                            <span>{{$item->is_required?'مطلوب لكل موظف':'حسب الحاجة'}}</span>
+                            <span>{{$item->is_required?__('مطلوب لكل موظف'):__('حسب الحاجة')}}</span>
                             <div class="d-flex align-items-center justify-content-end gap-2">
-                                <em>{{$item->is_active?'نشط':'غير نشط'}}</em>
+                                <em>{{$item->is_active?__('نشط'):__('غير نشط')}}</em>
                                 @if(auth()->user()?->hasPermission('roles.edit') && $item->is_active)
-                                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editDocumentType{{$item->id}}"><i class="bi bi-pencil-square"></i> تعديل</button>
+                                    <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editDocumentType{{$item->id}}"><i class="bi bi-pencil-square"></i> {{ __('تعديل') }}</button>
                                     <form method="POST" action="{{route('master.documents.destroy',$item)}}" onsubmit="return confirm('هل تريد حذف نوع المستند: {{$item->name}}؟')">
                                         @csrf @method('DELETE')
-                                        <button class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button>
                                     </form>
                                 @endif
                             </div>
                         </div>
                     @empty
-                        <div class="text-muted small p-2">لا توجد عناصر في هذا القسم.</div>
+                        <div class="text-muted small p-2">{{ __('لا توجد عناصر في هذا القسم.') }}</div>
                     @endforelse
                 @endforeach
             @else
@@ -46,19 +46,19 @@
                     <div class="master-row">
                         <b>{{$item->{$currentMeta['name_col']}??'—'}}</b>
                         <span>{{$item->{$currentMeta['code_col']}??'—'}}</span>
-                        <em>{{($item->is_active ?? true) ? 'نشط' : 'غير نشط'}}</em>
+                        <em>{{($item->is_active ?? true) ? __('نشط') : __('غير نشط')}}</em>
                         @if(auth()->user()?->hasPermission('roles.edit') && ($item->is_active ?? true))
                             <div class="master-row-actions">
-                                <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editMaster{{$item->id}}" title="تعديل"><i class="bi bi-pencil-square"></i> تعديل</button>
+                                <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editMaster{{$item->id}}" title="{{ __('تعديل') }}"><i class="bi bi-pencil-square"></i> {{ __('تعديل') }}</button>
                                 <form method="POST" action="{{route('master.destroy', [$type, $item->id])}}" onsubmit="return confirm('هل تريد حذف هذا العنصر؟')">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف"><i class="bi bi-trash"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button>
                                 </form>
                             </div>
                         @endif
                     </div>
                 @empty
-                    <div class="text-center text-muted py-5">لا توجد عناصر.</div>
+                    <div class="text-center text-muted py-5">{{ __('لا توجد عناصر.') }}</div>
                 @endforelse
             @endif
         </div>
@@ -68,17 +68,17 @@
 <div class="modal fade" id="masterModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
         <form method="POST" action="{{route('master.store',$type)}}">@csrf
-            <div class="modal-header"><h5>إضافة {{$currentMeta['title']}}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5>{{ __('إضافة') }} {{__($currentMeta['title'])}}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <label class="form-label">الاسم</label><input name="name" class="form-control" required>
-                <label class="form-label mt-3">الكود / البيان الإضافي</label><input name="code" class="form-control">
+                <label class="form-label">{{ __('الاسم') }}</label><input name="name" class="form-control" required>
+                <label class="form-label mt-3">{{ __('الكود / البيان الإضافي') }}</label><input name="code" class="form-control">
                 @if($type === 'documents')
-                    <label class="form-label mt-3">القسم</label>
-                    <select name="category" class="form-select"><option value="basic">مستندات أساسية</option><option value="job">مستندات خاصة بالوظيفة</option><option value="workplace">مستندات خاصة بمكتب العمل</option></select>
-                    <label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="required" value="1"><span class="form-check-label">مستند مطلوب لكل موظف</span></label>
+                    <label class="form-label mt-3">{{ __('القسم') }}</label>
+                    <select name="category" class="form-select"><option value="basic">{{ __('مستندات أساسية') }}</option><option value="job">{{ __('مستندات خاصة بالوظيفة') }}</option><option value="workplace">{{ __('مستندات خاصة بمكتب العمل') }}</option></select>
+                    <label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="required" value="1"><span class="form-check-label">{{ __('مستند مطلوب لكل موظف') }}</span></label>
                 @endif
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ') }}</button></div>
         </form>
     </div></div>
 </div>
@@ -88,14 +88,14 @@
         <div class="modal fade" id="editDocumentType{{$item->id}}" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
                 <form method="POST" action="{{route('master.documents.update',$item)}}">@csrf @method('PUT')
-                    <div class="modal-header"><h5>تعديل نوع المستند</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5>{{ __('تعديل نوع المستند') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
-                        <label class="form-label">الاسم</label><input name="name" class="form-control" value="{{$item->name}}" required>
-                        <label class="form-label mt-3">القسم</label>
-                        <select name="category" class="form-select"><option value="basic" @selected($item->category==='basic')>مستندات أساسية</option><option value="job" @selected($item->category==='job')>مستندات خاصة بالوظيفة</option><option value="workplace" @selected($item->category==='workplace')>مستندات خاصة بمكتب العمل</option></select>
-                        <label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="required" value="1" @checked($item->is_required)><span class="form-check-label">مستند مطلوب لكل موظف</span></label>
+                        <label class="form-label">{{ __('الاسم') }}</label><input name="name" class="form-control" value="{{$item->name}}" required>
+                        <label class="form-label mt-3">{{ __('القسم') }}</label>
+                        <select name="category" class="form-select"><option value="basic" @selected($item->category==='basic')>{{ __('مستندات أساسية') }}</option><option value="job" @selected($item->category==='job')>{{ __('مستندات خاصة بالوظيفة') }}</option><option value="workplace" @selected($item->category==='workplace')>{{ __('مستندات خاصة بمكتب العمل') }}</option></select>
+                        <label class="form-check mt-3"><input class="form-check-input" type="checkbox" name="required" value="1" @checked($item->is_required)><span class="form-check-label">{{ __('مستند مطلوب لكل موظف') }}</span></label>
                     </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديلات</button></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ التعديلات') }}</button></div>
                 </form>
             </div></div>
         </div>
@@ -107,14 +107,14 @@
         <div class="modal fade" id="editMaster{{$item->id}}" tabindex="-1">
             <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
                 <form method="POST" action="{{route('master.update', [$type, $item->id])}}">@csrf @method('PUT')
-                    <div class="modal-header"><h5>تعديل العنصر</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-header"><h5>{{ __('تعديل العنصر') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
-                        <label class="form-label">الاسم</label>
+                        <label class="form-label">{{ __('الاسم') }}</label>
                         <input name="name" class="form-control" value="{{$item->{$currentMeta['name_col']} ?? ''}}" required>
-                        <label class="form-label mt-3">الكود / البيان الإضافي</label>
+                        <label class="form-label mt-3">{{ __('الكود / البيان الإضافي') }}</label>
                         <input name="code" class="form-control" value="{{$item->{$currentMeta['code_col']} ?? ''}}">
                     </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary">حفظ التعديل</button></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button><button class="btn btn-primary">{{ __('حفظ التعديل') }}</button></div>
                 </form>
             </div></div>
         </div>
@@ -149,9 +149,9 @@ document.addEventListener('masar:success', event => {
     const row = document.createElement('div');
     row.className = masterType === 'documents' ? 'master-row master-document-row document-type-card' : 'master-row';
     if (masterType === 'documents') {
-        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${item.is_required ? 'مطلوب لكل موظف' : 'حسب الحاجة'}</span><div><em>${item.is_active === false ? 'غير نشط' : 'نشط'}</em></div>`;
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${item.is_required ? window.masarT('مطلوب لكل موظف') : window.masarT('حسب الحاجة')}</span><div><em>${item.is_active === false ? window.masarT('غير نشط') : window.masarT('نشط')}</em></div>`;
     } else {
-        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${escapeMaster(code)}</span><em>نشط</em>`;
+        row.innerHTML = `<b>${escapeMaster(name)}</b><span>${escapeMaster(code)}</span><em>${window.masarT("نشط")}</em>`;
     }
     masterRows.querySelector('.text-center.text-muted')?.remove();
     masterRows.appendChild(row);
@@ -177,9 +177,9 @@ if (masterType === 'documents') {
     };
     const bindDocumentForms = () => documentForms().filter(isDocumentForm).forEach(form => {
         form.dataset.ajax = 'true';
-        form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? 'جارٍ الحذف' : 'جارٍ الحفظ';
+        form.dataset.ajaxLabel = form.querySelector('input[name="_method"][value="DELETE"]') ? window.masarT('جارٍ الحذف') : window.masarT('جارٍ الحفظ');
         if (form.querySelector('input[name="_method"][value="DELETE"]')) {
-            form.dataset.ajaxConfirm = 'هل تريد حذف نوع المستند؟';
+            form.dataset.ajaxConfirm = window.masarT('هل تريد حذف نوع المستند؟');
             form.removeAttribute('onsubmit');
         }
     });

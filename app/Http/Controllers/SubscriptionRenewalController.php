@@ -18,14 +18,14 @@ class SubscriptionRenewalController extends Controller
     {
         $user = $request->user();
         abort_unless($user?->company_id, 403);
-        abort_unless($user->role?->name === 'hr_manager', 403, 'طلب التجديد متاح لمدير الشركة فقط.');
+        abort_unless($user->role?->name === 'hr_manager', 403, __('طلب التجديد متاح لمدير الشركة فقط.'));
         $data = $request->validate([
             'request_type' => ['required', 'in:renewal,upgrade,change'],
             'plan_id' => ['required', 'exists:subscription_plans,id'],
             'billing_period' => ['required', 'in:monthly,yearly'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
-        abort_if(SubscriptionRenewalRequest::where('company_id', $user->company_id)->where('status', 'pending')->exists(), 422, 'يوجد طلب تجديد أو ترقية قيد المراجعة بالفعل.');
+        abort_if(SubscriptionRenewalRequest::where('company_id', $user->company_id)->where('status', 'pending')->exists(), 422, __('يوجد طلب تجديد أو ترقية قيد المراجعة بالفعل.'));
 
         $plan = SubscriptionPlan::whereKey($data['plan_id'])->where('is_active', true)->firstOrFail();
         $renewal = SubscriptionRenewalRequest::create([
@@ -43,18 +43,18 @@ class SubscriptionRenewalController extends Controller
             ->each(fn (User $admin) => $admin->notify(new SubscriptionRenewalRequestedNotification($renewal)));
         ActivityLog::record('subscription_renewal_request', 'تم إرسال طلب تجديد أو ترقية اشتراك.', $renewal, null, $renewal->toArray(), 'subscriptions');
 
-        return back()->with('toast', 'تم إرسال طلب التجديد للمراجعة. سيتم تفعيل الاشتراك بعد اعتماده.');
+        return back()->with('toast', __('تم إرسال طلب التجديد للمراجعة. سيتم تفعيل الاشتراك بعد اعتماده.'));
     }
 
     public function update(Request $request, SubscriptionRenewalRequest $renewal)
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected']]);
-        abort_if($renewal->status !== 'pending', 422, 'تمت معالجة هذا الطلب بالفعل.');
+        abort_if($renewal->status !== 'pending', 422, __('تمت معالجة هذا الطلب بالفعل.'));
         if ($data['status'] === 'approved') {
             abort_unless(
                 SubscriptionPlan::whereKey($renewal->subscription_plan_id)->where('is_active', true)->exists(),
                 422,
-                'لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.'
+                __('لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.')
             );
         }
 

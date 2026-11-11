@@ -1,3 +1,4 @@
+const masarDashboardI18n = (key, fallback) => (window.dashboardI18n && window.dashboardI18n[key]) || fallback;
 document.addEventListener('DOMContentLoaded', () => {
   const modalEl = document.getElementById('dashboardDetailModal');
   const body = document.getElementById('dashboardDetailBody');
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const appendPage = async () => {
       if (button.disabled) return;
       button.disabled = true;
-      button.textContent = 'جارٍ التحميل...';
+      button.textContent = masarDashboardI18n('loading', 'جارٍ التحميل...');
       try {
         const response = await fetch(button.dataset.dashboardNext, {headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html'}});
         if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -32,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         wireMore();
       } catch (error) {
         button.disabled = false;
-        button.textContent = 'تعذر التحميل. إعادة المحاولة';
+        button.textContent = masarDashboardI18n('retry', 'تعذر التحميل. إعادة المحاولة');
       }
     };
     button.addEventListener('click', appendPage);
@@ -64,12 +65,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const alternate = path.includes('/index.php/') ? null : `${window.location.origin}${path.replace('/dashboard/', '/index.php/dashboard/')}`;
         if (!fallbackTried && error?.status === 404 && alternate && alternate !== url) return load(alternate, true);
         console.error('Dashboard details request failed', {url, error});
-        body.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل التفاصيل.<small class="d-block mt-2 text-muted">${error?.message || 'تحقق من اتصال قاعدة البيانات ومسار التطبيق.'}</small><small class="d-block mt-1 text-muted text-break">الرابط: ${url}</small><small class="d-block mt-1 text-muted text-break">الصفحة الحالية: ${window.location.pathname}</small></div>`;
+        body.innerHTML = `<div class="alert alert-danger mb-0">${masarDashboardI18n('failed', 'تعذر تحميل التفاصيل.')}<small class="d-block mt-2 text-muted">${error?.message || masarDashboardI18n('checkConn', 'تحقق من اتصال قاعدة البيانات ومسار التطبيق.')}</small><small class="d-block mt-1 text-muted text-break">${masarDashboardI18n('linkLabel', 'الرابط:')} ${url}</small><small class="d-block mt-1 text-muted text-break">${masarDashboardI18n('pageLabel', 'الصفحة الحالية:')} ${window.location.pathname}</small></div>`;
       });
   };
   document.querySelectorAll('[data-dashboard-detail]').forEach(element => element.addEventListener('click', event => {
     event.preventDefault();
-    const label = element.querySelector('b')?.textContent || 'تفاصيل المؤشر';
+    const label = element.querySelector('b')?.textContent || masarDashboardI18n('details', 'تفاصيل المؤشر');
     const icon = element.dataset.detailIcon || 'grid-1x2-fill';
     title?.querySelector('span:last-child').replaceChildren(document.createTextNode(label));
     const iconElement = title?.querySelector('i');
@@ -86,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     panel.addEventListener('click', event => {
       if (event.target.closest('a,button,input,select,form')) return;
       const [type, icon] = match[1];
-      const heading = panel.querySelector('.panel-head h3')?.textContent?.trim() || 'تفاصيل المؤشر';
+      const heading = panel.querySelector('.panel-head h3')?.textContent?.trim() || masarDashboardI18n('details', 'تفاصيل المؤشر');
       title?.querySelector('span:last-child').replaceChildren(document.createTextNode(heading));
       const iconElement = title?.querySelector('i');
       if (iconElement) iconElement.className = `bi bi-${icon}`;
@@ -107,6 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const base = window.location.pathname.replace(/\/dashboard(?:\/.*)?$/, '').replace(/\/$/, '');
     fetch(`${base}/dashboard/employee-search?search=` + encodeURIComponent(term), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
         .then(response => response.json())
-      .then(items => { employeeResults.innerHTML = items.length ? items.map(item => `<a class="list-group-item list-group-item-action" href="${item.url}">${item.name} <small class="text-muted">(${item.code})</small></a>`).join('') : '<div class="text-muted small p-2">لا توجد نتائج.</div>'; });
+      .then(items => { employeeResults.innerHTML = items.length ? items.map(item => `<a class="list-group-item list-group-item-action" href="${item.url}">${item.name} <small class="text-muted">(${item.code})</small></a>`).join('') : '<div class="text-muted small p-2">' + masarDashboardI18n('noResults', 'لا توجد نتائج.') + '</div>'; });
   });
 });

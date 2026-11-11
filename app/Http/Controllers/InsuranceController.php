@@ -113,7 +113,7 @@ class InsuranceController extends Controller
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Insurance record saved.', 'record' => $record->fresh(['employee.department', 'employee.currentSalary'])]);
         }
-        return back()->with('toast', 'تم حفظ بيانات التأمين بنجاح.');
+        return back()->with('toast', __('تم حفظ بيانات التأمين بنجاح.'));
     }
 
     public function update(Request $request, InsuranceRecord $insuranceRecord)
@@ -138,7 +138,7 @@ class InsuranceController extends Controller
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Insurance record updated.', 'record' => $insuranceRecord->fresh(['employee.department', 'employee.currentSalary'])]);
         }
-        return back()->with('toast', 'تم تحديث بيانات التأمين بنجاح.');
+        return back()->with('toast', __('تم تحديث بيانات التأمين بنجاح.'));
     }
 
     private function validateRecord(Request $request, bool $creating): array
@@ -200,7 +200,7 @@ class InsuranceController extends Controller
             return response()->json(['success' => true, 'message' => 'Organization insurance settings saved.']);
         }
 
-        return back()->with('toast', 'تم حفظ بيانات المنشأة والتأمينات.');
+        return back()->with('toast', __('تم حفظ بيانات المنشأة والتأمينات.'));
     }
 
     public function form(InsuranceRecord $insuranceRecord)

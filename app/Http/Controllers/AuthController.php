@@ -35,9 +35,9 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required'],
         ], [
-            'email.required' => 'البريد الإلكتروني مطلوب.',
-            'email.email' => 'يرجى إدخال بريد إلكتروني صحيح.',
-            'password.required' => 'كلمة المرور مطلوبة.',
+            'email.required' => __('البريد الإلكتروني مطلوب.'),
+            'email.email' => __('يرجى إدخال بريد إلكتروني صحيح.'),
+            'password.required' => __('كلمة المرور مطلوبة.'),
         ]);
 
         $remember = $request->boolean('remember');
@@ -48,18 +48,18 @@ class AuthController extends Controller
             if (!$user->is_active) {
                 Auth::logout();
                 return back()->withErrors([
-                    'email' => 'هذا الحساب معطل حاليًا. يرجى مراجعة مدير النظام.',
+                    'email' => __('هذا الحساب معطل حاليًا. يرجى مراجعة مدير النظام.'),
                 ]);
             }
             if (!$user->isSuperAdmin()) {
                 $subscription = $user->company_id ? CompanySubscription::where('company_id', $user->company_id)->whereIn('status', ['trial', 'active'])->latest('id')->first() : null;
                 $message = !$user->company_id || !$user->company || $user->company->status !== 'active'
-                    ? 'حساب الشركة غير نشط حاليًا. يرجى التواصل مع مدير المنصة.'
-                    : (!$subscription ? 'لا يوجد اشتراك نشط لهذه الشركة. يرجى التواصل لتفعيل الاشتراك.' : (($subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) ? 'انتهت مدة التجربة أو الاشتراك. يرجى التواصل مع مدير المنصة لتجديده.' : null));
+                    ? __('حساب الشركة غير نشط حاليًا. يرجى التواصل مع مدير المنصة.')
+                    : (!$subscription ? __('لا يوجد اشتراك نشط لهذه الشركة. يرجى التواصل لتفعيل الاشتراك.') : (($subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) ? __('انتهت مدة التجربة أو الاشتراك. يرجى التواصل مع مدير المنصة لتجديده.') : null));
                 if ($message) {
                     if ($subscription && $subscription->ends_at && $subscription->ends_at->endOfDay()->lt(now())) $subscription->update(['status' => 'expired']);
                     Auth::logout();
-                    return back()->withErrors(['email' => $message]);
+                    return back()->withErrors(['email' => __($message)]);
                 }
             }
 
@@ -71,7 +71,7 @@ class AuthController extends Controller
         }
 
         return back()->withErrors([
-            'email' => 'البيانات المدخلة غير صحيحة، يرجى المحاولة مرة أخرى.',
+            'email' => __('البيانات المدخلة غير صحيحة، يرجى المحاولة مرة أخرى.'),
         ])->onlyInput('email');
     }
 
@@ -98,7 +98,7 @@ class AuthController extends Controller
             ->first();
 
         if (!$plan) {
-            return back()->withErrors(['registration' => 'لا توجد باقة نشطة تناسب عدد الموظفين المختار حاليًا.'])->withInput();
+            return back()->withErrors(['registration' => __('لا توجد باقة نشطة تناسب عدد الموظفين المختار حاليًا.')])->withInput();
         }
 
         $user = DB::transaction(function () use ($data, $plan): User {
@@ -145,7 +145,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard')->with('toast', 'تم إنشاء الشركة وحساب مديرها وتفعيل الباقة المناسبة بنجاح.');
+        return redirect()->route('dashboard')->with('toast', __('تم إنشاء الشركة وحساب مديرها وتفعيل الباقة المناسبة بنجاح.'));
     }
 
     public function logout(Request $request)
@@ -168,7 +168,7 @@ class AuthController extends Controller
 
         return redirect()->route('password.request')->with(
             'site_success',
-            'إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رابط آمن لإعادة تعيين كلمة المرور.'
+            __('إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رابط آمن لإعادة تعيين كلمة المرور.')
         );
     }
 
@@ -196,7 +196,7 @@ class AuthController extends Controller
 
         return redirect()->route('login')->with(
             'site_success',
-            'تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.'
+            __('تم تحديث كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن.')
         );
     }
 }

@@ -42,7 +42,7 @@ class LeaveOpeningBalanceController extends Controller
         $confirmedZero = (bool) ($data['is_confirmed_zero'] ?? false);
         $amount = $confirmedZero ? 0.0 : (float) ($data['amount'] ?? 0);
         if (!$confirmedZero && $amount == 0.0) {
-            return back()->withErrors(['amount' => 'أدخل رصيدًا موجبًا أو سالبًا، أو اختر «تأكيد عدم وجود رصيد».'])->withInput();
+            return back()->withErrors(['amount' => __('أدخل رصيدًا موجبًا أو سالبًا، أو اختر «تأكيد عدم وجود رصيد».')])->withInput();
         }
 
         $entry = LeaveOpeningEntry::firstOrNew(['employee_id' => $employee->id, 'cycle_year' => $data['cycle_year']]);
@@ -55,7 +55,7 @@ class LeaveOpeningBalanceController extends Controller
         $entry->reason = $data['reason'];
         $entry->save();
 
-        return back()->with('toast', 'تم حفظ الرصيد الافتتاحي.');
+        return back()->with('toast', __('تم حفظ الرصيد الافتتاحي.'));
     }
 
     public function updateBaseline(Request $request)
@@ -66,6 +66,6 @@ class LeaveOpeningBalanceController extends Controller
             ['company_id' => $companyId, 'setting_key' => 'leave_carryover_baseline'],
             ['setting_value' => $data['baseline'], 'label' => 'Leave carryover baseline date', 'updated_at' => now(), 'created_at' => now()]
         );
-        return back()->with('toast', 'تم تحديث تاريخ بدء تتبع الترحيل.');
+        return back()->with('toast', __('تم تحديث تاريخ بدء تتبع الترحيل.'));
     }
 }

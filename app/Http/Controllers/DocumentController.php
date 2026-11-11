@@ -41,9 +41,9 @@ class DocumentController extends Controller
             'expiry_date' => ['nullable', 'date'],
             'document_file' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx'],
         ], [
-            'document_name.required' => 'اسم المسوغ مطلوب.',
-            'document_file.max' => 'الحد الأقصى لحجم الملف هو 10 ميجابايت.',
-            'document_file.mimes' => 'الملفات المدعومة هي الصور وملفات PDF ومستندات Word.',
+            'document_name.required' => __('اسم المسوغ مطلوب.'),
+            'document_file.max' => __('الحد الأقصى لحجم الملف هو 10 ميجابايت.'),
+            'document_file.mimes' => __('الملفات المدعومة هي الصور وملفات PDF ومستندات Word.'),
         ]);
 
         $docId = $request->input('document_id');
@@ -84,12 +84,12 @@ class DocumentController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم حفظ المسوغ بنجاح',
+                'message' => __('تم حفظ المسوغ بنجاح'),
                 'document' => $document,
             ]);
         }
 
-        return redirect()->route('employees.show', [$employee, 'tab' => 'documentsProfile'])->with('toast', 'تم حفظ المسوغ بنجاح');
+        return redirect()->route('employees.show', [$employee, 'tab' => 'documentsProfile'])->with('toast', __('تم حفظ المسوغ بنجاح'));
     }
 
     public function replace(Request $request, Document $document)
@@ -120,18 +120,18 @@ class DocumentController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم استبدال المسوغ بنجاح',
+                'message' => __('تم استبدال المسوغ بنجاح'),
                 'document' => $document,
             ]);
         }
 
-        return back()->with('toast', 'تم استبدال المسوغ بنجاح');
+        return back()->with('toast', __('تم استبدال المسوغ بنجاح'));
     }
 
     public function preview(Document $document)
     {
         if (!$document->file_path || !Storage::disk($document->storageDisk())->exists($document->file_path)) {
-            abort(404, 'الملف غير موجود.');
+            abort(404, __('الملف غير موجود.'));
         }
 
         return Storage::disk($document->storageDisk())->response($document->file_path, $document->file_name);
@@ -167,10 +167,10 @@ class DocumentController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'تم حذف المسوغ',
+                'message' => __('تم حذف المسوغ'),
             ]);
         }
 
-        return back()->with('toast', 'تم حذف المسوغ');
+        return back()->with('toast', __('تم حذف المسوغ'));
     }
 }

@@ -4,7 +4,7 @@
   const people = Array.isArray(config.people) ? config.people : [];
   let selected = people[0] || {};
   let mi = Number(config.monthIndex || 0);
-  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const months = [window.masarT('يناير'),window.masarT('فبراير'),window.masarT('مارس'),window.masarT('أبريل'),window.masarT('مايو'),window.masarT('يونيو'),window.masarT('يوليو'),window.masarT('أغسطس'),window.masarT('سبتمبر'),window.masarT('أكتوبر'),window.masarT('نوفمبر'),window.masarT('ديسمبر')];
   const money = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const statValues = [config.stats?.cost, config.stats?.net, config.stats?.insurance, config.stats?.tax];
   document.querySelectorAll('#payrollPrototype .stats .stat strong').forEach((node, index) => {
@@ -21,7 +21,7 @@
       const gross = Number(p.gross ?? (p.basic + p.allow));
       const net = Number(p.net ?? (earnings - deductions));
       const companyCost = Number(p.companyCost ?? gross);
-      return `<tr data-id="${p.id}" class="${p.id === selected.id ? 'selected' : ''}" tabindex="0" aria-label="عرض مسير راتب ${p.name}"><td>${i + 1}</td><td><div class="emp"><span class="mini">${p.initials || ''}</span><div><b>${p.name}</b><small>كود الموظف: ${p.code || p.id || '—'}</small></div></div></td><td><a class="salary-structure" href="${p.salaryUrl || '#'}">${p.structureLabel || '—'}</a><small class="d-block text-muted">ساري من ${p.effectiveFrom || '—'}</small><small class="d-block text-muted">المتفق عليه: ${money(p.agreedNet || 0)}</small></td><td><b>${money(gross)}</b></td><td style="color:#07845f">${money(earnings)}</td><td style="color:#d94a58">${money(deductions)}</td><td><b style="color:#0969e8">${money(net)}</b></td><td><b>${money(companyCost)}</b></td></tr>`;
+      return `<tr data-id="${p.id}" class="${p.id === selected.id ? 'selected' : ''}" tabindex="0" aria-label="${window.masarT("عرض مسير راتب")} ${p.name}"><td>${i + 1}</td><td><div class="emp"><span class="mini">${p.initials || ''}</span><div><b>${p.name}</b><small>${window.masarT("كود الموظف:")} ${p.code || p.id || '—'}</small></div></div></td><td><a class="salary-structure" href="${p.salaryUrl || '#'}">${p.structureLabel || '—'}</a><small class="d-block text-muted">${window.masarT("ساري من")} ${p.effectiveFrom || '—'}</small><small class="d-block text-muted">${window.masarT("المتفق عليه:")} ${money(p.agreedNet || 0)}</small></td><td><b>${money(gross)}</b></td><td style="color:#07845f">${money(earnings)}</td><td style="color:#d94a58">${money(deductions)}</td><td><b style="color:#0969e8">${money(net)}</b></td><td><b>${money(companyCost)}</b></td></tr>`;
     }).join('');
     document.getElementById('empty').style.display = arr.length ? 'none' : 'block';
     document.querySelectorAll('#employees tr').forEach(tr => {
@@ -45,7 +45,7 @@
     document.querySelector('#payrollPrototype .drawer .dtitle')?.remove();
     document.getElementById('pName').textContent = selected.name || '—';
     document.getElementById('pRole').textContent = `${selected.role || '—'} · ${selected.dept || '—'}`;
-    document.getElementById('pId').textContent = `الكود الوظيفي: ${selected.code || selected.id || '—'}`;
+    document.getElementById('pId').textContent = `${window.masarT("الكود الوظيفي:")} ${selected.code || selected.id || '—'}`;
     document.getElementById('pAvatar').textContent = selected.initials || '';
     document.getElementById('month').textContent = `${months[mi]} ${config.year || new Date().getFullYear()}`;
     const items = selected.items || [];
@@ -55,22 +55,22 @@
     document.getElementById('earnItems').innerHTML = items.map(x => `<div class="item"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');
     document.getElementById('deductItems').innerHTML = deductions.map(x => `<div class="item"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');
     document.getElementById('earnSum').textContent = money(es); document.getElementById('deductSum').textContent = money(ds);
-    document.getElementById('netAmount').innerHTML = money(selected.net ?? (es - ds)) + ' <small style="font-size:12px">ج.م</small>';
+    document.getElementById('netAmount').innerHTML = money(selected.net ?? (es - ds)) + window.masarStaticHtml(' <small style="font-size:12px">ج.م</small>');
     document.getElementById('formula').textContent = `${money(es)} − ${money(ds)}`;
     const stateLabel = selected.stateLabel || selected.state || '—';
     const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
     setText('pState', stateLabel);
-    setText('exPaidDays', `${selected.paidDays ?? 0} يوم`);
-    setText('exAbsenceDays', `${selected.absenceDays ?? 0} يوم`);
-    setText('exOvertimeHours', `${selected.overtimeHours ?? 0} ساعة`);
+    setText('exPaidDays', `${selected.paidDays ?? 0} ${window.masarT("يوم")}`);
+    setText('exAbsenceDays', `${selected.absenceDays ?? 0} ${window.masarT("يوم")}`);
+    setText('exOvertimeHours', `${selected.overtimeHours ?? 0} ${window.masarT("ساعة")}`);
     setText('exState', stateLabel);
-    setText('netState', selected.state === 'Draft' ? '● مسودة' : (selected.state === 'Approved' ? '● معتمد' : (selected.state === 'Locked' ? '● نهائي' : '')));
+    setText('netState', selected.state === 'Draft' ? window.masarT('● مسودة') : (selected.state === 'Approved' ? window.masarT('● معتمد') : (selected.state === 'Locked' ? window.masarT('● نهائي') : '')));
     const note = document.getElementById('netNote');
     if (note) {
       const midPeriod = Number(selected.paidDays ?? 30) < 30;
       const negativeDraft = Number(selected.net ?? 0) < 0 && selected.state === 'Draft' && midPeriod && Number(selected.insurance ?? 0) > 0;
       note.style.display = negativeDraft ? '' : 'none';
-      if (negativeDraft) note.textContent = 'التأمينات محمَّلة بقيمة الشهر كاملة من أول الفترة، بينما المستحقات تتراكم يومًا بيوم حتى نهاية الفترة.';
+      if (negativeDraft) note.textContent = window.masarT('التأمينات محمَّلة بقيمة الشهر كاملة من أول الفترة، بينما المستحقات تتراكم يومًا بيوم حتى نهاية الفترة.');
     }
   }
   function toast(message) { const t = document.getElementById('toast'); if (!t) return; t.textContent = message; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2500); }
@@ -105,14 +105,14 @@
     picker = document.createElement('div');
     picker.className = 'payroll-month-picker';
     picker.setAttribute('role', 'dialog');
-    picker.setAttribute('aria-label', 'اختيار شهر المسير');
+    picker.setAttribute('aria-label', window.masarT('اختيار شهر المسير'));
     const render = () => {
-      picker.innerHTML = `<div class="mp-head"><button type="button" data-mp="next" aria-label="السنة التالية"><i class="bi bi-chevron-right"></i></button><span>${year}</span><button type="button" data-mp="prev" aria-label="السنة السابقة"><i class="bi bi-chevron-left"></i></button></div>` +
+      picker.innerHTML = `<div class="mp-head"><button type="button" data-mp="next" aria-label="${window.masarT("السنة التالية")}"><i class="bi bi-chevron-right"></i></button><span>${year}</span><button type="button" data-mp="prev" aria-label="${window.masarT("السنة السابقة")}"><i class="bi bi-chevron-left"></i></button></div>` +
         `<div class="mp-grid">${months.map((name, i) => {
           const key = `${year}-${String(i + 1).padStart(2, '0')}`;
           const cls = ['mp-month', withData.has(key) ? 'has-data' : '', year === currentYear && i + 1 === currentMonth ? 'active' : ''].join(' ');
           return `<button type="button" class="${cls}" data-mp-month="${i + 1}">${name}</button>`;
-        }).join('')}</div><div class="mp-note">النقطة الخضراء = يوجد مسير لهذا الشهر</div>`;
+        }).join('')}</div><div class="mp-note">${window.masarT("النقطة الخضراء")} = ${window.masarT("يوجد مسير لهذا الشهر")}</div>`;
     };
     render();
     document.body.appendChild(picker);
@@ -131,7 +131,7 @@
     periodBox.setAttribute('role', 'button');
     periodBox.setAttribute('tabindex', '0');
     periodBox.setAttribute('aria-haspopup', 'dialog');
-    periodBox.title = 'اضغط لاختيار شهر آخر';
+    periodBox.title = window.masarT('اضغط لاختيار شهر آخر');
     periodBox.addEventListener('click', e => { e.stopPropagation(); openPicker(); });
     periodBox.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); } });
     const label = `${months[mi]} ${config.year || ''}`.trim();
@@ -179,7 +179,7 @@
   if (!config.isCurrentMonth && prototypePage) {
     const banner = document.createElement('div');
     banner.className = 'payroll-view-banner';
-    banner.innerHTML = `<span><i class="bi bi-eye"></i> أنت تعرض مسير ${months[mi]} ${config.year || ''}</span><button type="button" class="btn btn-sm btn-primary">العودة للشهر الحالي</button>`;
+    banner.innerHTML = `<span><i class="bi bi-eye"></i> ${window.masarT("أنت تعرض مسير")} ${months[mi]} ${config.year || ''}</span><button type="button" class="btn btn-sm btn-primary">${window.masarT("العودة للشهر الحالي")}</button>`;
     banner.querySelector('button').addEventListener('click', () => {
       const now = new Date();
       goToMonth(now.getFullYear(), now.getMonth() + 1);
@@ -189,7 +189,7 @@
   document.getElementById('close')?.addEventListener('click', closeDrawer);
   document.getElementById('drawerOverlay')?.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closePicker(); } });
-  document.getElementById('export')?.addEventListener('click', () => toast('يمكنك استخدام زر تصدير Excel أعلى الصفحة.'));
+  document.getElementById('export')?.addEventListener('click', () => toast(window.masarT('يمكنك استخدام زر تصدير Excel أعلى الصفحة.')));
   document.getElementById('view')?.remove();
   const pdfButton = document.getElementById('pdf');
   if (pdfButton) {
@@ -199,10 +199,10 @@
   const printButton = document.getElementById('print');
   if (printButton) {
     printButton.classList.add('btn-print');
-    printButton.innerHTML = '<i class="bi bi-printer" aria-hidden="true"></i><span>طباعة</span>';
+    printButton.innerHTML = window.masarStaticHtml('<i class="bi bi-printer" aria-hidden="true"></i><span>طباعة</span>');
   }
   document.getElementById('pdf')?.addEventListener('click', () => {
-    if (!config.pdfUrlTemplate || !selected.recordId) return toast('لا توجد قسيمة راتب متاحة لهذا الموظف.');
+    if (!config.pdfUrlTemplate || !selected.recordId) return toast(window.masarT('لا توجد قسيمة راتب متاحة لهذا الموظف.'));
     window.location.href = config.pdfUrlTemplate.replace('__RECORD__', encodeURIComponent(selected.recordId));
   });
   const actions = document.querySelector('#payrollPrototype .actions');
@@ -211,12 +211,12 @@
     whatsapp.type = 'button';
     whatsapp.id = 'whatsapp';
     whatsapp.className = 'btn btn-whatsapp whatsapp-payslip-btn';
-    whatsapp.innerHTML = '<i class="bi bi-whatsapp" aria-hidden="true"></i><span>واتساب</span>';
+    whatsapp.innerHTML = window.masarStaticHtml('<i class="bi bi-whatsapp" aria-hidden="true"></i><span>واتساب</span>');
     actions.insertBefore(whatsapp, document.getElementById('print'));
   }
   document.getElementById('whatsapp')?.addEventListener('click', () => {
     const phone = String(selected.phone || '').replace(/[^0-9]/g, '');
-    const message = encodeURIComponent(`قسيمة راتب ${selected.name || ''} — الكود الوظيفي: ${selected.code || selected.id || ''}`);
+    const message = encodeURIComponent(`${window.masarT("قسيمة راتب")} ${selected.name || ''} — ${window.masarT("الكود الوظيفي:")} ${selected.code || selected.id || ''}`);
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener');
   });
   // Replace the text-only WhatsApp handler with native PDF file sharing.
@@ -225,9 +225,9 @@
     const cleanWhatsappButton = whatsappButton.cloneNode(true);
     whatsappButton.replaceWith(cleanWhatsappButton);
     cleanWhatsappButton.addEventListener('click', async () => {
-      if (!config.pdfUrlTemplate || !selected.recordId) return toast('لا توجد قسيمة راتب متاحة لهذا الموظف.');
+      if (!config.pdfUrlTemplate || !selected.recordId) return toast(window.masarT('لا توجد قسيمة راتب متاحة لهذا الموظف.'));
       const pdfUrl = config.pdfUrlTemplate.replace('__RECORD__', encodeURIComponent(selected.recordId));
-      const message = `قسيمة راتب ${selected.name || ''} - الكود الوظيفي: ${selected.code || selected.id || ''}`;
+      const message = `${window.masarT("قسيمة راتب")} ${selected.name || ''} - ${window.masarT("الكود الوظيفي:")} ${selected.code || selected.id || ''}`;
       try {
         const response = await fetch(pdfUrl, { credentials: 'same-origin', headers: { Accept: 'application/pdf' } });
         if (!response.ok) throw new Error('PDF download failed');
@@ -253,9 +253,9 @@
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-        toast('تم تنزيل ملف PDF وفتح واتساب. اختر جهة الاتصال وأرفق الملف.');
+        toast(window.masarT('تم تنزيل ملف PDF وفتح واتساب. اختر جهة الاتصال وأرفق الملف.'));
       } catch (error) {
-        if (error?.name !== 'AbortError') toast('تعذر تجهيز ملف PDF للمشاركة.');
+        if (error?.name !== 'AbortError') toast(window.masarT('تعذر تجهيز ملف PDF للمشاركة.'));
       }
     });
   }

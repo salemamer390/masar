@@ -23,9 +23,9 @@ class DashboardDetailController extends Controller
         $perPage = in_array((int) $request->input('per_page', 15), [15, 25, 50, 100], true) ? (int) $request->input('per_page', 15) : 15;
         $items = collect();
         $title = match ($type) {
-            'employees' => 'الموظفون النشطون', 'new-employees' => 'الموظفون الجدد', 'attendance' => 'حالة الحضور اليوم', 'present' => 'الحاضرون اليوم', 'absent' => 'الغائبون اليوم', 'late' => 'المتأخرون اليوم',
-            'payroll-cost', 'payroll-summary' => 'ملخص الرواتب', 'payroll-net' => 'تفاصيل صافي الرواتب', 'documents-expiring' => 'المستندات التي تنتهي قريبًا',
-            'documents-incomplete' => 'ملفات الموظفين غير المكتملة', 'leaves' => 'آخر الإجازات',
+            'employees' => __('الموظفون النشطون'), 'new-employees' => __('الموظفون الجدد'), 'attendance' => __('حالة الحضور اليوم'), 'present' => __('الحاضرون اليوم'), 'absent' => __('الغائبون اليوم'), 'late' => __('المتأخرون اليوم'),
+            'payroll-cost', 'payroll-summary' => __('ملخص الرواتب'), 'payroll-net' => __('تفاصيل صافي الرواتب'), 'documents-expiring' => __('المستندات التي تنتهي قريبًا'),
+            'documents-incomplete' => __('ملفات الموظفين غير المكتملة'), 'leaves' => __('آخر الإجازات'),
         };
         $sectionUrl = match ($type) {
             'employees', 'new-employees' => route('employees.index'),

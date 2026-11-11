@@ -63,19 +63,19 @@ class UserController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ], [
-            'name.required' => 'الاسم مطلوب.',
-            'email.required' => 'البريد الإلكتروني مطلوب.',
-            'email.unique' => 'البريد الإلكتروني مسجل بالفعل.',
-            'password.required' => 'كلمة المرور مطلوبة.',
-            'password.min' => 'كلمة المرور يجب ألا تقل عن 6 أحرف.',
-            'role_id.required' => 'الدور مطلوب.',
+            'name.required' => __('الاسم مطلوب.'),
+            'email.required' => __('البريد الإلكتروني مطلوب.'),
+            'email.unique' => __('البريد الإلكتروني مسجل بالفعل.'),
+            'password.required' => __('كلمة المرور مطلوبة.'),
+            'password.min' => __('كلمة المرور يجب ألا تقل عن 6 أحرف.'),
+            'role_id.required' => __('الدور مطلوب.'),
         ]);
-        if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, 'لا يمكن منح صلاحية مدير المنصة.');
+        if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, __('لا يمكن منح صلاحية مدير المنصة.'));
         $this->rolesForActor()->whereKey($validated['role_id'])->firstOrFail();
         $this->authorizePermissionAssignment($validated);
 
         $companyId = auth()->user()->company_id ?: ($validated['company_id'] ?? null);
-        if (!$companyId) return back()->withErrors(['company_id' => 'يجب ربط المستخدم بشركة قبل إنشاء الحساب.'])->withInput();
+        if (!$companyId) return back()->withErrors(['company_id' => __('يجب ربط المستخدم بشركة قبل إنشاء الحساب.')])->withInput();
         $this->ensureRoleBelongsToCompany((int) $validated['role_id'], (int) $companyId);
         if (!auth()->user()->isSuperAdmin()) $this->ensureHrCapacity($companyId);
         $user = User::create([
@@ -92,7 +92,7 @@ class UserController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'User created.', 'user' => $user->fresh()->load(['role', 'directPermissions'])])
-            : back()->with('toast', 'تمت إضافة المستخدم بنجاح');
+            : back()->with('toast', __('تمت إضافة المستخدم بنجاح'));
     }
 
     public function update(Request $request, User $user)
@@ -106,7 +106,7 @@ class UserController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ]);
-        if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, 'لا يمكن منح صلاحية مدير المنصة.');
+        if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, __('لا يمكن منح صلاحية مدير المنصة.'));
         $this->rolesForActor()->whereKey($validated['role_id'])->firstOrFail();
         $this->authorizePermissionAssignment($validated);
 
@@ -126,7 +126,7 @@ class UserController extends Controller
 
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'User updated.', 'user' => $user->fresh()->load(['role', 'directPermissions'])])
-            : back()->with('toast', 'تم تحديث بيانات المستخدم بنجاح');
+            : back()->with('toast', __('تم تحديث بيانات المستخدم بنجاح'));
     }
 
     public function updateStatus(Request $request, User $user)
@@ -162,10 +162,10 @@ class UserController extends Controller
         ActivityLog::record('user_delete', "تم حذف المستخدم: {$name}.");
 
         if ($request->wantsJson()) {
-            return response()->json(['success' => true, 'message' => 'تم حذف المستخدم.', 'user_id' => $user->id]);
+            return response()->json(['success' => true, 'message' => __('تم حذف المستخدم.'), 'user_id' => $user->id]);
         }
 
-        return back()->with('toast', 'تم حذف المستخدم.');
+        return back()->with('toast', __('تم حذف المستخدم.'));
     }
 
     private function ensureUserCanBeManaged(User $user): void
@@ -176,13 +176,13 @@ class UserController extends Controller
             abort(403);
         }
         if ((int) $user->id === (int) $actor->id) {
-            abort(422, 'لا يمكنك إيقاف أو حذف حسابك الحالي.');
+            abort(422, __('لا يمكنك إيقاف أو حذف حسابك الحالي.'));
         }
         if ($user->isSuperAdmin()) {
-            abort(403, 'لا يمكن تعديل أو حذف حساب مدير المنصة من هنا.');
+            abort(403, __('لا يمكن تعديل أو حذف حساب مدير المنصة من هنا.'));
         }
         if ($user->role?->name === 'company_manager') {
-            abort(422, 'حساب مدير الشركة هو مالك الشركة ولا يمكن تعديله أو إيقافه أو حذفه.');
+            abort(422, __('حساب مدير الشركة هو مالك الشركة ولا يمكن تعديله أو إيقافه أو حذفه.'));
         }
     }
 
@@ -201,16 +201,16 @@ class UserController extends Controller
         if ($actor->isSuperAdmin()) return;
         $allowed = Permission::all()->filter(fn (Permission $permission) => $actor->hasPermission($permission->name))->pluck('id')->map(fn ($id) => (int) $id);
         $requested = collect($validated['permissions'] ?? [])->map(fn ($id) => (int) $id);
-        abort_if($requested->diff($allowed)->isNotEmpty(), 403, 'لا يمكنك منح صلاحية لا تملكها.');
+        abort_if($requested->diff($allowed)->isNotEmpty(), 403, __('لا يمكنك منح صلاحية لا تملكها.'));
         $rolePermissions = $this->rolesForActor()->with('permissions')->findOrFail($validated['role_id'])->permissions->pluck('id')->map(fn ($id) => (int) $id);
-        abort_if($rolePermissions->diff($allowed)->isNotEmpty(), 403, 'لا يمكنك تعيين دور يتضمن صلاحيات أعلى من صلاحياتك.');
+        abort_if($rolePermissions->diff($allowed)->isNotEmpty(), 403, __('لا يمكنك تعيين دور يتضمن صلاحيات أعلى من صلاحياتك.'));
     }
 
     private function ensureRoleBelongsToCompany(int $roleId, int $companyId): void
     {
         $roleCompanyId = Role::whereKey($roleId)->value('company_id');
         abort_if($roleCompanyId === null || (int) $roleCompanyId !== $companyId, 422,
-            'لا يمكن تعيين دور تابع لشركة أخرى لهذا المستخدم.');
+            __('لا يمكن تعيين دور تابع لشركة أخرى لهذا المستخدم.'));
     }
 
     private function rolesForActor()

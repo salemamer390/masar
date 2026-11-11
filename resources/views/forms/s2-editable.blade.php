@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>نموذج س2</title>
+    <title>{{ __('نموذج س2') }}</title>
     <style>
         @font-face { font-family: 'Mudir MT'; src: url('{{ asset('fonts/MudirMT.ttf') }}') format('truetype'); }
         @font-face { font-family: 'PT Bold Heading'; src: url('{{ asset('fonts/PTBoldHeading.ttf') }}') format('truetype'); }
@@ -69,34 +69,34 @@
     </style>
 </head>
 <body>
-    <div class="tools"><button type="button" onclick="window.print()">طباعة س2</button><a href="{{ route('insurance.index') }}">العودة للتأمينات</a></div>
+    <div class="tools"><button type="button" onclick="window.print()">{{ __('طباعة س2') }}</button><a href="{{ route('insurance.index') }}">{{ __('العودة للتأمينات') }}</a></div>
     <section class="page">
         <div class="head">
-            <div class="right">الهيئة القومية للتأمين الاجتماعي<br>مكتب: <span class="line">{{ $d['office'] }}</span></div>
+            <div class="right">{{ __('الهيئة القومية للتأمين الاجتماعي') }}<br>{{ __('مكتب:') }} <span class="line">{{ $d['office'] }}</span></div>
             <img src="{{ asset('images/nosi-logo.jpg') }}" alt="">
-            <div class="left">نموذج رقم (٢)<br><br>رقم المنشأة: <span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['establishment_number'], $i, 1) }}</i>@endfor</span></div>
+            <div class="left">{{ __('نموذج رقم (٢)') }}<br><br>{{ __('رقم المنشأة:') }} <span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['establishment_number'], $i, 1) }}</i>@endfor</span></div>
         </div>
-        <div class="titleline"><span class="year">٢٠٢٦</span><span>/</span><span>/</span><span>إخطار بتعديل / تحديث بيانات أجور المؤمن عليهم في</span></div>
-        <div class="section-title"><span>بيانات مقدم الطلب / المنشأة</span></div>
+        <div class="titleline"><span class="year">{{ __('٢٠٢٦') }}</span><span>/</span><span>/</span><span>{{ __('إخطار بتعديل / تحديث بيانات أجور المؤمن عليهم في') }}</span></div>
+        <div class="section-title"><span>{{ __('بيانات مقدم الطلب / المنشأة') }}</span></div>
         <div class="meta-grid">
-            <div class="meta-field"><span class="lab">مقدم الطلب:</span><span class="fill">{{ $d['applicant_name'] }}</span></div><div class="meta-field"><span class="lab">صفة مقدم الطلب:</span><span class="fill">{{ $d['applicant_title'] }}</span></div><div class="meta-field"><span class="lab">رقم تأميني:</span><span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['applicant_insurance_number'], $i, 1) }}</i>@endfor</span></div>
-            <div class="meta-field"><span class="lab">رقم قومي:</span><span class="boxes">@for($i=0;$i<14;$i++)<i>{{ mb_substr($d['applicant_national_id'], $i, 1) }}</i>@endfor</span></div><div class="meta-field phone-row"><span class="lab">رقم التليفون:</span><span class="fill">{{ $d['phone'] }}</span></div>
-            <div class="meta-field establishment-row"><span class="lab">اسم المنشأة:</span><span class="fill">{{ $d['organization_name'] }}</span><span class="lab">قطاع المنشأة:</span><span class="fill">{{ $d['sector'] }}</span><span class="lab">رقم التسجيل الضريبي:</span><span class="fill">{{ $d['tax_registration_number'] }}</span></div>
-            <div class="meta-field commercial-row"><span class="lab">رقم السجل التجاري:</span><span class="fill">{{ $d['commercial_registration_number'] }}</span><span class="lab">رقم السجل التجاري الموحد:</span><span class="fill">{{ $d['unified_commercial_registration_number'] }}</span></div>
+            <div class="meta-field"><span class="lab">{{ __('مقدم الطلب:') }}</span><span class="fill">{{ $d['applicant_name'] }}</span></div><div class="meta-field"><span class="lab">{{ __('صفة مقدم الطلب:') }}</span><span class="fill">{{ $d['applicant_title'] }}</span></div><div class="meta-field"><span class="lab">{{ __('رقم تأميني:') }}</span><span class="boxes">@for($i=0;$i<9;$i++)<i>{{ mb_substr($d['applicant_insurance_number'], $i, 1) }}</i>@endfor</span></div>
+            <div class="meta-field"><span class="lab">{{ __('رقم قومي:') }}</span><span class="boxes">@for($i=0;$i<14;$i++)<i>{{ mb_substr($d['applicant_national_id'], $i, 1) }}</i>@endfor</span></div><div class="meta-field phone-row"><span class="lab">{{ __('رقم التليفون:') }}</span><span class="fill">{{ $d['phone'] }}</span></div>
+            <div class="meta-field establishment-row"><span class="lab">{{ __('اسم المنشأة:') }}</span><span class="fill">{{ $d['organization_name'] }}</span><span class="lab">{{ __('قطاع المنشأة:') }}</span><span class="fill">{{ $d['sector'] }}</span><span class="lab">{{ __('رقم التسجيل الضريبي:') }}</span><span class="fill">{{ $d['tax_registration_number'] }}</span></div>
+            <div class="meta-field commercial-row"><span class="lab">{{ __('رقم السجل التجاري:') }}</span><span class="fill">{{ $d['commercial_registration_number'] }}</span><span class="lab">{{ __('رقم السجل التجاري الموحد:') }}</span><span class="fill">{{ $d['unified_commercial_registration_number'] }}</span></div>
         </div>
-        <div class="section-title"><span>بيانات المؤمن عليهم</span></div>
+        <div class="section-title"><span>{{ __('بيانات المؤمن عليهم') }}</span></div>
         <table>
             <colgroup><col style="width:22.1%"><col style="width:17.5%"><col style="width:24.2%"><col style="width:4.5%"><col style="width:5.1%"><col style="width:6.1%"><col style="width:10.5%"><col style="width:10%"></colgroup>
-            <thead><tr><th>الرقم التأميني</th><th>اسم المؤمن عليه</th><th>الرقم القومي</th><th colspan="3">تاريخ الالتحاق</th><th>أجر الاشتراك</th><th>الأجر الشامل</th></tr><tr><th></th><th></th><th></th><th>يوم</th><th>شهر</th><th>سنة</th><th>جنيه</th><th>جنيه</th></tr></thead>
+            <thead><tr><th>{{ __('الرقم التأميني') }}</th><th>{{ __('اسم المؤمن عليه') }}</th><th>{{ __('الرقم القومي') }}</th><th colspan="3">{{ __('تاريخ الالتحاق') }}</th><th>{{ __('أجر الاشتراك') }}</th><th>{{ __('الأجر الشامل') }}</th></tr><tr><th></th><th></th><th></th><th>{{ __('يوم') }}</th><th>{{ __('شهر') }}</th><th>{{ __('سنة') }}</th><th>{{ __('جنيه') }}</th><th>{{ __('جنيه') }}</th></tr></thead>
             <tbody>@for($row = 0; $row < 10; $row++)<tr><td class="table-grid-cell"><div class="table-grid grid-9">@for($i=0;$i<9;$i++)<span></span>@endfor</div></td><td></td><td class="table-grid-cell"><div class="table-grid grid-14">@for($i=0;$i<14;$i++)<span></span>@endfor</div></td><td></td><td></td><td></td><td></td><td></td></tr>@endfor</tbody>
         </table>
     </section>
     <section class="page">
-        <div class="declaration-title">إقرار</div>
-        <div class="declaration">أقر أنا .......................................................... بصفتي .......................................................... بأن جميع البيانات الواردة بهذا النموذج وملحقاته صحيحة (الأجر الشامل لحساب اشتراكات التأمين الصحي الشامل)، وأني أتحمل المسؤولية القانونية عن صحة البيانات الواردة بهذه الاستمارة، وفي حالة المخالفة تطبق العقوبات المنصوص عليها بالقانون رقم ١٤٨ لسنة ٢٠١٩ مع عدم الإخلال بأي عقوبات أشد واردة في قانون العقوبات، وعلى أن يتم موافاة الهيئة بأي تعديلات تطرأ على أجور العاملين بالمنشأة في أي تاريخ خلال العام يصدر فيه قرار أو قانون بتعديل الأجور وكذلك في يناير من كل عام.</div>
+        <div class="declaration-title">{{ __('إقرار') }}</div>
+        <div class="declaration">{{ __('أقر أنا .......................................................... بصفتي .......................................................... بأن جميع البيانات الواردة بهذا النموذج وملحقاته صحيحة (الأجر الشامل لحساب اشتراكات التأمين الصحي الشامل)، وأني أتحمل المسؤولية القانونية عن صحة البيانات الواردة بهذه الاستمارة، وفي حالة المخالفة تطبق العقوبات المنصوص عليها بالقانون رقم ١٤٨ لسنة ٢٠١٩ مع عدم الإخلال بأي عقوبات أشد واردة في قانون العقوبات، وعلى أن يتم موافاة الهيئة بأي تعديلات تطرأ على أجور العاملين بالمنشأة في أي تاريخ خلال العام يصدر فيه قرار أو قانون بتعديل الأجور وكذلك في يناير من كل عام.') }}</div>
         <div class="signature-date">
-            <div class="signature">توقيع صاحب العمل أو المدير المسؤول<br>..........................................................</div>
-            <div class="date-line">تحريرًا في: &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; ٢٠</div>
+            <div class="signature">{{ __('توقيع صاحب العمل أو المدير المسؤول') }}<br>..........................................................</div>
+            <div class="date-line">{{ __('تحريرًا في: &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; / &nbsp;&nbsp;&nbsp; ٢٠') }}</div>
         </div>
     </section>
 </body>

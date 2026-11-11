@@ -30,21 +30,21 @@ class OwnerAuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
         ], [
-            'email.required' => 'البريد الإلكتروني مطلوب.',
-            'email.email' => 'يرجى إدخال بريد إلكتروني صحيح.',
-            'password.required' => 'كلمة المرور مطلوبة.',
+            'email.required' => __('البريد الإلكتروني مطلوب.'),
+            'email.email' => __('يرجى إدخال بريد إلكتروني صحيح.'),
+            'password.required' => __('كلمة المرور مطلوبة.'),
         ]);
 
         // One generic error for every failure: wrong password, unknown email,
         // disabled account, or an account that simply is not the owner.
         if (!Auth::guard('owner')->attempt($credentials)) {
-            return back()->withErrors(['email' => self::ERROR_MESSAGE])->onlyInput('email');
+            return back()->withErrors(['email' => __(self::ERROR_MESSAGE)])->onlyInput('email');
         }
 
         $user = Auth::guard('owner')->user();
         if (!$user->is_active || !OwnerGate::allows($user)) {
             Auth::guard('owner')->logout();
-            return back()->withErrors(['email' => self::ERROR_MESSAGE])->onlyInput('email');
+            return back()->withErrors(['email' => __(self::ERROR_MESSAGE)])->onlyInput('email');
         }
 
         // Session fixation protection; regenerating keeps the regular app

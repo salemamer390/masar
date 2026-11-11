@@ -109,7 +109,7 @@ class OwnerDashboardController extends Controller
         $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','hr_user_limit'=>'nullable|integer|min:0|max:1000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string']);
         $features = collect(preg_split('/[,\n]+/', (string) ($data['features'] ?? '')))->map(fn($v)=>trim($v))->filter()->values()->all();
         SubscriptionPlan::create(['name'=>$data['name'],'slug'=>Str::slug($data['name']).'-'.Str::random(5),'employee_limit'=>$data['employee_limit'],'hr_user_limit'=>$data['hr_user_limit'] ?? 5,'price'=>$data['price'] ?? 0,'billing_period'=>$data['billing_period'],'features'=>$features,'sort_order'=>$data['employee_limit']]);
-        return back()->with('toast','تمت إضافة الباقة بنجاح.');
+        return back()->with('toast',__('تمت إضافة الباقة بنجاح.'));
     }
 
     public function updatePlan(Request $request, SubscriptionPlan $plan)
@@ -117,12 +117,12 @@ class OwnerDashboardController extends Controller
         $data = $request->validate(['name'=>'required|string|max:100','employee_limit'=>'required|integer|min:1|max:1000000','hr_user_limit'=>'nullable|integer|min:0|max:1000','price'=>'nullable|numeric|min:0','billing_period'=>'required|in:monthly,yearly','features'=>'nullable|string','is_active'=>'nullable|boolean']);
         $isActive = (bool) ($data['is_active'] ?? false);
         if (!$isActive && $plan->is_active && $plan->subscriptions()->whereIn('status', ['trial', 'active'])->exists()) {
-            return back()->withErrors(['is_active' => 'لا يمكن إيقاف باقة مرتبطة باشتراكات نشطة.'])->withInput();
+            return back()->withErrors(['is_active' => __('لا يمكن إيقاف باقة مرتبطة باشتراكات نشطة.')])->withInput();
         }
         $data['hr_user_limit'] = $data['hr_user_limit'] ?? 5;
         $data['features'] = collect(preg_split('/[,\n]+/', (string) ($data['features'] ?? '')))->map(fn($v)=>trim($v))->filter()->values()->all();
         $plan->update($data + ['is_active' => $isActive]);
-        return back()->with('toast','تم تحديث الباقة بنجاح.');
+        return back()->with('toast',__('تم تحديث الباقة بنجاح.'));
     }
 
     public function storeCompany(Request $request)
@@ -142,7 +142,7 @@ class OwnerDashboardController extends Controller
             ->where('is_active', true)
             ->first();
         if (!$plan) {
-            return back()->withErrors(['plan_id' => 'الباقة المختارة غير نشطة حاليًا.'])->withInput();
+            return back()->withErrors(['plan_id' => __('الباقة المختارة غير نشطة حاليًا.')])->withInput();
         }
         $company = null;
         DB::transaction(function () use ($data, $plan, &$company): void {
@@ -168,7 +168,7 @@ class OwnerDashboardController extends Controller
         // keeps this work lazy to avoid gateway timeouts on shared hosting).
         app(\App\Services\PayrollDefaultsService::class)->ensureForCompany((int) $company->id);
         ActivityLog::record('subscription_company_create', "تم إنشاء شركة جديدة: {$company->name}.", $company, null, $company->toArray(), 'subscriptions');
-        return back()->with('toast','تم إنشاء الشركة والاشتراك بنجاح.');
+        return back()->with('toast',__('تم إنشاء الشركة والاشتراك بنجاح.'));
     }
 
     public function updateCompanySubscription(Request $request, Company $company)
@@ -178,17 +178,17 @@ class OwnerDashboardController extends Controller
         $plan = SubscriptionPlan::query()->whereKey($data['plan_id'])->first();
         $changingPlan = !$subscription || (int) $subscription->subscription_plan_id !== (int) $data['plan_id'];
         if (!$plan || ($changingPlan && !$plan->is_active)) {
-            return back()->withErrors(['plan_id' => 'لا يمكن ربط الشركة بباقة غير نشطة.'])->withInput();
+            return back()->withErrors(['plan_id' => __('لا يمكن ربط الشركة بباقة غير نشطة.')])->withInput();
         }
         if (!$subscription) $subscription = new CompanySubscription(['company_id'=>$company->id, 'starts_at'=>today()]);
         $startsAt = $subscription->starts_at ? $subscription->starts_at->copy()->startOfDay() : today();
         if (!empty($data['ends_at']) && Carbon::parse($data['ends_at'])->startOfDay()->lt($startsAt)) {
-            return back()->withErrors(['ends_at' => 'تاريخ الانتهاء لا يمكن أن يسبق تاريخ بداية الاشتراك.'])->withInput();
+            return back()->withErrors(['ends_at' => __('تاريخ الانتهاء لا يمكن أن يسبق تاريخ بداية الاشتراك.')])->withInput();
         }
         $subscription->fill(['subscription_plan_id'=>$data['plan_id'],'status'=>$data['status'],'ends_at'=>$data['ends_at'] ?? null,'trial_days'=>$data['trial_days'] ?? 0]);
         $subscription->save();
         ActivityLog::record('subscription_update', "تم تحديث اشتراك الشركة: {$company->name}.", $subscription, null, $subscription->toArray(), 'subscriptions');
-        return back()->with('toast','تم تحديث اشتراك الشركة بنجاح.');
+        return back()->with('toast',__('تم تحديث اشتراك الشركة بنجاح.'));
     }
 
     public function updateCompanyStatus(Request $request, Company $company)
@@ -196,18 +196,18 @@ class OwnerDashboardController extends Controller
         $data = $request->validate(['status'=>'required|in:active,suspended']);
         $company->update($data);
         ActivityLog::record('subscription_company_status', "تم تحديث حالة الشركة: {$company->name}.", $company, null, $company->toArray(), 'subscriptions');
-        return back()->with('toast','تم تحديث حالة الشركة.');
+        return back()->with('toast',__('تم تحديث حالة الشركة.'));
     }
 
     public function updateRenewal(Request $request, SubscriptionRenewalRequest $renewal)
     {
         $data = $request->validate(['status' => ['required', 'in:approved,rejected']]);
-        abort_if($renewal->status !== 'pending', 422, 'تمت معالجة هذا الطلب بالفعل.');
+        abort_if($renewal->status !== 'pending', 422, __('تمت معالجة هذا الطلب بالفعل.'));
         if ($data['status'] === 'approved') {
             abort_unless(
                 SubscriptionPlan::whereKey($renewal->subscription_plan_id)->where('is_active', true)->exists(),
                 422,
-                'لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.'
+                __('لا يمكن اعتماد طلب مرتبط بباقة غير نشطة.')
             );
         }
 
@@ -251,7 +251,7 @@ class OwnerDashboardController extends Controller
         ]);
 
         if ($data['audience'] === 'company' && empty($data['company_id'])) {
-            return back()->withErrors(['company_id' => 'يرجى اختيار الشركة المستهدفة.']);
+            return back()->withErrors(['company_id' => __('يرجى اختيار الشركة المستهدفة.')]);
         }
 
         $recipients = User::query()

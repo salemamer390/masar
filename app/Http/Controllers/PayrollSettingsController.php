@@ -111,8 +111,8 @@ class PayrollSettingsController extends Controller
         ], [
             'tiers.*.to_minutes.gte' => '«إلى دقيقة» لازم تكون أكبر من أو تساوي «من دقيقة».',
             'tiers.*.occurrence_to.gte' => '«إلى المرة» لازم تكون أكبر من أو تساوي «من المرة».',
-            'tiers.*.from_minutes.required' => 'حدد «من دقيقة» لكل شريحة.',
-            'tiers.*.deduction_days.required' => 'حدد قيمة الجزاء لكل شريحة.',
+            'tiers.*.from_minutes.required' => __('حدد «من دقيقة» لكل شريحة.'),
+            'tiers.*.deduction_days.required' => __('حدد قيمة الجزاء لكل شريحة.'),
             'tiers.*.deduction_days.gte' => 'قيمة الجزاء لا تقل عن صفر (صفر يعني إنذار بدون خصم).',
         ]);
         $tiers = collect($data['tiers'] ?? [])->map(fn ($tier) => [
@@ -154,7 +154,7 @@ class PayrollSettingsController extends Controller
             'contact_active' => ['nullable', 'boolean'],
         ]);
         if (!Schema::hasTable('leave_type_company_limits') || !Schema::hasColumn('leave_type_company_limits', 'requires_document') || !Schema::hasColumn('leave_type_company_limits', 'is_active') || !Schema::hasColumn('leave_type_company_limits', 'is_paid') || !Schema::hasColumn('leave_type_company_limits', 'deducts_annual_balance') || !Schema::hasColumn('leave_type_company_limits', 'min_employees')) {
-            $message = 'لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.';
+            $message = __('لازم تشغّل php artisan migrate قبل حفظ حدود الإجازات.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 422) : back()->withErrors(['leave' => $message]);
         }
         $companyId = (int) auth()->user()->company_id;
@@ -162,13 +162,13 @@ class PayrollSettingsController extends Controller
         $allowedPolicies = array_merge(array_keys(\App\Support\LeaveLegalReference::policyRules()), ['annual_wait_months', 'allow_early_leave']);
         $data['policies'] = array_intersect_key($data['policies'], array_flip($allowedPolicies));
         foreach (['weekly_enabled', 'holidays_enabled', 'jobsearch_enabled', 'nursing_enabled', 'pregnant_enabled', 'annual_prorate_first_year', 'weekly_rest_paid', 'jobsearch_paid', 'nursing_paid_full', 'holidays_paid', 'holidays_alt_day_allowed'] as $key) {
-            if (isset($data['policies'][$key]) && !in_array((string) $data['policies'][$key], ['0', '1'], true)) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون 0 أو 1.']);
+            if (isset($data['policies'][$key]) && !in_array((string) $data['policies'][$key], ['0', '1'], true)) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => __('القيمة يجب أن تكون 0 أو 1.')]);
         }
         foreach (['nursing_window_months', 'maternity_months', 'childcare_max_years_per_request', 'childcare_min_gap_years', 'exam_notice_days', 'exam_annual_leave_notice_days', 'annual_min_consecutive_days', 'leave_settlement_planning_years', 'weekly_rest_accumulate_weeks', 'jobsearch_weekly_hours', 'pregnancy_reduced_hours_from_month', 'contagious_max_months', 'maternity_min_postpartum_days', 'sick_phase1_months', 'sick_phase1_pct', 'sick_phase2_months', 'sick_phase2_pct', 'sick_phase3_months', 'sick_phase3_pct', 'sick_cycle_years', 'sick_termination_notice_days'] as $key) {
-            if (isset($data['policies'][$key]) && (float) $data['policies'][$key] != (int) $data['policies'][$key]) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => 'القيمة يجب أن تكون عددًا صحيحًا.']);
+            if (isset($data['policies'][$key]) && (float) $data['policies'][$key] != (int) $data['policies'][$key]) throw \Illuminate\Validation\ValidationException::withMessages(['policies.'.$key => __('القيمة يجب أن تكون عددًا صحيحًا.')]);
         }
-        if ($request->boolean('contact_active') && !$request->filled('contact_pay')) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => 'اختر سياسة الأجر أولًا قبل تفعيل إجازة المخالطة. المادة 132 لا تحدد الأجر.']);
-        if ($request->has('contact_active') && !$request->filled('contact_pay') && LeaveType::where('company_id', $companyId)->where('policy_code', 'contagious_contact_company_'.$companyId)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => 'اختر سياسة الأجر للنوع المسجل، أو ألغِ تفعيله مع الإبقاء على سياسة أجره.']);
+        if ($request->boolean('contact_active') && !$request->filled('contact_pay')) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => __('اختر سياسة الأجر أولًا قبل تفعيل إجازة المخالطة. المادة 132 لا تحدد الأجر.')]);
+        if ($request->has('contact_active') && !$request->filled('contact_pay') && LeaveType::where('company_id', $companyId)->where('policy_code', 'contagious_contact_company_'.$companyId)->exists()) throw \Illuminate\Validation\ValidationException::withMessages(['contact_pay' => __('اختر سياسة الأجر للنوع المسجل، أو ألغِ تفعيله مع الإبقاء على سياسة أجره.')]);
         $currentPolicies = DB::table('leave_policy_settings')->where('company_id', $companyId)->pluck('setting_value', 'setting_key')->all();
         $nextPolicies = array_replace($currentPolicies, $data['policies']);
         $warnings = [];
@@ -245,7 +245,7 @@ class PayrollSettingsController extends Controller
             }
         });
         ActivityLog::record('leave_policy_update', 'Leave policy settings updated.', null, $before, ['policies' => $data['policies'], 'types' => $data['types'] ?? [], 'below_reference_confirmed' => $request->boolean('confirm_below_reference'), 'warnings' => $warnings, 'contact_pay' => $data['contact_pay'] ?? null, 'contact_active' => $data['contact_active'] ?? false], 'leaves');
-        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', 'تم حفظ إعدادات الإجازات بنجاح.');
+        return $request->wantsJson() ? response()->json(['success' => true, 'message' => 'Leave policy saved.']) : back()->with('toast', __('تم حفظ إعدادات الإجازات بنجاح.'));
     }
 
     public function updateOperational(Request $request, AttendanceMetricsService $attendanceMetrics, PayrollRunService $payrollRuns, HrOperationalSettingsService $hrSettings)
@@ -343,14 +343,14 @@ class PayrollSettingsController extends Controller
         }
         if ($needsConfirm && !$blocked) {
             $hrSettings->flush();
-            $message = 'تغيير بداية أو نهاية فترة المسير هيقفل ويحفظ سجل الحضور للفترات اللي لسه في مهلة التصحيح، وبعدها مش هيتعدل. ما اتحفظش أي تغيير لحد ما تأكد.';
+            $message = __('تغيير بداية أو نهاية فترة المسير هيقفل ويحفظ سجل الحضور للفترات اللي لسه في مهلة التصحيح، وبعدها مش هيتعدل. ما اتحفظش أي تغيير لحد ما تأكد.');
             return $request->wantsJson()
                 ? response()->json(['success' => false, 'needs_confirmation' => true, 'message' => $message, 'periods' => $needsConfirm], 409)
                 : back()->withInput()->with('period_confirm', ['message' => $message, 'periods' => $needsConfirm]);
         }
         if ($blocked) {
             $hrSettings->flush();
-            $message = 'ما اتحفظش تغيير بداية ونهاية فترة المسير لأن الفترة الجديدة فيها أيام اتحسبت قبل كده. الإعدادات الحالية اتساب زي ما هي، ومفيش أي مسير أو سجل اتغيّر.';
+            $message = __('ما اتحفظش تغيير بداية ونهاية فترة المسير لأن الفترة الجديدة فيها أيام اتحسبت قبل كده. الإعدادات الحالية اتساب زي ما هي، ومفيش أي مسير أو سجل اتغيّر.');
             $lines = array_column($blocked, 'text');
             return $request->wantsJson()
                 ? response()->json(['success' => false, 'message' => $message, 'overlaps' => $blocked], 422)
@@ -362,7 +362,7 @@ class PayrollSettingsController extends Controller
         $draftCount = $payrollRuns->refreshOpenDraftsForCompany($companyId);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Operational settings updated and calculations refreshed.', 'settings' => $data, 'attendance_updated' => $attendanceCount, 'drafts_refreshed' => $draftCount])
-            : back()->with('toast', 'تم حفظ إعدادات أوقات الدوام والراحة.')->with('period_notes', array_values(array_filter(array_merge($transitionNote ? [$transitionNote] : [], array_column($notes, 'text')))));
+            : back()->with('toast', __('تم حفظ إعدادات أوقات الدوام والراحة.'))->with('period_notes', array_values(array_filter(array_merge($transitionNote ? [$transitionNote] : [], array_column($notes, 'text')))));
     }
 
     public function storeHoliday(Request $request)
@@ -374,7 +374,7 @@ class PayrollSettingsController extends Controller
             return response()->json(['success' => true, 'message' => 'Holiday saved.', 'holiday' => $holiday]);
         }
 
-        return back()->with('toast', 'تم حفظ العطلة الرسمية.');
+        return back()->with('toast', __('تم حفظ العطلة الرسمية.'));
     }
 
     public function storeLeaveType(Request $request)
@@ -392,7 +392,7 @@ class PayrollSettingsController extends Controller
         ]);
         $name = trim($data['name']);
         $clash = LeaveType::where('name', $name)->where(fn ($q) => $q->whereNull('company_id')->orWhere('company_id', $companyId))->exists();
-        if ($clash) throw \Illuminate\Validation\ValidationException::withMessages(['name' => 'يوجد نوع إجازة بهذا الاسم بالفعل.']);
+        if ($clash) throw \Illuminate\Validation\ValidationException::withMessages(['name' => __('يوجد نوع إجازة بهذا الاسم بالفعل.')]);
         $type = LeaveType::create([
             'name' => $name,
             'company_id' => $companyId,
@@ -407,7 +407,7 @@ class PayrollSettingsController extends Controller
             'max_occurrences_service' => $data['max_occurrences_service'] ?? null,
         ]);
         ActivityLog::record('leave_type_create', 'Custom leave type created.', null, null, $type->toArray(), 'leaves');
-        return back()->with('toast', 'تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.');
+        return back()->with('toast', __('تمت إضافة نوع الإجازة بنجاح — أصبح متاحًا في طلبات الإجازة.'));
     }
 
     /**
@@ -420,7 +420,7 @@ class PayrollSettingsController extends Controller
         $companyId = $this->companyIdOrFail();
         $type = LeaveType::where('id', $leaveType)->where('company_id', $companyId)->first();
         if (!$type) {
-            $message = 'نوع الإجازة غير موجود ضمن أنواع شركتك الخاصة.';
+            $message = __('نوع الإجازة غير موجود ضمن أنواع شركتك الخاصة.');
             return $request->wantsJson() ? response()->json(['success' => false, 'message' => $message], 404) : back()->withErrors(['leave' => $message]);
         }
         if ($type->leaves()->exists()) {
@@ -428,14 +428,14 @@ class PayrollSettingsController extends Controller
             $type->archived_at = now();
             $type->save();
             ActivityLog::record('leave_type_archive', 'Custom leave type archived.', null, null, $type->toArray(), 'leaves');
-            $message = 'للنوع طلبات سابقة — أُزيل من الاختيارات الجديدة مع حفظ سجلاته كاملة.';
+            $message = __('للنوع طلبات سابقة — أُزيل من الاختيارات الجديدة مع حفظ سجلاته كاملة.');
             return $request->wantsJson() ? response()->json(['success' => true, 'archived' => true, 'message' => $message]) : back()->with('toast', $message);
         }
         $snapshot = $type->toArray();
         DB::table('leave_type_company_limits')->where('leave_type_id', $type->id)->delete();
         $type->delete();
         ActivityLog::record('leave_type_delete', 'Custom leave type deleted.', null, null, $snapshot, 'leaves');
-        $message = 'تم حذف نوع الإجازة نهائيًا — لم تكن له أي طلبات.';
+        $message = __('تم حذف نوع الإجازة نهائيًا — لم تكن له أي طلبات.');
         return $request->wantsJson() ? response()->json(['success' => true, 'archived' => false, 'message' => $message]) : back()->with('toast', $message);
     }
 
@@ -444,7 +444,7 @@ class PayrollSettingsController extends Controller
         DB::table('hr_holidays')->where('company_id',auth()->user()->company_id)->where('id', $holiday)->delete();
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Holiday deleted.', 'holiday_id' => $holiday])
-            : back()->with('toast', 'تم حذف العطلة الرسمية.');
+            : back()->with('toast', __('تم حذف العطلة الرسمية.'));
     }
 
     public function updateHoliday(Request $request, int $holiday)
@@ -468,7 +468,7 @@ class PayrollSettingsController extends Controller
             ]);
         }
 
-        return back()->with('toast', 'تم تحديث العطلة الرسمية.');
+        return back()->with('toast', __('تم تحديث العطلة الرسمية.'));
     }
 
     private function ensureAnnualFixedHolidays(): void
@@ -517,7 +517,7 @@ class PayrollSettingsController extends Controller
     private function companyIdOrFail(): int
     {
         $companyId = auth()->user()?->company_id;
-        abort_if(!$companyId, 403, 'إعدادات الرواتب تخص شركة محددة.');
+        abort_if(!$companyId, 403, __('إعدادات الرواتب تخص شركة محددة.'));
 
         return (int) $companyId;
     }
@@ -553,7 +553,7 @@ class PayrollSettingsController extends Controller
         abort_if(array_diff(array_keys($data['settings']), self::SETTING_KEYS) !== [], 422, 'Invalid payroll setting.');
         foreach ($data['settings'] as $value) {
             if ($value !== null && $value !== '' && (!is_numeric($value) || (float) $value < 0)) {
-                return back()->withErrors(['settings' => 'كل قيم الإعدادات يجب أن تكون أرقامًا موجبة.'])->withInput();
+                return back()->withErrors(['settings' => __('كل قيم الإعدادات يجب أن تكون أرقامًا موجبة.')])->withInput();
             }
         }
         // The last allowance (by sort order) takes the remaining share of the
@@ -566,7 +566,7 @@ class PayrollSettingsController extends Controller
         $lastKey = $activeAllowances->last()->allowance_key;
         $othersSum = round(array_sum(array_map('floatval', collect($data['allowances'])->except($lastKey)->all())), 4);
         if ($othersSum - 100 > 0.0001) {
-            return back()->withErrors(['allowances' => 'مجموع البدلات قبل الأخير لا يمكن أن يتجاوز 100%.'])->withInput();
+            return back()->withErrors(['allowances' => __('مجموع البدلات قبل الأخير لا يمكن أن يتجاوز 100%.')])->withInput();
         }
         $data['allowances'][$lastKey] = round(100 - $othersSum, 4);
 
@@ -658,10 +658,10 @@ class PayrollSettingsController extends Controller
             $isLastCategory = $index === count($categories) - 1;
             $max = ($category['max_income'] ?? null) === null || $category['max_income'] === '' ? null : (float) $category['max_income'];
             if ($isLastCategory !== ($max === null)) {
-                return back()->withErrors(['tax' => 'آخر فئة فقط تُترك بدون حد أعلى، وباقي الفئات لازم لها حد أعلى.'])->withInput();
+                return back()->withErrors(['tax' => __('آخر فئة فقط تُترك بدون حد أعلى، وباقي الفئات لازم لها حد أعلى.')])->withInput();
             }
             if ($max !== null && $previousMax !== null && $max <= $previousMax) {
-                return back()->withErrors(['tax' => 'حدود الفئات لازم تكون تصاعدية.'])->withInput();
+                return back()->withErrors(['tax' => __('حدود الفئات لازم تكون تصاعدية.')])->withInput();
             }
             $previousMax = $max;
 

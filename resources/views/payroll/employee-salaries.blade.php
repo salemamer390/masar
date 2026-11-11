@@ -1,13 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'رواتب الموظفين')
+@section('title', __('رواتب الموظفين'))
 
 @section('content')
 @php
     $pageBody = view('payroll.partials.employee-salaries-body')->render();
     $peopleJson = json_encode($prototypePeople, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $monthIndex = max(0, min(11, (int) $month->format('n') - 1));
-    $arabicMonthLabel = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'][$monthIndex] . ' ' . $month->format('Y');
+    $arabicMonthLabel = $month->locale(app()->getLocale())->translatedFormat('F Y');
 @endphp
 
 <link rel="stylesheet" href="{{ asset('payroll-assets/employee-salaries.css') }}">
@@ -77,24 +77,24 @@
 </style>
 
 <ul class="nav nav-tabs payroll-view-tabs" id="payrollViewTabs" role="tablist">
-  <li class="nav-item" role="presentation"><button type="button" class="nav-link active" data-payroll-tab="current"><i class="bi bi-wallet2"></i> مسير {{ $arabicMonthLabel ?? $month->format('m/Y') }}</button></li>
-  <li class="nav-item" role="presentation"><button type="button" class="nav-link" data-payroll-tab="history"><i class="bi bi-clock-history"></i> المسيرات السابقة <span class="badge text-bg-secondary">{{ $payrollHistory->count() }}</span></button></li>
+  <li class="nav-item" role="presentation"><button type="button" class="nav-link active" data-payroll-tab="current"><i class="bi bi-wallet2"></i> {{ __('مسير') }} {{ $arabicMonthLabel ?? $month->format('m/Y') }}</button></li>
+  <li class="nav-item" role="presentation"><button type="button" class="nav-link" data-payroll-tab="history"><i class="bi bi-clock-history"></i> {{ __('المسيرات السابقة') }} <span class="badge text-bg-secondary">{{ $payrollHistory->count() }}</span></button></li>
 </ul>
 
 <div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
   @if(auth()->user()?->hasPermission('payroll.export'))
-    <a class="btn btn-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}"><i class="bi bi-file-earmark-excel"></i> تصدير Excel</a>
+    <a class="btn btn-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}"><i class="bi bi-file-earmark-excel"></i> {{ __('تصدير Excel') }}</a>
   @endif
-  <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة</button>
+  <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> {{ __('طباعة') }}</button>
   @if(auth()->user()?->hasPermission('payroll.create'))
     <form method="POST" action="{{ route('payroll.runs.generate') }}" class="d-inline">
       @csrf
       <input type="hidden" name="month" value="{{ $month->format('Y-m-01') }}">
-      <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> تحديث المسير</button>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> {{ __('تحديث المسير') }}</button>
     </form>
   @endif
   @if(!empty($lastPayrollRefreshAt))
-    <span class="text-muted small align-self-center" title="{{ $lastPayrollRefreshAt->format('d/m/Y H:i') }}"><i class="bi bi-clock-history"></i> آخر تحديث: {{ $lastPayrollRefreshAt->isToday() ? $lastPayrollRefreshAt->format('H:i') : $lastPayrollRefreshAt->format('d/m/Y') }}</span>
+    <span class="text-muted small align-self-center" title="{{ $lastPayrollRefreshAt->format('d/m/Y H:i') }}"><i class="bi bi-clock-history"></i> {{ __('آخر تحديث:') }} {{ $lastPayrollRefreshAt->isToday() ? $lastPayrollRefreshAt->format('H:i') : $lastPayrollRefreshAt->format('d/m/Y') }}</span>
   @endif
 </div>
 
@@ -102,16 +102,16 @@
 
 <div id="payrollHistoryPane" hidden>
   @if($payrollHistory->isEmpty())
-    <div class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2"></i>لا توجد مسيرات سابقة بعد.</div>
+    <div class="text-center text-muted py-5"><i class="bi bi-inbox fs-1 d-block mb-2"></i>{{ __('لا توجد مسيرات سابقة بعد.') }}</div>
   @else
-    <p class="text-muted small mb-3">اضغط على أي شهر لعرض مسير الرواتب الخاص به.</p>
+    <p class="text-muted small mb-3">{{ __('اضغط على أي شهر لعرض مسير الرواتب الخاص به.') }}</p>
     <div class="payroll-history-grid">
       @foreach($payrollHistory as $item)
         <button type="button" class="payroll-history-card {{ $item['current'] ? 'is-current' : '' }}" data-history-month="{{ $item['month'] }}">
           <h4><span>{{ $item['label'] }}</span><span class="payroll-status s-{{ $item['status'] }}">{{ $item['status_label'] }}</span></h4>
-          <div class="row-line"><span>عدد الموظفين</span><b>{{ number_format($item['employees']) }}</b></div>
-          <div class="row-line"><span>صافي الرواتب</span><b class="net">{{ number_format($item['net'], 2) }}</b></div>
-          <div class="row-line"><span>تكلفة الشركة</span><b>{{ number_format($item['cost'], 2) }}</b></div>
+          <div class="row-line"><span>{{ __('عدد الموظفين') }}</span><b>{{ number_format($item['employees']) }}</b></div>
+          <div class="row-line"><span>{{ __('صافي الرواتب') }}</span><b class="net">{{ number_format($item['net'], 2) }}</b></div>
+          <div class="row-line"><span>{{ __('تكلفة الشركة') }}</span><b>{{ number_format($item['cost'], 2) }}</b></div>
         </button>
       @endforeach
     </div>

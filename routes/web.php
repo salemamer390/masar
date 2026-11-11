@@ -52,6 +52,7 @@ $sitePage = static function (string $page) {
     }
     $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\.html"[^>]*>.*?</a>~u', '', $html);
     $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
+    $html = \App\Support\MarketingLocalizer::translate($html);
 
     return response($html)
         ->header('Content-Type', 'text/html; charset=UTF-8')
@@ -73,6 +74,16 @@ Route::get('/forgot-password.html', [MarketingSiteController::class, 'forgotPass
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
 Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
+// Interface language switch (Arabic / English). Stored in the session and a
+// long-lived cookie so the choice survives new sessions and works for guests.
+Route::get('/locale/{locale}', function (string $locale) {
+    abort_unless(in_array($locale, ['ar', 'en'], true), 404);
+
+    session(['locale' => $locale]);
+
+    return redirect()->back()->withCookie(cookie()->forever('masar_locale', $locale));
+})->name('locale.switch');
 
 // Guest Routes
 Route::middleware('guest')->group(function () {
