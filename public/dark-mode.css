@@ -1080,3 +1080,48 @@ body.preview-dark .lv-ref .form-control:disabled { background: var(--dm-surface-
 
 /* Guided maternity modal: employee-name strip follows the dark surfaces. */
 body.preview-dark #employeeMaternityName { background: var(--dm-surface-2, #1f2c46); border-color: var(--dm-border, #2a3850); color: var(--dm-text, #e9eef7); }
+
+/* ---------- Guided tour ---------- */
+body.preview-dark .masar-tour-backdrop {
+  background: rgba(2, 6, 23, .6);
+}
+
+body.preview-dark .masar-tour-highlight {
+  outline-color: var(--dm-primary);
+  box-shadow: 0 0 0 9999px rgba(2, 6, 23, .6);
+}
+
+body.preview-dark .masar-tour-popover {
+  background: var(--dm-surface);
+  border-color: var(--dm-border);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .5);
+}
+
+body.preview-dark .masar-tour-popover .tour-title {
+  color: var(--dm-text);
+}
+
+body.preview-dark .masar-tour-popover .tour-title i {
+  color: var(--dm-primary);
+}
+
+body.preview-dark .masar-tour-popover .tour-body {
+  color: var(--dm-text-2);
+}
+
+body.preview-dark .masar-tour-popover .tour-progress {
+  color: var(--dm-muted);
+}
+
+body.preview-dark .masar-tour-popover .tour-btn-secondary {
+  background: var(--dm-surface-3);
+  color: var(--dm-text);
+}
+
+body.preview-dark .masar-tour-popover .tour-btn-ghost {
+  color: var(--dm-muted);
+}
+
+body.preview-dark .masar-tour-popover .tour-btn-ghost:hover {
+  color: var(--dm-text);
+}
