@@ -4197,6 +4197,9 @@ nav[role="navigation"] span[aria-current="page"] > span {
 /* A fixed dropdown still inherits the topbar's stacking context. Raise that
    context while open so even an expanded mobile sidebar cannot cover it. */
 .topbar:has(.notification-menu.show){z-index:30}
+/* Same protection for the language menu: the fixed sidebar (z-index 20) must
+   never cover it. */
+.topbar:has(.language-menu.show){z-index:30}
 /* ====== design-system.css ====== */
 :root {
   --color-primary: #1677FF;
