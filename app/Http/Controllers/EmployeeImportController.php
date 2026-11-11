@@ -158,7 +158,7 @@ class EmployeeImportController extends Controller
         if (!empty($analysis['capacity']['exceeded'])) {
             return response()->json(['success' => false, 'message' => __('عدد الموظفين بعد الاستيراد يتجاوز حد باقتك. عدّل الملف أو رقّ الباقة.')] + $payload, 422);
         }
-        if (($analysis['summary']['create'] + $analysis['summary']['update']) === 0) {
+        if (($analysis['summary']['create'] + $analysis['summary']['update']) === 0 && empty($analysis['domain_only'])) {
             return response()->json(['success' => false, 'message' => __('لا توجد صفوف صالحة للاستيراد.')] + $payload, 422);
         }
         if ($analysis['summary']['defaulted_dates'] > 0 && !$request->boolean('ack_dates')) {
@@ -590,6 +590,7 @@ class EmployeeImportController extends Controller
             'selected_sheet' => $analysis['selected_sheet'],
             'merge_available' => $analysis['merge_available'],
             'needs_mapping' => $analysis['needs_mapping'],
+            'domain_only' => (bool) ($analysis['domain_only'] ?? false),
             'columns' => $analysis['columns'],
             'field_usage' => (object) $analysis['field_usage'],
             'fields' => $fields,
