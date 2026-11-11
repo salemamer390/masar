@@ -1,4 +1,5 @@
 @auth
+<link rel="stylesheet" href="{{ asset('tour-editor.css') }}?v={{ @filemtime(public_path('tour-editor.css')) }}">
 @php
   $tourUser = auth()->user();
   $tourTracked = \App\Support\GuidedTour::isTracked();
