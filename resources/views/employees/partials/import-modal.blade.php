@@ -391,20 +391,23 @@
             const options = [window.masarStaticHtml('<option value="">تجاهل هذا العمود</option>')].concat(fields.map((field) => {
                 const takenBy = usage[field.key];
                 const disabled = takenBy !== undefined && takenBy !== col.key ? ' disabled' : '';
-                return '<option value="' + esc(field.key) + '"' + (col.field === field.key ? ' selected' : '') + disabled + '>' + esc(field.label) + (disabled ? window.masarT(' (مربوط بعمود آخر)') : '') + '</option>';
+                return '<option value="' + esc(field.key) + '"' + (col.field === field.key ? ' selected' : '') + disabled + '>' + esc(window.masarT(field.label)) + (disabled ? window.masarT(' (مربوط بعمود آخر)') : '') + '</option>';
             })).join('');
             const sample = (col.samples && col.samples.length) ? window.masarStaticHtml('<div class="small text-muted">مثال: ') + col.samples.map(esc).join(' • ') + '</div>' : '';
             const sheet = col.sheet ? window.masarStaticHtml('<div class="small text-muted">في ورقة: ') + esc(col.sheet) + '</div>' : '';
             const hint = (!col.field && col.suggestion)
-                ? window.masarStaticHtml('<div class="small text-warning-emphasis">هل تقصد «') + esc(col.suggestion_label) + window.masarStaticHtml('»؟ <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-map-confirm="') + esc(col.key) + '" data-map-field="' + esc(col.suggestion) + window.masarStaticHtml('">نعم، اربطه</button></div>')
+                ? window.masarStaticHtml('<div class="small text-warning-emphasis">هل تقصد «') + esc(window.masarT(col.suggestion_label)) + window.masarStaticHtml('»؟ <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-map-confirm="') + esc(col.key) + '" data-map-field="' + esc(col.suggestion) + window.masarStaticHtml('">نعم، اربطه</button></div>')
                 : '';
-            rows += '<tr><td class="align-top"><strong>' + esc(col.header) + '</strong>' + sheet + sample + hint + '</td><td style="min-width:190px"><select class="form-select form-select-sm" data-map-key="' + esc(col.key) + '">' + options + '</select></td></tr>';
+            const unsupported = (!col.field && col.unsupported)
+                ? window.masarStaticHtml('<div class="small text-secondary">') + window.masarT('حقل معروف لكنه غير مدعوم في مسار حاليًا، لن يُحفظ:') + ' «' + esc(col.unsupported) + '»' + window.masarStaticHtml('</div>')
+                : '';
+            rows += '<tr><td class="align-top"><strong>' + esc(col.header) + '</strong>' + sheet + sample + hint + unsupported + '</td><td style="min-width:190px"><select class="form-select form-select-sm" data-map-key="' + esc(col.key) + '">' + options + '</select></td></tr>';
         });
         const confirmAll = suggestions.length > 1 ? window.masarStaticHtml('<button type="button" class="btn btn-sm btn-outline-primary mb-2" data-map-confirm-all>تأكيد كل الاقتراحات (') + num(suggestions.length) + ')</button>' : '';
         const label = data.needs_mapping ? window.masarT('ربط عمود الأسماء (مطلوب)') : window.masarT('أعمدة لم نتعرف عليها (') + num(columns.length) + ')';
         const open = forceOpen || data.needs_mapping || suggestions.length > 0 || mapped > 0;
         return '<details class="border ' + (data.needs_mapping ? 'border-danger' : 'border-warning') + ' rounded mb-2"' + (open ? ' open' : '') + '><summary class="p-2 fw-semibold" style="cursor:pointer"><i class="bi bi-diagram-3"></i> ' + label + '</summary>' +
-            window.masarStaticHtml('<div class="p-2 pt-0"><div class="form-text mb-2">اربط كل عمود بالحقل المناسب لتُستورد بياناته، أو اتركه على «تجاهل». لا يُربط أي عمود إلا بعد تأكيدك.</div>') + confirmAll +
+            window.masarStaticHtml('<div class="p-2 pt-0"><div class="form-text mb-2">') + window.masarT('اربط كل عمود بالحقل المناسب لتُستورد بياناته، أو اتركه على «تجاهل». لا يُربط أي عمود من هذه الأعمدة إلا بعد تأكيدك.') + ' ' + window.masarT('عند اكتمال الاستيراد تُحفظ الأعمدة التي ربطتها في قاموس شركتك، ويتعرف عليها النظام تلقائيًا في الملفات التالية.') + window.masarStaticHtml('</div>') + confirmAll +
             window.masarStaticHtml('<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>العمود في ملفك</th><th>يقابل الحقل</th></tr></thead><tbody>') + rows + '</tbody></table></div></div></details>';
     }
 
@@ -857,7 +860,9 @@
             needsReload = true;
             renderResult(data);
             showStep('result');
-            if (typeof showToast === 'function') { showToast(data.message || window.masarT('تم الاستيراد بنجاح')); }
+            let doneMessage = data.message || window.masarT('تم الاستيراد بنجاح');
+            if (data.learned_aliases > 0) { doneMessage += ' ' + window.masarT('أسماء أعمدة جديدة اتعلمت من تأكيدك:') + ' ' + num(data.learned_aliases); }
+            if (typeof showToast === 'function') { showToast(doneMessage); }
         } catch (error) {
             showAlert(error.message);
         } finally {
