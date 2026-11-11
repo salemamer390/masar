@@ -254,12 +254,30 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertStringContainsString('أكّد خيار التحديث', $rejected->getContent());
         $this->assertSame('manual', Attendance::where('employee_id', $this->day->id)->first()->source);
 
-        // Confirm via re-preview (the checkbox marks the preview stale), then commit.
-        [, , , $confirmKey] = $this->rePreview($token, $units[0], [], ['overwrite' => 1]);
-        $this->import($token, $units[0], $confirmKey, [], ['overwrite' => 1])->assertRedirect(route('attendance.index'));
+        // The acknowledgement is commit-time consent: checking it must not invalidate the
+        // preview, so the original preview key commits directly with the overwrite option.
+        $this->import($token, $units[0], $key, [], ['overwrite' => 1])->assertRedirect(route('attendance.index'));
         $row = Attendance::where('employee_id', $this->day->id)->first();
         $this->assertSame('import', $row->source);
         $this->assertStringStartsWith('09:30', (string) $row->check_in);
+    }
+
+    public function test_overwrite_acknowledgement_keeps_the_preview_valid(): void
+    {
+        Attendance::create(['employee_id' => $this->day->id, 'company_id' => $this->company->id, 'attendance_date' => '2026-11-02', 'check_in' => '09:00', 'check_out' => '17:00', 'status' => 'Present', 'approval_status' => 'Approved', 'source' => 'manual']);
+        [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '2026-11-02', '09:30', '18:00', 'حاضر'],
+        ])));
+
+        // Re-rendering the preview with the overwrite option set returns the same preview key:
+        // the checkbox is consent, not interpretation, so it never forces a refresh.
+        [, , , $refreshedKey] = $this->rePreview($token, $units[0], [], ['overwrite' => 1]);
+        $this->assertSame($key, $refreshedKey, 'overwrite toggle must not change the preview key');
+
+        // The preview auto-refreshes on sheet/mapping changes and no longer marks the
+        // acknowledgement checkbox as a stale-making change.
+        $this->assertStringContainsString('requestSubmit', $html);
+        $this->assertStringNotContainsString('markStale', $html);
     }
 
     public function test_ambiguous_text_dates_require_an_explicit_format(): void
