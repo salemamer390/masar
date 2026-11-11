@@ -73,7 +73,7 @@ class AttendanceImportPreviewTest extends TestCase
         return [$tokenMatch[1] ?? '', $unitMatches[1] ?? [], $html, $keyMatch[1] ?? ''];
     }
 
-    /** Re-preview with changed selections, like the «تحديث المعاينة» button. */
+    /** Re-preview with changed selections, as the automatic preview refresh does. */
     private function rePreview(string $token, string $unit, array $map = [], array $options = []): array
     {
         $response = $this->post('/attendance/import/preview', ['import_token' => $token, 'unit' => $unit, 'map' => $map, 'options' => $options]);
