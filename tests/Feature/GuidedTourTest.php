@@ -107,7 +107,7 @@ class GuidedTourTest extends TestCase
         $this->assertSame(['[data-bs-target="#salaryModal"]', '.page-head'], $byKey['salary-structures']['target']);
         $this->assertSame(['[data-bs-target="#leaveModal"]', '.page-head'], $byKey['leaves']['target']);
         $this->assertSame(['[data-bs-target="#penaltyModal"]', '.page-head'], $byKey['penalties']['target']);
-        $this->assertSame(['.request-kpi-card', '.page-head'], $byKey['requests']['target']);
+        $this->assertSame(['#newRequestButton', '.page-head a[href*="create=1"]', '.page-head'], $byKey['requests']['target']);
         $this->assertSame(['[data-bs-target="#addDeviceModal"]', '.page-head'], $byKey['fingerprint']['target']);
         $this->assertSame(['.monthly-summary-table', '.page-head'], $byKey['monthly-summary']['target']);
         $this->assertSame(['#payrollViewTabs', '.employee-payroll-actions'], $byKey['payroll']['target']);
@@ -189,7 +189,20 @@ class GuidedTourTest extends TestCase
         $this->assertNull($b->fresh()->tour_step);
     }
 
-    public function test_paused_tour_surfaces_resume_state_on_other_pages(): void
+    public function test_tour_is_mandatory_with_no_skip_control(): void
+    {
+        $user = $this->fullPermissionUser();
+        $this->actingAs($user);
+
+        $html = $this->get('/employees')->assertOk()->getContent();
+
+        $this->assertStringContainsString('الانتقال إلى الصفحة', $html);
+        $this->assertStringContainsString('اضغط على «:page» من القائمة الجانبية', $html);
+        $this->assertStringNotContainsString('تخطي الجولة', $html);
+        $this->assertStringNotContainsString('متابعة الجولة', $html);
+    }
+
+    public function test_paused_tour_resumes_on_the_saved_step(): void
     {
         $user = $this->fullPermissionUser();
         $user->forceFill(['tour_step' => 'payroll'])->save();
@@ -198,7 +211,34 @@ class GuidedTourTest extends TestCase
         $html = $this->get('/employees')->assertOk()->getContent();
 
         $this->assertStringContainsString('current: "payroll"', $html);
-        $this->assertStringContainsString('متابعة الجولة', $html);
+    }
+
+    public function test_changes_are_refused_until_the_tour_is_finished(): void
+    {
+        config(['tour.enforce' => true]);
+        $user = $this->fullPermissionUser();
+        $this->actingAs($user);
+
+        $this->postJson('/notifications/read-all')->assertStatus(423);
+        $this->post('/notifications/read-all')->assertRedirect();
+        $this->assertNull($user->fresh()->tour_seen_at);
+
+        // Reading pages and the tour's own endpoints stay open.
+        $this->get('/employees')->assertOk();
+        $this->postJson('/tour/progress', ['step' => 'leaves'])->assertNoContent();
+        $this->post('/tour/complete')->assertNoContent();
+
+        $this->postJson('/notifications/read-all')->assertSuccessful();
+    }
+
+    public function test_logout_stays_available_during_the_tour(): void
+    {
+        config(['tour.enforce' => true]);
+        $user = $this->fullPermissionUser();
+        $this->actingAs($user);
+
+        $this->post('/logout')->assertRedirect();
+        $this->assertGuest();
     }
 
     public function test_user_menu_has_replay_entry(): void

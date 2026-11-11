@@ -5311,6 +5311,12 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   z-index: 10040;
 }
 
+/* The highlight cutout dims the page itself; the backdrop only blocks clicks
+   unless there is nothing to highlight. */
+.masar-tour-backdrop:not(.dim) {
+  background: transparent !important;
+}
+
 .masar-tour-highlight {
   position: fixed;
   z-index: 10045;
@@ -5422,44 +5428,4 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   .masar-tour-popover .tour-footer {
     flex-wrap: wrap;
   }
-}
-
-/* Resume chip shown when the tour is paused on another page. */
-.masar-tour-resume {
-  position: fixed;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1080;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  max-width: min(92vw, 520px);
-  padding: 10px 14px;
-  background: #fff;
-  border: 1px solid #dbe4f0;
-  border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
-  font-size: .85rem;
-  color: #0f172a;
-}
-
-.masar-tour-resume .tour-btn {
-  border: 0;
-  border-radius: 9px;
-  padding: 7px 12px;
-  font-size: .8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.masar-tour-resume .tour-btn-primary {
-  background: #1677f9;
-  color: #fff;
-}
-
-.masar-tour-resume .tour-btn-ghost {
-  background: transparent;
-  color: #64748b;
 }

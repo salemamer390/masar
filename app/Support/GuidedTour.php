@@ -15,6 +15,17 @@ use App\Models\User;
  */
 class GuidedTour
 {
+    private static ?bool $tracked = null;
+
+    /**
+     * False until the tour columns are migrated; the tour then stays off
+     * (and is never enforced) instead of breaking pages or locking users out.
+     */
+    public static function isTracked(): bool
+    {
+        return self::$tracked ??= \Illuminate\Support\Facades\Schema::hasColumn('users', 'tour_seen_at');
+    }
+
     /**
      * @return array<int, array{key: string, url: ?string, target: ?string, title: string, body: string}>
      */
@@ -28,7 +39,7 @@ class GuidedTour
             'target' => null,
             'icon' => 'bi-stars',
             'title' => __('أهلًا بك في مسار'),
-            'body' => __('جولة سريعة على أهم أجزاء النظام. يمكنك تخطيها في أي وقت، وإعادتها لاحقًا من قائمة المستخدم.'),
+            'body' => __('جولة سريعة وإجبارية على أهم أجزاء النظام، نمر فيها على الصفحات بالترتيب ونوضح لك مكان كل صفحة في القائمة الجانبية. يمكنك إعادتها لاحقًا من قائمة المستخدم.'),
         ]];
 
         $pages = [
@@ -82,9 +93,9 @@ class GuidedTour
                 'icon' => 'bi-file-earmark-text-fill',
                 'permission' => 'requests.view',
                 'route' => 'requests.index',
-                'target' => ['.request-kpi-card', '.page-head'],
+                'target' => ['#newRequestButton', '.page-head a[href*="create=1"]', '.page-head'],
                 'title' => __('الطلبات'),
-                'body' => __('طلبات السلف والأذونات والمأموريات والإضافي تُسجَّل وتُتابَع من هنا.'),
+                'body' => __('من زر «طلب جديد» تسجّل طلبات السلف والأذونات والمأموريات والإضافي، وتتابعها من نفس الصفحة.'),
             ],
             [
                 'key' => 'fingerprint',
