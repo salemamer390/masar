@@ -345,6 +345,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
 <link rel="stylesheet" href="{{ asset('css/pages/attendance-index-05.css') }}?v={{ filemtime(public_path('css/pages/attendance-index-05.css')) }}">
 @endpush
 @push('scripts')
+<script src="{{ asset('js/import-dropzone.js') }}?v={{ filemtime(public_path('js/import-dropzone.js')) }}"></script>
 <script>
 (() => {
   if (document.getElementById('attendanceImportModal')) return;
@@ -360,10 +361,66 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
             <input class="form-control" id="attendanceImportFile" type="file" name="file" accept=".xlsx,.csv,.txt" required>
             <div class="form-text">الحد الأقصى 20MB. السجلات المكررة لنفس الموظف والتاريخ يتم تحديثها.</div>
           </div>
+          <div class="px-3 pb-2" data-att-progress hidden role="status" aria-live="polite"><div class="small mb-1" data-att-progress-label>جارٍ رفع الملف...</div><progress class="w-100" max="100" data-att-progress-bar aria-label="تقدم رفع الملف"></progress></div>
+          <div class="alert alert-danger small mx-3" data-att-error hidden role="alert"></div>
           <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button><button class="btn btn-primary" type="submit"><i class="bi bi-upload"></i> بدء الاستيراد</button></div>
         </form>
       </div></div>
     </div>`);
+  const modal = document.getElementById('attendanceImportModal');
+  const form = modal.querySelector('form');
+  const input = modal.querySelector('#attendanceImportFile');
+  window.MasarImportDropzone?.init(input, { maxBytes: 20 * 1024 * 1024 });
+  const panel = modal.querySelector('[data-att-progress]');
+  const bar = modal.querySelector('[data-att-progress-bar]');
+  const label = modal.querySelector('[data-att-progress-label]');
+  const errBox = modal.querySelector('[data-att-error]');
+  const submitBtn = form.querySelector('button[type=submit]');
+  const showErr = (m) => { errBox.hidden = !m; errBox.textContent = m || ''; };
+  form.addEventListener('submit', (e) => {
+    if (!window.XMLHttpRequest || !window.FormData) return;
+    e.preventDefault();
+    showErr('');
+    if (!input.files.length) { showErr('اختر ملفًا أولًا.'); return; }
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', form.action);
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.setRequestHeader('X-Import-Upload', '1');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    panel.hidden = false; submitBtn.disabled = true;
+    bar.removeAttribute('value'); label.textContent = 'جارٍ رفع الملف...';
+    xhr.upload.onprogress = (ev) => {
+      if (!ev.lengthComputable) return;
+      const p = Math.min(100, Math.floor(ev.loaded / ev.total * 100));
+      bar.value = p; label.textContent = 'رفع الملف: ' + p + '٪';
+    };
+    xhr.upload.onload = () => { bar.removeAttribute('value'); label.textContent = 'اكتمل الرفع. جارٍ فحص الملف على الخادم...'; };
+    const done = () => { panel.hidden = true; submitBtn.disabled = false; };
+    xhr.onerror = xhr.onabort = xhr.ontimeout = () => { done(); showErr('تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.'); };
+    xhr.onload = () => {
+      done();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const d = JSON.parse(xhr.responseText);
+          if (d.import_token) {
+            const f = document.createElement('form');
+            f.method = 'POST'; f.action = form.action;
+            [['_token', form.querySelector('input[name=_token]').value], ['import_token', d.import_token]].forEach(([n, v]) => {
+              const i = document.createElement('input'); i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i);
+            });
+            document.body.appendChild(f); f.submit();
+            return;
+          }
+        } catch (x) {}
+      }
+      let msg = '';
+      try { const d = JSON.parse(xhr.responseText); msg = d.errors ? Object.values(d.errors).flat()[0] : d.message; } catch (x) {}
+      if (xhr.status === 419) msg = 'انتهت صلاحية الجلسة. أعد تحميل الصفحة وحاول مرة أخرى.';
+      if (xhr.status === 413) msg = 'الملف أكبر من الحجم المسموح به على الخادم.';
+      showErr(msg || 'حدث خطأ غير متوقع أثناء معالجة الملف.');
+    };
+    xhr.send(new FormData(form));
+  });
 })();
 </script>
 @endpush

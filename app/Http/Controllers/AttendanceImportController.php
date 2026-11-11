@@ -56,7 +56,7 @@ class AttendanceImportController extends Controller
             try {
                 $sheets = $this->reader->readAll($file->getRealPath(), $extension === 'txt' ? 'csv' : $extension);
             } catch (\Throwable $exception) {
-                return back()->withErrors(['file' => 'تعذر قراءة الملف: ' . $exception->getMessage()]);
+                return $this->previewFailure($request, 'تعذر قراءة الملف: ' . $exception->getMessage());
             }
             $token = (string) Str::uuid();
             Storage::disk('local')->put("imports/{$token}." . ($extension === 'txt' ? 'csv' : $extension), file_get_contents($file->getRealPath()));
@@ -85,9 +85,23 @@ class AttendanceImportController extends Controller
         if (!$units) {
             $this->deleteTempImport($token);
             $reasons = collect($skipped)->map(fn ($s) => "ورقة «{$s['name']}»: {$s['skip_reason']}")->implode(' ');
-            return back()->withErrors(['file' => 'لم يُعثر على ورقة حضور قابلة للاستيراد. ' . $reasons]);
+            return $this->previewFailure($request, 'لم يُعثر على ورقة حضور قابلة للاستيراد. ' . $reasons);
+        }
+        // Upload-progress request: the file is stored and valid, hand the token back and let the page
+        // navigate to the normal preview (same POST-with-token flow the preview form already uses).
+        if ($request->hasFile('file') && $request->header('X-Import-Upload') === '1') {
+            return response()->json(['import_token' => $token]);
         }
         return $this->renderPreview($token, $fileName, $units, $skipped, $sheets, $selectedUnit, $postedMap, $postedOptions);
+    }
+
+    /** Errors go back as JSON for the upload-progress request, and as a normal flash otherwise. */
+    private function previewFailure(Request $request, string $message)
+    {
+        if ($request->ajax() || $request->expectsJson() && !$request->accepts('text/html')) {
+            return response()->json(['message' => $message, 'errors' => ['file' => [$message]]], 422);
+        }
+        return back()->withErrors(['file' => $message]);
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
