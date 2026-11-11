@@ -181,6 +181,15 @@ class EmployeeImportController extends Controller
             return [$result, $distributed, $this->recordLineage($request, $analysis, $result, $distributed, $companyId)];
         });
 
+        // The import the user just confirmed is the moment their manual column
+        // links become trusted vocabulary: remember them for the next file.
+        // Learning never blocks the import (no-op before the migration runs).
+        $learnedAliases = $this->service->learnMappings(
+            $companyId,
+            json_decode((string) $request->input('mappings', '{}'), true),
+            $analysis
+        );
+
         $attendanceCount = (int) data_get($distributed, 'attendance.imported', 0);
         $leaveCount = (int) data_get($distributed, 'leaves.imported', 0);
         $penaltyCount = (int) data_get($distributed, 'penalties.imported', 0);
@@ -199,6 +208,7 @@ class EmployeeImportController extends Controller
             'distributed_insurance_count' => $insuranceCount,
             'batch_id' => $batch->id,
             'batches_url' => route('employees.import-batches.index'),
+            'learned_aliases' => $learnedAliases,
         ] + $payload);
     }
 

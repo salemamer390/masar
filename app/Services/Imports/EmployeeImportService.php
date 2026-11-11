@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeStatus;
 use App\Models\EmploymentType;
+use App\Models\ImportColumnAlias;
 use App\Models\Job;
 use App\Models\MovementRecord;
 use App\Models\MovementType;
@@ -16,6 +17,7 @@ use App\Models\Salary;
 use App\Services\PayrollCalculator;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -40,6 +42,70 @@ class EmployeeImportService
     private const CALCULATED_HEADERS = [
         'سنوات الخدمة', 'مدة الخدمة', 'الرصيد المستحق', 'المستخدم', 'المتبقي', 'تنبيه',
         'رصيد الإجازة السنوية المتبقي', 'إجمالي الإجازات', 'أيام الحضور', 'أيام الغياب',
+        // Payroll / attendance report outputs (computed by Masar, never imported).
+        'إجمالي المستحقات', 'إجمالي الاستقطاعات', 'مجموع المستحقات', 'مجموع الخصومات',
+        'إجمالي الخصومات', 'إجمالي الأرباح', 'total earnings', 'total deductions',
+        'خصم التأخير', 'خصم الغياب', 'خصومات أخرى', 'شهر الراتب', 'شهر المرتب',
+        'فترة الرواتب', 'دورة الرواتب', 'تاريخ صرف الراتب', 'تاريخ الصرف', 'مبلغ الإضافي',
+        'قيمة الإضافي', 'المكافأة', 'العمولة', 'ساعات العمل الفعلية', 'دقائق التأخير',
+        'دقائق الانصراف المبكر', 'مستحقات نهاية الخدمة', 'التسوية النهائية', 'إجمالي التسوية',
+        'payroll month', 'payroll period', 'payment date', 'overtime amount', 'bonus', 'commission',
+        'الرصيد المتبقي', 'المتبقي من الإجازات', 'remaining leave', 'leave remaining',
+    ];
+
+    /**
+     * Known HR fields Masar does not store yet (from the central synonym
+     * dictionary). They are never auto-mapped and never silently dropped: the
+     * review labels them «غير مدعوم - لن يُحفظ» so the user sees exactly what
+     * happens. label => header aliases.
+     */
+    private const UNSUPPORTED_FIELDS = [
+        'رقم جواز السفر' => ['رقم جواز السفر', 'جواز السفر', 'رقم الباسبور', 'passport number', 'passport no', 'passport'],
+        'محل الميلاد' => ['محل الميلاد', 'مكان الميلاد', 'جهة الميلاد', 'place of birth', 'birth place'],
+        'الديانة' => ['الديانة', 'الديانة الرسمية', 'religion'],
+        'الموقف من التجنيد' => ['الموقف من التجنيد', 'موقف التجنيد', 'الخدمة العسكرية', 'الحالة التجنيدية', 'military status', 'military service status'],
+        'فصيلة الدم' => ['فصيلة الدم', 'نوع الدم', 'blood group', 'blood type'],
+        'رقم هاتف بديل' => ['رقم بديل', 'هاتف بديل', 'موبايل إضافي', 'رقم الهاتف الثاني', 'alternative phone', 'secondary phone', 'other mobile'],
+        'المحافظة' => ['المحافظة', 'محافظة السكن', 'محافظة الإقامة', 'governorate', 'state'],
+        'المدينة' => ['المدينة', 'مدينة السكن', 'city', 'town'],
+        'المنطقة أو الحي' => ['المنطقة', 'الحي', 'الحي السكني', 'district', 'area', 'neighborhood', 'neighbourhood'],
+        'الرمز البريدي' => ['الرمز البريدي', 'الكود البريدي', 'postal code', 'zip code', 'zip', 'post code'],
+        'جهة اتصال الطوارئ' => ['جهة اتصال الطوارئ', 'شخص للطوارئ', 'اسم شخص للطوارئ', 'emergency contact', 'emergency person'],
+        'هاتف الطوارئ' => ['رقم الطوارئ', 'هاتف الطوارئ', 'رقم جهة اتصال الطوارئ', 'emergency phone', 'emergency contact number'],
+        'صلة القرابة' => ['صلة القرابة', 'درجة القرابة', 'relationship', 'relation', 'kinship'],
+        'الوردية' => ['الوردية', 'الشيفت', 'shift', 'shift name', 'work shift'],
+        'ساعات العمل' => ['ساعات العمل', 'عدد ساعات العمل', 'ساعات الدوام', 'ساعات الدوام اليومية', 'working hours', 'work hours', 'daily hours', 'duty hours'],
+        'مركز التكلفة' => ['مركز التكلفة', 'كود مركز التكلفة', 'cost center', 'cost centre', 'cost code'],
+        'الجامعة' => ['الجامعة', 'اسم الجامعة', 'university'],
+        'الكلية' => ['الكلية', 'اسم الكلية', 'faculty', 'college'],
+        'التخصص' => ['التخصص', 'التخصص الدراسي', 'مجال الدراسة', 'specialization', 'specialisation', 'major', 'study field'],
+        'سنة التخرج' => ['سنة التخرج', 'عام التخرج', 'تاريخ التخرج', 'graduation year', 'year of graduation', 'graduation date'],
+        'سنوات الخبرة' => ['سنوات الخبرة', 'عدد سنوات الخبرة', 'الخبرة العملية', 'experience years', 'years of experience', 'total experience'],
+        'جهة العمل السابقة' => ['جهة العمل السابقة', 'الشركة السابقة', 'آخر شركة', 'previous employer', 'previous company', 'last employer'],
+        'المهارات' => ['المهارات', 'المهارات الشخصية', 'المهارات الفنية', 'skills', 'competencies'],
+        'اللغات' => ['اللغات', 'اللغات التي يجيدها', 'languages', 'language skills'],
+        'فترة الاختبار' => ['فترة الاختبار', 'فترة التجربة', 'مدة الاختبار', 'probation period', 'trial period', 'probation'],
+        'تاريخ التثبيت' => ['تاريخ التثبيت', 'تاريخ التعيين النهائي', 'تاريخ اجتياز الاختبار', 'confirmation date', 'confirmed date'],
+        'نوع العقد' => ['نوع العقد', 'طبيعة العقد', 'عقد الموظف', 'contract type', 'employment contract type'],
+        'الراتب الأساسي' => ['الراتب الأساسي', 'الأجر الأساسي', 'الأساسي', 'المرتب الأساسي', 'أجر أساسي', 'basic salary', 'basic wage', 'base salary', 'basic pay'],
+        'الأجر الشامل' => ['الأجر الشامل', 'الراتب الشامل', 'المرتب الشامل', 'comprehensive salary', 'total compensation'],
+        'الأجر بالساعة' => ['أجر الساعة', 'سعر الساعة', 'قيمة الساعة', 'hourly rate', 'hourly wage'],
+        'الأجر اليومي' => ['الأجر اليومي', 'المرتب اليومي', 'اليومية', 'daily wage', 'daily rate', 'day rate'],
+        'الأجر السنوي' => ['الراتب السنوي', 'الأجر السنوي', 'إجمالي الراتب السنوي', 'annual salary', 'yearly salary', 'annual pay'],
+        'بدل الانتقال' => ['بدل الانتقال', 'بدل مواصلات', 'بدل المواصلات', 'انتقالات', 'transportation allowance', 'transport allowance', 'commuting allowance'],
+        'بدل السكن' => ['بدل السكن', 'بدل إقامة', 'بدل المسكن', 'housing allowance', 'accommodation allowance', 'housing'],
+        'بدل الوجبة' => ['بدل الوجبة', 'بدل طعام', 'بدل تغذية', 'meal allowance', 'food allowance', 'meals'],
+        'بدل الهاتف' => ['بدل الهاتف', 'بدل موبايل', 'بدل تليفون', 'mobile allowance', 'phone allowance', 'telephone allowance'],
+        'بدلات أخرى' => ['بدلات أخرى', 'بدل إضافي', 'بدلات متنوعة', 'other allowances', 'additional allowance'],
+        'الأجر التأميني' => ['الأجر التأميني', 'المرتب التأميني', 'الراتب التأميني', 'أجر الاشتراك التأميني', 'insurance salary', 'insured wage', 'contribution salary'],
+        'حصة الموظف التأمينية' => ['حصة الموظف', 'تأمينات الموظف', 'استقطاع التأمينات', 'employee insurance', 'employee contribution'],
+        'حصة الشركة التأمينية' => ['حصة الشركة', 'حصة صاحب العمل', 'تأمينات الشركة', 'employer insurance', 'employer contribution'],
+        'الرقم الضريبي' => ['الرقم الضريبي', 'رقم التسجيل الضريبي', 'رقم الملف الضريبي', 'tax number', 'tax id', 'tax registration number'],
+        'طريقة صرف الراتب' => ['طريقة الدفع', 'طريقة صرف الراتب', 'وسيلة الدفع', 'طريقة التحويل', 'payment method', 'pay method'],
+        'البنك' => ['اسم البنك', 'البنك', 'البنك المحول إليه', 'bank name', 'bank'],
+        'رقم الحساب البنكي' => ['رقم الحساب البنكي', 'الحساب البنكي', 'رقم الحساب', 'bank account', 'bank account number', 'account number'],
+        'رقم IBAN' => ['رقم الآيبان', 'الآيبان', 'رقم الحساب الدولي', 'iban', 'iban number'],
+        'كود الوظيفة' => ['كود الوظيفة', 'رقم الوظيفة', 'job code', 'position code', 'job id'],
     ];
 
     /** Employees in these statuses do not consume the plan's employee limit (same rule as EmployeeController). */
@@ -49,9 +115,14 @@ class EmployeeImportService
      * key => [Arabic label (also the template header), accepted header aliases]
      */
     public const COLUMNS = [
-        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code', 'الرقم']],
-        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'الاسم الرباعي', 'staff name', 'worker name', 'employee full name']],
-        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'رقم الهوية', 'الرقم القومي للموظف', 'رقم البطاقة الشخصية', 'البطاقة', 'national id', 'national_id', 'nid', 'national number', 'national no', 'id number']],
+        'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code', 'الرقم', 'رقم الموظف الوظيفي', 'كود العاملين', 'personnel number', 'employe code', 'employ code', 'emplyee id']],
+        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'الاسم الرباعي', 'staff name', 'worker name', 'employee full name', 'اسم الشخص', 'personnel name', 'employe name', 'emploee name']],
+        // Split-name parts are composed into full_name when the file has no
+        // single name column (stage: contextual understanding, not storage).
+        'first_name' => ['الاسم الأول', ['الاسم الشخصي', 'first name', 'first_name', 'given name', 'fname', 'frist name']],
+        'middle_name' => ['الاسم الأوسط', ['اسم الأب', 'اسم الجد', 'middle name', 'middle_name', 'second name', 'mname']],
+        'last_name' => ['اسم العائلة', ['اللقب', 'last name', 'last_name', 'family name', 'surname', 'lname']],
+        'national_id' => ['الرقم القومي', ['رقم قومي', 'الرقم القومى', 'رقم البطاقة', 'رقم الهوية', 'الرقم القومي للموظف', 'رقم البطاقة الشخصية', 'البطاقة', 'national id', 'national_id', 'nid', 'national number', 'national no', 'id number', 'الرقم الوطني', 'رقم بطاقة الرقم القومي', 'national id number', 'civil id', 'identity number', 'natioanl id']],
         'insurance_number' => ['الرقم التأميني', [
             // Arabic variants used by personnel/insurance spreadsheets.
             'رقم التأمين', 'الرقم التامينى', 'رقم التأمين الاجتماعي', 'رقم التأمينات',
@@ -61,33 +132,37 @@ class EmployeeImportService
             'insurance id', 'social insurance number', 'social insurance id',
             'social security number', 'social security id', 'insurance registration number',
             'ins no', 'ins number', 'ins id',
+            'رقم المؤمن عليه', 'insured number', 'insurence number',
         ]],
-        'phone' => ['رقم الهاتف', ['الهاتف', 'الموبايل', 'رقم الموبايل', 'التليفون', 'رقم التليفون', 'phone', 'mobile', 'رقم الجوال', 'الجوال', 'تليفون', 'رقم التلفون', 'التلفون', 'mobile number', 'phone number', 'tel', 'telephone']],
-        'email' => ['البريد الإلكتروني', ['البريد', 'الايميل', 'الإيميل', 'email', 'e-mail', 'الايميل الشخصي', 'البريد الالكتروني', 'email address']],
-        'birth_date' => ['تاريخ الميلاد', ['الميلاد', 'birth date', 'birth_date', 'date of birth', 'dob']],
-        'gender' => ['النوع', ['الجنس', 'gender', 'sex']],
-        'marital_status' => ['الحالة الاجتماعية', ['الحاله الاجتماعيه', 'marital status', 'marital_status']],
-        'qualification' => ['المؤهل', ['المؤهل الدراسي', 'المؤهل العلمي', 'qualification', 'education']],
-        'address' => ['العنوان', ['address']],
-        'nationality' => ['الجنسية', ['nationality']],
-        'department' => ['القسم', ['الإدارة', 'الادارة', 'department']],
-        'job' => ['الوظيفة', ['المسمى الوظيفي', 'المسمى', 'job', 'job title', 'title', 'position', 'الوظيفه', 'المسمي الوظيفي', 'job position']],
-        'branch' => ['الفرع', ['مكان العمل', 'branch', 'work location']],
-        'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'نوع الموظف', 'employment type', 'employment_type']],
-        'status' => ['الحالة الوظيفية', ['حالة الموظف', 'حالة العمل', 'employee status', 'status']],
-        'hire_date' => ['بداية العقد (عمود قديم)', ['تاريخ التعيين', 'تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date', 'joining date', 'date of joining', 'تاريخ التوظيف', 'تاريخ بداية العمل', 'تاريخ الانضمام']],
-        'contract_start_date' => ['بداية العقد', ['تاريخ بداية العقد', 'contract start', 'contract_start_date']],
-        'contract_end_date' => ['نهاية العقد', ['تاريخ نهاية العقد', 'contract end', 'contract_end_date']],
+        'phone' => ['رقم الهاتف', ['الهاتف', 'الموبايل', 'رقم الموبايل', 'التليفون', 'رقم التليفون', 'phone', 'mobile', 'رقم الجوال', 'الجوال', 'تليفون', 'رقم التلفون', 'التلفون', 'mobile number', 'phone number', 'tel', 'telephone', 'الهاتف المحمول', 'هاتف الموظف', 'mobile no', 'phone no', 'contact number', 'moblie number', 'phone nuber']],
+        'email' => ['البريد الإلكتروني', ['البريد', 'الايميل', 'الإيميل', 'email', 'e-mail', 'الايميل الشخصي', 'البريد الالكتروني', 'email address', 'البريد الشخصي', 'البريد الوظيفي', 'mail', 'personal email', 'work email', 'emial', 'eamil']],
+        'birth_date' => ['تاريخ الميلاد', ['الميلاد', 'birth date', 'birth_date', 'date of birth', 'dob', 'تاريخ ولادة الموظف', 'يوم الميلاد', 'birthday', 'date of brith', 'brith date']],
+        'gender' => ['النوع', ['الجنس', 'gender', 'sex', 'ذكر أو أنثى', 'gendar']],
+        'marital_status' => ['الحالة الاجتماعية', ['الحاله الاجتماعيه', 'marital status', 'marital_status', 'الحالة العائلية', 'أعزب أو متزوج', 'social status', 'marital stauts']],
+        'qualification' => ['المؤهل', ['المؤهل الدراسي', 'المؤهل العلمي', 'qualification', 'education', 'الدرجة العلمية', 'educational qualification', 'degree', 'qulification']],
+        'address' => ['العنوان', ['address', 'عنوان السكن', 'محل الإقامة', 'عنوان الموظف', 'home address', 'residence address', 'adress']],
+        'nationality' => ['الجنسية', ['nationality', 'جنسية الموظف', 'nationallity']],
+        'department' => ['القسم', ['الإدارة', 'الادارة', 'department', 'اسم القسم', 'الإدارة التابع لها', 'dept', 'division', 'section', 'departmant', 'departement']],
+        'job' => ['الوظيفة', ['المسمى الوظيفي', 'المسمى', 'job', 'job title', 'title', 'position', 'الوظيفه', 'المسمي الوظيفي', 'job position', 'اسم الوظيفة', 'المهنة', 'المنصب الوظيفي', 'designation', 'occupation', 'job tittle', 'desigination']],
+        'branch' => ['الفرع', ['مكان العمل', 'branch', 'work location', 'اسم الفرع', 'فرع العمل', 'موقع العمل', 'مقر العمل', 'branch name', 'brnch', 'office location', 'work place']],
+        'employment_type' => ['نوع التوظيف', ['نوع التعاقد', 'نوع العمل', 'نوع الموظف', 'employment type', 'employment_type', 'طبيعة العمل', 'employee type', 'staff type', 'worker type']],
+        'status' => ['الحالة الوظيفية', ['حالة الموظف', 'حالة العمل', 'employee status', 'status', 'موقف الموظف', 'employment status', 'staff status']],
+        'hire_date' => ['بداية العقد (عمود قديم)', ['تاريخ التعيين', 'تاريخ المباشرة', 'تاريخ الالتحاق', 'hire date', 'hire_date', 'join date', 'joining date', 'date of joining', 'تاريخ التوظيف', 'تاريخ بداية العمل', 'تاريخ الانضمام', 'تاريخ بدء العمل', 'hiring date', 'employment date', 'start date', 'hired date', 'joinning date']],
+        'contract_start_date' => ['بداية العقد', ['تاريخ بداية العقد', 'contract start', 'contract_start_date', 'تاريخ سريان العقد', 'contract from', 'start of contract']],
+        'contract_end_date' => ['نهاية العقد', ['تاريخ نهاية العقد', 'contract end', 'contract_end_date', 'تاريخ انتهاء العقد', 'contract to', 'expiry date', 'contract expiry']],
         'contract_duration' => ['مدة العقد', ['contract duration', 'contract_duration']],
-        'gross_salary' => ['الراتب الإجمالي', ['الراتب الاجمالي', 'اجمالي الراتب', 'إجمالي الراتب', 'المرتب الإجمالي', 'المرتب الاجمالي', 'إجمالي المرتب', 'الإجمالي', 'gross salary', 'gross_salary', 'gross']],
-        'net_salary' => ['الراتب الصافي', ['صافي الراتب', 'الصافي', 'net salary', 'net_salary', 'net']],
+        'gross_salary' => ['الراتب الإجمالي', ['الراتب الاجمالي', 'اجمالي الراتب', 'إجمالي الراتب', 'المرتب الإجمالي', 'المرتب الاجمالي', 'إجمالي المرتب', 'الإجمالي', 'gross salary', 'gross_salary', 'gross', 'الأجر الإجمالي', 'إجمالي الأجر', 'جروس', 'gross pay', 'total gross', 'gross wage', 'gorss salary']],
+        'net_salary' => ['الراتب الصافي', ['صافي الراتب', 'الصافي', 'net salary', 'net_salary', 'net', 'صافي المرتب', 'المرتب الصافي', 'الأجر الصافي', 'صافي الأجر', 'صافي المستحق', 'صافي القبض', 'المقبوض', 'net pay', 'take home salary', 'take home pay', 'net sallary', 'net salry', 'net salery', 'net sal']],
         'manager_code' => ['كود المدير المباشر', ['كود المدير', 'manager code', 'manager_code']],
-        'manager_name' => ['اسم المدير المباشر', ['المدير المباشر', 'اسم المدير', 'manager name', 'manager_name']],
+        'manager_name' => ['اسم المدير المباشر', ['المدير المباشر', 'اسم المدير', 'manager name', 'manager_name', 'المسؤول المباشر', 'direct manager', 'line manager', 'reporting manager', 'supervisor']],
         'shift_start' => ['بداية الدوام', ['بدايه الدوام', 'بداية دوام خاصة', 'بداية الوردية', 'وقت الحضور الرسمي', 'shift start', 'shift_start']],
         'shift_end' => ['نهاية الدوام', ['نهايه الدوام', 'نهاية دوام خاصة', 'نهاية الوردية', 'وقت الانصراف الرسمي', 'shift end', 'shift_end']],
-        'termination_type' => ['نوع انتهاء الخدمة', ['نوع إنهاء الخدمة', 'termination type', 'termination_type']],
-        'termination_date' => ['تاريخ انتهاء الخدمة', ['تاريخ إنهاء الخدمة', 'تاريخ ترك العمل', 'تاريخ الخروج', 'آخر يوم عمل', 'تاريخ الاستقالة', 'termination date', 'termination_date']],
-        'manual_annual_balance' => ['رصيد الإجازة السنوية اليدوي', ['رصيد سنوي يدوي (اختياري)', 'رصيد إجازة سنوية', 'رصيد الإجازات', 'manual annual balance', 'manual_annual_balance']],
+        'termination_type' => ['نوع انتهاء الخدمة', ['نوع إنهاء الخدمة', 'termination type', 'termination_type', 'سبب انتهاء الخدمة', 'طريقة انتهاء الخدمة', 'separation type', 'exit type']],
+        // «آخر يوم عمل» / «تاريخ الاستقالة» / dismissal dates are deliberately NOT
+        // aliases here: their equivalence with end-of-service is not established,
+        // so they stay for manual confirmation (per the reviewed dictionary).
+        'termination_date' => ['تاريخ انتهاء الخدمة', ['تاريخ إنهاء الخدمة', 'تاريخ ترك العمل', 'تاريخ الخروج', 'termination date', 'termination_date']],
+        'manual_annual_balance' => ['رصيد الإجازة السنوية اليدوي', ['رصيد سنوي يدوي (اختياري)', 'رصيد إجازة سنوية', 'رصيد الإجازات', 'manual annual balance', 'manual_annual_balance', 'رصيد الإجازة', 'leave balance', 'available leave', 'vacation balance']],
         'notes' => ['ملاحظات', ['ملاحظة', 'notes', 'note']],
     ];
 
@@ -112,6 +187,9 @@ class EmployeeImportService
 
     /** @var array<string, array<string, string>>|null */
     private ?array $wordMaps = null;
+
+    /** Company whose learned column aliases apply to the current analysis. */
+    private ?int $companyId = null;
 
     /** @var array<string, string> */
     private array $statusIds = [];
@@ -163,7 +241,8 @@ class EmployeeImportService
             return $result;
         }
 
-        $aliases = $this->aliasMap();
+        $this->companyId = $companyId;
+        $aliases = $this->aliasMap($companyId);
         $infos = [];
         foreach ($sheets as $index => $sheet) {
             [$headerRow, $map, $entries, $used] = $this->detectHeader($sheet['rows'], $aliases, $manual);
@@ -291,6 +370,18 @@ class EmployeeImportService
                 foreach ($info['map'] as $column => $key) {
                     $record[$key] = isset($cells[$column]) ? trim((string) $cells[$column]) : '';
                 }
+                // Split name columns («الاسم الأول/الأوسط/العائلة») compose the
+                // full name when the file has no single name column.
+                if (trim((string) ($record['full_name'] ?? '')) === '') {
+                    $parts = array_filter([
+                        trim((string) ($record['first_name'] ?? '')),
+                        trim((string) ($record['middle_name'] ?? '')),
+                        trim((string) ($record['last_name'] ?? '')),
+                    ], static fn (string $part): bool => $part !== '');
+                    if ($parts !== []) {
+                        $record['full_name'] = implode(' ', $parts);
+                    }
+                }
                 if (implode('', $record) === '') {
                     continue;
                 }
@@ -334,7 +425,7 @@ class EmployeeImportService
     /** A multi-sheet employee source must contain identity/profile data too. */
     private function isEmployeeDataSheet(array $used): bool
     {
-        if (!isset($used['full_name'])) {
+        if (!$this->hasNameField($used)) {
             return false;
         }
 
@@ -393,7 +484,9 @@ class EmployeeImportService
         $hasTime = $has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout']);
         $hasDate = $has(['التاريخ', 'تاريخ الحضور', 'attendance date', 'attendance_date']) || $hasExact(['date', 'day', 'اليوم']);
         if ($hasTime && $hasDate) return 'attendance';
-        if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type', 'start date'])) return 'leaves';
+        // Bare "start date" is not a leaves marker: in an employees sheet it is the
+        // hire date, so only leave-specific markers classify a sheet as leaves.
+        if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type'])) return 'leaves';
         if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])) return 'penalties';
         if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
         if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'نوع الطلب', 'overtime', 'bonus', 'commission', 'incentive', 'profit', 'permission', 'mission', 'request type', 'إذن', 'مأمورية'])) return 'requests';
@@ -403,7 +496,7 @@ class EmployeeImportService
         // 'unknown' for review rather than being guessed.
         if ($has(['الأجر التأميني', 'مبلغ الاشتراك', 'اشتراك التأمينات', 'insurance wage', 'insurance subscription'])
             && !$has(['الرقم القومي', 'تاريخ التعيين', 'بداية العقد', 'تاريخ الميلاد', 'national id', 'hire date', 'contract start', 'birth date'])) return 'insurance';
-        if (isset($used['full_name']) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
+        if ($this->hasNameField($used) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         // Last resort: common sheet names are only a hint for a sheet the columns could not
         // classify. The user still reviews and can change the type on the sheets step.
@@ -412,13 +505,13 @@ class EmployeeImportService
 
     /** Common Arabic/English sheet names, used only as a hint when columns are inconclusive. */
     private const SHEET_NAME_HINTS = [
-        'employees' => ['الموظفين', 'موظفين', 'بيانات الموظفين', 'بيانات العاملين', 'العاملين', 'شئون العاملين', 'شؤون العاملين', 'employees', 'employee', 'employee data', 'staff', 'personnel', 'workers'],
-        'attendance' => ['الحضور', 'الحضور والانصراف', 'سجل الحضور', 'الحضور والإنصراف', 'البصمات', 'بصمات', 'attendance', 'punches', 'time attendance', 'attendance log', 'timesheet'],
-        'leaves' => ['الإجازات', 'الاجازات', 'إجازات', 'اجازات', 'leaves', 'leave', 'vacations'],
-        'penalties' => ['الجزاءات', 'جزاءات', 'المخالفات', 'penalties', 'disciplinary'],
+        'employees' => ['الموظفين', 'موظفين', 'بيانات الموظفين', 'بيانات العاملين', 'العاملين', 'شئون العاملين', 'شؤون العاملين', 'employees', 'employee', 'employee data', 'staff', 'personnel', 'workers', 'العاملون', 'hr data'],
+        'attendance' => ['الحضور', 'الحضور والانصراف', 'سجل الحضور', 'الحضور والإنصراف', 'البصمات', 'بصمات', 'attendance', 'punches', 'time attendance', 'attendance log', 'timesheet', 'البصمة'],
+        'leaves' => ['الإجازات', 'الاجازات', 'إجازات', 'اجازات', 'leaves', 'leave', 'vacations', 'الأجازات', 'طلبات الإجازة'],
+        'penalties' => ['الجزاءات', 'جزاءات', 'المخالفات', 'penalties', 'disciplinary', 'الإنذارات', 'التحقيقات', 'warnings'],
         'advances' => ['السلف', 'سلف', 'advances', 'advance'],
         'requests' => ['الطلبات', 'طلبات', 'requests'],
-        'insurance' => ['التأمينات', 'التأمين', 'التامينات', 'insurance', 'social insurance'],
+        'insurance' => ['التأمينات', 'التأمين', 'التامينات', 'insurance', 'social insurance', 'التأمين الاجتماعي', 'بيانات التأمين'],
     ];
 
     private function kindFromSheetName(string $name): ?string
@@ -635,7 +728,7 @@ class EmployeeImportService
     /**
      * @return array<string, string> normalised header alias => field key
      */
-    private function aliasMap(): array
+    private function aliasMap(?int $companyId = null): array
     {
         $aliases = [];
         foreach (self::COLUMNS as $key => [$label, $extra]) {
@@ -643,8 +736,187 @@ class EmployeeImportService
                 $aliases[$this->key($alias)] = $key;
             }
         }
+        // Headers this company confirmed in earlier imports join the
+        // dictionary; a built-in entry always wins over a learned one.
+        foreach ($this->learnedAliases($companyId) as $learned) {
+            $aliases[$learned['alias_key']] ??= $learned['field'];
+        }
 
         return $aliases;
+    }
+
+    /**
+     * Column headers this company taught the importer by confirming a manual
+     * mapping in a completed import. Empty before the migration runs, on any
+     * database error, or for a missing company - learning is an enhancement,
+     * never a requirement for importing.
+     *
+     * @return array<int, array{field: string, alias: string, alias_key: string}>
+     */
+    private function learnedAliases(?int $companyId): array
+    {
+        if ($companyId === null || $companyId <= 0) {
+            return [];
+        }
+        try {
+            if (!Schema::hasTable('import_column_aliases')) {
+                return [];
+            }
+
+            return ImportColumnAlias::withoutGlobalScopes()
+                ->where('company_id', $companyId)
+                ->get(['field', 'alias', 'alias_key'])
+                ->filter(static fn ($row): bool => isset(self::COLUMNS[$row->field]))
+                ->map(static fn ($row): array => ['field' => $row->field, 'alias' => $row->alias, 'alias_key' => $row->alias_key])
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Remembers the user-confirmed header → field links of a completed import,
+     * so the next workbook with the same headers is recognised automatically.
+     * Scoped to the company; built-in dictionary entries always win. Never
+     * blocks or breaks the import: any failure returns 0.
+     *
+     * @param array<string, mixed> $analysis
+     */
+    public function learnMappings(int $companyId, mixed $rawMappings, array $analysis): int
+    {
+        if ($companyId <= 0) {
+            return 0;
+        }
+        try {
+            if (!Schema::hasTable('import_column_aliases')) {
+                return 0;
+            }
+            $manual = $this->sanitizeMappings($rawMappings);
+            if ($manual === []) {
+                return 0;
+            }
+            $headers = [];
+            foreach ($analysis['columns'] ?? [] as $column) {
+                if (is_array($column)) {
+                    $header = (string) ($column['header'] ?? '');
+                    $key = (string) ($column['key'] ?? '');
+                    if ($header !== '') {
+                        $headers[$header] = $header;
+                        if ($key !== '') {
+                            $headers[$key] = $header;
+                        }
+                    }
+                }
+            }
+            $learned = 0;
+            foreach ($manual as $key => $field) {
+                $rawHeader = (string) $key;
+                $alias = trim((string) ($headers[$rawHeader] ?? $rawHeader));
+                $aliasKey = $this->key($alias);
+                if ($alias === '' || $aliasKey === '' || mb_strlen($alias) > 190 || $this->isCalculatedHeader($rawHeader)) {
+                    continue;
+                }
+                $exists = ImportColumnAlias::withoutGlobalScopes()
+                    ->where('company_id', $companyId)->where('alias_key', $aliasKey)->exists();
+                ImportColumnAlias::withoutGlobalScopes()->updateOrCreate(
+                    ['company_id' => $companyId, 'alias_key' => $aliasKey],
+                    ['field' => $field, 'alias' => $alias]
+                );
+                if (!$exists) {
+                    $learned++;
+                }
+            }
+
+            return $learned;
+        } catch (Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Normalised word tokens of a header or alias: the same letter/diacritic
+     * unification as key(), but word boundaries are kept so matching can
+     * reason about meaning (e.g. «اسم الموظف» vs «اسم القسم»).
+     *
+     * @return array<int, string>
+     */
+    private function tokens(string $value): array
+    {
+        $value = mb_strtolower(trim($this->latinDigits($value)), 'UTF-8');
+        $value = (string) preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $value);
+        $value = strtr($value, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا', 'ى' => 'ي', 'ة' => 'ه', 'ؤ' => 'و', 'ئ' => 'ي']);
+        $parts = preg_split('/[^\p{L}\p{N}]+/u', $value, -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_unique($parts ?: []));
+    }
+
+    /** field => original alias texts (built-in dictionary + company-learned). */
+    private function fieldAliasTexts(): array
+    {
+        $texts = [];
+        foreach (self::COLUMNS as $field => [$label, $extra]) {
+            $texts[$field] = array_merge([$label], $extra);
+        }
+        foreach ($this->learnedAliases($this->companyId) as $learned) {
+            $texts[$learned['field']][] = $learned['alias'];
+        }
+
+        return $texts;
+    }
+
+    /**
+     * Contextual match: a header is recognised when every token of a known
+     * alias appears in it and exactly one field owns the most specific such
+     * alias (2+ tokens). A tie between fields means the header is genuinely
+     * ambiguous - it stays unmatched for the user to confirm, never guessed.
+     *
+     * @param array<int, string> $headerTokens
+     */
+    private function contextualMatch(array $headerTokens): ?string
+    {
+        if (count($headerTokens) < 2) {
+            return null;
+        }
+        $scores = [];
+        foreach ($this->fieldAliasTexts() as $field => $texts) {
+            foreach ($texts as $text) {
+                $aliasTokens = $this->tokens($text);
+                if (count($aliasTokens) < 2 || array_diff($aliasTokens, $headerTokens) !== []) {
+                    continue;
+                }
+                $scores[$field] = max($scores[$field] ?? 0, count($aliasTokens));
+            }
+        }
+        if ($scores === []) {
+            return null;
+        }
+        $best = max($scores);
+        $fields = array_keys(array_filter($scores, static fn (int $score): bool => $score === $best));
+
+        return count($fields) === 1 ? $fields[0] : null;
+    }
+
+    /** The field a known-but-unsupported header belongs to (dictionary fields Masar does not store), or null. */
+    private function unsupportedFieldLabel(string $normalized): ?string
+    {
+        static $map = null;
+        if ($map === null) {
+            $map = [];
+            foreach (self::UNSUPPORTED_FIELDS as $label => $aliases) {
+                foreach ($aliases as $alias) {
+                    $map[$this->key($alias)] = $label;
+                }
+            }
+        }
+
+        return $map[$normalized] ?? null;
+    }
+
+    /** A sheet only counts as employee data when a name column exists (single or split parts). */
+    private function hasNameField(array $used): bool
+    {
+        return isset($used['full_name']) || isset($used['first_name']) || isset($used['last_name']);
     }
 
     /**
@@ -713,6 +985,21 @@ class EmployeeImportService
             }
         }
 
+        // Contextual pass: what exact matching missed, word-meaning may still
+        // recognise unambiguously (e.g. «اسم الموظف بالكامل»). Ties and
+        // single-token similarities stay for the user to confirm.
+        foreach ($entries as $position => $entry) {
+            if ($entry['field'] !== null || $this->unsupportedFieldLabel($entry['key']) !== null) {
+                continue;
+            }
+            $field = $this->contextualMatch($this->tokens($entry['header']));
+            if ($field !== null && !isset($used[$field])) {
+                $map[$entry['column']] = $field;
+                $used[$field] = 'context';
+                $entries[$position]['field'] = $field;
+            }
+        }
+
         return [$map, $used, $entries];
     }
 
@@ -741,7 +1028,7 @@ class EmployeeImportService
                 break;
             }
             [$map, $used, $entries] = $this->mapRow($cells, $aliases, $manual);
-            if (isset($used['full_name'])) {
+            if ($this->hasNameField($used)) {
                 return [(int) $rowNumber, $map, $entries, $used];
             }
         }
@@ -769,6 +1056,7 @@ class EmployeeImportService
                 'field' => $entry['field'],
                 'suggestion' => $suggestion,
                 'suggestion_label' => $suggestion !== null ? self::COLUMNS[$suggestion][0] : null,
+                'unsupported' => $entry['field'] === null ? $this->unsupportedFieldLabel((string) $entry['key']) : null,
                 'sheet' => $sheet,
                 'samples' => ($rows !== null && $headerRow !== null) ? $this->sampleValues($rows, $headerRow, (int) $entry['column']) : [],
             ];
@@ -847,9 +1135,14 @@ class EmployeeImportService
         if ($length < 3) {
             return null;
         }
+        if ($this->unsupportedFieldLabel($key) !== null) {
+            return null; // known but not storable: labelled, never suggested as another field
+        }
 
-        $best = null;
-        $bestScore = 0.0;
+        // Best score per FIELD, not per alias: when two different fields are
+        // nearly as likely (e.g. «الراتب» between net and gross), the header
+        // is ambiguous and gets no suggestion - the user decides.
+        $fieldScores = [];
         foreach ($aliases as $alias => $field) {
             if (isset($used[$field])) {
                 continue;
@@ -860,13 +1153,26 @@ class EmployeeImportService
             } else {
                 $score = $this->similarity($key, (string) $alias);
             }
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $best = $field;
+            if ($score > ($fieldScores[$field] ?? 0.0)) {
+                $fieldScores[$field] = $score;
+            }
+        }
+        if ($fieldScores === []) {
+            return null;
+        }
+        arsort($fieldScores);
+        $best = array_key_first($fieldScores);
+        $bestScore = $fieldScores[$best];
+        if ($bestScore < 0.70) {
+            return null;
+        }
+        foreach ($fieldScores as $field => $score) {
+            if ($field !== $best && $score >= $bestScore - 0.03) {
+                return null;
             }
         }
 
-        return $bestScore >= 0.70 ? $best : null;
+        return $best;
     }
 
     /**

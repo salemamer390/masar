@@ -106,10 +106,10 @@ class WorkbookAttendanceImporter
         $aliases = [
             'code' => ['employee code', 'employee_code', 'code', 'كود الموظف', 'الكود'],
             'name' => ['employee name', 'employee_name', 'name', 'اسم الموظف', 'الموظف'],
-            'date' => ['date', 'attendance date', 'attendance_date', 'التاريخ', 'تاريخ الحضور'],
-            'in' => ['check in', 'check_in', 'in', 'الحضور', 'وقت الحضور'],
-            'out' => ['check out', 'check_out', 'out', 'الانصراف', 'وقت الانصراف'],
-            'status' => ['status', 'الحالة'],
+            'date' => ['date', 'attendance date', 'attendance_date', 'التاريخ', 'تاريخ الحضور', 'يوم الحضور', 'work date'],
+            'in' => ['check in', 'check_in', 'in', 'الحضور', 'وقت الحضور', 'ساعة الحضور', 'وقت الدخول', 'تسجيل الدخول', 'بصمة الدخول', 'checkin', 'time in', 'clock in', 'entry time', 'punch in'],
+            'out' => ['check out', 'check_out', 'out', 'الانصراف', 'وقت الانصراف', 'ساعة الانصراف', 'وقت الخروج', 'تسجيل الخروج', 'بصمة الخروج', 'checkout', 'time out', 'clock out', 'exit time', 'punch out'],
+            'status' => ['status', 'الحالة', 'حالة الحضور', 'attendance status'],
         ];
         $map = [];
         foreach ($headers as $index => $header) {
