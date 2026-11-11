@@ -57,6 +57,7 @@ class FingerprintDeviceService extends BaseService
     {
         return [
             'drivers' => $this->driverResolver->supportedDrivers(),
+            'modes' => \App\Enums\FingerprintConnectionMode::cases(),
             'timezones' => ['Africa/Cairo', 'UTC', 'Asia/Riyadh', 'Europe/London'],
         ];
     }
