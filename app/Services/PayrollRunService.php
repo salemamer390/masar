@@ -120,11 +120,16 @@ class PayrollRunService
 
                     $structure = $this->calculator->structureForSalary($salary);
                     $inputs = $this->approvedInputs($employee, $month, $structure, $window, $run->is_transition ? $run : null);
+                    $existingRecord = PayrollRecord::withoutGlobalScopes()->where('company_id', $companyId)
+                        ->where('payroll_run_id', $run->id)->where('employee_id', $employee->id)->first();
+                    $manualInputs = $existingRecord ? $this->manualInputsFor($existingRecord) : [];
+                    $inputs = $this->applyManualInputs($inputs, $manualInputs);
                     $chargeMonths = $this->chargeMonthsFor($run, $month);
                     $insuranceMonths = count(array_filter($chargeMonths, fn ($chargeMonth) => $this->insuranceIsDueForMonth($employee, $chargeMonth)));
                     $insuranceDue = $insuranceMonths > 0;
                     $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor'], max(1, $insuranceMonths), $run->is_transition);
                     $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window, max(1, $insuranceMonths));
+                    $payload['calculation_snapshot']['manual_inputs'] = $manualInputs;
                     $this->storeRecord($run, $employee, $month, $payload, $companyId);
                 }
 
@@ -220,7 +225,7 @@ class PayrollRunService
             $changes['advance_details'] = $updated;
         }
 
-        $record = $this->recalculateRecord($record, $changes);
+        $record = $this->recalculateRecord($record, $changes, false);
         $record->forceFill([
             'calculation_snapshot' => array_merge($record->calculation_snapshot ?? [], [
                 'settlement' => ['id' => $settlement->id, 'lines' => $lines],
@@ -419,14 +424,18 @@ class PayrollRunService
             $incomeTax = round($structureTax * $window['factor']
                 + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2);
             $martyrsFund = round($martyrsFull * $window['factor'] + $extraMartyrs, 2);
-            $engineFixedEarned = round((float) $calculation['basic_salary'] + (float) $calculation['allowances'], 2);
-            $variableEntitlements = round((float) $calculation['entitlements'] - $engineFixedEarned, 2);
+            // Variable lines are never prorated. Deriving them by subtracting
+            // separately rounded fixed components invents a +/-0.01 earning.
+            $variableEntitlements = round(array_sum(array_map(
+                fn ($key) => (float) ($calculation[$key] ?? 0),
+                ['overtime_amount', 'bonus', 'incentives', 'commission', 'profit_share', 'other_earnings', 'advance_earnings']
+            )), 2);
             $entitlements = round($fixedEarned + $variableEntitlements, 2);
             $deductionsTotal = round((float) $calculation['monthly_deductions']
                 - (float) $calculation['income_tax'] - (float) $calculation['martyrs_fund']
                 + $incomeTax + $martyrsFund, 2);
             $netMonthly = round($entitlements - $deductionsTotal, 2);
-            $monthlyTotal = round((float) $calculation['monthly_total'] - $engineFixedEarned + $fixedEarned, 2);
+            $monthlyTotal = $entitlements;
             $employeeCost = round($entitlements + (float) $calculation['employer_insurance'], 2);
             // Audit trail: the gross extra the full-paid allowances pay over
             // the all-prorated baseline, and the statutory amounts it carries.
@@ -483,12 +492,76 @@ class PayrollRunService
         ];
     }
 
+    private const MANUAL_INPUT_FIELDS = ['ot_day_hours', 'ot_night_hours', 'bonus', 'loans', 'other_earnings', 'other_deductions'];
+
+    private function applyManualInputs(array $inputs, array $manual): array
+    {
+        $inputs = array_replace($inputs, $manual);
+        // Keep the advance allocation ledger consistent with an edited total,
+        // using the same available-balance cap as the existing input editor.
+        if (array_key_exists('loans', $manual) && !empty($inputs['advance_details'])) {
+            $remaining = min((float) $inputs['loans'], round(collect($inputs['advance_details'])
+                ->sum(fn ($detail) => (float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0)), 2));
+            $inputs['loans'] = $remaining;
+            foreach ($inputs['advance_details'] as &$detail) {
+                $available = round((float) ($detail['installment'] ?? 0) + (float) ($detail['remaining_after'] ?? 0), 2);
+                $installment = round(min($available, $remaining), 2);
+                $detail['installment'] = $installment;
+                $detail['remaining_after'] = round($available - $installment, 2);
+                $remaining = round(max(0, $remaining - $installment), 2);
+            }
+            unset($detail);
+        }
+        return $inputs;
+    }
+
+    private function manualInputsFor(PayrollRecord $record): array
+    {
+        $snapshot = (array) $record->calculation_snapshot;
+        if (array_key_exists('manual_inputs', $snapshot)) {
+            return array_intersect_key((array) $snapshot['manual_inputs'], array_flip(self::MANUAL_INPUT_FIELDS));
+        }
+        // Legacy edits have no marker. Recover only audited changes whose latest
+        // edited value is still present, never freeze all source-derived inputs
+        // and never resurrect a value already replaced by a later refresh.
+        $manual = [];
+        $logs = \App\Models\ActivityLog::withoutGlobalScopes()
+            ->where('company_id', $record->company_id)->where('model_type', PayrollRecord::class)
+            ->where('model_id', $record->id)->where('action', 'payroll_inputs_update')->orderBy('id')->get();
+        foreach ($logs as $log) {
+            foreach (self::MANUAL_INPUT_FIELDS as $field) {
+                if (array_key_exists($field, (array) $log->new_values)
+                    && (float) data_get($log->old_values, $field, 0) !== (float) $log->new_values[$field]) {
+                    $manual[$field] = (float) $log->new_values[$field];
+                }
+            }
+        }
+        return array_filter($manual, fn ($value, $field) => array_key_exists($field, (array) ($snapshot['inputs'] ?? []))
+            && abs((float) $snapshot['inputs'][$field] - $value) < 0.000001, ARRAY_FILTER_USE_BOTH);
+    }
+
     /** Recalculate one draft record after the user edited its monthly inputs. */
-    public function recalculateRecord(PayrollRecord $record, array $changes): PayrollRecord
+    public function recalculateRecord(PayrollRecord $record, array $changes, bool $trackManualInputs = true): PayrollRecord
     {
         $snapshot = (array) $record->calculation_snapshot;
         $salary = Salary::withoutGlobalScopes()->findOrFail($record->salary_id);
         $run = PayrollRun::withoutGlobalScopes()->findOrFail($record->payroll_run_id);
+        $manualInputs = $this->manualInputsFor($record);
+        if ($trackManualInputs) {
+            $edited = array_intersect_key($changes, array_flip(self::MANUAL_INPUT_FIELDS));
+            // The editor shows settlement-inclusive totals. Retain only the
+            // base override; approved settlement lines are reapplied separately.
+            $lines = (array) data_get($snapshot, 'settlement.lines', []);
+            $settlementParts = [
+                'other_earnings' => (float) ($lines['leave_payout'] ?? 0) + (float) ($lines['gratuity'] ?? 0) + (float) ($lines['manual_earnings'] ?? 0),
+                'other_deductions' => (float) ($lines['manual_deductions'] ?? 0),
+                'loans' => (float) ($lines['advance_recovery'] ?? 0),
+            ];
+            foreach ($settlementParts as $field => $amount) {
+                if (array_key_exists($field, $edited)) $edited[$field] = max(0, round((float) $edited[$field] - $amount, 2));
+            }
+            $manualInputs = array_replace($manualInputs, $edited);
+        }
         $inputs = array_merge((array) ($snapshot['inputs'] ?? []), $changes);
         $insuranceDue = (bool) ($snapshot['insurance_due'] ?? true);
         $window = [
@@ -498,11 +571,12 @@ class PayrollRunService
             'factor' => (float) ($snapshot['proration_factor'] ?? 1.0),
         ];
 
-        return CompanyContext::run((int) $record->company_id, function () use ($record, $salary, $run, $inputs, $insuranceDue, $window) {
+        return CompanyContext::run((int) $record->company_id, function () use ($record, $salary, $run, $inputs, $insuranceDue, $window, $snapshot, $manualInputs) {
             $structure = $this->calculator->structureForSalary($salary);
             $insuranceMonths = (int) ($snapshot['insurance_months'] ?? ($insuranceDue ? 1 : 0));
             $calculation = $this->calculate($salary, $structure, $inputs, $insuranceDue, (float) $window['factor'], max(1, $insuranceMonths), $run->is_transition);
             $payload = $this->buildPayload($run, $salary, $structure, $calculation, $inputs, $insuranceDue, $window, max(1, $insuranceMonths));
+            $payload['calculation_snapshot']['manual_inputs'] = $manualInputs;
             unset($payload['payroll_run_id'], $payload['salary_id'], $payload['status'], $payload['is_locked']);
             $record->update($payload);
 
