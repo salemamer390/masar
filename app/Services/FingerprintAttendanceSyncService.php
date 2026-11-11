@@ -58,6 +58,66 @@ class FingerprintAttendanceSyncService extends BaseService
         return FingerprintDevice::query()->where('is_active', true)->where('sync_enabled', true)->when($options['device_id'] ?? null, fn ($q, $id) => $q->whereKey($id))->orderBy('id')->get()->filter(fn (FingerprintDevice $d) => ($options['force'] ?? false) || $d->isDueForSync())->values();
     }
 
+    /**
+     * Import punches that a device (ADMS push) or its local bridge delivered to
+     * the server, through the exact same dedupe, matching and reconciliation
+     * pipeline as a server pull. Callers must have authenticated the device
+     * first; this method does not re-check any credential.
+     */
+    public function importDevicePunches(FingerprintDevice $device, iterable $punches, FingerprintSyncType $type): FingerprintDeviceSyncLog
+    {
+        $started = microtime(true);
+        $log = FingerprintDeviceSyncLog::create([
+            'device_id' => $device->id,
+            'sync_type' => $type->value,
+            'status' => FingerprintSyncStatus::Running->value,
+            'started_at' => now(),
+            'initiated_by' => null,
+        ]);
+
+        try {
+            $result = $this->importPunches($device, collect($punches), $log->id);
+            $log->update([
+                'status' => FingerprintSyncStatus::Success->value,
+                'completed_at' => now(),
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                'records_received' => $result['records_received'],
+                'imported_count' => $result['imported_count'],
+                'skipped_count' => $result['skipped_count'],
+                'duplicate_count' => $result['duplicate_count'],
+                'failed_count' => $result['failed_count'],
+                'metadata' => [
+                    'unresolved_count' => $result['unresolved_count'],
+                    'exception_days' => $result['exception_days'],
+                    'auto_resolved' => $result['auto_resolved'],
+                    'cursor_timestamp' => $result['cursor_timestamp'],
+                ],
+            ]);
+            $device->update([
+                'last_connected_at' => now(),
+                'last_sync_at' => now(),
+                'push_last_seen_at' => now(),
+                'health_status' => 'online',
+                'consecutive_failures' => 0,
+                'last_connection_failure_at' => null,
+                'sync_cursor_timestamp' => $result['cursor_timestamp'],
+                'sync_cursor_hash' => $result['cursor_hash'],
+            ]);
+
+            return $log->refresh();
+        } catch (Throwable $exception) {
+            $log->update([
+                'status' => FingerprintSyncStatus::Failed->value,
+                'completed_at' => now(),
+                'duration_ms' => (int) round((microtime(true) - $started) * 1000),
+                'failed_count' => 1,
+                'error_message' => $exception->getMessage(),
+            ]);
+
+            return $log->refresh();
+        }
+    }
+
     private function importPunches(FingerprintDevice $device, Collection $punches, ?int $syncLogId = null): array
     {
         $result = ['records_received' => $punches->count(), 'imported_count' => 0, 'skipped_count' => 0, 'duplicate_count' => 0, 'failed_count' => 0, 'unresolved_count' => 0, 'exception_days' => 0, 'auto_resolved' => 0, 'cursor_timestamp' => $device->sync_cursor_timestamp?->format('Y-m-d H:i:s'), 'cursor_hash' => $device->sync_cursor_hash];
