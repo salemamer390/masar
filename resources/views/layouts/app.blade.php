@@ -585,6 +585,7 @@
     if (event.persisted) window.location.reload();
   });
 </script>
+@include('components.guided-tour')
 @stack('scripts')
 </body>
 </html>
