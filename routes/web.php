@@ -34,6 +34,27 @@ use App\Http\Controllers\MarketingSiteController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
+// Device-initiated fingerprint ingestion (no login session).
+// ADMS / push protocol: ingestion exists ONLY on the per-device secret path
+// (/iclock/{token}/...); the fixed ZK-standard path never imports data - the
+// serial number is an identity, not authentication. The bridge API is
+// bearer-token authenticated. Both reject plain HTTP in production.
+Route::middleware(['throttle:60,1', \App\Http\Middleware\RequireSecureFingerprintIngestion::class])->group(function () {
+    Route::any('/iclock/cdata', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'unauthenticated'])->name('fingerprint.adms.fixed-cdata');
+    Route::any('/iclock/getrequest', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'unauthenticated'])->name('fingerprint.adms.fixed-getrequest');
+    Route::any('/iclock/devicecmd', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'unauthenticated'])->name('fingerprint.adms.fixed-devicecmd');
+    Route::get('/iclock/{token}/cdata', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'handshake'])->where('token', '[A-Za-z0-9]{32,64}')->name('fingerprint.adms.handshake');
+    Route::post('/iclock/{token}/cdata', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'receiveData'])->where('token', '[A-Za-z0-9]{32,64}')->name('fingerprint.adms.cdata');
+    Route::get('/iclock/{token}/getrequest', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'getRequest'])->where('token', '[A-Za-z0-9]{32,64}')->name('fingerprint.adms.getrequest');
+    Route::post('/iclock/{token}/devicecmd', [\App\Http\Controllers\Fingerprint\AdmsController::class, 'deviceCmd'])->where('token', '[A-Za-z0-9]{32,64}')->name('fingerprint.adms.devicecmd');
+});
+
+Route::middleware(['throttle:120,1', \App\Http\Middleware\RequireSecureFingerprintIngestion::class, \App\Http\Middleware\AuthenticateFingerprintBridge::class])
+    ->prefix('api/fingerprint-bridge')->name('fingerprint.bridge.')->group(function () {
+        Route::match(['get', 'post'], '/handshake', [\App\Http\Controllers\Fingerprint\BridgeApiController::class, 'handshake'])->name('handshake');
+        Route::post('/punches', [\App\Http\Controllers\Fingerprint\BridgeApiController::class, 'punches'])->name('punches');
+    });
+
 // Public marketing pages. Keep the supplied HTML design intact and only add
 // the Laravel behavior needed for authentication and contact forms.
 $sitePage = static function (string $page) {
@@ -278,6 +299,7 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
         Route::get('/devices/{fingerprintDevice}/edit', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'edit'])->middleware('permission:fingerprint-devices.update')->name('devices.edit');
         Route::put('/devices/{fingerprintDevice}', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'update'])->middleware('permission:fingerprint-devices.update')->name('devices.update');
         Route::delete('/devices/{fingerprintDevice}', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'destroy'])->middleware('permission:fingerprint-devices.delete')->name('devices.destroy');
+        Route::post('/devices/{fingerprintDevice}/push-token', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'regeneratePushToken'])->middleware('permission:fingerprint-devices.update')->name('devices.push-token');
         Route::post('/devices/{fingerprintDevice}/test-connection', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'testConnection'])->middleware('permission:fingerprint-devices.test')->name('devices.test');
         Route::post('/devices/{fingerprintDevice}/retrieve-info', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'retrieveInfo'])->middleware('permission:fingerprint-devices.test')->name('devices.info');
         Route::post('/devices/{fingerprintDevice}/sync', [\App\Http\Controllers\Fingerprint\FingerprintDeviceController::class, 'sync'])->middleware('permission:fingerprint-devices.sync')->name('devices.sync');
