@@ -208,6 +208,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
     Route::get('/jobs/rows', [JobDataController::class, 'rows'])
         ->middleware('permission:employees.view')
         ->name('jobs.rows');
+    Route::get('/jobs/overtime-review', [JobDataController::class, 'overtimeReview'])
+        ->middleware('permission:employees.view')
+        ->name('jobs.overtime-review');
     Route::get('/jobs/export', [JobDataController::class, 'export'])
         ->middleware('permission:employees.view')
         ->name('jobs.export');

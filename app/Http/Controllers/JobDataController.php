@@ -42,6 +42,14 @@ class JobDataController extends Controller
         $employees = $employeeQuery->paginate($perPage)->withQueryString();
 
         $monthlyRows = $this->buildMonthlyRows($employees->getCollection(), $month);
+        // The overtime alert scans the whole filtered set, not the current
+        // page, so the counts stay correct at any company size.
+        $overtimeGaps = $this->collectOvertimeGaps(
+            $this->applyEmployeeFilters(Employee::select(['id', 'employee_code', 'full_name', 'shift_start', 'shift_end']), $request),
+            $month
+        );
+        $overtimeGapDays = count($overtimeGaps);
+        $overtimeGapEmployees = collect($overtimeGaps)->pluck('employee.id')->unique()->count();
         $summaryRowData = $monthlyRows->mapWithKeys(fn (array $row) => [(string) $row['employee']->id => [
             'employee_id' => $row['employee']->id,
             'employee_code' => (string) $row['employee']->employee_code,
@@ -68,6 +76,7 @@ class JobDataController extends Controller
 
         return view('jobs.index', compact(
             'employees', 'monthlyRows', 'summaryRowData', 'month', 'summaryHistory',
+            'overtimeGapDays', 'overtimeGapEmployees',
             'totalJobs',
             'totalDepartments',
             'totalBranches',
@@ -78,6 +87,72 @@ class JobDataController extends Controller
             'branches',
             'employmentTypes'
         ));
+    }
+
+    /** Searchable, paginated list of days with overtime presence no timed request covers. */
+    public function overtimeReview(Request $request)
+    {
+        $month = $request->filled('month')
+            ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth()
+            : now()->startOfMonth();
+        $gaps = collect($this->collectOvertimeGaps(
+            $this->applyEmployeeFilters(Employee::select(['id', 'employee_code', 'full_name', 'shift_start', 'shift_end']), $request),
+            $month
+        ));
+        $page = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+        $entries = new \Illuminate\Pagination\LengthAwarePaginator(
+            $gaps->forPage($page, 25)->values(), $gaps->count(), 25, $page,
+            ['path' => route('jobs.overtime-review'), 'query' => $request->query()]
+        );
+
+        return view('jobs.overtime_review', [
+            'entries' => $entries,
+            'month' => $month,
+            'gapEmployeeCount' => $gaps->pluck('employee.id')->unique()->count(),
+        ]);
+    }
+
+    /**
+     * Days with outside-shift presence no timed overtime request covers.
+     * Mirrors the entitlement math exactly: potential day/night minutes per
+     * attendance row minus what the day's requests actually earn there, so a
+     * fully covered day never alerts and a partially covered day alerts only
+     * for the uncovered remainder. Review aid only - no entitlement changes.
+     *
+     * @return array<int, array{employee: Employee, date: string, day_minutes: int, night_minutes: int}>
+     */
+    private function collectOvertimeGaps($employeeQuery, Carbon $month): array
+    {
+        $period = app(\App\Services\PayrollRunService::class)->periodFor($month);
+        $entries = [];
+        $employeeQuery->chunkById(100, function ($employees) use (&$entries, $period) {
+            $employeeIds = $employees->pluck('id');
+            $attendance = Attendance::effective()->whereIn('employee_id', $employeeIds)
+                ->whereBetween('attendance_date', [$period['start']->toDateString(), $period['end']->toDateString()])
+                ->whereNotNull('check_in')->whereNotNull('check_out')
+                ->get()->groupBy('employee_id');
+            $requests = HrRequest::effective()->with('requestType')->whereIn('employee_id', $employeeIds)->get()
+                ->filter(fn (HrRequest $request) => $this->requestBelongsToPeriod($request, $period['start'], $period['end']))
+                ->groupBy('employee_id');
+            foreach ($employees as $employee) {
+                $employeeRequests = $requests->get($employee->id, collect());
+                foreach ($attendance->get($employee->id, collect()) as $item) {
+                    $dayGap = $this->overtimeMinutes($item, $employee, 'day')
+                        - $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'day');
+                    $nightGap = $this->overtimeMinutes($item, $employee, 'night')
+                        - $this->requestedOvertimeMinutes($item, $employee, $employeeRequests, 'night');
+                    if ($dayGap <= 0 && $nightGap <= 0) continue;
+                    $entries[] = [
+                        'employee' => $employee,
+                        'date' => Carbon::parse($item->attendance_date)->toDateString(),
+                        'day_minutes' => max(0, $dayGap),
+                        'night_minutes' => max(0, $nightGap),
+                    ];
+                }
+            }
+        });
+
+        return $entries;
     }
 
     /** Return the next employee batch for the progressive monthly-summary table. */
