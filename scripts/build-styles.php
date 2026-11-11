@@ -7,6 +7,7 @@ $parts = [
     'resources/styles/01-foundation.css',
     'resources/styles/02-components.css',
     'resources/styles/03-design-system.css',
+    'resources/styles/04-tour.css',
 ];
 $css = '';
 foreach ($parts as $part) {

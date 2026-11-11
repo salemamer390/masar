@@ -9,7 +9,7 @@ class StyleAssetsTest extends TestCase
     public function test_published_css_matches_ordered_sources(): void
     {
         $css = '';
-        foreach (['app-header.txt', '01-foundation.css', '02-components.css', '03-design-system.css'] as $name) {
+        foreach (['app-header.txt', '01-foundation.css', '02-components.css', '03-design-system.css', '04-tour.css'] as $name) {
             $css .= file_get_contents(resource_path('styles/'.$name));
         }
         $this->assertSame($css, file_get_contents(public_path('app.css')));

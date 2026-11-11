@@ -23,6 +23,8 @@ class User extends Authenticatable implements CanResetPasswordContract
         'employee_id',
         'is_active',
         'last_login_at',
+        'tour_seen_at',
+        'tour_step',
         'company_id',
     ];
 
@@ -37,6 +39,7 @@ class User extends Authenticatable implements CanResetPasswordContract
             'password' => 'hashed',
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
+            'tour_seen_at' => 'datetime',
         ];
     }
 

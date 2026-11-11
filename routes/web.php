@@ -29,6 +29,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SubscriptionPlanController;
 use App\Http\Controllers\CompanyAccountController;
 use App\Http\Controllers\SubscriptionRenewalController;
+use App\Http\Controllers\TourController;
 use App\Http\Controllers\MarketingSiteController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
@@ -110,6 +111,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache'])->group(function () 
     });
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/tour/progress', [TourController::class, 'progress'])->name('tour.progress');
+    Route::post('/tour/complete', [TourController::class, 'complete'])->name('tour.complete');
+    Route::post('/tour/replay', [TourController::class, 'reset'])->name('tour.replay');
     Route::get('/access-denied', fn () => view('errors.access-denied'))->name('access.denied');
     Route::get('/company/account', [CompanyAccountController::class, 'index'])
         ->middleware('permission:users.view')
