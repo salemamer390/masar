@@ -176,7 +176,7 @@
         const needsAck = (data.summary.defaulted_dates || 0) > 0;
         const acknowledged = !needsAck || (ackBox() && ackBox().checked);
         const updatesAcknowledged = !(data.summary.update || 0) || (updateAckBox() && updateAckBox().checked);
-        btn.commit.disabled = busy || data.needs_mapping || importableCount(data) === 0 || (data.capacity && data.capacity.exceeded) || !acknowledged || !updatesAcknowledged;
+        btn.commit.disabled = busy || data.needs_mapping || (!data.domain_only && importableCount(data) === 0) || (data.capacity && data.capacity.exceeded) || !acknowledged || !updatesAcknowledged;
     }
 
     function setBusy(isBusy, button, label) {
@@ -323,6 +323,10 @@
             tone = 'danger'; icon = 'x-octagon-fill';
             title = window.masarT('الاستيراد يتجاوز حد باقتك');
             text = window.masarT('الباقة ') + data.capacity.plan + window.masarT(' تسمح بـ ') + num(data.capacity.limit) + window.masarT(' موظف، المسجل حاليًا ') + num(data.capacity.current) + window.masarT('، وبعد الاستيراد سيصبح ') + num(data.capacity.projected) + window.masarT('. عدّل الملف أو رقّ الباقة.');
+        } else if (data.domain_only) {
+            tone = 'info'; icon = 'info-circle-fill';
+            title = window.masarT('الملف لا يحتوي جدول موظفين');
+            text = window.masarT('سيُستورد محتوى أوراق البيانات (الحضور والجزاءات وغيرها) للموظفين الموجودين بالفعل فقط، ولن يُنشأ أو يُحدَّث أي موظف. إن كنت تريد إضافة موظفين، أضف ورقة جدولية بعمود «الاسم الكامل».');
         } else if (importable === 0) {
             tone = 'danger'; icon = 'x-octagon-fill';
             title = window.masarT('لا توجد صفوف صالحة للاستيراد');
@@ -641,12 +645,14 @@
         box.decisions.innerHTML = decisions ? window.masarStaticHtml('<div class="fw-semibold mb-2"><i class="bi bi-hand-index"></i> قرارات مطلوبة (') + count + ')</div>' + decisions : '';
         box.info.innerHTML = infoHtml(data, mappingInDecisions);
 
-        box.tableWrap.hidden = !!data.needs_mapping;
+        box.tableWrap.hidden = !!data.needs_mapping || (!data.domain_only && importableCount(data) === 0);
         renderTabs();
         renderTable();
 
         const commitLabel = btn.commit.querySelector('span');
-        commitLabel.textContent = window.masarT('تأكيد استيراد ') + num(importableCount(data)) + window.masarT(' صف');
+        commitLabel.textContent = data.domain_only
+            ? window.masarT('تأكيد استيراد بيانات الأوراق')
+            : window.masarT('تأكيد استيراد ') + num(importableCount(data)) + window.masarT(' صف');
         btn.commit.dataset.label = commitLabel.textContent;
         updateCommitState();
     }
@@ -725,12 +731,12 @@
             const data = await send(urls.preview, false);
             lastData = data;
             // Bind the commit to what this preview showed: keep the
-            // server-issued review token and seed the confirmed sheet kinds
-            // so the commit echoes the reviewed plan even when the sheets
-            // step was skipped. User changes made afterwards overwrite the
-            // seeded values, and each refetch refreshes the token.
+            // server-issued review token so the commit echoes the reviewed
+            // plan even when the sheets step was skipped. Only sheet kinds
+            // the user actually chose are sent back - seeding auto-detected
+            // kinds here would mark report sheets as confirmed and let the
+            // commit treat them as employee tables.
             state.reviewToken = data.review_token || '';
-            (data.sheets || []).forEach((s) => { if (!(s.name in state.sheetKinds)) { state.sheetKinds[s.name] = s.kind; } });
             if (mode === 'preview' || !needsSheetsStep(data)) {
                 renderPreview(data);
                 showStep('preview');
