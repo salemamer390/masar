@@ -182,6 +182,13 @@ class FinalSettlementTest extends TestCase
         $this->assertEqualsWithDelta((float) $before->loans, (float) $after->loans, 0.01);
         $this->assertSame($settlement->id, (int) data_get($after->calculation_snapshot, 'settlement.id'));
         $this->assertSame($run->id, $settlement->fresh()->payroll_run_id);
+
+        // A later manual edit is a displayed total including the settlement.
+        // The next refresh must preserve the extra 100, not add settlement twice.
+        app(PayrollRunService::class)->recalculateRecord($after, ['other_earnings' => (float) $after->other_earnings + 100]);
+        app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), [$employee->id], $company->id);
+        $after->refresh();
+        $this->assertEqualsWithDelta((float) $before->other_earnings + 100, (float) $after->other_earnings, 0.01);
     }
 
     public function test_later_runs_never_deduct_a_settlement_recovered_advance_again(): void
