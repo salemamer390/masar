@@ -165,7 +165,7 @@ class AttendanceImportController extends Controller
                 return $this->renderPreview($token, $fileName, $units, $skipped, $sheets, $unit['key'], $postedMap, $postedOptions,
                     "سيُحدَّث {$overwriteStats['total']} سجلًا موجودًا"
                     . ($overwriteStats['manual'] ? " (منها {$overwriteStats['manual']} مُدخل يدويًا أو معتمد)" : '')
-                    . '. أكّد خيار التحديث في المعاينة ثم حدّث المعاينة قبل الاعتماد.');
+                    . '. أكّد خيار التحديث في المعاينة ثم اضغط «اعتماد واستيراد».');
             }
 
             $batch = \App\Models\AttendanceImportBatch::create([
@@ -319,8 +319,11 @@ class AttendanceImportController extends Controller
     private function previewKey(string $token, string $unitKey, array $map, array $options): string
     {
         ksort($map);
-        ksort($options);
-        return hash('sha256', $token . '|' . $unitKey . '|' . json_encode($map) . '|' . json_encode($options));
+        // Only inputs that change the interpretation belong in the key: the column map and the
+        // text-date format. The overwrite acknowledgement is commit-time consent checked in
+        // store(), so toggling it must not invalidate the preview.
+        $interpretation = ['date_format' => $options['date_format'] ?? ''];
+        return hash('sha256', $token . '|' . $unitKey . '|' . json_encode($map) . '|' . json_encode($interpretation));
     }
 
     /** Keep only known fields; values are '' (unassign) or a column index. */
