@@ -159,7 +159,7 @@ class PayrollController extends Controller
         // Data shape consumed by the approved payroll drawer prototype.
         // Keeping this adapter here lets us preserve the prototype UI while
         // replacing its sample JavaScript data with the real payroll records.
-        $statusLabels = ['Draft' => 'مسودة', 'Approved' => 'معتمد', 'Locked' => 'مغلق'];
+        $statusLabels = ['Draft' => __('مسودة'), 'Approved' => __('معتمد'), 'Locked' => __('مغلق')];
         $prototypePeople = $recordCollection->values()->map(function ($record) use ($statusLabels) {
             $snapshot = (array) ($record->calculation_snapshot ?? []);
             $inputs = (array) ($snapshot['inputs'] ?? []);
@@ -174,14 +174,14 @@ class PayrollController extends Controller
                 ? (float) $record->basic_salary
                 : round((float) $record->basic_salary * $displayFactor, 2);
             $items = [
-                ['الراتب الأساسي', (float) $record->basic_salary],
+                [__('الراتب الأساسي'), (float) $record->basic_salary],
             ];
             $allowanceItems = 0;
             foreach ([
-                'housing_allowance' => 'بدل السكن',
-                'transportation_allowance' => 'بدل الانتقال',
-                'meal_allowance' => 'بدل الوجبة',
-                'clothing_allowance' => 'بدل ملبس',
+                'housing_allowance' => __('بدل السكن'),
+                'transportation_allowance' => __('بدل الانتقال'),
+                'meal_allowance' => __('بدل الوجبة'),
+                'clothing_allowance' => __('بدل ملبس'),
             ] as $key => $label) {
                 $value = $displayAllowance($key);
                 if ($value > 0) {
@@ -190,24 +190,24 @@ class PayrollController extends Controller
                 }
             }
             if ($allowanceItems <= 0 && (float) $record->allowances > 0) {
-                $items[] = ['البدلات', (float) $record->allowances];
+                $items[] = [__('البدلات'), (float) $record->allowances];
             }
             $dayOvertimeAmount = max((float) ($record->day_overtime_amount ?? 0), (float) ($record->ot_day_amount ?? 0));
             $nightOvertimeAmount = max((float) ($record->night_overtime_amount ?? 0), (float) ($record->ot_night_amount ?? 0));
             foreach ([
-                'day_overtime_amount' => 'إضافي نهاري',
-                'night_overtime_amount' => 'إضافي ليلي',
-                'bonus' => 'المكافآت',
-                'incentives' => 'الحوافز',
-                'commission' => 'العمولات',
-                'profit_share' => 'نصيب الأرباح',
-                'other_earnings' => 'استحقاقات أخرى',
+                'day_overtime_amount' => __('إضافي نهاري'),
+                'night_overtime_amount' => __('إضافي ليلي'),
+                'bonus' => __('المكافآت'),
+                'incentives' => __('الحوافز'),
+                'commission' => __('العمولات'),
+                'profit_share' => __('نصيب الأرباح'),
+                'other_earnings' => __('استحقاقات أخرى'),
             ] as $key => $label) {
                 $value = $key === 'day_overtime_amount' ? $dayOvertimeAmount : ($key === 'night_overtime_amount' ? $nightOvertimeAmount : (float) ($record->{$key} ?? 0));
                 if ($value > 0) $items[] = [$label, $value];
             }
             $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
-            if ($advance > 0) $items[] = ['السلفة المصروفة', $advance];
+            if ($advance > 0) $items[] = [__('السلفة المصروفة'), $advance];
             $advanceInstallment = (float) data_get($inputs, 'loans', data_get($snapshot, 'loans', $record->loans ?? 0));
             // Split the penalty deduction between automatic lateness/early-departure tiers and manual
             // penalties in proportion to their requested days (a monthly cap reduces both equally).
@@ -220,17 +220,17 @@ class PayrollController extends Controller
             $policyShare = (float) data_get($snapshot, 'attendance_penalty_deduction', 0);
             if ($policyShare <= 0 && $policyDays > 0 && $requestedDays > 0) $policyShare = round($penaltyTotal * min(1, $policyDays / $requestedDays), 2);
             $penaltyLines = $policyShare > 0
-                ? [['جزاءات التأخير والخروج المبكر ('.count($policyDetails).' مخالفة)', $policyShare], ['خصم الجزاءات', round($penaltyTotal - $policyShare, 2)]]
-                : [['خصم الجزاءات', $penaltyTotal]];
+                ? [[__('جزاءات التأخير والخروج المبكر (:count مخالفة)', ['count' => count($policyDetails)]), $policyShare], [__('خصم الجزاءات'), round($penaltyTotal - $policyShare, 2)]]
+                : [[__('خصم الجزاءات'), $penaltyTotal]];
             $deductions = [
-                ['تأمين الموظف', (float) $record->employee_insurance],
-                ['الضريبة', (float) $record->income_tax],
-                ['صندوق الشهداء', (float) $record->martyrs_fund],
-                ['خصم الغياب', (float) $record->absence_deduction],
+                [__('تأمين الموظف'), (float) $record->employee_insurance],
+                [__('الضريبة'), (float) $record->income_tax],
+                [__('صندوق الشهداء'), (float) $record->martyrs_fund],
+                [__('خصم الغياب'), (float) $record->absence_deduction],
                 ...$penaltyLines,
-                ['خصم وقت التأخير والخروج المبكر', (float) ($record->attendance_time_deduction ?? 0)],
-                ['قسط السلفة', $advanceInstallment],
-                ['خصومات أخرى', (float) $record->other_deductions],
+                [__('خصم وقت التأخير والخروج المبكر'), (float) ($record->attendance_time_deduction ?? 0)],
+                [__('قسط السلفة'), $advanceInstallment],
+                [__('خصومات أخرى'), (float) $record->other_deductions],
             ];
             $deductions = array_values(array_filter($deductions, fn ($item) => $item[1] > 0));
             $initials = mb_substr((string) ($employee?->full_name ?? '—'), 0, 2);
@@ -272,26 +272,26 @@ class PayrollController extends Controller
                 'basic' => (float) $record->basic_salary,
                 'allow' => (float) $record->allowances,
                 'allowanceItems' => array_values(array_filter([
-                    ['بدل السكن', (float) $record->housing_allowance],
-                    ['بدل الانتقال', (float) $record->transportation_allowance],
-                    ['بدل الوجبة', (float) $record->meal_allowance],
-                    ['بدل ملبس', (float) $record->clothing_allowance],
+                    [__('بدل السكن'), (float) $record->housing_allowance],
+                    [__('بدل الانتقال'), (float) $record->transportation_allowance],
+                    [__('بدل الوجبة'), (float) $record->meal_allowance],
+                    [__('بدل ملبس'), (float) $record->clothing_allowance],
                 ], fn ($item) => $item[1] > 0)),
                 'allowanceItemsProrated' => array_values(array_filter([
-                    ['بدل السكن', $displayAllowance('housing_allowance')],
-                    ['بدل الانتقال', $displayAllowance('transportation_allowance')],
-                    ['بدل الوجبة', $displayAllowance('meal_allowance')],
-                    ['بدل ملبس', $displayAllowance('clothing_allowance')],
+                    [__('بدل السكن'), $displayAllowance('housing_allowance')],
+                    [__('بدل الانتقال'), $displayAllowance('transportation_allowance')],
+                    [__('بدل الوجبة'), $displayAllowance('meal_allowance')],
+                    [__('بدل ملبس'), $displayAllowance('clothing_allowance')],
                 ], fn ($item) => $item[1] > 0)),
                 'additionalItems' => array_values(array_filter([
-                    ['إضافي نهاري', $dayOvertimeAmount],
-                    ['إضافي ليلي', $nightOvertimeAmount],
-                    ['المكافآت', (float) $record->bonus],
-                    ['الحوافز', (float) $record->incentives],
-                    ['العمولات', (float) $record->commission],
-                    ['نصيب الأرباح', (float) $record->profit_share],
-                    ['استحقاقات أخرى', (float) $record->other_earnings],
-                    ['السلفة المصروفة', (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0))],
+                    [__('إضافي نهاري'), $dayOvertimeAmount],
+                    [__('إضافي ليلي'), $nightOvertimeAmount],
+                    [__('المكافآت'), (float) $record->bonus],
+                    [__('الحوافز'), (float) $record->incentives],
+                    [__('العمولات'), (float) $record->commission],
+                    [__('نصيب الأرباح'), (float) $record->profit_share],
+                    [__('استحقاقات أخرى'), (float) $record->other_earnings],
+                    [__('السلفة المصروفة'), (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0))],
                 ], fn ($item) => $item[1] > 0)),
                 'gross' => (float) $record->gross_salary,
                 'entitlements' => $displayEntitlements,
@@ -303,11 +303,11 @@ class PayrollController extends Controller
                 'stateLabel' => $statusLabels[$record->status] ?? $record->status,
                 'insurance' => (float) $record->employee_insurance,
                 'initials' => $initials,
-                'structureLabel' => $record->salary_id ? 'هيكل #' . $record->salary_id : 'بدون هيكل',
+                'structureLabel' => $record->salary_id ? __('هيكل #') . $record->salary_id : __('بدون هيكل'),
                 'effectiveFrom' => $record->salary?->effective_from?->format('d/m/Y'),
                 'agreedNet' => (float) ($record->agreed_net_salary ?? 0),
                 'salaryUrl' => $record->salary_id ? route('salaries.index', ['employee_id' => $employee?->id]) : null,
-                'items' => array_merge([['المستحق حتى اليوم', $toDateEntitlement]], array_slice($items, 1)),
+                'items' => array_merge([[__('المستحق حتى اليوم'), $toDateEntitlement]], array_slice($items, 1)),
                 'deductions' => $deductions,
                 'penaltyReasons' => array_values(array_map(fn ($d) => (string) ($d['reason'] ?? ''), $policyDetails)),
                 'paidDays' => (int) data_get($snapshot, 'paid_days', 0),
@@ -369,66 +369,52 @@ class PayrollController extends Controller
         $inputs = (array) ($snapshot['inputs'] ?? []);
         $positive = static fn ($value): bool => (float) $value > 0;
         $advance = (float) data_get($inputs, 'advance_earnings', data_get($snapshot, 'advance_earnings', 0));
-        $arabic = static fn (string $value): string => html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $allowances = array_values(array_filter([
-            ['بدل السكن', (float) $payrollRecord->housing_allowance],
-            ['بدل الانتقال', (float) $payrollRecord->transportation_allowance],
-            ['بدل الوجبة', (float) $payrollRecord->meal_allowance],
-            ['بدل ملبس', (float) $payrollRecord->clothing_allowance],
+            [__('بدل السكن'), (float) $payrollRecord->housing_allowance],
+            [__('بدل الانتقال'), (float) $payrollRecord->transportation_allowance],
+            [__('بدل الوجبة'), (float) $payrollRecord->meal_allowance],
+            [__('بدل ملبس'), (float) $payrollRecord->clothing_allowance],
         ], fn ($item) => $positive($item[1])));
-        $allowanceLabels = [$arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x633;&#x643;&#x646;'), $arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x627;&#x646;&#x62a;&#x642;&#x627;&#x644;'), $arabic('&#x628;&#x62f;&#x644; &#x627;&#x644;&#x648;&#x62c;&#x628;&#x629;'), $arabic('&#x628;&#x62f;&#x644; &#x645;&#x644;&#x628;&#x633;')];
-        foreach ($allowances as $index => &$item) { $item[0] = $allowanceLabels[$index] ?? $arabic('&#x627;&#x644;&#x628;&#x62f;&#x644;&#x627;&#x62a;'); }
-        unset($item);
         if (!$allowances && (float) $payrollRecord->allowances > 0) {
-            $allowances[] = ['البدلات', (float) $payrollRecord->allowances];
+            $allowances[] = [__('البدلات'), (float) $payrollRecord->allowances];
         }
 
         $overtime = array_values(array_filter([
-            ['الإضافي النهاري', (float) ($payrollRecord->day_overtime_amount ?: $payrollRecord->ot_day_amount)],
-            ['الإضافي الليلي', (float) ($payrollRecord->night_overtime_amount ?: $payrollRecord->ot_night_amount)],
-            ['الإضافي', (float) $payrollRecord->overtime_amount],
+            [__('الإضافي النهاري'), (float) ($payrollRecord->day_overtime_amount ?: $payrollRecord->ot_day_amount)],
+            [__('الإضافي الليلي'), (float) ($payrollRecord->night_overtime_amount ?: $payrollRecord->ot_night_amount)],
+            [__('الإضافي'), (float) $payrollRecord->overtime_amount],
         ], fn ($item) => $positive($item[1])));
-        $overtimeLabels = [$arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a; &#x627;&#x644;&#x646;&#x647;&#x627;&#x631;&#x64a;'), $arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a; &#x627;&#x644;&#x644;&#x64a;&#x644;&#x64a;'), $arabic('&#x627;&#x644;&#x625;&#x636;&#x627;&#x641;&#x64a;')];
-        foreach ($overtime as $index => &$item) { $item[0] = $overtimeLabels[$index] ?? $item[0]; }
-        unset($item);
         if (count($overtime) > 1) {
-            $overtime = array_values(array_filter($overtime, fn ($item) => $item[0] !== 'الإضافي'));
+            $overtime = array_values(array_filter($overtime, fn ($item) => $item[0] !== __('الإضافي')));
         }
 
         $additional = array_values(array_filter([
-            ['المكافآت', (float) $payrollRecord->bonus],
-            ['الحوافز', (float) $payrollRecord->incentives],
-            ['العمولات', (float) $payrollRecord->commission],
-            ['نصيب الأرباح', (float) $payrollRecord->profit_share],
-            ['استحقاقات أخرى', (float) $payrollRecord->other_earnings],
-            ['السلفة المصروفة', $advance],
+            [__('المكافآت'), (float) $payrollRecord->bonus],
+            [__('الحوافز'), (float) $payrollRecord->incentives],
+            [__('العمولات'), (float) $payrollRecord->commission],
+            [__('نصيب الأرباح'), (float) $payrollRecord->profit_share],
+            [__('استحقاقات أخرى'), (float) $payrollRecord->other_earnings],
+            [__('السلفة المصروفة'), $advance],
         ], fn ($item) => $positive($item[1])));
 
-        $additionalLabels = [$arabic('&#x627;&#x644;&#x645;&#x643;&#x627;&#x641;&#x622;&#x627;&#x62a;'), $arabic('&#x627;&#x644;&#x62d;&#x648;&#x627;&#x641;&#x632;'), $arabic('&#x627;&#x644;&#x639;&#x645;&#x648;&#x644;&#x627;&#x62a;'), $arabic('&#x646;&#x635;&#x64a;&#x628; &#x627;&#x644;&#x623;&#x631;&#x628;&#x627;&#x62d;'), $arabic('&#x627;&#x633;&#x62a;&#x62d;&#x642;&#x627;&#x642;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;'), $arabic('&#x627;&#x644;&#x633;&#x644;&#x641;&#x629; &#x627;&#x644;&#x645;&#x635;&#x631;&#x648;&#x641;&#x629;')];
-        foreach ($additional as $index => &$item) { $item[0] = $additionalLabels[$index] ?? $item[0]; }
-        unset($item);
         $earnings = array_merge(
-            [['المستحق حتى اليوم', (float) data_get($snapshot, 'to_date_entitlement', $payrollRecord->basic_salary)]],
+            [[__('المستحق حتى اليوم'), (float) data_get($snapshot, 'to_date_entitlement', $payrollRecord->basic_salary)]],
             $allowances,
             $overtime,
             $additional,
         );
-        if (isset($earnings[0])) { $earnings[0][0] = $arabic('&#x627;&#x644;&#x645;&#x633;&#x62a;&#x62d;&#x642; &#x62d;&#x62a;&#x649; &#x627;&#x644;&#x64a;&#x648;&#x645;'); }
         $deductions = array_values(array_filter([
-            ['تأمين الموظف', (float) $payrollRecord->employee_insurance],
-            ['الضريبة', (float) $payrollRecord->income_tax],
-            ['صندوق الشهداء', (float) $payrollRecord->martyrs_fund],
-            ['خصم الغياب', (float) $payrollRecord->absence_deduction],
-            ['خصم الجزاءات', (float) $payrollRecord->penalty_deduction],
-            ['خصم وقت التأخير والخروج المبكر', (float) ($payrollRecord->attendance_time_deduction ?? 0)],
-            ['قسط السلفة', (float) $payrollRecord->loans],
-            ['استقطاعات أخرى', (float) $payrollRecord->other_deductions],
+            [__('تأمين الموظف'), (float) $payrollRecord->employee_insurance],
+            [__('الضريبة'), (float) $payrollRecord->income_tax],
+            [__('صندوق الشهداء'), (float) $payrollRecord->martyrs_fund],
+            [__('خصم الغياب'), (float) $payrollRecord->absence_deduction],
+            [__('خصم الجزاءات'), (float) $payrollRecord->penalty_deduction],
+            [__('خصم وقت التأخير والخروج المبكر'), (float) ($payrollRecord->attendance_time_deduction ?? 0)],
+            [__('قسط السلفة'), (float) $payrollRecord->loans],
+            [__('استقطاعات أخرى'), (float) $payrollRecord->other_deductions],
         ], fn ($item) => $positive($item[1])));
 
-        $deductionLabels = [$arabic('&#x62a;&#x623;&#x645;&#x64a;&#x646; &#x627;&#x644;&#x645;&#x648;&#x638;&#x641;'), $arabic('&#x627;&#x644;&#x636;&#x631;&#x64a;&#x628;&#x629;'), $arabic('&#x635;&#x646;&#x62f;&#x648;&#x642; &#x627;&#x644;&#x634;&#x647;&#x62f;&#x627;&#x621;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x63a;&#x64a;&#x627;&#x628;'), $arabic('&#x62e;&#x635;&#x645; &#x627;&#x644;&#x62c;&#x632;&#x627;&#x621;&#x627;&#x62a;'), $arabic('&#x62e;&#x635;&#x645; &#x648;&#x642;&#x62a; &#x627;&#x644;&#x62a;&#x623;&#x62e;&#x64a;&#x631; &#x648;&#x627;&#x644;&#x62e;&#x631;&#x648;&#x62c; &#x627;&#x644;&#x645;&#x628;&#x643;&#x631;'), $arabic('&#x642;&#x633;&#x637; &#x627;&#x644;&#x633;&#x644;&#x641;&#x629;'), $arabic('&#x627;&#x633;&#x62a;&#x642;&#x637;&#x627;&#x639;&#x627;&#x62a; &#x623;&#x62e;&#x631;&#x649;')];
-        foreach ($deductions as $index => &$item) { $item[0] = $deductionLabels[$index] ?? $item[0]; }
-        unset($item);
         $viewData = [
             'record' => $payrollRecord,
             'earnings' => $earnings,
@@ -461,7 +447,7 @@ class PayrollController extends Controller
                 'orientation' => 'P',
                 'tempDir' => $tempDir,
                 'default_font' => 'dejavusans',
-                'directionality' => 'rtl',
+                'directionality' => app()->getLocale() === 'ar' ? 'rtl' : 'ltr',
                 'margin_left' => 14, 'margin_right' => 14,
                 'margin_top' => 14, 'margin_bottom' => 14,
                 'margin_header' => 0, 'margin_footer' => 0,
@@ -750,6 +736,21 @@ class PayrollController extends Controller
             abort_unless(is_file($template), 500, 'Excel template is missing.');
             $spreadsheet = IOFactory::load($template);
             $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setRightToLeft(app()->getLocale() === 'ar');
+            foreach ($sheet->getRowIterator(1, 1) as $headerRow) {
+                foreach ($headerRow->getCellIterator() as $cell) {
+                    $value = $cell->getValue();
+                    if ($value instanceof \PhpOffice\PhpSpreadsheet\RichText\RichText) {
+                        $translated = new \PhpOffice\PhpSpreadsheet\RichText\RichText();
+                        $run = $translated->createTextRun(__($value->getPlainText()));
+                        $first = $value->getRichTextElements()[0] ?? null;
+                        if ($first instanceof \PhpOffice\PhpSpreadsheet\RichText\Run) $run->setFont(clone $first->getFont());
+                        $cell->setValue($translated);
+                    } elseif (is_string($value)) {
+                        $cell->setValue(__($value));
+                    }
+                }
+            }
 
             // Keep every template heading visible in Excel. Long Arabic
             // headings otherwise get clipped in the RTL sheet and appear
@@ -809,7 +810,7 @@ class PayrollController extends Controller
             return response()->streamDownload(function () use ($records) {
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
-                fputcsv($out, ['الموظف', 'كود الموظف', 'القسم', 'صافي المتفق عليه', 'الأساسي', 'إجمالي البدلات', 'الإضافي', 'مكافآت وحوافز وعمولات واستحقاقات أخرى', 'السلفة المصروفة', 'Gross', 'الأجر التأميني', 'تأمين الموظف', 'ضريبة الدخل', 'صندوق أسر الشهداء', 'خصم الغياب', 'خصم الجزاءات', 'قسط السلفة', 'خصومات أخرى', 'إجمالي الخصومات', 'صافي الراتب', 'حصة صاحب العمل', 'تكلفة الموظف', 'أيام مدفوعة', 'الحالة']);
+                fputcsv($out, array_map(fn ($label) => __($label), ['الموظف', 'كود الموظف', 'القسم', 'صافي المتفق عليه', 'الأساسي', 'إجمالي البدلات', 'الإضافي', 'مكافآت وحوافز وعمولات واستحقاقات أخرى', 'السلفة المصروفة', 'Gross', 'الأجر التأميني', 'تأمين الموظف', 'ضريبة الدخل', 'صندوق أسر الشهداء', 'خصم الغياب', 'خصم الجزاءات', 'قسط السلفة', 'خصومات أخرى', 'إجمالي الخصومات', 'صافي الراتب', 'حصة صاحب العمل', 'تكلفة الموظف', 'أيام مدفوعة', 'الحالة']));
                 foreach ($records as $r) {
                     $extras = (float) $r->bonus + (float) $r->incentives + (float) $r->commission + (float) $r->profit_share + (float) $r->other_earnings;
                     fputcsv($out, \App\Support\CsvSafe::row([

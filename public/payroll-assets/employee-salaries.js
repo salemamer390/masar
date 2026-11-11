@@ -5,6 +5,11 @@
   let selected = people[0] || {};
   let mi = Number(config.monthIndex || 0);
   const months = [window.masarT('يناير'),window.masarT('فبراير'),window.masarT('مارس'),window.masarT('أبريل'),window.masarT('مايو'),window.masarT('يونيو'),window.masarT('يوليو'),window.masarT('أغسطس'),window.masarT('سبتمبر'),window.masarT('أكتوبر'),window.masarT('نوفمبر'),window.masarT('ديسمبر')];
+  // Escape every dynamic text/attribute inserted into markup, including stored names.
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  const safeUrl = value => {
+    try { const url = new URL(value || '#', window.location.href); return ['http:', 'https:'].includes(url.protocol) && url.origin === window.location.origin ? url.href : '#'; } catch (_) { return '#'; }
+  };
   const money = n => Number(n || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
   const statValues = [config.stats?.cost, config.stats?.net, config.stats?.insurance, config.stats?.tax];
   document.querySelectorAll('#payrollPrototype .stats .stat strong').forEach((node, index) => {
@@ -14,14 +19,14 @@
     const q = document.getElementById('search').value.trim().toLowerCase();
     const d = document.getElementById('dept').value;
     const s = document.getElementById('state').value;
-    const arr = people.filter(p => (p.name.toLowerCase().includes(q) || String(p.code || p.id).toLowerCase().includes(q)) && (!d || p.dept === d) && (!s || p.state === s));
+    const arr = people.filter(p => (String(p.name || '').toLowerCase().includes(q) || String(p.code || p.id).toLowerCase().includes(q)) && (!d || p.dept === d) && (!s || p.state === s));
     document.getElementById('employees').innerHTML = arr.map((p, i) => {
       const earnings = Number(p.entitlements ?? (p.items || []).reduce((n, x) => n + Number(x[1] || 0), 0));
       const deductions = Number(p.totalDeductions ?? p.deduct ?? 0);
       const gross = Number(p.gross ?? (p.basic + p.allow));
       const net = Number(p.net ?? (earnings - deductions));
       const companyCost = Number(p.companyCost ?? gross);
-      return `<tr data-id="${p.id}" class="${p.id === selected.id ? 'selected' : ''}" tabindex="0" aria-label="${window.masarT("عرض مسير راتب")} ${p.name}"><td>${i + 1}</td><td><div class="emp"><span class="mini">${p.initials || ''}</span><div><b>${p.name}</b><small>${window.masarT("كود الموظف:")} ${p.code || p.id || '—'}</small></div></div></td><td><a class="salary-structure" href="${p.salaryUrl || '#'}">${p.structureLabel || '—'}</a><small class="d-block text-muted">${window.masarT("ساري من")} ${p.effectiveFrom || '—'}</small><small class="d-block text-muted">${window.masarT("المتفق عليه:")} ${money(p.agreedNet || 0)}</small></td><td><b>${money(gross)}</b></td><td style="color:#07845f">${money(earnings)}</td><td style="color:#d94a58">${money(deductions)}</td><td><b style="color:#0969e8">${money(net)}</b></td><td><b>${money(companyCost)}</b></td></tr>`;
+      return `<tr data-id="${esc(p.id)}" class="${p.id === selected.id ? 'selected' : ''}" tabindex="0" aria-label="${window.masarT("عرض مسير راتب")} ${esc(p.name)}"><td>${i + 1}</td><td><div class="emp"><span class="mini">${esc(p.initials || '')}</span><div><b>${esc(p.name)}</b><small>${window.masarT("كود الموظف:")} ${esc(p.code || p.id || '—')}</small></div></div></td><td><a class="salary-structure" href="${esc(safeUrl(p.salaryUrl))}">${esc(p.structureLabel || '—')}</a><small class="d-block text-muted">${window.masarT("ساري من")} ${esc(p.effectiveFrom || '—')}</small><small class="d-block text-muted">${window.masarT("المتفق عليه:")} ${money(p.agreedNet || 0)}</small></td><td><b>${money(gross)}</b></td><td style="color:#07845f">${money(earnings)}</td><td style="color:#d94a58">${money(deductions)}</td><td><b style="color:#0969e8">${money(net)}</b></td><td><b>${money(companyCost)}</b></td></tr>`;
     }).join('');
     document.getElementById('empty').style.display = arr.length ? 'none' : 'block';
     document.querySelectorAll('#employees tr').forEach(tr => {
@@ -52,8 +57,8 @@
     const deductions = selected.deductions || [];
     const es = Number(selected.entitlements ?? items.reduce((n, x) => n + Number(x[1] || 0), 0));
     const ds = Number(selected.totalDeductions ?? deductions.reduce((n, x) => n + Number(x[1] || 0), 0));
-    document.getElementById('earnItems').innerHTML = items.map(x => `<div class="item"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');
-    document.getElementById('deductItems').innerHTML = deductions.map(x => `<div class="item"><span>${x[0]}</span><b>${money(x[1])}</b></div>`).join('');
+    document.getElementById('earnItems').innerHTML = items.map(x => `<div class="item"><span>${esc(x[0])}</span><b>${money(x[1])}</b></div>`).join('');
+    document.getElementById('deductItems').innerHTML = deductions.map(x => `<div class="item"><span>${esc(x[0])}</span><b>${money(x[1])}</b></div>`).join('');
     document.getElementById('earnSum').textContent = money(es); document.getElementById('deductSum').textContent = money(ds);
     document.getElementById('netAmount').innerHTML = money(selected.net ?? (es - ds)) + window.masarStaticHtml(' <small style="font-size:12px">ج.م</small>');
     document.getElementById('formula').textContent = `${money(es)} − ${money(ds)}`;

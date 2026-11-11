@@ -78,4 +78,111 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         $this->assertEqualsWithDelta(33.33, (float) $record2->meal_allowance, 0.01);
         $this->assertEqualsWithDelta(66.67, (float) $record2->clothing_allowance, 0.01);
     }
+    private function auditRecord(): PayrollRecord
+    {
+        // Reuse this test's existing drawer fixture, not a screen lifecycle.
+        \App\Models\Salary::create([
+            'company_id' => $this->company->id, 'employee_id' => $this->employee->id,
+            'effective_from' => '2026-01-01', 'salary_type' => 'gross', 'salary_input' => 8600,
+            'basic_salary' => 6000, 'allowances' => 2600,
+            'housing_allowance' => 0, 'transportation_allowance' => 0, 'meal_allowance' => 0, 'clothing_allowance' => 0,
+            'gross_salary' => 8600, 'net_salary' => 8000, 'no_insurance' => true, 'status' => 'Active',
+        ]);
+        $run = app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        return $run->records()->where('employee_id', $this->employee->id)->firstOrFail();
+    }
+
+    public function test_partial_period_money_reconciles_without_a_phantom_piastre(): void
+    {
+        $record = $this->auditRecord();
+        $this->assertSame('573.33', number_format((float) $record->monthly_total, 2, '.', ''));
+        $this->assertSame('0.00', number_format((float) $record->net_salary, 2, '.', ''));
+        $this->assertSame('573.33', number_format((float) $record->employee_cost, 2, '.', ''));
+        $this->assertEquals(round((float) $record->basic_salary + (float) $record->allowances - (float) $record->deductions, 2), (float) $record->net_salary);
+    }
+
+    public function test_explicit_manual_inputs_survive_repeated_generation_including_zero(): void
+    {
+        $record = $this->auditRecord();
+        $service = app(PayrollRunService::class);
+        $record = $service->recalculateRecord($record, ['other_earnings' => 500, 'other_deductions' => 25]);
+        $before = $record->net_salary;
+        $service->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        $record->refresh();
+        $this->assertEquals(500, $record->other_earnings);
+        $this->assertEquals(25, $record->other_deductions);
+        $this->assertEquals($before, $record->net_salary);
+        $record = $service->recalculateRecord($record, ['other_earnings' => 0]);
+        $service->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        $record->refresh();
+        $this->assertEquals(0, $record->other_earnings);
+        $this->assertSame(0, (int) data_get($record->calculation_snapshot, 'manual_inputs.other_earnings'));
+        $this->assertEquals(25, $record->other_deductions);
+    }
+
+    public function test_audited_legacy_override_is_preserved_but_automatic_inputs_still_refresh(): void
+    {
+        $record = $this->auditRecord();
+        $service = app(PayrollRunService::class);
+        $record = $service->recalculateRecord($record, ['other_earnings' => 500]);
+        $snapshot = $record->calculation_snapshot;
+        unset($snapshot['manual_inputs']);
+        $record->update(['calculation_snapshot' => $snapshot]);
+        \App\Models\ActivityLog::record('payroll_inputs_update', 'test', $record, ['other_earnings' => 0], ['other_earnings' => 500], 'payroll');
+        Carbon::setTestNow(Carbon::parse('2026-11-03 18:00:00', 'Africa/Cairo'));
+        $service->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        $record->refresh();
+        $this->assertEquals(500, $record->other_earnings);
+        $this->assertEquals(3, data_get($record->calculation_snapshot, 'paid_days'));
+        $this->assertEquals(3, data_get($record->calculation_snapshot, 'inputs.absence_days'));
+    }
+
+    public function test_sparse_payslip_labels_keep_their_meaning_in_both_languages(): void
+    {
+        $record = $this->auditRecord();
+        $record->update(['meal_allowance' => 17, 'day_overtime_amount' => 0, 'ot_day_amount' => 0,
+            'night_overtime_amount' => 23, 'overtime_amount' => 23, 'commission' => 29]);
+        foreach (['ar', 'en'] as $locale) {
+            $captured = null;
+            \Illuminate\Support\Facades\View::composer('payroll.payslip-pdf', function ($view) use (&$captured) { $captured = $view->getData(); });
+            $response = $this->withSession(['locale' => $locale])->get(route('payroll.employee-salaries.payslip-pdf', $record));
+            $response->assertOk()->assertHeader('content-type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF', $response->getContent());
+            $earnings = array_column($captured['earnings'], 1, 0);
+            $deductions = array_column($captured['deductions'], 1, 0);
+            $this->assertEquals(17, $earnings[$locale === 'ar' ? 'بدل الوجبة' : 'Meal allowance']);
+            $this->assertEquals(23, $earnings[$locale === 'ar' ? 'الإضافي الليلي' : 'Night overtime']);
+            $this->assertEquals(29, $earnings[$locale === 'ar' ? 'العمولات' : 'Commissions']);
+            $this->assertEquals(573.33, $deductions[$locale === 'ar' ? 'خصم الغياب' : 'Absence deduction']);
+            $this->assertArrayNotHasKey($locale === 'ar' ? 'تأمين الموظف' : 'Employee insurance', $deductions);
+        }
+    }
+
+    public function test_controller_fed_drawer_labels_follow_english_locale(): void
+    {
+        $this->auditRecord();
+        $response = $this->withSession(['locale' => 'en'])->get(route('payroll.employee-salaries', ['month' => '2026-11-01']));
+        $response->assertOk();
+        $people = $response->viewData('prototypePeople');
+        $this->assertSame('Draft', $people[0]['stateLabel']);
+        $this->assertStringStartsWith('Structure #', $people[0]['structureLabel']);
+        $this->assertSame('Accrued to date', $people[0]['items'][0][0]);
+        $this->assertSame('Absence deduction', $people[0]['deductions'][0][0]);
+    }
+
+    public function test_excel_headers_and_direction_follow_the_selected_locale(): void
+    {
+        $this->auditRecord();
+        foreach (['ar', 'en'] as $locale) {
+            $response = $this->withSession(['locale' => $locale])->get(route('payroll.export', ['month' => '2026-11-01', 'format' => 'xlsx']));
+            $response->assertOk();
+            $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($response->baseResponse->getFile()->getPathname())->getActiveSheet();
+            $this->assertSame($locale === 'ar', $sheet->getRightToLeft());
+            $this->assertSame($locale === 'ar' ? 'الموظف' : 'Employee', (string) $sheet->getCell('A1')->getValue());
+            foreach ($sheet->rangeToArray('A1:X1')[0] as $heading) {
+                if ($locale === 'en') $this->assertDoesNotMatchRegularExpression('/[\x{0600}-\x{06ff}]/u', $heading);
+            }
+        }
+    }
+
 }
