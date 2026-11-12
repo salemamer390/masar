@@ -190,7 +190,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'بيانات محفوظة من Masar. فتح الملف لا يعيد حساب الرواتب أو الأرصدة.',
+              'بيانات محفوظة من Odir. فتح الملف لا يعيد حساب الرواتب أو الأرصدة.',
             ),
             const SizedBox(height: 12),
             if (loading)

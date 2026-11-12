@@ -50,7 +50,7 @@ class GuidedTourTest extends TestCase
         $this->assertStringContainsString('window.masarGuidedTour', $html);
         $this->assertStringContainsString('active: true', $html);
         $this->assertStringContainsString('js/tour.js', $html);
-        $this->assertStringContainsString('أهلًا بك في مسار', $html);
+        $this->assertStringContainsString('أهلًا بك في اودير', $html);
         $this->assertStringContainsString('جاهز للبدء', $html);
     }
 

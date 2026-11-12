@@ -93,8 +93,8 @@ class _AppShellState extends State<AppShell> {
               padding: const EdgeInsets.all(16),
               children: [
                 PageHeading(
-                  (widget.session['user'] as Map)['name']?.toString() ?? 'مسار',
-                  subtitle: 'تظهر الوحدات حسب صلاحيات حسابك في Masar.',
+                  (widget.session['user'] as Map)['name']?.toString() ?? 'اودير',
+                  subtitle: 'تظهر الوحدات حسب صلاحيات حسابك في Odir.',
                 ),
                 ...modules
                     .skip(4)
@@ -249,7 +249,7 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 6),
               Text(
-                data?['date']?.toString() ?? 'ملخص الشركة من خادم Masar',
+                data?['date']?.toString() ?? 'ملخص الشركة من خادم Odir',
                 style: const TextStyle(color: Colors.white70),
               ),
             ],

@@ -403,7 +403,7 @@
                 ? window.masarStaticHtml('<div class="small text-warning-emphasis">هل تقصد «') + esc(window.masarT(col.suggestion_label)) + window.masarStaticHtml('»؟ <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-map-confirm="') + esc(col.key) + '" data-map-field="' + esc(col.suggestion) + window.masarStaticHtml('">نعم، اربطه</button></div>')
                 : '';
             const unsupported = (!col.field && col.unsupported)
-                ? window.masarStaticHtml('<div class="small text-secondary">') + window.masarT('حقل معروف لكنه غير مدعوم في مسار حاليًا، لن يُحفظ:') + ' «' + esc(col.unsupported) + '»' + window.masarStaticHtml('</div>')
+                ? window.masarStaticHtml('<div class="small text-secondary">') + window.masarT('حقل معروف لكنه غير مدعوم في اودير حاليًا، لن يُحفظ:') + ' «' + esc(col.unsupported) + '»' + window.masarStaticHtml('</div>')
                 : '';
             rows += '<tr><td class="align-top"><strong>' + esc(col.header) + '</strong>' + sheet + sample + hint + unsupported + '</td><td style="min-width:190px"><select class="form-select form-select-sm" data-map-key="' + esc(col.key) + '">' + options + '</select></td></tr>';
         });

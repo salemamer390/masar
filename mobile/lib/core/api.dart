@@ -42,7 +42,7 @@ class ApiClient {
         uri.hasFragment ||
         (uri.scheme != 'https' &&
             !(kDebugMode && local && uri.scheme == 'http'))) {
-      throw const ApiException(0, 'استخدم عنوان Masar الصحيح عبر HTTPS.');
+      throw const ApiException(0, 'استخدم عنوان Odir الصحيح عبر HTTPS.');
     }
     return uri.replace(path: uri.path.replaceAll(RegExp(r'/+$'), ''));
   }
@@ -119,7 +119,7 @@ class ApiClient {
     } on http.ClientException {
       throw const ApiException(
         0,
-        'تعذر الاتصال بالخادم. تحقق من الشبكة وعنوان Masar.',
+        'تعذر الاتصال بالخادم. تحقق من الشبكة وعنوان Odir.',
       );
     }
     if (!kIsWeb) {

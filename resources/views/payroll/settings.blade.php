@@ -119,7 +119,7 @@
 @csrf @method('PUT')
 <?php
   // نفس صفحة التصميم المعتمدة حرفيًا (نفس المجموعات والبطاقات والحقول وترتيبها)،
-  // بألوان مسار وخط التطبيق، بدون استيراد/تصدير، والحقول مربوطة بحفظ التطبيق الفعلي.
+  // بألوان اودير وخط التطبيق، بدون استيراد/تصدير، والحقول مربوطة بحفظ التطبيق الفعلي.
   $lvNum = fn ($v) => $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.');
   $policyValues = $leavePolicies->pluck('setting_value', 'setting_key')->all();
   $pol = fn (string $key, $default) => $policyValues[$key] ?? $default;

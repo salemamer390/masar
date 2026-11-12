@@ -1,5 +1,5 @@
 name: masar_mobile
-description: Masar HR Arabic mobile client for the existing Laravel application.
+description: Odir HR Arabic mobile client for the existing Laravel application.
 publish_to: 'none'
 version: 1.0.0+1
 environment:
@@ -21,7 +21,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/masar-logo.png
+    - assets/odir-logo.png
   fonts:
     - family: Cairo
       fonts:

@@ -2,7 +2,7 @@
 @section('title', __('إدارة الشركات'))
 @section('content')
 <header class="pa-top">
-  <div class="pa-logo">{{ __('م') }}</div><div class="pa-brand">MASAR<small>HR &amp; Payroll Platform</small></div>
+  <div class="pa-logo">{{ __('ا') }}</div><div class="pa-brand">ODIR<small>HR &amp; Payroll Platform</small></div>
   <div class="pa-heading"><h1>{{ __('إدارة الشركات المشتركة') }}</h1><p>{{ __('إدارة الشركات والاشتراكات والباقات من لوحة المنصة.') }}</p></div>
   <a class="pa-link" href="{{ route('dashboard') }}"><i class="bi bi-box-arrow-right"></i> {{ __('العودة للتطبيق') }}</a>
   <div class="pa-user">{{ auth()->user()->name }} <small>{{ __('· مدير المنصة') }}</small></div>

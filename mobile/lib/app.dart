@@ -104,7 +104,7 @@ class _MasarAppState extends State<MasarApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     navigatorKey: navigatorKey,
-    title: 'Masar HR',
+    title: 'Odir HR',
     debugShowCheckedModeBanner: false,
     theme: MasarTheme.light,
     locale: const Locale('ar'),
@@ -128,10 +128,10 @@ class _MasarAppState extends State<MasarApp> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Image.asset('assets/masar-logo.png', height: 85),
+                          Image.asset('assets/odir-logo.png', height: 85),
                           const SizedBox(height: 12),
                           const Text(
-                            'مسار',
+                            'اودير',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 34,
@@ -140,7 +140,7 @@ class _MasarAppState extends State<MasarApp> {
                             ),
                           ),
                           const Text(
-                            'MASAR HR',
+                            'ODIR HR',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: MasarColors.muted),
                           ),
@@ -154,7 +154,7 @@ class _MasarAppState extends State<MasarApp> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'حساب Masar الحقيقي وصلاحيات شركتك، من مكان واحد.',
+                            'حساب Odir الحقيقي وصلاحيات شركتك، من مكان واحد.',
                           ),
                           const SizedBox(height: 20),
                           if (widget.api == null &&
@@ -167,7 +167,7 @@ class _MasarAppState extends State<MasarApp> {
                               textDirection: TextDirection.ltr,
                               keyboardType: TextInputType.url,
                               decoration: const InputDecoration(
-                                labelText: 'عنوان خادم Masar',
+                                labelText: 'عنوان خادم Odir',
                                 hintText: 'https://...',
                               ),
                             ),

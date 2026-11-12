@@ -42,7 +42,7 @@ class EmployeeImportService
     private const CALCULATED_HEADERS = [
         'سنوات الخدمة', 'مدة الخدمة', 'الرصيد المستحق', 'المستخدم', 'المتبقي', 'تنبيه',
         'رصيد الإجازة السنوية المتبقي', 'إجمالي الإجازات', 'أيام الحضور', 'أيام الغياب',
-        // Payroll / attendance report outputs (computed by Masar, never imported).
+        // Payroll / attendance report outputs (computed by Odir, never imported).
         'إجمالي المستحقات', 'إجمالي الاستقطاعات', 'مجموع المستحقات', 'مجموع الخصومات',
         'إجمالي الخصومات', 'إجمالي الأرباح', 'total earnings', 'total deductions',
         'خصم التأخير', 'خصم الغياب', 'خصومات أخرى', 'شهر الراتب', 'شهر المرتب',
@@ -54,7 +54,7 @@ class EmployeeImportService
     ];
 
     /**
-     * Known HR fields Masar does not store yet (from the central synonym
+     * Known HR fields Odir does not store yet (from the central synonym
      * dictionary). They are never auto-mapped and never silently dropped: the
      * review labels them «غير مدعوم - لن يُحفظ» so the user sees exactly what
      * happens. label => header aliases.
@@ -1051,7 +1051,7 @@ class EmployeeImportService
         return count($fields) === 1 ? $fields[0] : null;
     }
 
-    /** The field a known-but-unsupported header belongs to (dictionary fields Masar does not store), or null. */
+    /** The field a known-but-unsupported header belongs to (dictionary fields Odir does not store), or null. */
     private function unsupportedFieldLabel(string $normalized): ?string
     {
         static $map = null;
