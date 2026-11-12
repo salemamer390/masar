@@ -692,7 +692,7 @@ class _ModulePageState extends State<ModulePage> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Text(
-                'الإجازات الإدارية المسجلة تسري فورًا وفق منطق Masar. احتساب الأيام والرصيد يتم على الخادم.',
+                'الإجازات الإدارية المسجلة تسري فورًا وفق منطق Odir. احتساب الأيام والرصيد يتم على الخادم.',
                 style: TextStyle(color: MasarColors.muted, fontSize: 12),
               ),
             ),

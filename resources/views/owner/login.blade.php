@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ __('دخول المالك — MASAR HR') }}</title>
+  <link rel="icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
+  <title>{{ __('دخول المالك — ODIR HR') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">

@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <link rel="shortcut icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ __('تسجيل الدخول — MASAR HR') }}</title>
+  <link rel="icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
+  <link rel="shortcut icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
+  <title>{{ __('تسجيل الدخول — ODIR HR') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -57,9 +57,9 @@
 <div class="login-card">
   <div class="login-brand">
     <div class="login-brand-icon login-brand-logo">
-      <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
+      <img src="{{ asset('images/odir-hr-logo.png') }}" alt="ODIR HR">
     </div>
-    <h1 class="h4 fw-bold mb-1">{{ __('مسار — MASAR HR') }}</h1>
+    <h1 class="h4 fw-bold mb-1">{{ __('اودير — ODIR HR') }}</h1>
     <p class="text-muted small mb-0">{{ __('نظام إدارة الموارد البشرية وشؤون العاملين') }}</p>
   </div>
 
@@ -125,7 +125,7 @@
   </div>
 
   <div class="mt-4 pt-3 border-top text-center">
-    <small class="text-muted">{{ __('نظام إدارة الموارد البشرية MASAR HR') }}</small>
+    <small class="text-muted">{{ __('نظام إدارة الموارد البشرية ODIR HR') }}</small>
   </div>
 </div>
 

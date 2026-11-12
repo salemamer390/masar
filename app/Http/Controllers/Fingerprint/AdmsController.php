@@ -51,7 +51,7 @@ class AdmsController extends Controller
             'method' => $request->method(),
         ]);
 
-        return $this->plain('ERROR: this server requires a device-specific secure path. Configure the full URL provided by your Masar device page.', 403);
+        return $this->plain('ERROR: this server requires a device-specific secure path. Configure the full URL provided by your Odir device page.', 403);
     }
 
     /** GET /iclock/{token}/cdata - device handshake. */

@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <link rel="icon" type="image/png" href="{{ asset('images/masar-hr-logo.png') }}">
-  <title>{{ config('app.name', 'MASAR HR') }} — @yield('title', __('لوحة تحكم المالك'))</title>
+  <link rel="icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
+  <title>{{ config('app.name', 'ODIR HR') }} — @yield('title', __('لوحة تحكم المالك'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,8 +41,8 @@
 <body>
   <header class="owner-topbar">
     <div class="brand">
-      <img src="{{ asset('images/masar-hr-logo.png') }}" alt="MASAR HR">
-      <span>{{ __('مسار') }}</span>
+      <img src="{{ asset('images/odir-hr-logo.png') }}" alt="ODIR HR">
+      <span>{{ __('اودير') }}</span>
       <span class="badge-private"><i class="bi bi-shield-lock-fill"></i> {{ __('وصول خاص') }}</span>
     </div>
     <div class="owner-user">

@@ -38,7 +38,7 @@ td { vertical-align: top; }
 
 <table>
   <tr>
-    <td class="brand-cell" width="65%"><div class="title">MASAR HR</div><div class="sub">{{ __('قسيمة راتب') }}</div></td>
+    <td class="brand-cell" width="65%"><div class="title">ODIR HR</div><div class="sub">{{ __('قسيمة راتب') }}</div></td>
     <td class="brand-cell period" width="35%">{{ $record->payroll_month?->translatedFormat('F Y') }}</td>
   </tr>
 </table>
@@ -78,7 +78,7 @@ td { vertical-align: top; }
 <table class="net"><tr><td width="55%">{{ __('صافي الراتب') }}</td><td width="45%" class="amt">{{ number_format($net, 2) }} EGP</td></tr></table>
 
 <div class="gap"></div>
-<div class="foot">{{ __('تم إنشاء القسيمة بواسطة MASAR HR') }}</div>
+<div class="foot">{{ __('تم إنشاء القسيمة بواسطة ODIR HR') }}</div>
 
 </body>
 </html>

@@ -91,7 +91,7 @@ JS);
         $data['company_id'] = $request->user()?->company_id;
         ContactMessage::create($data);
 
-        return redirect()->route('site.contact')->with('site_success', __('تم استلام رسالتك بنجاح. سيتواصل معك فريق مسار قريبًا.'));
+        return redirect()->route('site.contact')->with('site_success', __('تم استلام رسالتك بنجاح. سيتواصل معك فريق اودير قريبًا.'));
     }
 
     private function formPage(Request $request, string $file, string $action, array $replacements, string $script = '', array $hidden = [])

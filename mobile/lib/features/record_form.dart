@@ -458,7 +458,7 @@ class _RecordFormState extends State<RecordForm> {
         content: Text(
           widget.module == 'leaves'
               ? 'الإجازة الإدارية تسري فورًا وفق قواعد الرصيد والفترة. هل تريد حفظها؟'
-              : 'سيتم حفظ التغيير في Masar وفق صلاحياتك. هل تريد المتابعة؟',
+              : 'سيتم حفظ التغيير في Odir وفق صلاحياتك. هل تريد المتابعة؟',
         ),
         actions: [
           TextButton(

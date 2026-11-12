@@ -1,5 +1,5 @@
 /* إعدادات الإجازات — نفس تصميم الصفحة المعتمدة حرفيًا (الترميز والترتيب والمقاسات)،
-   بألوان مسار وخط التطبيق Cairo، بدون استيراد/تصدير. النطاق: هذا القسم فقط. */
+   بألوان اودير وخط التطبيق Cairo، بدون استيراد/تصدير. النطاق: هذا القسم فقط. */
 #leavePolicy{--lp-ink:var(--color-primary-dark,#0B1F55);--lp-law:var(--color-primary,#1677FF);--lp-soft:var(--color-primary-soft,#EAF2FF);--lp-border:#dde3e8;--lp-paper:#f6f8fa;--lp-muted:#52616d;--lp-hint:#7a8791;--lp-mod:#b7791f;--lp-bad:#b42318}
 #leavePolicy h2,#leavePolicy h3{color:var(--lp-ink);font-weight:600}
 

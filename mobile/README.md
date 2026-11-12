@@ -1,8 +1,8 @@
-# Masar HR mobile
+# Odir HR mobile
 
 Work in progress. This branch is not a finished application or a public release.
 
-Flutter Android/iOS client in the existing Masar repository. The supplied Flutter prototype is the visual starting point; its demo database, non-validating login and made-up payroll calculations are not used.
+Flutter Android/iOS client in the existing Odir repository. The supplied Flutter prototype is the visual starting point; its demo database, non-validating login and made-up payroll calculations are not used.
 
 ## Account rule
 
@@ -19,7 +19,7 @@ Create the company account on the existing website first. Sign into mobile using
 flutter pub get
 flutter analyze
 flutter test
-flutter run --dart-define=MASAR_BASE_URL=https://YOUR-MASAR-HOST
+flutter run --dart-define=MASAR_BASE_URL=https://YOUR-ODIR-HOST
 flutter build apk --debug --target-platform android-arm64
 ```
 
