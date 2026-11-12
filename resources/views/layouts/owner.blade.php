@@ -31,7 +31,8 @@
       border-radius: 8px; padding: 4px 14px; font-size: .82rem; font-weight: 600;
     }
     .owner-topbar .btn-logout:hover { background: rgba(255,255,255,.12); }
-    .owner-content { padding: 24px; }
+    .owner-content { padding: 24px; min-width: 0; }
+    @media(max-width:600px){.owner-topbar{flex-wrap:wrap;padding:10px 14px}.owner-topbar .owner-user{flex-wrap:wrap}.owner-content{padding:14px}}
   </style>
   @stack('styles')
 @if(app()->getLocale() === 'en')<link href="{{ asset('ltr.css') }}" rel="stylesheet">@endif

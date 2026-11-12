@@ -88,10 +88,10 @@ class OwnerDashboardTest extends TestCase
         $this->actingAs($this->superAdmin('someone-else@example.test'))->get('/owner')->assertNotFound();
     }
 
-    public function test_super_admin_tied_to_a_company_gets_404_even_with_the_owner_email(): void
+    public function test_allowlisted_super_admin_tied_to_a_company_can_use_owner_guard(): void
     {
         [$company] = $this->companyWithManager('owner-bound-co');
-        $this->actingAs($this->superAdmin(self::OWNER_EMAIL, $company->id))->get('/owner')->assertNotFound();
+        $this->actingAs($this->superAdmin(self::OWNER_EMAIL, $company->id), 'owner')->get('/owner')->assertOk();
     }
 
     public function test_the_owner_opens_the_dashboard_via_the_owner_guard_without_a_web_session(): void
@@ -151,8 +151,8 @@ class OwnerDashboardTest extends TestCase
         $this->superAdmin(self::OWNER_EMAIL, $company->id, 'bound-pass-123');
 
         $this->post('/owner/login', ['email' => self::OWNER_EMAIL, 'password' => 'bound-pass-123'])
-            ->assertSessionHasErrors('email');
-        $this->assertGuest('owner');
+            ->assertRedirect(route('owner.index'));
+        $this->assertAuthenticated('owner');
     }
 
     public function test_owner_login_preserves_a_concurrent_company_web_session(): void

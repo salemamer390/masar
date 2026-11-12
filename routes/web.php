@@ -660,6 +660,19 @@ Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->
     Route::put('/companies/{company}/status', [\App\Http\Controllers\OwnerDashboardController::class, 'updateCompanyStatus'])->name('companies.status.update');
     Route::put('/renewals/{renewal}', [\App\Http\Controllers\OwnerDashboardController::class, 'updateRenewal'])->name('renewals.update');
     Route::post('/announcements', [\App\Http\Controllers\OwnerDashboardController::class, 'sendAnnouncement'])->name('announcements.send');
+
+    // Guided-tour management: draft edits, preview and publish (see the
+    // OwnerTourController docblock for the draft/publish rules).
+    Route::get('/tour', [\App\Http\Controllers\OwnerTourController::class, 'index'])->name('tour.index');
+    Route::post('/tour/draft', [\App\Http\Controllers\OwnerTourController::class, 'startDraft'])->name('tour.draft.start');
+    Route::delete('/tour/draft', [\App\Http\Controllers\OwnerTourController::class, 'discardDraft'])->name('tour.draft.discard');
+    Route::post('/tour/publish', [\App\Http\Controllers\OwnerTourController::class, 'publish'])->name('tour.publish');
+    Route::post('/tour/steps', [\App\Http\Controllers\OwnerTourController::class, 'storeStep'])->name('tour.steps.store');
+    Route::post('/tour/steps/picked', [\App\Http\Controllers\OwnerTourController::class, 'storePickedStep'])->name('tour.steps.picked');
+    Route::put('/tour/steps/{tourStep}', [\App\Http\Controllers\OwnerTourController::class, 'updateStep'])->name('tour.steps.update');
+    Route::post('/tour/steps/{tourStep}/move', [\App\Http\Controllers\OwnerTourController::class, 'moveStep'])->name('tour.steps.move');
+    Route::post('/tour/steps/{tourStep}/toggle', [\App\Http\Controllers\OwnerTourController::class, 'toggleStep'])->name('tour.steps.toggle');
+    Route::delete('/tour/steps/{tourStep}', [\App\Http\Controllers\OwnerTourController::class, 'destroyStep'])->name('tour.steps.destroy');
 });
 
 // Mobile JSON adapter, sharing the existing web session and business rules.
