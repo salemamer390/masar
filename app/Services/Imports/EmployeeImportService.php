@@ -231,6 +231,7 @@ class EmployeeImportService
             'capacity' => null,
             'new_lookups' => ['departments' => [], 'jobs' => [], 'branches' => []],
             'duplicates' => $duplicates,
+            'domain_only' => false,
         ];
 
         try {
@@ -259,7 +260,7 @@ class EmployeeImportService
 
         $multipleSheets = count($sheets) > 1;
         foreach ($infos as $index => $info) {
-            $detected = $this->detectWorkbookSheetKind($sheets[$index]['rows'], $info['used'], (string) $sheets[$index]['name']);
+            $detected = $this->detectWorkbookSheetKind($sheets[$index]['rows'], $info['used'], (string) $sheets[$index]['name'], $multipleSheets);
             $kind = $confirmedKinds[(string) $index] ?? $confirmedKinds[(string) $sheets[$index]['name']] ?? $detected;
             // The user's confirmed type is authoritative: a sheet confirmed as
             // employee data is eligible even when the auto-markers missed it,
@@ -305,20 +306,41 @@ class EmployeeImportService
         $candidates = array_values(array_keys(array_filter($infos, static fn (array $info): bool => !empty($info['eligible']))));
         $result['merge_available'] = count($candidates) > 1;
 
-        // No sheet has a recognisable "full name" header: let the user map columns manually.
+        // No employee table in this workbook: when its sheets are complete data
+        // domains (attendance, penalties, ...) the review can still import them
+        // for the employees they name - no employee is created or updated.
         if ($candidates === []) {
-            $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual, false);
-            if ($columns === []) {
-                $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual, true);
+            [$importableDomains, $incompleteDomains] = $this->domainReadiness($result['sheets']);
+            if ($importableDomains !== []) {
+                $result['domain_only'] = true;
+
+                return $result;
             }
+
+            // No sheet has a recognisable "full name" header: let the user map columns manually.
+            $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual);
             if ($columns === []) {
                 $hasRows = false;
                 foreach ($sheets as $sheet) {
                     $hasRows = $hasRows || $sheet['rows'] !== [];
                 }
-                $result['file_errors'][] = $hasRows
-                    ? 'لم يتم العثور على عمود «الاسم الكامل» في الملف. أضف عمودًا بهذا الاسم أو حمّل النموذج الجاهز.'
-                    : 'الملف لا يحتوي على أي بيانات.';
+                if ($hasRows && $incompleteDomains !== []) {
+                    // The file has recognisable data sheets that cannot link to
+                    // employees yet - say exactly what is missing instead of the
+                    // generic name-column error.
+                    $labels = self::kindLabels();
+                    $details = [];
+                    foreach ($incompleteDomains as $entry) {
+                        $details[] = 'ورقة «' . $entry['name'] . '» (' . ($labels[$entry['kind']] ?? $entry['kind']) . ') تنقصها: ' . implode('، ', $entry['missing']);
+                    }
+                    $result['file_errors'][] = 'لم يتم العثور على ورقة بيانات موظفين جدولية في الملف. '
+                        . implode('؛ ', $details)
+                        . '. أكمل الأعمدة الناقصة لتُستورد بيانات هذه الأوراق للموظفين الموجودين، أو أضف جدول موظفين بعمود «الاسم الكامل».';
+                } else {
+                    $result['file_errors'][] = $hasRows
+                        ? 'لم يتم العثور على عمود «الاسم الكامل» في الملف. أضف عمودًا بهذا الاسم أو حمّل النموذج الجاهز.'
+                        : 'الملف لا يحتوي على أي بيانات.';
+                }
 
                 return $result;
             }
@@ -445,7 +467,7 @@ class EmployeeImportService
      * domain, and an attendance sheet needs a real date column - anything
      * uncertain stays 'unknown' for the user to decide.
      */
-    private function detectWorkbookSheetKind(array $rows, array $used, string $name = ''): string
+    private function detectWorkbookSheetKind(array $rows, array $used, string $name = '', bool $multipleSheets = false): string
     {
         // Dashboard/summary/account sheets are auxiliary, and the file's own
         // sheet name is the strongest signal for them.
@@ -496,11 +518,93 @@ class EmployeeImportService
         // 'unknown' for review rather than being guessed.
         if ($has(['الأجر التأميني', 'مبلغ الاشتراك', 'اشتراك التأمينات', 'insurance wage', 'insurance subscription'])
             && !$has(['الرقم القومي', 'تاريخ التعيين', 'بداية العقد', 'تاريخ الميلاد', 'national id', 'hire date', 'contract start', 'birth date'])) return 'insurance';
+        // Label/value report sheets (a vertical profile or a single-column label
+        // list under a title row) are never employee tables, however name-like
+        // the matched cell is: their rows are field labels, not people, and
+        // importing them would create employees named «أيام الحضور» and similar.
+        if ($multipleSheets && $this->isVerticalProfile($rows, $used)) {
+            $hint = $this->kindFromSheetName($name);
+
+            return $hint === 'employees' ? 'unknown' : ($hint ?? 'unknown');
+        }
         if ($this->hasNameField($used) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         // Last resort: common sheet names are only a hint for a sheet the columns could not
         // classify. The user still reviews and can change the type on the sheets step.
         return $this->kindFromSheetName($name) ?? 'unknown';
+    }
+
+    /**
+     * A vertical label/value sheet: profile cards and report summaries where
+     * each row is «field label | value» (or a bare label list under a title),
+     * never one person per row. detectHeader mistakes the «اسم الموظف» label
+     * cell for a header row, and everything below it («الراتب الصافي», «أيام
+     * الحضور», ...) would import as employee names. Real tables are wider than
+     * two columns, map several fields from their header row, or start at the
+     * first content row without a title above them.
+     *
+     * @param array<int, array<int, string>> $rows
+     * @param array<string, string> $used fields mapped from the detected header row
+     */
+    private function isVerticalProfile(array $rows, array $used): bool
+    {
+        if (count($used) >= 2) {
+            return false;
+        }
+        $content = 0;
+        $pairs = 0;
+        $firstContentRow = null;
+        $nameRow = null;
+        $scanned = 0;
+        foreach ($rows as $number => $cells) {
+            $nonEmpty = array_values(array_filter($cells, static fn ($value) => trim((string) $value) !== ''));
+            $count = count($nonEmpty);
+            if ($count === 0) {
+                continue;
+            }
+            if ($count > 2) {
+                return false;
+            }
+            $content++;
+            $firstContentRow ??= (int) $number;
+            if ($count === 2) {
+                $pairs++;
+            }
+            if ($nameRow === null && ++$scanned <= 15) {
+                foreach ($nonEmpty as $value) {
+                    if ($this->isNameLabel($this->key((string) $value))) {
+                        $nameRow = (int) $number;
+                        break;
+                    }
+                }
+            }
+        }
+        if ($content < 4 || $nameRow === null || $nameRow === $firstContentRow) {
+            return false;
+        }
+
+        return $pairs === 0 || $pairs >= 2;
+    }
+
+    /** The cell text is a known name-field header or alias («الاسم الكامل», «اسم الموظف», ...). */
+    private function isNameLabel(string $key): bool
+    {
+        if ($key === '') {
+            return false;
+        }
+        foreach (['full_name', 'first_name', 'last_name'] as $field) {
+            [$label, $aliases] = self::COLUMNS[$field];
+            if ($key === $this->key($label)) {
+                return true;
+            }
+            foreach ($aliases as $alias) {
+                if ($key === $this->key($alias)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** Common Arabic/English sheet names, used only as a hint when columns are inconclusive. */
@@ -618,31 +722,81 @@ class EmployeeImportService
                 continue;
             }
             $name = (string) ($sheet['name'] ?? '');
-            $config = $sheet['domain_config'] ?? null;
-            if (!is_array($config) || (int) ($config['header_row'] ?? -1) < 0) {
+            $check = $this->domainSheetMissing($kind, $fields, $sheet['domain_config'] ?? null);
+            if (!$check['header']) {
                 return 'ورقة «' . $name . '»: لم يتعرف التطبيق على صف العناوين لنوع «' . ($labels[$kind] ?? $kind) . '». اختر نوعًا آخر أو راجع الملف.';
             }
-            $map = (array) ($config['map'] ?? []);
-            $missing = [];
-            foreach (self::requiredDomainFields($kind) as $field) {
-                if (!isset($map[$field])) {
-                    $missing[] = (string) ($fields[$field] ?? $field);
-                }
-            }
-            if (in_array($kind, ['attendance', 'leaves', 'penalties', 'requests', 'advances'], true) && !isset($map['code']) && !isset($map['name'])) {
-                $missing[] = 'كود أو اسم الموظف';
-            }
-            // Mirrors the insurance importer's own sheet gate.
-            if ($kind === 'insurance' && isset($map['insurance_number'])
-                && !array_intersect(['insured_salary', 'office', 'category', 'status', 'job_code'], array_keys($map))) {
-                $missing[] = 'حقل تأميني واحد على الأقل (الأجر التأميني، المكتب، الفئة، الحالة، أو كود الوظيفة)';
-            }
-            if ($missing !== []) {
-                return 'ورقة «' . $name . '»: أكمل ربط الحقول المطلوبة (' . implode('، ', $missing) . ').';
+            if ($check['missing'] !== []) {
+                return 'ورقة «' . $name . '»: أكمل ربط الحقول المطلوبة (' . implode('، ', $check['missing']) . ').';
             }
         }
 
         return null;
+    }
+
+    /**
+     * What one sheet of this domain kind still needs before its parser can
+     * run: header=false means the header row itself was not detected.
+     *
+     * @param array<string, string> $fields
+     * @return array{header: bool, missing: array<int, string>}
+     */
+    private function domainSheetMissing(string $kind, array $fields, mixed $config): array
+    {
+        if (!is_array($config) || (int) ($config['header_row'] ?? -1) < 0) {
+            return ['header' => false, 'missing' => []];
+        }
+        $map = (array) ($config['map'] ?? []);
+        $missing = [];
+        foreach (self::requiredDomainFields($kind) as $field) {
+            if (!isset($map[$field])) {
+                $missing[] = (string) ($fields[$field] ?? $field);
+            }
+        }
+        if (in_array($kind, ['attendance', 'leaves', 'penalties', 'requests', 'advances'], true) && !isset($map['code']) && !isset($map['name'])) {
+            $missing[] = 'كود أو اسم الموظف';
+        }
+        // Mirrors the insurance importer's own sheet gate.
+        if ($kind === 'insurance' && isset($map['insurance_number'])
+            && !array_intersect(['insured_salary', 'office', 'category', 'status', 'job_code'], array_keys($map))) {
+            $missing[] = 'حقل تأميني واحد على الأقل (الأجر التأميني، المكتب، الفئة، الحالة، أو كود الوظيفة)';
+        }
+
+        return ['header' => true, 'missing' => $missing];
+    }
+
+    /**
+     * Sheets that would import as their effective domain kind right now, and
+     * domain sheets that still miss required columns. Used to let a workbook
+     * with no employee table proceed to review (domain-only import) and to
+     * explain precisely why an incomplete one cannot.
+     *
+     * @param array<int, array<string, mixed>> $sheetEntries
+     * @return array{0: array<int, string>, 1: array<int, array{name: string, kind: string, missing: array<int, string>}>}
+     */
+    private function domainReadiness(array $sheetEntries): array
+    {
+        $importable = [];
+        $incomplete = [];
+        foreach ($sheetEntries as $entry) {
+            $kind = (string) ($entry['kind'] ?? 'unknown');
+            $fields = self::domainFields($kind);
+            if ($fields === []) {
+                continue;
+            }
+            $check = $this->domainSheetMissing($kind, $fields, $entry['domain_config'] ?? null);
+            if ($check['header'] && $check['missing'] === []) {
+                $importable[] = (string) ($entry['name'] ?? '');
+                continue;
+            }
+            $missing = $check['missing'];
+            if (!$check['header']) {
+                $missing[] = 'صف العناوين';
+            }
+            $incomplete[] = ['name' => (string) ($entry['name'] ?? ''), 'kind' => $kind, 'missing' => $missing];
+        }
+
+        return [$importable, $incomplete];
     }
 
     /** Reviewed per-sheet column choices: only real fields of the sheet's domain, only non-negative column indexes. */
@@ -1105,7 +1259,7 @@ class EmployeeImportService
      * @param array<string, string> $manual
      * @return array<string, array<string, mixed>> keyed by normalised header
      */
-    private function unmatchedColumns(array $sheets, array $infos, array $aliases, array $manual, bool $force): array
+    private function unmatchedColumns(array $sheets, array $infos, array $aliases, array $manual): array
     {
         $columns = [];
         foreach ($sheets as $index => $sheet) {
@@ -1113,7 +1267,9 @@ class EmployeeImportService
                 continue;
             }
             $firstRow = reset($sheet['rows']);
-            if (!is_array($firstRow) || (!$force && count($firstRow) < 2)) {
+            // A one-cell first row is a report title, not a header row: never
+            // offer it as a mappable column.
+            if (!is_array($firstRow) || count($firstRow) < 2) {
                 continue;
             }
             [, $used, $entries] = $this->mapRow($firstRow, $aliases, $manual);
