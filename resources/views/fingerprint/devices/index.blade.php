@@ -7,7 +7,7 @@
 <x-pagination-controls :paginator="$devices" />
 
 @php
-  $deviceFormFields = ['name','device_type','driver','ip_address','port','communication_key','serial_number','physical_location','timezone','sync_interval_minutes','sync_enabled','is_active','notes'];
+  $deviceFormFields = ['name','device_type','driver','connection_mode','ip_address','port','communication_key','serial_number','physical_location','timezone','sync_interval_minutes','sync_enabled','is_active','notes'];
   $deviceFormHasErrors = $errors->hasAny($deviceFormFields);
 @endphp
 <!-- Add Device Modal -->
@@ -31,10 +31,11 @@
             <div class="col-md-6"><label class="form-label">{{ __('اسم الجهاز') }}</label><input name="name" class="form-control" required value="{{ old('name') }}"></div>
             <div class="col-md-6"><label class="form-label">{{ __('نوع الجهاز') }}</label><input name="device_type" class="form-control" value="{{ old('device_type','zkteco') }}"></div>
             <div class="col-md-6"><label class="form-label">{{ __('مشغل الجهاز') }}</label><select name="driver" class="form-select">@foreach(\App\Enums\FingerprintDeviceDriver::cases() as $deviceDriver)<option value="{{ $deviceDriver->value }}" @selected(old('driver','zkteco_tcp')===$deviceDriver->value)>{{ $deviceDriver->label() }}</option>@endforeach</select></div>
-            <div class="col-md-6"><label class="form-label">{{ __('IP الجهاز') }}</label><input name="ip_address" dir="ltr" class="form-control" required value="{{ old('ip_address') }}"></div>
-            <div class="col-md-3"><label class="form-label">{{ __('المنفذ') }}</label><input type="number" name="port" class="form-control" required value="{{ old('port',4370) }}"></div>
+            <div class="col-md-6"><label class="form-label">{{ __('طريقة الاتصال') }}</label><select name="connection_mode" class="form-select">@foreach($modes as $mode)<option value="{{ $mode->value }}" @selected(old('connection_mode','server_pull')===$mode->value)>{{ $mode->label() }}</option>@endforeach</select></div>
+            <div class="col-md-6"><label class="form-label">{{ __('IP الجهاز') }}</label><input name="ip_address" dir="ltr" class="form-control" value="{{ old('ip_address') }}"><small class="text-muted">{{ __('مطلوب فقط لطريقة السحب من الخادم') }}</small></div>
+            <div class="col-md-3"><label class="form-label">{{ __('المنفذ') }}</label><input type="number" name="port" class="form-control" value="{{ old('port',4370) }}"></div>
             <div class="col-md-3"><label class="form-label">Comm Key</label><input type="number" name="communication_key" class="form-control" value="{{ old('communication_key') }}"></div>
-            <div class="col-md-6"><label class="form-label">{{ __('الرقم التسلسلي') }}</label><input name="serial_number" class="form-control" value="{{ old('serial_number') }}"></div>
+            <div class="col-md-6"><label class="form-label">{{ __('الرقم التسلسلي') }}</label><input name="serial_number" class="form-control" value="{{ old('serial_number') }}"><small class="text-muted">{{ __('إلزامي لطريقتي الإرسال المباشر والبرنامج الوسيط') }}</small></div>
             <div class="col-md-6"><label class="form-label">{{ __('الموقع') }}</label><input name="physical_location" class="form-control" value="{{ old('physical_location') }}"></div>
             <div class="col-md-4"><label class="form-label">{{ __('المنطقة الزمنية') }}</label><select name="timezone" class="form-select">@foreach($timezones as $tz)<option value="{{ $tz }}" @selected(old('timezone','Africa/Cairo')===$tz)>{{ $tz }}</option>@endforeach</select></div>
             <div class="col-md-4"><label class="form-label">{{ __('فاصل المزامنة بالدقائق') }}</label><input type="number" min="1" name="sync_interval_minutes" class="form-control" value="{{ old('sync_interval_minutes',15) }}"></div>

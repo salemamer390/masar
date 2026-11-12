@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\FingerprintConnectionMode;
 use App\Enums\FingerprintDeviceDriver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,7 @@ class FingerprintDevice extends Model
         'name',
         'device_type',
         'driver',
+        'connection_mode',
         'ip_address',
         'port',
         'communication_key',
@@ -31,13 +33,23 @@ class FingerprintDevice extends Model
         'last_connection_failure_at',
         'sync_cursor_timestamp',
         'sync_cursor_hash',
+        'push_token_hash',
+        'push_token_set_at',
+        'push_last_seen_at',
         'notes',
+    ];
+
+    protected $hidden = [
+        'push_token_hash',
     ];
 
     protected function casts(): array
     {
         return [
             'driver' => FingerprintDeviceDriver::class,
+            'connection_mode' => FingerprintConnectionMode::class,
+            'push_token_set_at' => 'datetime',
+            'push_last_seen_at' => 'datetime',
             'port' => 'integer',
             'communication_key' => 'integer',
             'sync_enabled' => 'boolean',
@@ -51,6 +63,21 @@ class FingerprintDevice extends Model
         ];
     }
 
+    public function usesServerPull(): bool
+    {
+        return $this->connection_mode === FingerprintConnectionMode::ServerPull;
+    }
+
+    public function hasPushSecret(): bool
+    {
+        return ! empty($this->push_token_hash);
+    }
+
+    public function commands(): HasMany
+    {
+        return $this->hasMany(FingerprintDeviceCommand::class, 'device_id');
+    }
+
     public function syncLogs(): HasMany
     {
         return $this->hasMany(FingerprintDeviceSyncLog::class, 'device_id');
@@ -59,6 +86,11 @@ class FingerprintDevice extends Model
     public function isDueForSync(): bool
     {
         if (! $this->is_active || ! $this->sync_enabled) {
+            return false;
+        }
+
+        // Push and bridge devices are never dialed by the server.
+        if ($this->connection_mode !== FingerprintConnectionMode::ServerPull) {
             return false;
         }
 

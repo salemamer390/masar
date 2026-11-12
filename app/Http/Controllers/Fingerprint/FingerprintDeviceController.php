@@ -11,6 +11,7 @@ use App\Models\FingerprintDevice;
 use App\Services\DeviceConnectionService;
 use App\Services\FingerprintAttendanceSyncService;
 use App\Services\FingerprintDeviceService;
+use App\Services\FingerprintPushTokenService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -19,7 +20,8 @@ class FingerprintDeviceController extends Controller
     public function __construct(
         private readonly FingerprintDeviceService $service,
         private readonly DeviceConnectionService $connectionService,
-        private readonly FingerprintAttendanceSyncService $syncService
+        private readonly FingerprintAttendanceSyncService $syncService,
+        private readonly FingerprintPushTokenService $pushTokens
     ) {}
 
     public function index(FingerprintDeviceFilterRequest $request): View
@@ -38,6 +40,16 @@ class FingerprintDeviceController extends Controller
     public function store(FingerprintDeviceRequest $request): RedirectResponse
     {
         $device = $this->service->create($request->validated());
+
+        // Push and bridge devices authenticate with a per-device secret;
+        // generate it now and show it exactly once.
+        if ($device->connection_mode->requiresPushSecret()) {
+            $plain = $this->pushTokens->regenerate($device);
+
+            return redirect()->route('fingerprint.devices.show', $device)
+                ->with('success', __('تم إنشاء جهاز البصمة بنجاح.'))
+                ->with('push_token', $plain);
+        }
 
         return redirect()->route('fingerprint.devices.show', $device)->with('success', __('تم إنشاء جهاز البصمة بنجاح.'));
     }
@@ -62,7 +74,29 @@ class FingerprintDeviceController extends Controller
     {
         $this->service->update($fingerprintDevice, $request->validated());
 
+        // A device switched to a push mode without a secret gets one now.
+        if ($fingerprintDevice->connection_mode->requiresPushSecret() && ! $fingerprintDevice->hasPushSecret()) {
+            $plain = $this->pushTokens->regenerate($fingerprintDevice);
+
+            return redirect()->route('fingerprint.devices.show', $fingerprintDevice)
+                ->with('success', __('تم تحديث جهاز البصمة بنجاح.'))
+                ->with('push_token', $plain);
+        }
+
         return redirect()->route('fingerprint.devices.show', $fingerprintDevice)->with('success', __('تم تحديث جهاز البصمة بنجاح.'));
+    }
+
+    public function regeneratePushToken(FingerprintDevice $fingerprintDevice): RedirectResponse
+    {
+        if (! $fingerprintDevice->connection_mode->requiresPushSecret()) {
+            return back()->with('error', __('هذا الجهاز يعمل بالسحب من الخادم ولا يستخدم رمز ربط.'));
+        }
+
+        $plain = $this->pushTokens->regenerate($fingerprintDevice);
+
+        return back()
+            ->with('success', __('تم إنشاء رمز ربط جديد. الرموز السابقة توقفت عن العمل.'))
+            ->with('push_token', $plain);
     }
 
     public function destroy(FingerprintDevice $fingerprintDevice): RedirectResponse
@@ -74,6 +108,10 @@ class FingerprintDeviceController extends Controller
 
     public function testConnection(FingerprintDevice $fingerprintDevice): RedirectResponse
     {
+        if (! $fingerprintDevice->usesServerPull()) {
+            return back()->with('error', __('اختبار الاتصال متاح فقط للأجهزة التي يسحب منها الخادم مباشرة.'));
+        }
+
         $log = $this->connectionService->testConnection($fingerprintDevice, auth()->id());
 
         return back()->with($log->status->value === 'success' ? 'success' : 'error', $log->status->value === 'success'
@@ -83,6 +121,10 @@ class FingerprintDeviceController extends Controller
 
     public function retrieveInfo(FingerprintDevice $fingerprintDevice): RedirectResponse
     {
+        if (! $fingerprintDevice->usesServerPull()) {
+            return back()->with('error', __('قراءة معلومات الجهاز متاحة فقط للأجهزة التي يسحب منها الخادم مباشرة.'));
+        }
+
         $log = $this->connectionService->retrieveDeviceInfo($fingerprintDevice, auth()->id());
 
         return back()->with($log->status->value === 'success' ? 'success' : 'error', $log->status->value === 'success'
@@ -92,6 +134,10 @@ class FingerprintDeviceController extends Controller
 
     public function sync(FingerprintDevice $fingerprintDevice): RedirectResponse
     {
+        if (! $fingerprintDevice->usesServerPull()) {
+            return back()->with('error', __('المزامنة اليدوية من الخادم متاحة فقط لأجهزة السحب المباشر. أجهزة الإرسال ترسل بصماتها بنفسها.'));
+        }
+
         $log = $this->syncService->syncDevice($fingerprintDevice, auth()->id(), [
             'device_id' => $fingerprintDevice->id,
             'force' => true,
