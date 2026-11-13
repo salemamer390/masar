@@ -187,11 +187,18 @@ class EmployeeImportController extends Controller
         $confirmedMappings = (array) json_decode((string) $request->input('mappings', '{}'), true);
         $reviewedMappings = (array) json_decode((string) $request->input('employee_mappings', '{}'), true);
         $candidates = [];
-        foreach ($analysis['columns'] ?? [] as $column) {
-            // Only previously unknown headers are eligible for company vocabulary.
-            // Conflicting meanings across sheets must stay sheet-scoped, not learned globally.
-            if (!empty($column['field']) && isset($reviewedMappings[$column['sheet'] ?? ''])) {
-                $candidates[$column['key']][$column['field']] = true;
+        $unknownKeys = array_fill_keys(array_column($analysis['columns'] ?? [], 'key'), true);
+        foreach ($analysis['sheets'] ?? [] as $sheet) {
+            $selected = ($analysis['selected_sheet'] ?? null) === 'all'
+                || (string) ($analysis['selected_sheet'] ?? '') === (string) $sheet['index'];
+            if (!$selected || ($sheet['kind'] ?? '') !== 'employees') continue;
+            foreach ($sheet['employee_config']['columns'] ?? [] as $column) {
+                $key = $this->service->key($column['header']);
+                $field = $reviewedMappings[$sheet['name']][$column['index']] ?? null;
+                // Unknown headers only; conflicting sheet meanings are never learned globally.
+                if (isset($unknownKeys[$key]) && is_string($field) && $field !== '') {
+                    $candidates[$key][$field] = true;
+                }
             }
         }
         foreach ($candidates as $key => $fields) {
