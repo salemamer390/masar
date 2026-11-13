@@ -155,6 +155,9 @@ trait ParsesImportValues
             $minute = (int) $m[2];
             $second = isset($m[3]) && $m[3] !== '' ? (int) $m[3] : 0;
             $meridiem = isset($m[4]) ? mb_strtolower($m[4]) : '';
+            if ($meridiem !== '' && ($hour < 1 || $hour > 12)) {
+                throw new InvalidArgumentException('وقت غير صالح «' . $value . '».');
+            }
             if (($meridiem === 'pm' || $meridiem === 'م') && $hour < 12) {
                 $hour += 12;
             } elseif (($meridiem === 'am' || $meridiem === 'ص') && $hour === 12) {

@@ -107,6 +107,7 @@ $stats = $current['preview'];
         <div class="d-flex gap-2 mb-3 flex-wrap">
           @if($stats['errors'])<button class="btn btn-outline-danger btn-sm" type="submit" formaction="{{ route('attendance.import.rejected') }}">تحميل تقرير المرفوضات والمراجعة كاملًا (Excel)</button>@endif
         </div>
+        @if(!empty($stats['warnings']))<div class="alert alert-warning small"><ul class="mb-0">@foreach($stats['warnings'] as $warning)<li>{{ $warning }}</li>@endforeach</ul></div>@endif
         <div class="btn-group mb-3" role="group" aria-label="تصفية نتائج التحقق">
           <button type="button" class="btn btn-light active" data-validation-tab="all">الكل</button>
           <button type="button" class="btn btn-light" data-validation-tab="ready">صالح / تحديث ({{ $stats['row_count'] }})</button>

@@ -614,4 +614,120 @@ class AttendanceImportPreviewTest extends TestCase
         $this->get($url)->assertStatus(410);
     }
 
+
+    public function test_arabic_names_digits_dates_times_and_statuses_are_normalized_without_renaming_employee(): void
+    {
+        $this->day->update(['employee_code' => '101', 'full_name' => 'عامر سالم جمعه']);
+        [$token, $units, $html, $key] = $this->preview($this->workbook([['name' => 'اليومي', 'rows' => [
+            ['كود الموظف', 'اسم الموظف', 'التاريخ', 'الحضور', 'الانصراف', 'الحالة'],
+            ['١٠١.٠', 'عَامِر سـالم جمعة', '٢٠٢٦-١١-٢٠', '٠٩:٣٠', '٠٥:٠٠ م', 'متاخر'],
+        ]]]));
+        $this->assertStringContainsString('تمت مطابقة الاسم بعد توحيد الحروف والتشكيل', $html);
+        $this->assertStringContainsString('2026-11-20', $html);
+        $this->assertSame(0, Attendance::count());
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $row = Attendance::where('employee_id', $this->day->id)->firstOrFail();
+        $this->assertSame('09:30:00', $row->getRawOriginal('check_in'));
+        $this->assertSame('17:00:00', $row->getRawOriginal('check_out'));
+        $this->assertSame('Late', $row->status);
+        $this->assertSame('عامر سالم جمعه', $this->day->fresh()->full_name);
+    }
+
+    public function test_unknown_attendance_status_is_rejected_in_preview_and_commit_not_saved_raw(): void
+    {
+        [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '2026-11-20', '', '', 'حالة غريبة'],
+        ])));
+        $this->assertStringContainsString('حالة الحضور', $html);
+        $this->assertStringContainsString('غير معروفة', $html);
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $this->assertSame(0, Attendance::count());
+    }
+
+    public function test_status_only_aliases_map_to_existing_canonical_states(): void
+    {
+        [$token, $units, , $key] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '2026-11-20', '', '', 'اجازه'],
+            ['I1', '2026-11-21', '', '', 'غياب'],
+            ['I1', '2026-11-22', '', '', 'حضور'],
+        ])));
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $this->assertSame(['Leave', 'Absent', 'Present'], Attendance::where('employee_id', $this->day->id)->orderBy('attendance_date')->pluck('status')->all());
+    }
+
+    public function test_normalized_code_collisions_are_rejected_and_leading_zero_codes_stay_distinct(): void
+    {
+        $this->day->update(['employee_code' => '101']);
+        $this->night->update(['employee_code' => '101.0']);
+        [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
+            ['۱۰۱', '2026-11-20', '09:00', '17:00', ''],
+        ])));
+        $this->assertStringContainsString('أكثر من سجل بعد توحيد الأرقام', $html);
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $this->assertSame(0, Attendance::count());
+        $this->night->update(['employee_code' => '0101']);
+        [$token, $units, , $key] = $this->preview($this->workbook($this->dailyRows([
+            ['٠١٠١', '2026-11-20', '22:00', '06:00', ''],
+        ])));
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $this->assertSame($this->night->id, Attendance::firstOrFail()->employee_id);
+    }
+
+    public function test_arabic_ambiguous_dates_still_require_explicit_format_and_invalid_times_are_rejected(): void
+    {
+        [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '٠٣/٠٤/٢٠٢٦', '09:00', '17:00', ''],
+        ])));
+        $this->assertStringContainsString('غامض', $html);
+        $this->import($token, $units[0], $key)->assertStatus(422);
+        $this->assertSame(0, Attendance::count());
+        [, , $html] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '2026-11-20', '٢٥:٠٠', '17:00', 'حاضر'],
+        ])));
+        $this->assertStringContainsString('توقيت حضور أو انصراف غير صالح', $html);
+    }
+
+    public function test_workbook_attendance_uses_the_same_normalization_and_never_saves_unknown_status(): void
+    {
+        $this->day->update(['employee_code' => '101', 'full_name' => 'أحمد مصطفى']);
+        $file = $this->workbook([['name' => 'الحضور', 'rows' => [
+            ['كود الموظف', 'اسم الموظف', 'التاريخ', 'وقت الحضور', 'وقت الانصراف', 'الحالة'],
+            ['۱۰۱.۰', 'احمد مصطفي', '٢٠٢٦-١١-٢٠', '٠٩:٠٠', '٠٥:٠٠ م', 'حضور'],
+            ['١٠١', 'أحمد مصطفى', '2026-11-21', '', '', 'راحة'],
+            ['١٠١', 'شخص مختلف', '2026-11-22', '09:00', '17:00', 'حاضر'],
+            ['١٠١', 'أحمد مصطفى', '2026-11-23', '٢٥:٠٠', '17:00', 'حاضر'],
+        ]]]);
+        $report = \App\Support\CompanyContext::run($this->company->id, fn () => app(\App\Services\Imports\WorkbookAttendanceImporter::class)->import($file->getRealPath(), 'xlsx', app(\App\Services\PayrollPeriodGuard::class), app(\App\Services\PayrollRunService::class)));
+        $this->assertSame(1, $report['imported']);
+        $this->assertSame(3, $report['skipped']);
+        $this->assertCount(1, $report['warnings']);
+        $this->assertSame('Present', Attendance::firstOrFail()->status);
+        $this->assertCount(3, $report['failures']);
+    }
+
+    public function test_raw_punches_accept_arabic_digits_without_changing_shift_aggregation(): void
+    {
+        $this->day->update(['employee_code' => '101']);
+        [$token, $units, , $key] = $this->preview($this->workbook([['name' => 'البصمات', 'rows' => [
+            ['كود الموظف', 'التاريخ والوقت'],
+            ['١٠١', '٢٠٢٦-١١-٢٠ ٠٩:٠٠'],
+            ['۱۰۱', '٢٠٢٦-١١-٢٠ ١٧:٠٠'],
+        ]]]));
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $row = Attendance::where('employee_id', $this->day->id)->firstOrFail();
+        $this->assertSame('09:00:00', $row->getRawOriginal('check_in'));
+        $this->assertSame('17:00:00', $row->getRawOriginal('check_out'));
+    }
+
+    public function test_normalized_codes_preserve_case_insensitive_lookup_and_zero_is_a_valid_code(): void
+    {
+        $this->day->update(['employee_code' => 'HR-012']);
+        $this->night->update(['employee_code' => '0']);
+        [$token, $units, , $key] = $this->preview($this->workbook($this->dailyRows([
+            ['hr-٠١٢', '2026-11-20', '09:00', '17:00', ''],
+            ['٠', '2026-11-20', '22:00', '06:00', ''],
+        ])));
+        $this->import($token, $units[0], $key)->assertRedirect();
+        $this->assertSame(2, Attendance::count());
+    }
 }
