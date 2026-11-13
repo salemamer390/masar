@@ -115,7 +115,7 @@ class AttendanceSheetAnalyzer
                 $key = $this->normalise($cell);
                 $next = trim((string) ($cells[$i + 1] ?? ''));
                 if ($next === '') continue;
-                if (in_array($key, ['الكود', 'كود', 'رقمالموظف', 'كودالموظف'], true) && $hint['code'] === null) $hint['code'] = $next;
+                if (in_array($key, array_map(fn ($v) => $this->normalise($v), ['الكود', 'كود', 'رقمالموظف', 'كودالموظف']), true) && $hint['code'] === null) $hint['code'] = $next;
                 if (in_array($key, ['الموظف', 'اسمالموظف', 'الاسم'], true) && $hint['name'] === null) $hint['name'] = $next;
             }
         }
@@ -131,6 +131,6 @@ class AttendanceSheetAnalyzer
 
     private function normalise(mixed $value): string
     {
-        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value)));
+        return app(ImportValueNormalizer::class)->key((string) $value);
     }
 }
