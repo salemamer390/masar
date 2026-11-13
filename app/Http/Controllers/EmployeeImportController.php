@@ -52,6 +52,7 @@ class EmployeeImportController extends Controller
 
         return response()->json(['success' => true] + $this->payload($analysis) + [
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
+            'mapping_error' => $this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null),
             'penalty_types' => PenaltyType::withoutGlobalScopes()->orderBy('name')->pluck('name'),
             'review_token' => $this->reviewToken($request, $analysis, $companyId),
         ]);
@@ -69,6 +70,7 @@ class EmployeeImportController extends Controller
      */
     private function simulateDomains(Request $request, array $analysis, int $companyId): array
     {
+        if ($this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null) !== null) return [];
         $file = $request->file('file');
         $extension = strtolower((string) $file?->getClientOriginalExtension());
         if ($extension !== 'xlsx') {
@@ -148,10 +150,11 @@ class EmployeeImportController extends Controller
         // The reviewed column mapping must be complete enough to parse each
         // data sheet as its confirmed kind - enforced server-side, not only
         // in the modal.
-        if ($extension === 'xlsx' && ($configError = $this->service->domainConfigError($analysis['sheets'] ?? [])) !== null) {
+        if (($configError = $this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null)) !== null) {
             return response()->json(['success' => false, 'message' => $configError] + $payload, 422);
         }
 
+        if ($analysis['file_errors'] !== []) return response()->json(['success' => false, 'message' => implode('؛ ', $analysis['file_errors'])] + $payload, 422);
         if ($analysis['needs_mapping']) {
             return response()->json(['success' => false, 'message' => __('اربط عمود الأسماء بالحقل «الاسم الكامل» أولًا.')] + $payload, 422);
         }
@@ -298,6 +301,7 @@ class EmployeeImportController extends Controller
                     'header_row' => (int) ($sheet['domain_config']['header_row'] ?? -1),
                     'map' => (array) ($sheet['domain_config']['map'] ?? []),
                     'domain' => $kind,
+                    'default_date' => $sheet['domain_config']['default_date'] ?? null,
                 ];
             }
             return $configs;
@@ -509,6 +513,7 @@ class EmployeeImportController extends Controller
                 'kind' => (string) ($sheet['kind'] ?? 'unknown'),
                 'header_row' => is_array($config) ? (int) ($config['header_row'] ?? -1) : null,
                 'map' => $map,
+                'default_date' => $config['default_date'] ?? null,
                 'employee_config' => $sheet['employee_config'] ?? null,
             ];
         }
@@ -539,6 +544,7 @@ class EmployeeImportController extends Controller
             'mappings' => ['nullable', 'string', 'max:20000'],
             'sheet_kinds' => ['nullable', 'string', 'max:20000'],
             'domain_mappings' => ['nullable', 'string', 'max:20000'],
+            'sheet_dates' => ['nullable', 'string', 'max:10000'],
             'employee_mappings' => ['nullable', 'string', 'max:50000'],
             'ack_dates' => ['nullable', 'boolean'],
             'ack_updates' => ['nullable', 'boolean'],
@@ -578,12 +584,13 @@ class EmployeeImportController extends Controller
                 'mappings' => is_array($mappings) ? $mappings : [],
                 'sheet_kinds' => is_array($sheetKinds) ? $sheetKinds : [],
                 'domain_mappings' => is_array($domainMappings) ? $domainMappings : [],
+                'sheet_dates' => json_decode((string) $request->input('sheet_dates', '{}'), true) ?: [],
                 'employee_mappings' => json_decode((string) $request->input('employee_mappings', '{}'), true) ?: [],
             ]
         );
 
-        if ($analysis['file_errors'] !== []) {
-            return response()->json(['success' => false, 'message' => $analysis['file_errors'][0]], 422);
+        if ($analysis['file_errors'] !== [] && empty($analysis['sheets'])) {
+            return response()->json(['success' => false, 'message' => implode('؛ ', $analysis['file_errors'])], 422);
         }
 
         return [$analysis, $companyId];
@@ -601,6 +608,7 @@ class EmployeeImportController extends Controller
         }
 
         return [
+            'file_errors' => $analysis['file_errors'],
             'summary' => $analysis['summary'],
             'capacity' => $analysis['capacity'],
             'new_lookups' => $analysis['new_lookups'],
@@ -615,6 +623,8 @@ class EmployeeImportController extends Controller
             'fields' => $fields,
             'today' => date('d/m/Y'),
             'kind_labels' => EmployeeImportService::kindLabels(),
+            'required_employee_fields' => EmployeeImportService::requiredEmployeeFields(),
+            'required_domain_fields' => collect(array_keys(EmployeeImportService::kindLabels()))->mapWithKeys(fn ($kind) => [$kind => EmployeeImportService::requiredDomainFields($kind)])->all(),
             'domain_fields' => [
                 'attendance' => EmployeeImportService::domainFields('attendance'),
                 'leaves' => EmployeeImportService::domainFields('leaves'),
