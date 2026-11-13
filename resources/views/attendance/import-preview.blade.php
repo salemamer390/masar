@@ -1,59 +1,39 @@
 @extends('layouts.app')
-@section('title',__('معاينة استيراد الحضور'))
+@section('title',__('استيراد الحضور'))
+@push('styles')<link rel="stylesheet" href="{{ asset('css/import-wizard.css') }}?v=1">@endpush
 @section('content')
 @php
-    $controller = app(\App\Http\Controllers\AttendanceImportController::class);
+$controller = app(\App\Http\Controllers\AttendanceImportController::class);
+$current = collect($units)->firstWhere('key',$selectedUnit);
+$stats = $current['preview'];
 @endphp
-<div class="container py-3" style="max-width:980px">
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-    <div>
-      <h4 class="mb-1"><i class="bi bi-file-earmark-spreadsheet me-2"></i>{{ __('معاينة استيراد الحضور') }}</h4>
-      <div class="text-muted small">{{ __('الملف:') }} {{ $fileName }} {{ __('— لم يُحفظ أي سجل بعد. راجع الورقة وتعيين الأعمدة ثم اعتمد الاستيراد.') }}</div>
-    </div>
-    <a href="{{ route('attendance.index') }}" class="btn btn-light"><i class="bi bi-arrow-right"></i> {{ __('رجوع') }}</a>
+<div class="odir-import attendance-wizard">
+  <div class="wizard-header">
+    <h4><i class="bi bi-file-earmark-spreadsheet"></i> {{ __('استيراد الحضور والانصراف') }}</h4>
+    <div class="import-stepper"><span class="text-success"><b class="step-number">✓</b>رفع الملف</span><span data-att-step="sheets"><b class="step-number">2</b>الأوراق وأنواعها</span><span data-att-step="review"><b class="step-number">3</b>المراجعة</span><span><b class="step-number">4</b>النتيجة</span></div>
   </div>
-
-  @if($error)
-  <div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ $error }}</div>
-  @endif
-
-  @if($skipped)
-  <div class="alert alert-warning">
-    <strong>{{ __('أوراق تم تخطيها ولن تُستورد:') }}</strong>
-    <ul class="mb-0 mt-2">
-      @foreach($skipped as $sheet)
-      <li>«{{ $sheet['name'] }}»: {{ $sheet['skip_reason'] }}</li>
-      @endforeach
-    </ul>
-  </div>
-  @endif
-
   <form method="POST" action="{{ route('attendance.import.preview') }}">
     @csrf
     <input type="hidden" name="import_token" value="{{ $token }}">
     <input type="hidden" name="preview_key" id="previewKey" value="{{ $previewKey }}">
-
-    @foreach($units as $unit)
-    <div class="card shadow-sm mb-3 unit-card">
-      <div class="card-body">
-        <div class="form-check mb-2">
-          <input class="form-check-input unit-radio" type="radio" name="unit" id="unit-{{ $unit['key'] }}" value="{{ $unit['key'] }}" @if($selectedUnit === $unit['key']) checked @endif>
-          <label class="form-check-label" for="unit-{{ $unit['key'] }}">
-            <strong>
-            @if(count($unit['sheets']) > 1)
-              {{ __('مجموعة «أوراق الموظفين» (') }}{{ count($unit['sheets']) }} {{ __('ورقة)') }}
-            @else
-              {{ __('ورقة «') }}{{ $unit['sheets'][0]['name'] }}»
-            @endif
-            </strong>
-            <span class="text-muted small">{{ $controller->layoutLabel($unit['layout']) }}</span>
-          </label>
-        </div>
-
-        @if(count($unit['sheets']) > 1)
-        <div class="text-muted small mb-2">{{ __('الأوراق:') }} {{ implode('، ', array_map(fn ($s) => $s['name'], $unit['sheets'])) }}</div>
-        @endif
-
+    <input type="hidden" name="wizard" value="1">
+    <input type="hidden" name="wizard_step" id="attendanceWizardStep" value="{{ request('wizard_step','sheets') === 'review' || $error ? 'review' : 'sheets' }}">
+    <div class="wizard-body">
+      <div class="file-chip mb-3">{{ $fileName }}</div>
+      @if($error)<div class="alert alert-danger" role="alert">{{ $error }}</div>@endif
+      @if($skipped)<div class="import-note mb-3"><strong>أوراق تم تخطيها</strong><ul class="mb-0">@foreach($skipped as $sheet)<li>{{ $sheet['name'] }}: {{ $sheet['skip_reason'] }}</li>@endforeach</ul></div>@endif
+      <section data-att-stage="sheets">
+        <div class="import-section-title">الأوراق وربط الأعمدة</div>
+        <p class="small text-muted">اختر الورقة أو مجموعة الأوراق المطلوب استيرادها. راجع الربط وعينة البيانات. يُستورد اختيار واحد فقط في كل مرة.</p>
+        @foreach($units as $unit)
+        <div class="unit-card py-3">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <input class="form-check-input unit-radio" type="radio" name="unit" id="unit-{{ $unit['key'] }}" value="{{ $unit['key'] }}" @checked($selectedUnit === $unit['key'])>
+            <label for="unit-{{ $unit['key'] }}" class="fw-semibold">{{ implode('، ',array_column($unit['sheets'],'name')) }}</label>
+            <span class="mapping-chip">{{ $controller->layoutLabel($unit['layout']) }}</span>
+            <span class="small text-muted">{{ count($unit['sheets']) }} ورقة · {{ count($unit['map']) }} حقول مرتبطة</span>
+          </div>
+          <details @if($selectedUnit===$unit['key']) open @endif><summary class="text-primary small mb-3">عرض / تعديل الربط وعينة البيانات</summary>
         <div class="row g-3 mb-3 map-fields" data-unit="{{ $unit['key'] }}">
           @foreach($fields as $field)
           @php
@@ -93,38 +73,25 @@
           @endif
         </div>
 
-        <div class="d-flex gap-3 flex-wrap small mb-2">
-          <span class="badge bg-success-subtle text-success-emphasis border"><i class="bi bi-check2"></i> {{ $unit['preview']['row_count'] }} {{ __('سجلًا جاهزًا') }}</span>
-          <span class="badge bg-primary-subtle text-primary-emphasis border"><i class="bi bi-people"></i> {{ $unit['preview']['employee_count'] }} {{ __('موظفًا مُطابَقًا') }}</span>
-          @if($unit['preview']['overwrites'] > 0)
-          <span class="badge bg-warning-subtle text-warning-emphasis border"><i class="bi bi-arrow-repeat"></i> {{ __('سيُحدَّث') }} {{ $unit['preview']['overwrites'] }} {{ __('سجلًا موجودًا') }}@php
-            if ($unit['preview']['overwrites_manual'] > 0) { echo ' (منها ' . $unit['preview']['overwrites_manual'] . ' يدوي/معتمد)'; }
-          @endphp</span>
-          @endif
-          @if($unit['preview']['errors'])
-          <span class="badge bg-danger-subtle text-danger-emphasis border"><i class="bi bi-exclamation-triangle"></i> {{ count($unit['preview']['errors']) }} {{ __('تنبيه') }}</span>
-          @endif
-        </div>
 
-        @if($unit['preview']['deferred_existing'] > 0)
-        <div class="alert alert-warning py-2">{{ $unit['preview']['deferred_existing'] }} {{ __('يومًا ببصمات زائدة له سجل حضور موجود: السجل الحالي سيبقى كما هو لحين المراجعة في الاستثناءات، ولن يتغير بهذا الاستيراد.') }}</div>
-        @endif
-        @if($unit['preview']['sample'])
-        <div class="table-responsive mb-2">
-          <table class="table table-sm table-striped align-middle mb-0">
-            <thead><tr><th>{{ __('الموظف') }}</th><th>{{ __('الكود') }}</th><th>{{ __('التاريخ') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th></tr></thead>
-            <tbody>
-              @foreach($unit['preview']['sample'] as $row)
-              <tr>
-                <td>{{ $row['employee'] }}</td><td>{{ $row['code'] }}</td><td>{{ $row['date'] }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td>
-                <td>@if($row['exists'])<span class="badge bg-warning-subtle text-warning-emphasis border">{{ __('موجود — سيُحدَّث') }}</span>@endif</td>
-              </tr>
-              @endforeach
-            </tbody>
-          </table>
+          <div class="table-responsive"><table class="table table-sm small"><thead><tr><th>الموظف</th><th>الكود</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th></tr></thead><tbody>
+          @foreach(array_slice($unit['preview']['sample'],0,5) as $row)<tr><td>{{ $row['employee'] }}</td><td>{{ $row['code'] }}</td><td>{{ $row['date'] }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td></tr>@endforeach
+          </tbody></table></div></details>
         </div>
-        @endif
-
+        @endforeach
+        <div class="d-flex justify-content-end mt-3"><button type="button" class="btn btn-primary" data-att-next>متابعة للمراجعة <i class="bi bi-arrow-left"></i></button></div>
+      </section>
+      <section data-att-stage="review" hidden>
+        <div class="import-section-title">مراجعة البيانات قبل الاستيراد</div>
+        <p class="small text-muted">لا تُحفظ البيانات قبل التأكيد. البصمات الزائدة تُحفظ للمراجعة دون استبدال السجل الحالي.</p>
+        <div class="import-stats">
+          <div class="import-stat neutral"><span>سجلات قابلة للمعالجة</span><strong>{{ $stats['row_count'] }}</strong></div>
+          <div class="import-stat good"><span>موظفون مطابقون</span><strong>{{ $stats['employee_count'] }}</strong></div>
+          <div class="import-stat blue"><span>سجلات موجودة</span><strong>{{ $stats['overwrites'] }}</strong></div>
+          <div class="import-stat bad"><span>رسائل تحقق / مراجعة</span><strong>{{ count($stats['errors']) }}</strong></div>
+        </div>
+        @foreach($units as $unit)
+          @if($unit['key']===$selectedUnit)
         @if($unit['preview']['overwrites'] > 0)
         <div class="form-check mb-2">
           <input class="form-check-input options-check" type="checkbox" id="ow-{{ $unit['key'] }}" name="options_{{ $unit['key'] }}[overwrite]" value="1" @if(!empty($unit['options']['overwrite'])) checked @endif>
@@ -132,25 +99,28 @@
         </div>
         @endif
 
-        @if($unit['preview']['errors'])
-        <details class="small">
-          <summary class="text-danger">{{ __('صفوف تحتاج مراجعة (لن تُستورد):') }}</summary>
-          <ul class="mt-2 mb-0">
-            @foreach($unit['preview']['errors'] as $rowError)
-            <li>{{ $rowError }}</li>
-            @endforeach
-          </ul>
-        </details>
-        @endif
-      </div>
-    </div>
-    @endforeach
 
-    <div class="alert alert-info small py-2 d-none" id="stalePreviewNote"><i class="bi bi-arrow-repeat me-1"></i>{{ __('جاري تحديث المعاينة بعد تغيير الورقة أو التعيين…') }}</div>
-    <div class="d-flex gap-2 justify-content-end">
-      <a href="{{ route('attendance.index') }}" class="btn btn-light">{{ __('إلغاء') }}</a>
-      <button type="submit" class="btn btn-primary" id="confirmImport" formaction="{{ route('attendance.import') }}"><i class="bi bi-check2-circle"></i> {{ __('اعتماد واستيراد') }}</button>
+          @endif
+        @endforeach
+        @if($stats['overwrites'])<div class="alert alert-info">سيُحدَّث {{ $stats['overwrites'] }} سجلًا موجودًا فقط بعد موافقتك.</div>@endif
+        @if($stats['deferred_existing'])<div class="alert alert-warning">{{ $stats['deferred_existing'] }} أيام ببصمات زائدة: السجل الحالي سيبقى كما هو حتى مراجعة الاستثناءات.</div>@endif
+        <div class="d-flex gap-2 mb-3 flex-wrap">
+          @if($stats['errors'])<button class="btn btn-outline-danger btn-sm" type="submit" formaction="{{ route('attendance.import.rejected') }}">تحميل تقرير المرفوضات والمراجعة كاملًا (Excel)</button>@endif
+        </div>
+        <div class="btn-group mb-3" role="group" aria-label="تصفية نتائج التحقق">
+          <button type="button" class="btn btn-light active" data-validation-tab="all">الكل</button>
+          <button type="button" class="btn btn-light" data-validation-tab="ready">صالح / تحديث ({{ $stats['row_count'] }})</button>
+          <button type="button" class="btn btn-light" data-validation-tab="error">أخطاء / مراجعة ({{ count($stats['errors']) }})</button>
+        </div>
+        <div class="table-responsive" style="max-height:380px;overflow:auto"><table class="table align-middle"><thead><tr><th>الموظف / الصف</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>نتيجة التحقق</th></tr></thead><tbody>
+          @foreach($stats['sample'] as $row)<tr data-validation-row="ready"><td>{{ $row['employee'] }}<div class="small text-muted">{{ $row['code'] }}</div></td><td>{{ $row['date'] }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td><td><span class="badge {{ $row['deferred'] ? 'text-bg-warning' : ($row['exists'] ? 'text-bg-primary' : 'text-bg-success') }}">{{ $row['deferred'] ? 'مراجعة بصمات' : ($row['exists'] ? 'تحديث' : 'جديد') }}</span></td></tr>@endforeach
+          @foreach($stats['errors'] as $message)<tr data-validation-row="error"><td colspan="5" class="small text-danger">{{ $message }}</td></tr>@endforeach
+        </tbody></table></div>
+        <div class="d-flex gap-2 justify-content-end mt-3"><button type="button" class="btn btn-light" data-att-back>رجوع للأوراق</button><button type="submit" class="btn btn-primary" id="confirmImport" formaction="{{ route('attendance.import') }}" @disabled(!$stats['row_count'])>اعتماد واستيراد</button></div>
+      </section>
+      <div class="alert alert-info small py-2 d-none mt-3" id="stalePreviewNote">جارٍ تحديث المعاينة بعد تغيير الورقة أو الربط…</div>
     </div>
+    <div class="wizard-footer"><a class="btn btn-light" href="{{ route('attendance.index') }}">إلغاء</a></div>
   </form>
 </div>
 @push('scripts')
@@ -161,6 +131,19 @@
   const confirmBtn = document.getElementById('confirmImport');
   const note = document.getElementById('stalePreviewNote');
   let refreshing = false;
+  const stageInput = document.getElementById('attendanceWizardStep');
+  const show = (step) => {
+    stageInput.value = step;
+    form.querySelectorAll('[data-att-stage]').forEach(el=>el.hidden=el.dataset.attStage!==step);
+    document.querySelectorAll('[data-att-step]').forEach(el=>{el.classList.toggle('text-primary',el.dataset.attStep===step);});
+  };
+  document.querySelectorAll('[data-att-next]').forEach(el=>el.addEventListener('click',()=>show('review')));
+  document.querySelectorAll('[data-att-back]').forEach(el=>el.addEventListener('click',()=>show('sheets')));
+  show(stageInput.value);
+  document.querySelectorAll('[data-validation-tab]').forEach(btn=>btn.addEventListener('click',()=>{
+    document.querySelectorAll('[data-validation-tab]').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('[data-validation-row]').forEach(row=>row.hidden=btn.dataset.validationTab!=='all'&&row.dataset.validationRow!==btn.dataset.validationTab);
+  }));
   form.addEventListener('submit', () => {
     // Only the checked unit's fields are submitted, renamed to map[field]/options[field].
     form.querySelectorAll('.map-select, .options-select, .options-check').forEach((el) => { el.disabled = true; });
