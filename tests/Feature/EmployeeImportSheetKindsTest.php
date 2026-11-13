@@ -430,4 +430,32 @@ class EmployeeImportSheetKindsTest extends TestCase
 
         return $this->postJson('/employees/import', $params + ['review_token' => $token]);
     }
+    public function test_sheet_scoped_employee_mapping_is_signed_and_does_not_change_another_sheet(): void
+    {
+        $file = $this->workbook([['name'=>'موظفون إضافيون','rows'=>[
+            ['الكود','الاسم الكامل','رقم الهاتف'], ['402','منى علي','01087654321'],
+        ]]]);
+        $params=['file'=>$file,'sheet'=>'all','sheet_kinds'=>json_encode(['الموظفين'=>'employees','موظفون إضافيون'=>'employees']),
+            'employee_mappings'=>json_encode(['الموظفين'=>[2=>'notes']])];
+        $preview=$this->postJson('/employees/import/preview',$params); $preview->assertOk();
+        $token=$preview->json('review_token');
+        $tampered=$params; $tampered['employee_mappings']='{}'; $tampered['review_token']=$token;
+        $this->postJson('/employees/import',$tampered)->assertStatus(422);
+        $this->postJson('/employees/import',$params+['review_token'=>$token])->assertOk()->assertJson(['success'=>true]);
+        $first=Employee::where('company_id',$this->company->id)->where('employee_code','401')->firstOrFail();
+        $second=Employee::where('company_id',$this->company->id)->where('employee_code','402')->firstOrFail();
+        $this->assertSame('01012345678',$first->notes); $this->assertEmpty($first->phone);
+        $this->assertSame('01087654321',$second->phone);
+    }
+
+    public function test_new_unknown_employee_header_mapping_is_learned_after_confirmed_import(): void
+    {
+        $params=['file'=>$this->workbook([['name'=>'إضافي','rows'=>[
+            ['الكود','الاسم الكامل','اتصال خاص للزميل'],['402','منى علي','01087654321'],
+        ]]]),'sheet'=>'all','sheet_kinds'=>json_encode(['الموظفين'=>'employees','إضافي'=>'employees']),
+        'employee_mappings'=>json_encode(['إضافي'=>[2=>'phone']])];
+        $response=$this->commitImport($params); $response->assertOk()->assertJson(['success'=>true]);
+        $this->assertSame('phone',\App\Models\ImportColumnAlias::where('company_id',$this->company->id)->where('alias','اتصال خاص للزميل')->value('field'));
+    }
+
 }
