@@ -184,11 +184,20 @@ class EmployeeImportController extends Controller
         // The import the user just confirmed is the moment their manual column
         // links become trusted vocabulary: remember them for the next file.
         // Learning never blocks the import (no-op before the migration runs).
-        $learnedAliases = $this->service->learnMappings(
-            $companyId,
-            json_decode((string) $request->input('mappings', '{}'), true),
-            $analysis
-        );
+        $confirmedMappings = (array) json_decode((string) $request->input('mappings', '{}'), true);
+        $reviewedMappings = (array) json_decode((string) $request->input('employee_mappings', '{}'), true);
+        $candidates = [];
+        foreach ($analysis['columns'] ?? [] as $column) {
+            // Only previously unknown headers are eligible for company vocabulary.
+            // Conflicting meanings across sheets must stay sheet-scoped, not learned globally.
+            if (!empty($column['field']) && isset($reviewedMappings[$column['sheet'] ?? ''])) {
+                $candidates[$column['key']][$column['field']] = true;
+            }
+        }
+        foreach ($candidates as $key => $fields) {
+            if (count($fields) === 1) $confirmedMappings[$key] = array_key_first($fields);
+        }
+        $learnedAliases = $this->service->learnMappings($companyId, $confirmedMappings, $analysis);
 
         $attendanceCount = (int) data_get($distributed, 'attendance.imported', 0);
         $leaveCount = (int) data_get($distributed, 'leaves.imported', 0);
@@ -493,6 +502,7 @@ class EmployeeImportController extends Controller
                 'kind' => (string) ($sheet['kind'] ?? 'unknown'),
                 'header_row' => is_array($config) ? (int) ($config['header_row'] ?? -1) : null,
                 'map' => $map,
+                'employee_config' => $sheet['employee_config'] ?? null,
             ];
         }
         $mappings = json_decode((string) $request->input('mappings', '{}'), true);
@@ -522,6 +532,7 @@ class EmployeeImportController extends Controller
             'mappings' => ['nullable', 'string', 'max:20000'],
             'sheet_kinds' => ['nullable', 'string', 'max:20000'],
             'domain_mappings' => ['nullable', 'string', 'max:20000'],
+            'employee_mappings' => ['nullable', 'string', 'max:50000'],
             'ack_dates' => ['nullable', 'boolean'],
             'ack_updates' => ['nullable', 'boolean'],
         ], [
@@ -560,6 +571,7 @@ class EmployeeImportController extends Controller
                 'mappings' => is_array($mappings) ? $mappings : [],
                 'sheet_kinds' => is_array($sheetKinds) ? $sheetKinds : [],
                 'domain_mappings' => is_array($domainMappings) ? $domainMappings : [],
+                'employee_mappings' => json_decode((string) $request->input('employee_mappings', '{}'), true) ?: [],
             ]
         );
 
