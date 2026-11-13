@@ -26,16 +26,15 @@ class AttendanceSheetAnalyzer
 
     private const ALIASES = [
         'employee_code' => ['كود الموظف', 'كود', 'الكود', 'رقم الموظف', 'الرقم الوظيفي', 'employee code', 'employee_code', 'emp code', 'code', 'رقم العامل', 'كود العامل', 'رقم البصمة', 'كود البصمة', 'كود الموظف في الجهاز', 'user id', 'userid', 'emp id', 'employee id', 'employee no', 'emp no', 'badge', 'badge no', 'الرقم'],
-        'employee_name' => ['اسم الموظف', 'الموظف', 'الاسم', 'employee name', 'employee_name', 'name', 'اسم العامل', 'اسم الموظف بالكامل', 'الاسم بالكامل', 'full name', 'staff name', 'worker name'],
+        'employee_name' => ['الموظفين', 'الموظفون', 'الاسماء', 'اسم الموظف', 'الموظف', 'الاسم', 'employee name', 'employee_name', 'name', 'اسم العامل', 'اسم الموظف بالكامل', 'الاسم بالكامل', 'full name', 'staff name', 'worker name'],
         'date' => ['التاريخ', 'تاريخ الحضور', 'تاريخ يوم العمل', 'تاريخ العمل', 'date', 'attendance date', 'attendance_date', 'work date', 'تاريخ اليوم', 'تاريخ الدوام', 'يوم العمل', 'تاريخ الحضور والانصراف', 'day date', 'attendance day', 'اليوم', 'يوم الحضور', 'تاريخ يوم الحضور'],
         'punch_at' => ['التاريخ والوقت', 'وقت البصمة', 'التوقيت', 'datetime', 'date time', 'punch time', 'timestamp', 'تاريخ ووقت البصمة', 'التاريخ والتوقيت', 'التاريخ / الوقت', 'date/time', 'date & time', 'date and time', 'punch date time', 'check time', 'clock time'],
-        'check_in' => ['الحضور', 'وقت الحضور', 'أول بصمة', 'اول بصمة', 'بصمة الحضور', 'check in', 'check_in', 'first punch', 'in', 'دخول', 'الدخول', 'وقت الدخول', 'بصمة دخول', 'حضور', 'time in', 'clock in', 'in time', 'first in', 'check-in', 'checkin', 'arrival', 'ميعاد الحضور', 'أول بصمه', 'اول بصمه', 'ساعة الحضور', 'تسجيل الدخول', 'بصمة الدخول', 'entry time', 'punch in'],
-        'check_out' => ['الانصراف', 'وقت الانصراف', 'آخر بصمة', 'اخر بصمة', 'بصمة الانصراف', 'check out', 'check_out', 'last punch', 'out', 'خروج', 'الخروج', 'وقت الخروج', 'بصمة خروج', 'انصراف', 'time out', 'clock out', 'out time', 'last out', 'check-out', 'checkout', 'departure', 'ميعاد الانصراف', 'أخر بصمه', 'آخر بصمه', 'اخر بصمه', 'ساعة الانصراف', 'تسجيل الخروج', 'بصمة الخروج', 'exit time', 'punch out'],
-        'status' => ['الحالة', 'status', 'حالة الحضور', 'حالة اليوم', 'موقف الحضور', 'attendance status', 'daily status'],
+        'check_in' => ['الحضور', 'وقت الحضور', 'أول بصمة', 'اول بصمة', 'بصمة الحضور', 'c/in', 'check in', 'check_in', 'first punch', 'in', 'دخول', 'الدخول', 'وقت الدخول', 'بصمة دخول', 'حضور', 'time in', 'clock in', 'in time', 'first in', 'check-in', 'checkin', 'arrival', 'ميعاد الحضور', 'أول بصمه', 'اول بصمه', 'ساعة الحضور', 'تسجيل الدخول', 'بصمة الدخول', 'entry time', 'punch in'],
+        'check_out' => ['الانصراف', 'وقت الانصراف', 'آخر بصمة', 'اخر بصمة', 'بصمة الانصراف', 'c/out', 'check out', 'check_out', 'last punch', 'out', 'خروج', 'الخروج', 'وقت الخروج', 'بصمة خروج', 'انصراف', 'time out', 'clock out', 'out time', 'last out', 'check-out', 'checkout', 'departure', 'ميعاد الانصراف', 'أخر بصمه', 'آخر بصمه', 'اخر بصمه', 'ساعة الانصراف', 'تسجيل الخروج', 'بصمة الخروج', 'exit time', 'punch out'],
     ];
 
     /** Fields the user may map in the preview, in display order. */
-    public const MAPPABLE_FIELDS = ['employee_code', 'employee_name', 'date', 'punch_at', 'check_in', 'check_out', 'status'];
+    public const MAPPABLE_FIELDS = ['employee_code', 'employee_name', 'date', 'punch_at', 'check_in', 'check_out'];
 
     private const HEADER_SCAN_ROWS = 10;
 
@@ -65,7 +64,7 @@ class AttendanceSheetAnalyzer
             $hasEmployee = isset($map['employee_code']) || isset($map['employee_name']);
             $hasInOut = isset($map['check_in']) || isset($map['check_out']);
             $layout = null;
-            if (isset($map['date']) && $hasEmployee && $hasInOut) {
+            if ($hasEmployee && $hasInOut) {
                 $layout = self::LAYOUT_DAILY;
             } elseif (isset($map['punch_at']) && $hasEmployee) {
                 $layout = self::LAYOUT_PUNCHES;
