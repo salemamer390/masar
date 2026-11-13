@@ -298,7 +298,7 @@ class EmployeeImportService
                     }
                 }
                 if ($config !== null) {
-                    $config['map'] = array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []);
+                    $config['map'] = array_filter(array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []), static fn ($column) => $column !== null);
                     $entry['domain_config'] = $config;
                 }
             }
@@ -809,6 +809,7 @@ class EmployeeImportService
         foreach ($mappings as $sheet => $fields) {
             if (!is_array($fields)) continue;
             foreach ($fields as $field => $column) {
+                if ($column === null || $column === '') { $clean[(string) $sheet][(string) $field] = null; continue; }
                 if (!is_numeric($column) || (int) $column < 0) continue;
                 $clean[(string) $sheet][(string) $field] = (int) $column;
             }
