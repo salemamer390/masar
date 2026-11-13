@@ -135,14 +135,14 @@ class EmployeeImportMappingTest extends TestCase
         $this->assertSame('notes', $map[1]);
     }
 
-    public function test_reviewed_name_can_map_unknown_header_but_ignoring_name_is_not_importable(): void
+    public function test_reviewed_name_can_map_unknown_header_and_missing_name_keeps_editor_available(): void
     {
         $rows = [1 => ['Custom employee', 'Phone'], 2 => ['A Person', '010']];
         [$row, $map] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [0 => 'full_name']);
         $this->assertSame(1, $row);
         $this->assertSame('full_name', $map[0]);
         [$row] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [0 => '']);
-        $this->assertNull($row);
+        $this->assertSame(1, $row);
     }
 
 }
