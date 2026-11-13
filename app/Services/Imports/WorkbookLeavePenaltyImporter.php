@@ -21,7 +21,7 @@ class WorkbookLeavePenaltyImporter
     ) {}
 
     public const LEAVE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'leave_type' => 'نوع الإجازة', 'start' => 'من تاريخ', 'end' => 'إلى تاريخ', 'days' => 'عدد الأيام', 'status' => 'حالة القرار', 'reason' => 'ملاحظات'];
-    public const PENALTY_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'penalty_type' => 'نوع الجزاء', 'date' => 'تاريخ القرار', 'deduction' => 'أيام الخصم', 'status' => 'حالة القرار', 'reason' => 'ملاحظات'];
+    public const PENALTY_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'penalty_type' => 'نوع الجزاء', 'date' => 'تاريخ القرار', 'deduction' => 'أيام الخصم'];
 
     /** Detected header row + field map for one sheet, exposed for the review UI. */
     public function detectConfig(array $rows): ?array
@@ -71,7 +71,7 @@ class WorkbookLeavePenaltyImporter
     private function hasBareCodeCell(array $row): bool
     {
         foreach ($row as $value) {
-            if (in_array($this->normalise($value), ['الكود', 'كود'], true)) return true;
+            if (in_array($this->normalise($value), ['الكود', 'كود', 'code'], true)) return true;
         }
         return false;
     }
@@ -117,9 +117,10 @@ class WorkbookLeavePenaltyImporter
                     $result['excluded_rows'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => ['استبعده المستخدم أثناء المراجعة قبل الحفظ.']];
                     continue;
                 }
+                if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
-                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح.');
+                if (!$employee) throw new \RuntimeException('كود الموظف غير موجود.');
+                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود.');
                 $guard->ensureOpen($date);
                 $typeName = trim((string) ($row[$map['penalty_type']] ?? ''));
                 $fixedType = $penaltyFixes[$sheet][$line] ?? null;
@@ -128,11 +129,13 @@ class WorkbookLeavePenaltyImporter
                 if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
                 $type = PenaltyType::where('name', $typeName)->first() ?: PenaltyType::where('name', 'like', '%'.$typeName.'%')->first();
                 if (!$type) throw new \RuntimeException('نوع الجزاء غير موجود.');
-                $days = (float) ($row[$map['deduction']] ?? 0);
+                $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
+                if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر.');
+                $days = (float) $quantity;
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
                 if ($exists) throw new \RuntimeException('سجل الجزاء موجود بالفعل.');
-                $status = $this->status($row[$map['status'] ?? -1] ?? '');
-                Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $row[$map['reason'] ?? -1] ?? $type->name, 'action' => $row[$map['reason'] ?? -1] ?? $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
+                $status = 'Approved';
+                Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $type->name, 'action' => $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
             } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
         }
@@ -149,7 +152,7 @@ class WorkbookLeavePenaltyImporter
 
     private function mapHeaders(array $headers): array
     {
-        $aliases = ['code' => ['كود الموظف', 'الكود', 'كود', 'employee code', 'code'], 'name' => ['اسم الموظف', 'employee name', 'name'], 'leave_type' => ['نوع الإجازة', 'leave type', 'تصنيف الإجازة', 'vacation type', 'leave category'], 'start' => ['من تاريخ', 'start date', 'بداية الإجازة', 'تاريخ بداية الإجازة', 'إجازة من', 'leave start date', 'from date', 'vacation from'], 'end' => ['إلى تاريخ', 'end date', 'نهاية الإجازة', 'تاريخ نهاية الإجازة', 'إجازة إلى', 'leave end date', 'to date', 'vacation to'], 'days' => ['عدد الأيام', 'days', 'عدد أيام الإجازة', 'أيام الإجازة', 'مدة الإجازة', 'leave days', 'number of leave days', 'vacation days', 'leave duration'], 'status' => ['حالة الطلب', 'حالة القرار', 'status', 'حالة الإجازة', 'موقف الطلب', 'leave status', 'request status'], 'reason' => ['ملاحظات', 'السبب', 'reason', 'سبب الإجازة', 'سبب الطلب', 'leave reason', 'request reason', 'وصف المخالفة', 'وصف الجزاء'], 'penalty_type' => ['نوع الجزاء', 'penalty type', 'الجزاء', 'الإجراء التأديبي', 'disciplinary action', 'sanction type'], 'date' => ['تاريخ القرار', 'التاريخ', 'penalty date', 'decision date'], 'deduction' => ['أيام الخصم المطبقة', 'تعديل يدوي لأيام الخصم', 'أيام الخصم', 'deduction days', 'أيام الجزاء', 'عدد أيام الجزاء', 'penalty days', 'suspension days']];
+        $aliases = ['code' => ['كود الموظف', 'الكود', 'كود', 'employee code', 'code'], 'name' => ['الموظفين', 'الموظفون', 'الاسماء', 'الأسماء', 'الاسم', 'اسم الموظف', 'employee name', 'name'], 'leave_type' => ['نوع الإجازة', 'leave type', 'تصنيف الإجازة', 'vacation type', 'leave category'], 'start' => ['من تاريخ', 'start date', 'بداية الإجازة', 'تاريخ بداية الإجازة', 'إجازة من', 'leave start date', 'from date', 'vacation from'], 'end' => ['إلى تاريخ', 'end date', 'نهاية الإجازة', 'تاريخ نهاية الإجازة', 'إجازة إلى', 'leave end date', 'to date', 'vacation to'], 'days' => ['عدد الأيام', 'days', 'عدد أيام الإجازة', 'أيام الإجازة', 'مدة الإجازة', 'leave days', 'number of leave days', 'vacation days', 'leave duration'], 'status' => ['حالة الطلب', 'حالة القرار', 'status', 'حالة الإجازة', 'موقف الطلب', 'leave status', 'request status'], 'reason' => ['ملاحظات', 'السبب', 'reason', 'سبب الإجازة', 'سبب الطلب', 'leave reason', 'request reason', 'وصف المخالفة', 'وصف الجزاء'], 'penalty_type' => ['نوع الجزاء', 'penalty type', 'الجزاء', 'الإجراء التأديبي', 'disciplinary action', 'sanction type'], 'date' => ['تاريخ القرار', 'التاريخ', 'penalty date', 'decision date'], 'deduction' => ['أيام الخصم المطبقة', 'تعديل يدوي لأيام الخصم', 'أيام الخصم', 'deduction days', 'أيام الجزاء', 'عدد أيام الجزاء', 'penalty days', 'suspension days']];
         $map = [];
         foreach ($headers as $index => $header) {
             $key = $this->normalise($header);

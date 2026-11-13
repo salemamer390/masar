@@ -28,6 +28,7 @@ use Tests\TestCase;
 class EmployeeImportDomainOnlyTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
 
     private User $user;
     private Company $company;
@@ -56,7 +57,7 @@ class EmployeeImportDomainOnlyTest extends TestCase
     private function xlsx(array $sheets, string $filename = 'workbook.xlsx'): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'do') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, $sheets);
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets($sheets));
 
         return UploadedFile::fake()->createWithContent($filename, file_get_contents($path));
     }
@@ -148,11 +149,10 @@ class EmployeeImportDomainOnlyTest extends TestCase
     public function test_unlinkable_workbook_gets_precise_error_and_creates_nothing(): void
     {
         $preview = $this->postJson('/employees/import/preview', ['file' => $this->unlinkedWorkbook()]);
-        $preview->assertStatus(422);
-        $message = (string) $preview->json('message');
-        $this->assertStringContainsString('الحضور والانصراف', $message);
-        $this->assertStringContainsString('الجزاءات', $message);
-        $this->assertStringContainsString('كود أو اسم الموظف', $message, 'the error names the missing linking columns instead of the generic name-column dead-end');
+        $preview->assertOk();
+        $this->assertNotEmpty($preview->json('mapping_error'));
+        $this->assertNotEmpty($preview->json('sheets.0.domain_config.headers'));
+        $this->postJson('/employees/import', ['file' => $this->unlinkedWorkbook(), 'review_token' => $preview->json('review_token')])->assertStatus(422);
         $this->assertStringNotContainsString('أيام الحضور', Employee::pluck('full_name')->implode(','));
         $this->assertSame(1, Employee::where('company_id', $this->company->id)->count(), 'no report label becomes an employee');
         $this->assertSame(0, Attendance::count());
@@ -187,18 +187,143 @@ class EmployeeImportDomainOnlyTest extends TestCase
         $this->assertNull(Employee::where('company_id', $this->company->id)->where('full_name', 'أيام الحضور')->first());
     }
 
-    public function test_single_sheet_name_only_contract_is_unchanged(): void
+    public function test_single_sheet_missing_required_columns_stays_editable_but_cannot_commit(): void
     {
         $csv = "الكود,الاسم الكامل\n501,موظف جديد\n";
         $file = UploadedFile::fake()->createWithContent('staff.csv', $csv);
         $preview = $this->postJson('/employees/import/preview', ['file' => $file]);
         $preview->assertOk();
         $this->assertFalse((bool) $preview->json('domain_only'));
-        $this->assertSame(1, (int) $preview->json('summary.create'));
+        $this->assertSame(0, (int) $preview->json('summary.create'));
+        $this->assertStringContainsString('الرقم القومي', $preview->json('mapping_error'));
 
         $token = $preview->json('review_token');
         $this->post('/employees/import', ['file' => UploadedFile::fake()->createWithContent('staff.csv', $csv), 'review_token' => $token])
-            ->assertOk()->assertJson(['success' => true]);
-        $this->assertNotNull(Employee::where('company_id', $this->company->id)->where('employee_code', '501')->first());
+            ->assertStatus(422);
+        $this->assertNull(Employee::where('company_id', $this->company->id)->where('employee_code', '501')->first());
     }
+    private function requiredEmployeeCsv(array $overrides = [], array $omit = []): UploadedFile
+    {
+        $values = array_diff_key(array_replace([
+            'كود' => 'R501', 'الاسماء' => 'موظف المتطلبات', 'الرقم القومي' => '29001011234567',
+            'الوظيفة' => 'محاسب', 'بداية العقد' => '2026-01-01', 'نهاية العقد' => '2027-12-31', 'الراتب الإجمالي' => '5000',
+        ], $overrides), array_flip($omit));
+        return UploadedFile::fake()->createWithContent('required.csv', implode(',', array_keys($values))."\n".implode(',', $values)."\n");
+    }
+
+    public function test_employee_required_columns_stay_editable_and_commit_is_blocked_with_exact_labels(): void
+    {
+        foreach (['كود', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'نهاية العقد', 'الراتب الإجمالي'] as $field) {
+            $params = ['file' => $this->requiredEmployeeCsv([], [$field])];
+            $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
+            $this->assertNotEmpty($preview->json('sheets.0.employee_config.columns'));
+            $this->assertNotEmpty($preview->json('mapping_error'));
+            $this->postJson('/employees/import', $params + ['review_token' => $preview->json('review_token')])->assertStatus(422);
+        }
+        $this->assertFalse(Employee::where('employee_code', 'R501')->exists());
+    }
+
+    public function test_employee_blank_required_values_are_row_errors_before_defaults(): void
+    {
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->requiredEmployeeCsv([
+            'كود' => '', 'الرقم القومي' => '', 'الوظيفة' => '', 'بداية العقد' => '', 'نهاية العقد' => '', 'الراتب الإجمالي' => '',
+        ])])->assertOk();
+        $text = implode(' ', $preview->json('rows.0.errors'));
+        foreach (['كود الموظف', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'نهاية العقد', 'الراتب الإجمالي أو الراتب الصافي'] as $label) $this->assertStringContainsString($label, $text);
+        $this->assertSame('error', $preview->json('rows.0.action'));
+    }
+
+    public function test_gross_or_net_salary_is_sufficient_but_both_missing_is_not(): void
+    {
+        foreach ([[], ['الراتب الإجمالي']] as $omit) {
+            $overrides = $omit ? ['الراتب الصافي' => '4500'] : [];
+            $preview = $this->postJson('/employees/import/preview', ['file' => $this->requiredEmployeeCsv($overrides, $omit)])->assertOk();
+            $this->assertNull($preview->json('mapping_error'));
+            $this->assertSame(1, $preview->json('summary.create'));
+        }
+    }
+
+    public function test_attendance_manual_date_and_optional_name_are_signed_and_status_input_is_ignored(): void
+    {
+        $file = $this->xlsx([['name'=>'الحضور','rows'=>[
+            ['code','الحضور','الانصراف','الحالة'], ['104','09:20','17:00','غائب'],
+        ]]]);
+        $params = ['file'=>$file, 'sheet_kinds'=>json_encode(['الحضور'=>'attendance']), 'sheet_dates'=>json_encode(['الحضور'=>'2026-11-12'])];
+        $missing = $this->postJson('/employees/import/preview', array_diff_key($params, ['sheet_dates'=>true]))->assertOk();
+        $this->assertStringContainsString('التاريخ', $missing->json('mapping_error'));
+        $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
+        $this->assertNull($preview->json('mapping_error'));
+        $this->assertArrayNotHasKey('status', $preview->json('domain_fields.attendance'));
+        $tampered = $params; $tampered['sheet_dates'] = json_encode(['الحضور'=>'2026-11-13']);
+        $this->postJson('/employees/import', $tampered + ['review_token'=>$preview->json('review_token')])->assertStatus(422);
+        $this->postJson('/employees/import', $params + ['review_token'=>$preview->json('review_token')])->assertOk();
+        $attendance = Attendance::firstOrFail();
+        $this->assertSame('2026-11-12', $attendance->attendance_date->toDateString());
+        $this->assertSame('Late', $attendance->status);
+    }
+
+    public function test_penalties_require_values_and_ignore_removed_status_and_notes(): void
+    {
+        $file = $this->xlsx([['name'=>'الجزاءات','rows'=>[
+            ['code','نوع الجزاء','تاريخ القرار','أيام الخصم','حالة القرار','ملاحظات'],
+            ['104','خصم','2026-11-12','١','Rejected','must not be imported'],
+            ['104','خصم','2026-11-13','','Approved',''],
+            ['','خصم','2026-11-14','1','Approved',''],
+            ['104','','2026-11-15','1','Approved',''],
+            ['104','خصم','','1','Approved',''],
+        ]]]);
+        $params=['file'=>$file];
+        $preview=$this->postJson('/employees/import/preview',$params)->assertOk();
+        $this->assertArrayNotHasKey('status',$preview->json('domain_fields.penalties'));
+        $this->assertArrayNotHasKey('reason',$preview->json('domain_fields.penalties'));
+        $this->postJson('/employees/import',$params+['review_token'=>$preview->json('review_token')])->assertOk();
+        $this->assertSame(1, Penalty::count());
+        $penalty=Penalty::firstOrFail();
+        $this->assertSame('Approved',$penalty->status);
+        $this->assertSame('خصم',$penalty->reason);
+        $this->assertEquals(1,$penalty->deduction_days);
+    }
+
+    public function test_new_name_and_time_aliases_are_added_without_removing_old_ones(): void
+    {
+        foreach (['اسم الموظف','الاسم','الموظفين','الاسماء','الموظفون','employee name'] as $name) {
+            $file=$this->xlsx([['name'=>'الحضور','rows'=>[
+                ['code',$name,'التاريخ','c/in','c/out'],['104','عامر سالم جمعه','2026-11-12','09:00','17:00'],
+            ]]]);
+            $preview=$this->postJson('/employees/import/preview',['file'=>$file])->assertOk();
+            $this->assertNull($preview->json('mapping_error'));
+            $this->assertSame(['code'=>0,'name'=>1,'date'=>2,'in'=>3,'out'=>4],$preview->json('sheets.0.domain_config.map'));
+            $file=$this->xlsx([['name'=>'الجزاءات','rows'=>[
+                ['كود',$name,'نوع الجزاء','تاريخ القرار','أيام الخصم'],['104','عامر سالم جمعه','خصم','2026-11-12','1'],
+            ]]]);
+            $preview=$this->postJson('/employees/import/preview',['file'=>$file])->assertOk();
+            $this->assertSame(1,$preview->json('sheets.0.domain_config.map.name'));
+        }
+        $analyzer=app(\App\Services\Imports\AttendanceSheetAnalyzer::class);
+        foreach ([['in','out'],['c/in','c/out'],['الحضور','الانصراف'],['أول بصمة','آخر بصمة']] as [$in,$out]) {
+            $map=$analyzer->mapHeaders(['كود','التاريخ',$in,$out]);
+            $this->assertSame(2,$map['check_in']); $this->assertSame(3,$map['check_out']);
+        }
+    }
+
+    public function test_missing_date_with_optional_name_and_c_in_out_is_attendance_not_people(): void
+    {
+        $file=$this->xlsx([['name'=>'بيانات','rows'=>[
+            ['code','الموظفين','c/in','c/out'],['104','عامر سالم جمعه','09:00','17:00'],
+        ]]]);
+        $preview=$this->postJson('/employees/import/preview',['file'=>$file])->assertOk();
+        $this->assertSame('attendance',$preview->json('sheets.0.kind'));
+        $this->assertStringContainsString('التاريخ',$preview->json('mapping_error'));
+        $this->assertTrue($preview->json('domain_only'));
+    }
+
+    public function test_domain_preview_does_not_hide_sixth_precise_row_error(): void
+    {
+        $rows=[['code','التاريخ','in','out']];
+        for($i=1;$i<=6;$i++) $rows[]=['missing-'.$i,'2026-11-12','09:00','17:00'];
+        $preview=$this->postJson('/employees/import/preview',['file'=>$this->xlsx([['name'=>'الحضور','rows'=>$rows]])])->assertOk();
+        $this->assertCount(6,$preview->json('domains.attendance.errors'));
+        $this->assertStringContainsString('الصف 7',$preview->json('domains.attendance.errors.5'));
+    }
+
 }

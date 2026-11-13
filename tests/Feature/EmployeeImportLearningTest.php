@@ -23,6 +23,7 @@ use Tests\TestCase;
 class EmployeeImportLearningTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
 
     private User $user;
     private Company $company;
@@ -61,7 +62,7 @@ class EmployeeImportLearningTest extends TestCase
     private function xlsx(array $sheets): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'lrn') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, $sheets);
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets($sheets));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
@@ -129,7 +130,7 @@ class EmployeeImportLearningTest extends TestCase
         $employee = Employee::where('company_id', $this->company->id)->where('full_name', 'خالد سيد')->first();
         $this->assertNotNull($employee);
         $this->assertSame('E-9', $employee->employee_code, 'The built-in «الكود» mapping must beat the learned one.');
-        $this->assertNull($employee->national_id);
+        $this->assertNotNull($employee->national_id); // supplied required ID, never the code mislearned as an ID
     }
 
     public function test_learned_aliases_are_isolated_per_company(): void

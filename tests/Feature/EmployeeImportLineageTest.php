@@ -41,11 +41,11 @@ class EmployeeImportLineageTest extends TestCase
 
     private function csvUpload(): UploadedFile
     {
-        $csv = "الكود,الاسم الكامل,رقم الهاتف,البريد الإلكتروني,الرقم التأميني\n"
-            . "E1,Hoda Import,01011112222,,9001\n"
-            . "E2,New Person,01033334444,,9002\n"
-            . "E3,Fix Me,01055556666,not-an-email,9003\n"
-            . "E4,Skip Me,123,,9004\n";
+        $csv = "الكود,الاسم الكامل,رقم الهاتف,البريد الإلكتروني,الرقم التأميني,الرقم القومي,الوظيفة,بداية العقد,نهاية العقد,الراتب الإجمالي\n"
+            . "E1,Hoda Import,01011112222,,9001,29001011234561,موظف,2025-01-01,2027-12-31,5000\n"
+            . "E2,New Person,01033334444,,9002,29001011234562,موظف,2025-01-01,2027-12-31,5000\n"
+            . "E3,Fix Me,01055556666,not-an-email,9003,29001011234563,موظف,2025-01-01,2027-12-31,5000\n"
+            . "E4,Skip Me,123,,9004,29001011234564,موظف,2025-01-01,2027-12-31,5000\n";
 
         return UploadedFile::fake()->createWithContent('staff.csv', $csv);
     }
@@ -138,6 +138,7 @@ class EmployeeImportLineageTest extends TestCase
                 'phone' => '01055556666',
                 'email' => 'fixed@example.test',
                 'insurance_number' => '9003',
+                'national_id' => '29001011234563', 'job' => 'موظف', 'contract_start_date' => '2025-01-01', 'contract_end_date' => '2027-12-31', 'gross_salary' => '5000',
             ],
         ])->assertSessionHasNoErrors()->assertRedirect();
 

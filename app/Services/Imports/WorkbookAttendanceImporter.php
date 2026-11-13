@@ -23,7 +23,7 @@ class WorkbookAttendanceImporter
         private readonly HrOperationalSettingsService $settings,
     ) {}
 
-    public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'التاريخ', 'in' => 'وقت الحضور', 'out' => 'وقت الانصراف', 'status' => 'الحالة'];
+    public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'التاريخ', 'in' => 'وقت الحضور', 'out' => 'وقت الانصراف'];
 
     /** Detected header row + field map for one sheet, exposed for the review UI. */
     public function detectConfig(array $rows): ?array
@@ -59,21 +59,25 @@ class WorkbookAttendanceImporter
                 [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
                 $map = $this->mapHeaders($headers);
             }
-            if (!isset($map['date']) || (!isset($map['code']) && !isset($map['name']))) continue;
+            if (!isset($map['code'], $map['in'], $map['out']) || (!isset($map['date']) && empty($config['default_date']))) {
+                $errors[] = $sheet['name'] . ': أعمدة الحضور المطلوبة: كود الموظف، التاريخ، وقت الحضور، وقت الانصراف. أكمل الربط.';
+                continue;
+            }
             foreach ($rows as $line => $row) {
                 try {
+                    foreach (['code' => 'كود الموظف', 'in' => 'وقت الحضور', 'out' => 'وقت الانصراف'] as $field => $label) {
+                        if (blank($row[$map[$field] ?? -1] ?? null)) throw new \RuntimeException($label . ' مطلوب.');
+                    }
                     $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو بياناته غير مكتملة.');
                     if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $row[$map['name'] ?? -1] ?? null)) { $warnings[] = "{$sheet['name']} / الصف {$line}: $warning"; }
-                    $date = $this->date($row[$map['date']] ?? null);
+                    $date = $this->date($row[$map['date'] ?? -1] ?? ($config['default_date'] ?? null));
                     if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
                     $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
                     if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف.');
-                    $status = $this->status($row[$map['status'] ?? -1] ?? '');
-                    if ($status === null) throw new \RuntimeException('حالة الحضور غير معروفة؛ راجعها، لم يُستورد الصف.');
-                    $status = $status ?: (($in || $out) ? 'Present' : 'Absent');
+                    $status = 'Present';
                     $metrics = app(\App\Services\AttendanceMetricsService::class)->metrics($employee, $in, $out, $status);
                     Attendance::updateOrCreate(
                         ['employee_id' => $employee->id, 'attendance_date' => $date],
@@ -110,12 +114,12 @@ class WorkbookAttendanceImporter
     private function mapHeaders(array $headers): array
     {
         $aliases = [
-            'code' => ['employee code', 'employee_code', 'code', 'كود الموظف', 'الكود'],
-            'name' => ['employee name', 'employee_name', 'name', 'اسم الموظف', 'الموظف'],
+            'code' => ['employee code', 'employee_code', 'code', 'كود', 'كود الموظف', 'الكود'],
+            'name' => ['الموظفين', 'الموظفون', 'الاسماء', 'الاسم', 'اسم الموظف', 'employee name', 'employee_name', 'name', 'اسم الموظف', 'الموظف'],
             'date' => ['date', 'attendance date', 'attendance_date', 'التاريخ', 'تاريخ الحضور', 'يوم الحضور', 'work date'],
-            'in' => ['check in', 'check_in', 'in', 'الحضور', 'وقت الحضور', 'ساعة الحضور', 'وقت الدخول', 'تسجيل الدخول', 'بصمة الدخول', 'checkin', 'time in', 'clock in', 'entry time', 'punch in'],
-            'out' => ['check out', 'check_out', 'out', 'الانصراف', 'وقت الانصراف', 'ساعة الانصراف', 'وقت الخروج', 'تسجيل الخروج', 'بصمة الخروج', 'checkout', 'time out', 'clock out', 'exit time', 'punch out'],
-            'status' => ['status', 'الحالة', 'حالة الحضور', 'attendance status'],
+            'in' => ['c/in', 'check in', 'check_in', 'in', 'الحضور', 'وقت الحضور', 'ساعة الحضور', 'وقت الدخول', 'تسجيل الدخول', 'بصمة الدخول', 'checkin', 'time in', 'clock in', 'entry time', 'punch in'],
+            'out' => ['c/out', 'check out', 'check_out', 'out', 'الانصراف', 'وقت الانصراف', 'ساعة الانصراف', 'وقت الخروج', 'تسجيل الخروج', 'بصمة الخروج', 'checkout', 'time out', 'clock out', 'exit time', 'punch out'],
+
         ];
         $map = [];
         foreach ($headers as $index => $header) {
@@ -146,7 +150,6 @@ class WorkbookAttendanceImporter
     }
 
     private function normalise(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
-    private function status(mixed $value): ?string { return app(ImportValueNormalizer::class)->attendanceStatus($value); }
     private function person(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
     private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse(app(ImportValueNormalizer::class)->digits((string) $value))->toDateString() : null; } catch (\Throwable) { return null; } }
     private function time(mixed $value): ?string { return app(ImportValueNormalizer::class)->time($value); }

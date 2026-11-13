@@ -42,14 +42,14 @@ $stats = $current['preview'];
             if ($unit['layout'] === \App\Services\Imports\AttendanceSheetAnalyzer::LAYOUT_PUNCHES) {
                 $relevant = in_array($field, ['employee_code','employee_name','punch_at'], true);
             } elseif ($unit['layout'] === \App\Services\Imports\AttendanceSheetAnalyzer::LAYOUT_DAILY) {
-                $relevant = in_array($field, ['employee_code','employee_name','date','check_in','check_out','status'], true);
+                $relevant = in_array($field, ['employee_code','employee_name','date','check_in','check_out'], true);
             } else {
-                $relevant = in_array($field, ['date','check_in','check_out','status'], true);
+                $relevant = in_array($field, ['date','check_in','check_out'], true);
             }
           @endphp
           @if($relevant)
           <div class="col-6 col-md-4 col-lg-3">
-            <label class="form-label small mb-1">{{ $fieldLabels[$field] ?? $field }}</label>
+            <label class="form-label small mb-1">{{ $fieldLabels[$field] ?? $field }} @if($field !== 'employee_name')<span class="text-danger" aria-label="مطلوب">*</span>@endif</label>
             <select class="form-select form-select-sm map-select" name="map_{{ $unit['key'] }}[{{ $field }}]">
               <option value="">{{ __('— غير مُعيَّن —') }}</option>
               @foreach($unit['headers'] as $index => $header)
@@ -71,6 +71,7 @@ $stats = $current['preview'];
             <div class="form-text text-danger">{{ __('وُجدت تواريخ نصية غامضة مثل 03/04/2026.') }}</div>
           </div>
           @endif
+          @if($unit['layout'] !== \App\Services\Imports\AttendanceSheetAnalyzer::LAYOUT_PUNCHES)<div class="col-6 col-md-4"><label class="form-label small">تاريخ موحّد يدويًا (إذا لم يوجد عمود تاريخ)<input type="date" class="form-control form-control-sm options-select" name="options_{{ $unit['key'] }}[default_date]" value="{{ $unit['options']['default_date'] ?? '' }}"></label></div>@endif
         </div>
 
 

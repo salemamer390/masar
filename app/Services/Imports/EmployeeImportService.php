@@ -116,7 +116,7 @@ class EmployeeImportService
      */
     public const COLUMNS = [
         'employee_code' => ['كود الموظف', ['الكود', 'كود', 'رقم الموظف', 'employee code', 'employee_code', 'emp code', 'code', 'الرقم الوظيفي', 'كود العامل', 'رقم العامل', 'employee id', 'employee no', 'emp id', 'emp no', 'staff id', 'staff code', 'الرقم', 'رقم الموظف الوظيفي', 'كود العاملين', 'personnel number', 'employe code', 'employ code', 'emplyee id']],
-        'full_name' => ['الاسم الكامل', ['الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'الاسم الرباعي', 'staff name', 'worker name', 'employee full name', 'اسم الشخص', 'personnel name', 'employe name', 'emploee name']],
+        'full_name' => ['الاسم الكامل', ['الموظفين', 'الموظفون', 'الاسماء', 'الاسم', 'اسم الموظف', 'اسم', 'full name', 'full_name', 'name', 'employee name', 'اسم العامل', 'الاسم بالكامل', 'اسم الموظف بالكامل', 'الاسم رباعي', 'الاسم الرباعي', 'staff name', 'worker name', 'employee full name', 'اسم الشخص', 'personnel name', 'employe name', 'emploee name']],
         // Split-name parts are composed into full_name when the file has no
         // single name column (stage: contextual understanding, not storage).
         'first_name' => ['الاسم الأول', ['الاسم الشخصي', 'first name', 'first_name', 'given name', 'fname', 'frist name']],
@@ -217,6 +217,7 @@ class EmployeeImportService
         $confirmedKinds = $this->sanitizeSheetKinds($options['sheet_kinds'] ?? []);
         $domainMappings = $this->sanitizeDomainMappings($options['domain_mappings'] ?? []);
         $employeeMappings = is_array($options['employee_mappings'] ?? null) ? $options['employee_mappings'] : [];
+        $sheetDates = is_array($options['sheet_dates'] ?? null) ? $options['sheet_dates'] : [];
 
         $result = [
             'file_errors' => [],
@@ -299,8 +300,20 @@ class EmployeeImportService
                 }
                 if ($config !== null) {
                     $config['map'] = array_filter(array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []), static fn ($column) => $column !== null);
+                    $config['map'] = array_intersect_key($config['map'], self::domainFields($kind));
+                    if ($kind === 'attendance' && is_scalar($sheetDates[$sheets[$index]['name']] ?? null) && filled($sheetDates[$sheets[$index]['name']] ?? null)) {
+                        try { $config['default_date'] = $this->parseDate((string) $sheetDates[$sheets[$index]['name']]); }
+                        catch (InvalidArgumentException) { $config['date_error'] = 'التاريخ اليدوي غير صالح؛ استخدم YYYY-MM-DD.'; }
+                    }
                     $entry['domain_config'] = $config;
                 }
+            }
+            if ($kind === 'employees') {
+                $entry['required_fields'] = self::requiredEmployeeFields();
+                $entry['missing_fields'] = $this->missingEmployeeFields(array_values($info['map']));
+            } elseif (self::domainFields($kind) !== []) {
+                $entry['required_fields'] = self::requiredDomainFields($kind);
+                $entry['missing_fields'] = $this->domainSheetMissing($kind, self::domainFields($kind), $entry['domain_config'] ?? null)['missing'];
             }
             $result['sheets'][] = $entry;
         }
@@ -321,28 +334,18 @@ class EmployeeImportService
 
             // No sheet has a recognisable "full name" header: let the user map columns manually.
             $columns = $this->unmatchedColumns($sheets, $infos, $aliases, $manual);
+            if ($incompleteDomains !== []) {
+                $result['domain_only'] = true;
+                return $result;
+            }
             if ($columns === []) {
                 $hasRows = false;
                 foreach ($sheets as $sheet) {
                     $hasRows = $hasRows || $sheet['rows'] !== [];
                 }
-                if ($hasRows && $incompleteDomains !== []) {
-                    // The file has recognisable data sheets that cannot link to
-                    // employees yet - say exactly what is missing instead of the
-                    // generic name-column error.
-                    $labels = self::kindLabels();
-                    $details = [];
-                    foreach ($incompleteDomains as $entry) {
-                        $details[] = 'ورقة «' . $entry['name'] . '» (' . ($labels[$entry['kind']] ?? $entry['kind']) . ') تنقصها: ' . implode('، ', $entry['missing']);
-                    }
-                    $result['file_errors'][] = 'لم يتم العثور على ورقة بيانات موظفين جدولية في الملف. '
-                        . implode('؛ ', $details)
-                        . '. أكمل الأعمدة الناقصة لتُستورد بيانات هذه الأوراق للموظفين الموجودين، أو أضف جدول موظفين بعمود «الاسم الكامل».';
-                } else {
-                    $result['file_errors'][] = $hasRows
-                        ? 'لم يتم العثور على عمود «الاسم الكامل» في الملف. أضف عمودًا بهذا الاسم أو حمّل النموذج الجاهز.'
-                        : 'الملف لا يحتوي على أي بيانات.';
-                }
+                $result['file_errors'][] = $hasRows
+                    ? 'لم يتم العثور على عمود «الاسم الكامل» في الملف. اربط عمود الاسم يدويًا في خطوة الشيتات.'
+                    : 'الملف لا يحتوي على أي بيانات.';
 
                 return $result;
             }
@@ -505,9 +508,9 @@ class EmployeeImportService
         };
 
         if ($has($auxiliaryNeedles)) return 'auxiliary';
-        $hasTime = $has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout']);
+        $hasTime = $has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout']) || $hasExact(['in', 'out', 'c/in', 'c/out', 'الحضور', 'الانصراف']);
         $hasDate = $has(['التاريخ', 'تاريخ الحضور', 'attendance date', 'attendance_date']) || $hasExact(['date', 'day', 'اليوم']);
-        if ($hasTime && $hasDate) return 'attendance';
+        if ($hasTime && ($hasDate || ($hasExact(['in', 'c/in', 'الحضور', 'وقت الحضور']) && $hasExact(['out', 'c/out', 'الانصراف', 'وقت الانصراف'])))) return 'attendance';
         // Bare "start date" is not a leaves marker: in an employees sheet it is the
         // hire date, so only leave-specific markers classify a sheet as leaves.
         if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type'])) return 'leaves';
@@ -676,6 +679,23 @@ class EmployeeImportService
         };
     }
 
+    public static function requiredEmployeeFields(): array
+    {
+        return ['employee_code', 'full_name', 'national_id', 'job', 'contract_start_date', 'contract_end_date'];
+    }
+
+    private function missingEmployeeFields(array $fields): array
+    {
+        $missing = [];
+        foreach (self::requiredEmployeeFields() as $field) {
+            if ($field === 'full_name' && array_intersect(['full_name', 'first_name', 'last_name'], $fields)) continue;
+            if ($field === 'contract_start_date' && in_array('hire_date', $fields, true)) continue;
+            if (!in_array($field, $fields, true)) $missing[] = self::COLUMNS[$field][0];
+        }
+        if (!array_intersect(['gross_salary', 'net_salary'], $fields)) $missing[] = 'الراتب الإجمالي أو الراتب الصافي (واحد على الأقل)';
+        return $missing;
+    }
+
     /** Auto-detected header row + field map of a sheet for its (confirmed) kind. */
     private function detectDomainConfig(string $kind, array $rows): ?array
     {
@@ -697,9 +717,9 @@ class EmployeeImportService
     public static function requiredDomainFields(string $kind): array
     {
         return match ($kind) {
-            'attendance' => ['date'],
+            'attendance' => ['code', 'date', 'in', 'out'],
             'leaves' => ['leave_type', 'start', 'end'],
-            'penalties' => ['penalty_type', 'date', 'deduction'],
+            'penalties' => ['code', 'penalty_type', 'date', 'deduction'],
             'requests', 'advances' => ['date'],
             'insurance' => ['insurance_number'],
             default => [],
@@ -714,12 +734,13 @@ class EmployeeImportService
      *
      * @param array<int, array<string, mixed>> $sheets
      */
-    public function domainConfigError(array $sheets): ?string
+    public function domainConfigError(array $sheets, mixed $selectedSheet = null): ?string
     {
         $labels = self::kindLabels();
         foreach ($sheets as $sheet) {
             $kind = (string) ($sheet['kind'] ?? 'unknown');
             $fields = self::domainFields($kind);
+            if ($kind === 'employees' && ($selectedSheet === null || $selectedSheet === 'all' || (string) ($sheet['index'] ?? '') === (string) $selectedSheet) && !empty($sheet['missing_fields'])) return 'الشيت «' . ($sheet['name'] ?? '') . '»: أكمل ربط الحقول المطلوبة (' . implode('، ', $sheet['missing_fields']) . ').';
             if ($fields === []) {
                 continue;
             }
@@ -728,6 +749,7 @@ class EmployeeImportService
             if (!$check['header']) {
                 return 'ورقة «' . $name . '»: لم يتعرف التطبيق على صف العناوين لنوع «' . ($labels[$kind] ?? $kind) . '». اختر نوعًا آخر أو راجع الملف.';
             }
+            if (!empty($sheet['domain_config']['date_error'])) return 'الشيت «' . $name . '»: ' . $sheet['domain_config']['date_error'];
             if ($check['missing'] !== []) {
                 return 'ورقة «' . $name . '»: أكمل ربط الحقول المطلوبة (' . implode('، ', $check['missing']) . ').';
             }
@@ -751,11 +773,12 @@ class EmployeeImportService
         $map = (array) ($config['map'] ?? []);
         $missing = [];
         foreach (self::requiredDomainFields($kind) as $field) {
-            if (!isset($map[$field])) {
+            if ($kind === 'attendance' && $field === 'date' && !empty($config['default_date'])) continue;
+            if (!isset($map[$field]) || !is_numeric($map[$field]) || !array_key_exists((int) $map[$field], $config['headers'] ?? [])) {
                 $missing[] = (string) ($fields[$field] ?? $field);
             }
         }
-        if (in_array($kind, ['attendance', 'leaves', 'penalties', 'requests', 'advances'], true) && !isset($map['code']) && !isset($map['name'])) {
+        if (in_array($kind, ['leaves', 'requests', 'advances'], true) && !isset($map['code']) && !isset($map['name'])) {
             $missing[] = 'كود أو اسم الموظف';
         }
         // Mirrors the insurance importer's own sheet gate.
@@ -1197,7 +1220,7 @@ class EmployeeImportService
             }
             foreach ($entries as &$entry) { $entry['field'] = $map[$entry['column']] ?? null; }
             unset($entry);
-            return $this->hasNameField($used) ? [(int) $headerRow, $map, $entries, $used] : [null, [], [], []];
+            return [(int) $headerRow, $map, $entries, $used];
         }
         $scanned = 0;
         foreach ($rows as $rowNumber => $cells) {
@@ -1506,6 +1529,12 @@ class EmployeeImportService
                 return null;
             }
         };
+
+        foreach (['employee_code' => 'كود الموظف', 'national_id' => 'الرقم القومي', 'job' => 'الوظيفة', 'contract_end_date' => 'نهاية العقد'] as $field => $label) {
+            if ($get($field) === '') $errors[] = $label . ' مطلوب.';
+        }
+        if ($get('contract_start_date') === '' && $get('hire_date') === '') $errors[] = 'بداية العقد مطلوبة.';
+        if ($get('gross_salary') === '' && $get('net_salary') === '') $errors[] = 'الراتب الإجمالي أو الراتب الصافي مطلوب (واحد على الأقل).';
 
         // ---- name -------------------------------------------------------
         $name = $this->cleanText($get('full_name'));

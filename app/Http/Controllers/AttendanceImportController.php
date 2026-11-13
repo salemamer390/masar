@@ -151,7 +151,7 @@ class AttendanceImportController extends Controller
                 return $this->renderPreview($token, $fileName, $units, $skipped, $sheets, $unit['key'], $postedMap, $postedOptions,
                     'تغيّرت الورقة أو التعيين أو الخيارات بعد آخر معاينة. راجع المعاينة المحدّثة ثم اضغط «اعتماد واستيراد».');
             }
-            if ($error = $this->validateMapForLayout($unit['layout'], $map)) {
+            if ($error = $this->validateMapForLayout($unit['layout'], $map, $options)) {
                 return $this->renderPreview($token, $fileName, $units, $skipped, $sheets, $unit['key'], $postedMap, $postedOptions, $error);
             }
             if ($this->unitHasAmbiguousDates($unit, $map, $sheets) && $options['date_format'] === '') {
@@ -406,7 +406,7 @@ class AttendanceImportController extends Controller
         // Only inputs that change the interpretation belong in the key: the column map and the
         // text-date format. The overwrite acknowledgement is commit-time consent checked in
         // store(), so toggling it must not invalidate the preview.
-        $interpretation = ['date_format' => $options['date_format'] ?? ''];
+        $interpretation = ['date_format' => $options['date_format'] ?? '', 'default_date' => $options['default_date'] ?? ''];
         return hash('sha256', $token . '|' . $unitKey . '|' . json_encode($map) . '|' . json_encode($interpretation));
     }
 
@@ -427,12 +427,14 @@ class AttendanceImportController extends Controller
         $clean = [];
         if (array_key_exists('overwrite', $options)) $clean['overwrite'] = (bool) $options['overwrite'];
         if (array_key_exists('date_format', $options) && in_array($options['date_format'], ['dmy', 'mdy'], true)) $clean['date_format'] = $options['date_format'];
+        if (array_key_exists('default_date', $options)) $clean['default_date'] = (string) $options['default_date'];
         return $clean;
     }
 
     private function normaliseOptions(array $options): array
     {
         return [
+            'default_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($options['default_date'] ?? '')) ? (string) $options['default_date'] : '',
             'overwrite' => !empty($options['overwrite']),
             'date_format' => in_array($options['date_format'] ?? '', ['dmy', 'mdy'], true) ? $options['date_format'] : '',
         ];
@@ -490,18 +492,16 @@ class AttendanceImportController extends Controller
         return [$units, $skipped];
     }
 
-    private function validateMapForLayout(string $layout, array $map): ?string
+    private function validateMapForLayout(string $layout, array $map, array $options = []): ?string
     {
-        $hasEmployee = isset($map['employee_code']) || isset($map['employee_name']);
-        return match ($layout) {
-            AttendanceSheetAnalyzer::LAYOUT_DAILY => (!isset($map['date']) || !$hasEmployee)
-                ? 'حدد عمود التاريخ وعمود الموظف (الكود أو الاسم) قبل الاستيراد.' : null,
-            AttendanceSheetAnalyzer::LAYOUT_PUNCHES => (!isset($map['punch_at']) || !$hasEmployee)
-                ? 'حدد عمود «التاريخ والوقت» وعمود الموظف (الكود أو الاسم) قبل الاستيراد.' : null,
-            AttendanceSheetAnalyzer::LAYOUT_PER_EMPLOYEE => (!isset($map['date']) || (!isset($map['check_in']) && !isset($map['check_out'])))
-                ? 'حدد عمود التاريخ وعمود الحضور أو الانصراف قبل الاستيراد.' : null,
-            default => 'شكل الورقة غير مدعوم.',
+        $required = match ($layout) {
+            AttendanceSheetAnalyzer::LAYOUT_DAILY => ['employee_code', 'date', 'check_in', 'check_out'],
+            AttendanceSheetAnalyzer::LAYOUT_PUNCHES => ['employee_code', 'punch_at'],
+            AttendanceSheetAnalyzer::LAYOUT_PER_EMPLOYEE => ['date', 'check_in', 'check_out'],
+            default => [],
         };
+        $missing = array_filter($required, fn ($field) => !isset($map[$field]) && !($field === 'date' && !empty($options['default_date'])));
+        return $missing ? 'أكمل ربط الحقول المطلوبة: ' . implode('، ', array_map(fn ($field) => $this->fieldLabels()[$field], $missing)) . '.' : null;
     }
 
     /** Parse the confirmed unit into uniform rows: employee, date, check_in, check_out, status, ref. */
@@ -533,21 +533,15 @@ class AttendanceImportController extends Controller
                 $ref = "«{$sheet['name']}» / الصف {$line}";
                 [$employee, $error] = $this->resolveEmployee($row[$map['employee_code'] ?? -1] ?? null, $row[$map['employee_name'] ?? -1] ?? null);
                 if (!$employee) { $errors[] = "$ref: $error"; continue; }
-                $date = $this->parseDateStrict($row[$map['date']] ?? null, $options['date_format'], $ambiguous);
+                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? ($options['default_date'] ?? null), $options['date_format'], $ambiguous);
                 if (!$date) { $errors[] = "$ref: " . ($ambiguous ? 'تاريخ نصي غامض — حدد تنسيق التاريخ من خيارات الورقة.' : 'تاريخ الحضور غير صالح.'); continue; }
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {
                     $errors[] = "$ref: توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف."; continue;
                 }
-                $statusCell = trim((string) ($row[$map['status'] ?? -1] ?? ''));
-                if (!$checkIn && !$checkOut && $statusCell === '') {
-                    $errors[] = "$ref: صف بلا بصمات ولا حالة — تم تخطيه ولن يُسجَّل غيابًا.";
-                    continue;
-                }
-                $status = $this->status($statusCell);
-                if ($status === null) { $errors[] = "$ref: حالة الحضور «{$statusCell}» غير معروفة؛ راجعها، لم يُستورد الصف."; continue; }
-                $status = $status ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
+                if (!$checkIn || !$checkOut) { $errors[] = "$ref: " . (!$checkIn ? 'وقت الحضور مطلوب.' : 'وقت الانصراف مطلوب.'); continue; }
+                $status = 'Present';
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
@@ -605,7 +599,7 @@ class AttendanceImportController extends Controller
             if (!$employee) { $errors[] = "«{$sheet['name']}»: $error"; continue; }
             foreach ($this->dataRows($sheet, $sheets) as $line => $row) {
                 $ref = "«{$sheet['name']}» / الصف {$line}";
-                $date = $this->parseDateStrict($row[$map['date']] ?? null, $options['date_format'], $ambiguous);
+                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? ($options['default_date'] ?? null), $options['date_format'], $ambiguous);
                 if (!$date) {
                     // Per-employee sheets often repeat metadata under the table; only real failures surface.
                     if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) >= 2) {
@@ -618,14 +612,8 @@ class AttendanceImportController extends Controller
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {
                     $errors[] = "$ref: توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف."; continue;
                 }
-                $statusCell = trim((string) ($row[$map['status'] ?? -1] ?? ''));
-                if (!$checkIn && !$checkOut && $statusCell === '') {
-                    $errors[] = "$ref: صف بلا بصمات ولا حالة — تم تخطيه ولن يُسجَّل غيابًا.";
-                    continue;
-                }
-                $status = $this->status($statusCell);
-                if ($status === null) { $errors[] = "$ref: حالة الحضور «{$statusCell}» غير معروفة؛ راجعها، لم يُستورد الصف."; continue; }
-                $status = $status ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
+                if (!$checkIn || !$checkOut) { $errors[] = "$ref: " . (!$checkIn ? 'وقت الحضور مطلوب.' : 'وقت الانصراف مطلوب.'); continue; }
+                $status = 'Present';
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
@@ -637,6 +625,7 @@ class AttendanceImportController extends Controller
     {
         $options = $this->normaliseOptions($unit['options'] ?? []);
         [$rows, $errors] = $this->parseUnit($unit, $unit['map'], $sheets, $options);
+        if ($missing = $this->validateMapForLayout($unit['layout'], $unit['map'], $options)) $errors = array_merge([$missing], $errors);
         $byEmployee = [];
         foreach ($rows as $row) {
             $byEmployee[$row['employee']->id] = $row['employee'];
@@ -832,7 +821,7 @@ class AttendanceImportController extends Controller
     {
         return [
             'employee_code' => 'كود الموظف', 'employee_name' => 'اسم الموظف', 'date' => 'التاريخ',
-            'punch_at' => 'التاريخ والوقت (بصمات خام)', 'check_in' => 'الحضور / أول بصمة', 'check_out' => 'الانصراف / آخر بصمة', 'status' => 'الحالة',
+            'punch_at' => 'التاريخ والوقت (بصمات خام)', 'check_in' => 'الحضور / أول بصمة', 'check_out' => 'الانصراف / آخر بصمة',
         ];
     }
 
@@ -857,8 +846,5 @@ class AttendanceImportController extends Controller
         return app(ImportValueNormalizer::class)->time($value);
     }
 
-    private function status(mixed $value): ?string
-    {
-        return app(ImportValueNormalizer::class)->attendanceStatus($value);
-    }
+
 }

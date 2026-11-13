@@ -29,6 +29,7 @@ use Tests\TestCase;
 class EmployeeWorkbookImportTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
 
     private User $user;
     private Company $company;
@@ -57,7 +58,7 @@ class EmployeeWorkbookImportTest extends TestCase
     private function workbook(): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, [
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets([
             ['name' => 'الموظفين', 'rows' => [
                 ['الكود', 'الاسم الكامل', 'الرقم التأميني', 'رقم الهاتف', 'تاريخ التعيين'],
                 ['301', 'سارة الجديدة', 'INS-301', '01011112222', '2024-01-01'],
@@ -92,7 +93,7 @@ class EmployeeWorkbookImportTest extends TestCase
                 ['إجمالي العمالة', '2'],
                 ['متوسط الأجور', '5000'],
             ]],
-        ]);
+        ]));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
@@ -208,7 +209,7 @@ class EmployeeWorkbookImportTest extends TestCase
     private function penaltyFixWorkbook(): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, [
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets([
             ['name' => 'الموظفين', 'rows' => [
                 ['الكود', 'الاسم الكامل', 'الرقم التأميني'],
                 ['301', 'سارة الجديدة', 'INS-301'],
@@ -217,7 +218,7 @@ class EmployeeWorkbookImportTest extends TestCase
                 ['كود الموظف', 'نوع الجزاء', 'تاريخ القرار', 'أيام الخصم'],
                 ['301', '', '2026-11-05', '1'],
             ]],
-        ]);
+        ]));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
@@ -307,10 +308,10 @@ class EmployeeWorkbookImportTest extends TestCase
         Employee::create(['employee_code' => '403', 'full_name' => 'صاحب رقم', 'first_name' => 'صاحب', 'company_id' => $this->company->id, 'status_id' => $status->id, 'hire_date' => '2024-01-01', 'insurance_number' => 'INS-403']);
 
         $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, [
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets([
             ['name' => 'الموظفين', 'rows' => [
                 ['الكود', 'الاسم الكامل', 'الرقم القومي'],
-                ['410', 'موظف جديد', ''],
+                ['410', 'موظف جديد', '29001011234567'],
             ]],
             ['name' => 'التأمينات', 'rows' => [
                 ['كود الموظف', 'اسم الموظف', 'الرقم التأميني', 'الأجر التأميني'],
@@ -319,7 +320,7 @@ class EmployeeWorkbookImportTest extends TestCase
                 ['999', 'لا أحد', 'INS-404', '3000'],           // no match at all
                 ['555', 'صاحب رقم', 'INS-403', '3000'],         // unknown code: must not fall back to INS-403's owner
             ]],
-        ]);
+        ]));
         $file = UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
 
         $response = $this->commitImport(['file' => $file, 'ack_updates' => '1']);
@@ -396,13 +397,13 @@ class EmployeeWorkbookImportTest extends TestCase
     private function workbookWithDomainSheet(array $domainSheet): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, [
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets([
             ['name' => 'الموظفين', 'rows' => [
                 ['الكود', 'الاسم الكامل', 'الرقم القومي'],
-                ['410', 'موظف جديد', ''],
+                ['410', 'موظف جديد', '29001011234567'],
             ]],
             $domainSheet,
-        ]);
+        ]));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
@@ -411,7 +412,7 @@ class EmployeeWorkbookImportTest extends TestCase
     {
         $rows = EmployeeImportRow::where('kind', $kind)->orderBy('line')->get();
         $this->assertCount(3, $rows);
-        $this->assertStringContainsString('أكثر من موظف', implode(' ', $rows[0]->errors));
+        $this->assertStringContainsString(in_array($kind, ['attendance','penalties']) ? 'كود الموظف مطلوب' : 'أكثر من موظف', implode(' ', $rows[0]->errors));
         $this->assertStringContainsString('لا يطابق الاسم', implode(' ', $rows[1]->errors));
         $this->assertStringContainsString('غير موجود في الشركة', implode(' ', $rows[2]->errors));
         foreach ($rows as $row) {
@@ -426,7 +427,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['كود الموظف', 'اسم الموظف', 'التاريخ', 'وقت الحضور', 'وقت الانصراف'],
             ['', 'توأم أول', '2026-11-02', '09:00', '17:00'],         // ambiguous: two employees share the name
             ['403', 'اسم آخر تماما', '2026-11-03', '09:00', '17:00'], // conflict: code 403 belongs to صاحب كود
-            ['', 'فريد الاسم', '2026-11-04', '09:00', '17:00'],       // unambiguous name still imports
+            ['404', 'فريد الاسم', '2026-11-04', '09:00', '17:00'],       // unambiguous name still imports
             ['555', 'فريد الاسم', '2026-11-05', '09:00', '17:00'],      // unknown code: no name fallback
         ]]);
 
@@ -464,7 +465,7 @@ class EmployeeWorkbookImportTest extends TestCase
             ['كود الموظف', 'اسم الموظف', 'نوع الجزاء', 'تاريخ القرار', 'أيام الخصم'],
             ['', 'توأم أول', 'خصم', '2026-11-05', '1'],
             ['403', 'اسم آخر تماما', 'خصم', '2026-11-05', '1'],
-            ['', 'فريد الاسم', 'خصم', '2026-11-05', '1'],
+            ['404', 'فريد الاسم', 'خصم', '2026-11-05', '1'],
             ['555', 'فريد الاسم', 'خصم', '2026-11-06', '1'],       // unknown code: no name fallback
         ]]);
 

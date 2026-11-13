@@ -23,6 +23,7 @@ use Tests\TestCase;
 class WorkbookRequestTypesImportTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
 
     private User $user;
     private Company $company;
@@ -72,10 +73,10 @@ class WorkbookRequestTypesImportTest extends TestCase
     private function workbook(array $sheets): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'wb') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, array_merge([[
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets(array_merge([[
             'name' => 'الموظفين',
             'rows' => [['الكود', 'الاسم الكامل', 'تاريخ التعيين'], ['900', 'موظف جديد', '2024-01-01']],
-        ]], $sheets));
+        ]], $sheets)));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
