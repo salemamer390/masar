@@ -119,4 +119,30 @@ class EmployeeImportMappingTest extends TestCase
         $this->assertCount(count($rows[1]), $map);
         $this->assertSame([], $entries);
     }
+    public function test_reviewed_mapping_overrides_recognised_field_and_can_ignore_it(): void
+    {
+        $rows = [1 => ['Full Name', 'Phone', 'Notes'], 2 => ['A Person', '01012345678', 'value']];
+        [$row, $map, $entries] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [1 => '', 2 => 'phone']);
+        $this->assertSame(1, $row);
+        $this->assertSame([0 => 'full_name', 2 => 'phone'], $map);
+    }
+
+    public function test_reviewed_mapping_preserves_detected_header_after_cover_rows(): void
+    {
+        $rows = [1 => ['Company cover'], 2 => ['Full Name', 'Phone'], 3 => ['A Person', '010']];
+        [$row, $map] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [1 => 'notes']);
+        $this->assertSame(2, $row);
+        $this->assertSame('notes', $map[1]);
+    }
+
+    public function test_reviewed_name_can_map_unknown_header_but_ignoring_name_is_not_importable(): void
+    {
+        $rows = [1 => ['Custom employee', 'Phone'], 2 => ['A Person', '010']];
+        [$row, $map] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [0 => 'full_name']);
+        $this->assertSame(1, $row);
+        $this->assertSame('full_name', $map[0]);
+        [$row] = $this->invoke('detectHeader', $rows, $this->invoke('aliasMap'), [], [0 => '']);
+        $this->assertNull($row);
+    }
+
 }

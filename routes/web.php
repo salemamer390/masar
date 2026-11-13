@@ -273,6 +273,12 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
         Route::post('/import/preview', [\App\Http\Controllers\AttendanceImportController::class, 'preview'])
             ->middleware('permission:attendance.create')
             ->name('import.preview');
+        Route::post('/import/rejected', [\App\Http\Controllers\AttendanceImportController::class, 'rejected'])
+            ->middleware('permission:attendance.create')->name('import.rejected');
+        Route::get('/import-result/{token}', [\App\Http\Controllers\AttendanceImportController::class, 'result'])
+            ->middleware('permission:attendance.create')->name('import.result');
+        Route::get('/import-result/{token}/rejected', [\App\Http\Controllers\AttendanceImportController::class, 'resultRejected'])
+            ->middleware('permission:attendance.create')->name('import.result.rejected');
         Route::post('/import', [\App\Http\Controllers\AttendanceImportController::class, 'store'])
             ->middleware('permission:attendance.create')
             ->name('import');

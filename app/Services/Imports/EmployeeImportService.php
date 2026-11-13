@@ -216,6 +216,7 @@ class EmployeeImportService
         $choice = (string) ($options['sheet'] ?? 'auto');
         $confirmedKinds = $this->sanitizeSheetKinds($options['sheet_kinds'] ?? []);
         $domainMappings = $this->sanitizeDomainMappings($options['domain_mappings'] ?? []);
+        $employeeMappings = is_array($options['employee_mappings'] ?? null) ? $options['employee_mappings'] : [];
 
         $result = [
             'file_errors' => [],
@@ -246,7 +247,7 @@ class EmployeeImportService
         $aliases = $this->aliasMap($companyId);
         $infos = [];
         foreach ($sheets as $index => $sheet) {
-            [$headerRow, $map, $entries, $used] = $this->detectHeader($sheet['rows'], $aliases, $manual);
+            [$headerRow, $map, $entries, $used] = $this->detectHeader($sheet['rows'], $aliases, $manual, $employeeMappings[$sheet['name']] ?? null);
             $dataRows = 0;
             if ($headerRow !== null) {
                 foreach (array_keys($sheet['rows']) as $rowNumber) {
@@ -277,6 +278,7 @@ class EmployeeImportService
                 'kind' => $kind,
                 'detected_kind' => $detected,
                 'sample' => $this->sheetSample($sheets[$index]['rows'], $info['header_row']),
+                'employee_config' => $this->employeeConfig($sheets[$index]['rows'], $info),
             ];
             // The column mapping the domain parser will use: auto-detected, with
             // the user's reviewed choices on top. Shown and editable in the review.
@@ -296,7 +298,7 @@ class EmployeeImportService
                     }
                 }
                 if ($config !== null) {
-                    $config['map'] = array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []);
+                    $config['map'] = array_filter(array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []), static fn ($column) => $column !== null);
                     $entry['domain_config'] = $config;
                 }
             }
@@ -807,6 +809,7 @@ class EmployeeImportService
         foreach ($mappings as $sheet => $fields) {
             if (!is_array($fields)) continue;
             foreach ($fields as $field => $column) {
+                if ($column === null || $column === '') { $clean[(string) $sheet][(string) $field] = null; continue; }
                 if (!is_numeric($column) || (int) $column < 0) continue;
                 $clean[(string) $sheet][(string) $field] = (int) $column;
             }
@@ -1174,13 +1177,31 @@ class EmployeeImportService
      * @param array<string, string> $manual
      * @return array{0: ?int, 1: array<int, string>, 2: array<int, array<string, mixed>>, 3: array<string, string>}
      */
-    private function detectHeader(array $rows, array $aliases, array $manual): array
+    private function detectHeader(array $rows, array $aliases, array $manual, mixed $explicit = null): array
     {
+        if (is_array($explicit)) {
+            [$headerRow] = $this->detectHeader($rows, $aliases, $manual);
+            if ($headerRow === null) {
+                foreach ($rows as $number => $cells) {
+                    if (trim(implode('', $cells)) !== '') { $headerRow = $number; break; }
+                }
+            }
+            if ($headerRow === null) return [null, [], [], []];
+            [$map, , $entries] = $this->mapRow($rows[$headerRow], $aliases, $manual);
+            $used = [];
+            foreach ($rows[$headerRow] as $column => $header) {
+                $field = array_key_exists($column, $explicit) ? $explicit[$column] : ($map[$column] ?? null);
+                if (is_string($field) && isset(self::COLUMNS[$field]) && !isset($used[$field])) {
+                    $map[$column] = $field; $used[$field] = 'reviewed';
+                } else { unset($map[$column]); }
+            }
+            foreach ($entries as &$entry) { $entry['field'] = $map[$entry['column']] ?? null; }
+            unset($entry);
+            return $this->hasNameField($used) ? [(int) $headerRow, $map, $entries, $used] : [null, [], [], []];
+        }
         $scanned = 0;
         foreach ($rows as $rowNumber => $cells) {
-            if (++$scanned > 15) {
-                break;
-            }
+            if (++$scanned > 15) break;
             [$map, $used, $entries] = $this->mapRow($cells, $aliases, $manual);
             if ($this->hasNameField($used)) {
                 return [(int) $rowNumber, $map, $entries, $used];
@@ -1188,6 +1209,19 @@ class EmployeeImportService
         }
 
         return [null, [], [], []];
+    }
+
+    /** All columns, including recognised ones, for the sheet-level mapping editor. */
+    private function employeeConfig(array $rows, array $info): array
+    {
+        $headerRow = $info['header_row'] ?? array_key_first($rows);
+        $columns = [];
+        foreach (($rows[$headerRow] ?? []) as $index => $header) {
+            $columns[] = ['index' => $index, 'header' => (string) $header,
+                'field' => $info['map'][$index] ?? null,
+                'samples' => $this->sampleValues($rows, (int) $headerRow, (int) $index)];
+        }
+        return ['header_row' => $headerRow, 'columns' => $columns];
     }
 
     /**
