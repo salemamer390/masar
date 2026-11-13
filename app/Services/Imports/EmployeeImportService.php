@@ -510,7 +510,7 @@ class EmployeeImportService
         if ($has($auxiliaryNeedles)) return 'auxiliary';
         $hasTime = $has(['وقتالحضور', 'وقت الانصراف', 'دقائقالتأخير', 'checkin', 'checkout']) || $hasExact(['in', 'out', 'c/in', 'c/out', 'الحضور', 'الانصراف']);
         $hasDate = $has(['التاريخ', 'تاريخ الحضور', 'attendance date', 'attendance_date']) || $hasExact(['date', 'day', 'اليوم']);
-        if ($hasTime && $hasDate) return 'attendance';
+        if ($hasTime && ($hasDate || ($hasExact(['in', 'c/in', 'الحضور', 'وقت الحضور']) && $hasExact(['out', 'c/out', 'الانصراف', 'وقت الانصراف'])))) return 'attendance';
         // Bare "start date" is not a leaves marker: in an employees sheet it is the
         // hire date, so only leave-specific markers classify a sheet as leaves.
         if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type'])) return 'leaves';
