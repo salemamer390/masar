@@ -178,3 +178,11 @@
 #employeesImportModal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 #employeesImportModal .wizard-footer{position:sticky;bottom:0;z-index:2;flex:0 0 auto;background:#fff;padding-bottom:max(16px,env(safe-area-inset-bottom))}
 @media(max-width:600px){#employeesImportModal .modal-dialog{--import-modal-gap:8px;margin:var(--import-modal-gap);height:calc(100% - 2 * var(--import-modal-gap))}#employeesImportModal .wizard-footer{padding-bottom:max(12px,env(safe-area-inset-bottom))}}
+/* Sheet summaries are expandable rows; embedded controls keep their own actions. */
+#employeesImportModal .sheet-summary-row{cursor:pointer}
+#employeesImportModal .sheet-summary-row>td{transition:background-color .15s ease}
+#employeesImportModal .sheet-summary-row:hover>td,#employeesImportModal .sheet-summary-row:focus-visible>td{background:#eaf3ff}
+#employeesImportModal .sheet-summary-row[aria-expanded="true"]>td{background:#f0f6ff}
+#employeesImportModal .sheet-summary-row:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+#employeesImportModal .sheet-summary-row [data-sheet-toggle] i{display:inline-grid;place-items:center;width:30px;height:30px;margin-inline-end:6px;border:1px solid #9cbef0;border-radius:8px;background:#eaf3ff;color:#124a92;font-size:19px;font-weight:900;vertical-align:middle}
+#employeesImportModal .sheet-summary-row [data-sheet-toggle]{color:#124a92;text-decoration:none}
