@@ -569,4 +569,49 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertSame('unknown', $method->invoke($service, [['x', 'y']], [], 'Sheet1'));
         $this->assertSame('auxiliary', $method->invoke($service, [['x', 'y']], [], 'لوحة التحكم'));
     }
+    public function test_complete_rejection_export_contains_more_than_25_errors_and_no_mutations(): void
+    {
+        $rows = [];
+        for ($i=0; $i<40; $i++) $rows[] = ['MISSING-'.$i, '2026-11-20', '09:00', '17:00', 'Present'];
+        [$token, $units, $html] = $this->preview($this->workbook($this->dailyRows($rows)));
+        $this->assertStringContainsString('MISSING-39', $html);
+        $before = Attendance::count();
+        $response = $this->post('/attendance/import/rejected', ['import_token'=>$token, 'unit'=>$units[0]]);
+        $response->assertOk()->assertDownload('attendance-rejected.xlsx');
+        $sheets = (new \App\Services\Imports\SpreadsheetReader())->readAll($response->baseResponse->getFile()->getPathname(), 'xlsx');
+        $this->assertCount(41, $sheets[0]['rows']);
+        $this->assertStringContainsString('MISSING-39', json_encode($sheets));
+        $this->assertSame($before, Attendance::count());
+    }
+
+    public function test_rejection_export_refuses_other_user_and_expired_upload(): void
+    {
+        [$token, $units] = $this->preview($this->workbook($this->dailyRows([['MISSING','2026-11-20','09:00','17:00','Present']])));
+        $originalId = $this->user->id;
+        $other = $this->user->replicate(); $other->email='other-import@example.test'; $other->save();
+        $this->actingAs($other)->post('/attendance/import/rejected',['import_token'=>$token,'unit'=>$units[0]])->assertStatus(410);
+        $this->actingAs(User::find($originalId));
+        Carbon::setTestNow(now()->addMinutes(31));
+        $this->post('/attendance/import/rejected',['import_token'=>$token,'unit'=>$units[0]])->assertStatus(410);
+    }
+
+    public function test_wizard_result_keeps_full_report_after_source_is_consumed(): void
+    {
+        $rows = [['I1','2026-11-20','09:00','17:00','Present']];
+        for($i=0;$i<35;$i++) $rows[]=['BAD-'.$i,'2026-11-20','09:00','17:00','Present'];
+        [$token,$units,,$key]=$this->preview($this->workbook($this->dailyRows($rows)));
+        $response=$this->post('/attendance/import',['import_token'=>$token,'unit'=>$units[0],'preview_key'=>$key,'wizard'=>'1']);
+        $response->assertRedirect(); $url=$response->headers->get('Location');
+        $this->assertStringContainsString('/attendance/import-result/',$url);
+        $this->get($url)->assertOk()->assertSee('35');
+        $download=$this->get($url.'/rejected'); $download->assertOk()->assertDownload('attendance-rejected.xlsx');
+        $sheets=(new \App\Services\Imports\SpreadsheetReader())->readAll($download->baseResponse->getFile()->getPathname(),'xlsx');
+        $this->assertCount(36,$sheets[0]['rows']);
+        $other=$this->user->replicate(); $other->email='report-other@example.test'; $other->save();
+        $this->actingAs($other)->get($url)->assertNotFound();
+        $this->get($url.'/rejected')->assertNotFound();
+        $this->actingAs($this->user); Carbon::setTestNow(now()->addMinutes(31));
+        $this->get($url)->assertStatus(410);
+    }
+
 }
