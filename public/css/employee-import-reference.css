@@ -171,3 +171,10 @@
 #employeesImportModal .btn-success:hover{background:#157347;border-color:#146c43}
 #employeesImportModal .file-summary{font-size:14px}
 #employeesImportModal .duplicate-card input:focus-visible + .radio-dot{outline:3px solid #1260d84d;outline-offset:3px}
+/* Keep actions in view at normal zoom, including short laptop viewports. */
+#employeesImportModal .modal-dialog{--import-modal-gap:16px;margin:var(--import-modal-gap) auto;height:calc(100% - 2 * var(--import-modal-gap));min-height:0}
+#employeesImportModal .modal-content{display:flex;flex-direction:column;max-height:calc(100vh - 2 * var(--import-modal-gap));max-height:calc(100dvh - 2 * var(--import-modal-gap));overflow:hidden}
+#employeesImportModal .modal-header{flex:0 0 auto}
+#employeesImportModal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+#employeesImportModal .wizard-footer{position:sticky;bottom:0;z-index:2;flex:0 0 auto;background:#fff;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+@media(max-width:600px){#employeesImportModal .modal-dialog{--import-modal-gap:8px;margin:var(--import-modal-gap);height:calc(100% - 2 * var(--import-modal-gap))}#employeesImportModal .wizard-footer{padding-bottom:max(12px,env(safe-area-inset-bottom))}}
