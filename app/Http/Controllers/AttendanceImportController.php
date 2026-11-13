@@ -10,6 +10,8 @@ use App\Services\AttendancePeriodArchiveService;
 use App\Services\HrOperationalSettingsService;
 use App\Services\Imports\AttendanceSheetAnalyzer;
 use App\Services\Imports\PunchAggregator;
+use App\Services\Imports\ImportValueNormalizer;
+use App\Services\Imports\AttendanceImportEmployeeMatcher;
 use App\Services\Imports\SpreadsheetReader;
 use App\Services\PayrollPeriodGuard;
 use App\Services\PayrollRunService;
@@ -32,6 +34,8 @@ use Illuminate\Support\Str;
 class AttendanceImportController extends Controller
 {
     private const TOKEN_TTL_MINUTES = 30;
+    private array $normalizationWarnings = [];
+    private ?AttendanceImportEmployeeMatcher $employeeMatcher = null;
 
     public function __construct(
         private readonly SpreadsheetReader $reader,
@@ -171,7 +175,7 @@ class AttendanceImportController extends Controller
             $batch = \App\Models\AttendanceImportBatch::create([
                 'company_id' => $request->user()->company_id, 'user_id' => $request->user()->id,
                 'file_name' => $fileName, 'layout' => $unit['layout'],
-                'original_data' => ['unit' => $unit, 'map' => $map, 'options' => $options, 'sheets' => array_values(array_map(fn ($sheet) => $sheets[$sheet['index']], $unit['sheets'])), 'errors' => $parseErrors],
+                'original_data' => ['unit' => $unit, 'map' => $map, 'options' => $options, 'sheets' => array_values(array_map(fn ($sheet) => $sheets[$sheet['index']], $unit['sheets'])), 'errors' => $parseErrors, 'warnings' => array_values(array_unique($this->normalizationWarnings))],
             ]);
             $deferred = 0; $imported = 0; $skippedRows = 0; $errors = $parseErrors; $affectedEmployeeIds = [];
             foreach ($rows as $row) {
@@ -233,6 +237,7 @@ class AttendanceImportController extends Controller
                 'fileName' => $fileName, 'message' => $message, 'imported' => $imported,
                 'deferred' => $deferred, 'failed' => $skippedRows, 'error_count' => count($errors),
                 'errors' => array_slice($errors, 0, 25),
+                'warnings' => array_values(array_unique($this->normalizationWarnings)),
                 'export' => $this->errorExportRows($errors, $unit, $sheets),
                 'batch_id' => $batch->id,
             ]));
@@ -502,6 +507,8 @@ class AttendanceImportController extends Controller
     /** Parse the confirmed unit into uniform rows: employee, date, check_in, check_out, status, ref. */
     private function parseUnit(array $unit, array $map, array $sheets, array $options): array
     {
+        $this->normalizationWarnings = [];
+        $this->employeeMatcher = new AttendanceImportEmployeeMatcher();
         return match ($unit['layout']) {
             AttendanceSheetAnalyzer::LAYOUT_DAILY => $this->parseDaily($unit, $map, $sheets, $options),
             AttendanceSheetAnalyzer::LAYOUT_PUNCHES => $this->parsePunches($unit, $map, $sheets, $options),
@@ -538,7 +545,9 @@ class AttendanceImportController extends Controller
                     $errors[] = "$ref: صف بلا بصمات ولا حالة — تم تخطيه ولن يُسجَّل غيابًا.";
                     continue;
                 }
-                $status = $this->status($statusCell) ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
+                $status = $this->status($statusCell);
+                if ($status === null) { $errors[] = "$ref: حالة الحضور «{$statusCell}» غير معروفة؛ راجعها، لم يُستورد الصف."; continue; }
+                $status = $status ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
@@ -614,7 +623,9 @@ class AttendanceImportController extends Controller
                     $errors[] = "$ref: صف بلا بصمات ولا حالة — تم تخطيه ولن يُسجَّل غيابًا.";
                     continue;
                 }
-                $status = $this->status($statusCell) ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
+                $status = $this->status($statusCell);
+                if ($status === null) { $errors[] = "$ref: حالة الحضور «{$statusCell}» غير معروفة؛ راجعها، لم يُستورد الصف."; continue; }
+                $status = $status ?: (($checkIn || $checkOut) ? 'Present' : 'Absent');
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
@@ -649,6 +660,7 @@ class AttendanceImportController extends Controller
                 'deferred' => ($row['issue'] ?? null) === 'extra',
             ], $rows),
             'errors' => $errors,
+            'warnings' => array_values(array_unique($this->normalizationWarnings)),
         ];
     }
 
@@ -702,7 +714,7 @@ class AttendanceImportController extends Controller
 
     private function isAmbiguousTextDate(mixed $value): bool
     {
-        $value = trim((string) $value);
+        $value = trim(app(ImportValueNormalizer::class)->digits((string) $value));
         if (!preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(\s|$)/', $value, $m)) return false;
         return (int) $m[1] <= 12 && (int) $m[2] <= 12;
     }
@@ -716,7 +728,7 @@ class AttendanceImportController extends Controller
     private function parseDateStrict(mixed $value, string $format, ?bool &$ambiguous = null): ?string
     {
         $ambiguous = false;
-        $raw = trim((string) $value);
+        $raw = trim(app(ImportValueNormalizer::class)->digits((string) $value));
         if ($raw === '') return null;
         if ($format !== '' && preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/', $raw, $m)) {
             $date = $this->componentsToDate($m[1], $m[2], $m[3], $format);
@@ -735,13 +747,13 @@ class AttendanceImportController extends Controller
     private function parseDateTimeStrict(mixed $value, string $format, ?bool &$ambiguous = null): ?Carbon
     {
         $ambiguous = false;
-        $raw = trim((string) $value);
+        $raw = trim(app(ImportValueNormalizer::class)->digits((string) $value));
         if ($raw === '') return null;
         if ($format !== '' && preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(.*)$/', $raw, $m)) {
             $date = $this->componentsToDate($m[1], $m[2], $m[3], $format);
             if (!$date) return null;
             $time = trim($m[4]);
-            if ($time !== '' && (!preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $time, $tm) || (int) $tm[1] > 23 || (int) $tm[2] > 59 || (int) ($tm[3] ?? 0) > 59)) return null;
+            if ($time !== '') { $time = $this->parseTime($time); if ($time === null) return null; }
             try {
                 return $time !== '' ? $date->setTimeFromTimeString($time) : $date;
             } catch (\Throwable) {
@@ -754,7 +766,7 @@ class AttendanceImportController extends Controller
             $date = $this->componentsToDate($m[1], $m[2], $m[3], $formatGuess);
             if (!$date) return null;
             $time = trim($m[4]);
-            if ($time !== '' && (!preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $time, $tm) || (int) $tm[1] > 23 || (int) $tm[2] > 59 || (int) ($tm[3] ?? 0) > 59)) return null;
+            if ($time !== '') { $time = $this->parseTime($time); if ($time === null) return null; }
             try {
                 return $time !== '' ? $date->setTimeFromTimeString($time) : $date;
             } catch (\Throwable) {
@@ -794,17 +806,24 @@ class AttendanceImportController extends Controller
      */
     private function resolveEmployee(mixed $code, mixed $name, bool $allowNameFallback = false): array
     {
-        $code = filled($code) ? trim((string) $code) : null;
+        $code = filled($code) ? app(ImportValueNormalizer::class)->identifier((string) $code) : null;
         $name = filled($name) ? trim((string) $name) : null;
-        if (!$code) {
+        if ($code === null || $code === '') {
             return [null, 'كود الموظف مطلوب؛ المطابقة بالكود فقط والاسم للمراجعة.'];
         }
-        $employee = Employee::where('employee_code', $code)->first();
+        try {
+            $employee = ($this->employeeMatcher ??= new AttendanceImportEmployeeMatcher())->byCode($code);
+        } catch (\RuntimeException $exception) {
+            return [null, $exception->getMessage()];
+        }
         if (!$employee) {
             return [null, "كود الموظف «{$code}» غير موجود في النظام."];
         }
         if ($name && !$allowNameFallback && $this->normalisePersonName($employee->full_name) !== $this->normalisePersonName($name)) {
             return [null, "كود الموظف «{$code}» لا يطابق اسم الموظف الموجود في النظام («{$employee->full_name}»)."];
+        }
+        if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $name)) {
+            $this->normalizationWarnings[] = 'كود ' . $code . ': ' . $warning;
         }
         return [$employee, null];
     }
@@ -830,15 +849,16 @@ class AttendanceImportController extends Controller
     private function minutes(string $time): int { $c = Carbon::parse($time); return $c->hour * 60 + $c->minute; }
     private function normalisePersonName(mixed $value): string
     {
-        $value = preg_replace('/\s+/u', ' ', trim((string) $value));
-        return mb_strtolower((string) $value);
+        return app(ImportValueNormalizer::class)->key((string) $value);
     }
 
-    private function parseTime(mixed $value): ?string {
-        $raw=trim((string)$value); if ($raw==='') return null;
-        if (is_numeric($raw) && (float)$raw>=0 && (float)$raw<1) { $seconds=(int)round((float)$raw*86400); return sprintf('%02d:%02d',intdiv($seconds,3600)%24,intdiv($seconds%3600,60)); }
-        if (preg_match('/^(?:\d{4}-\d{2}-\d{2}[ T])?(\d{1,2}):(\d{2})(?::(\d{2}))?$/',$raw,$m) && (int)$m[1]<24 && (int)$m[2]<60 && (int)($m[3]??0)<60) return sprintf('%02d:%02d',$m[1],$m[2]);
-        return null;
+    private function parseTime(mixed $value): ?string
+    {
+        return app(ImportValueNormalizer::class)->time($value);
     }
-    private function status(mixed $value): string { $key = (string) preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); return match (true) { in_array($key, ['متأخر', 'late'], true) => 'Late', in_array($key, ['غائب', 'absent'], true) => 'Absent', in_array($key, ['إجازة', 'leave'], true) => 'Leave', in_array($key, ['حاضر', 'present'], true) => 'Present', default => trim((string) $value) }; }
+
+    private function status(mixed $value): ?string
+    {
+        return app(ImportValueNormalizer::class)->attendanceStatus($value);
+    }
 }
