@@ -458,4 +458,18 @@ class EmployeeImportSheetKindsTest extends TestCase
         $this->assertSame('phone',\App\Models\ImportColumnAlias::where('company_id',$this->company->id)->where('alias','اتصال خاص للزميل')->value('field'));
     }
 
+    public function test_reviewed_domain_mapping_can_explicitly_clear_detected_optional_column(): void
+    {
+        $response=$this->postJson('/employees/import/preview',[
+            'file'=>$this->workbook([['name'=>'حضور','rows'=>[
+                ['الكود','التاريخ','الحضور','الانصراف'], ['401','2026-11-10','09:00','17:00'],
+            ]]]),'sheet_kinds'=>json_encode(['حضور'=>'attendance']),
+            'domain_mappings'=>json_encode(['حضور'=>['check_out'=>'']]),
+        ]);
+        $response->assertOk();
+        $sheet=collect($response->json('sheets'))->firstWhere('name','حضور');
+        $this->assertArrayNotHasKey('check_out',$sheet['domain_config']['map']);
+        $this->assertArrayHasKey('date',$sheet['domain_config']['map']);
+    }
+
 }
