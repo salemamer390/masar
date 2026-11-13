@@ -100,7 +100,7 @@ class EmployeeImportController extends Controller
                 $domains[$domain] = [
                     'imported' => $imported,
                     'skipped' => $skipped,
-                    'errors' => array_slice((array) ($data['errors'] ?? []), 0, 5),
+                    'errors' => (array) ($data['errors'] ?? []),
                     'warnings' => array_slice((array) ($data['warnings'] ?? []), 0, 10),
                 ] + ($domain === 'penalties' ? ['failures' => array_slice((array) ($data['failures'] ?? []), 0, 25), 'excluded' => (int) ($data['excluded'] ?? 0)] : []);
             }
