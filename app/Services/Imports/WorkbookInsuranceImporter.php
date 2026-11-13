@@ -193,7 +193,7 @@ class WorkbookInsuranceImporter
     {
         $aliases = [
             'code' => ['كود الموظف', 'الكود', 'رقم الموظف', 'employee code', 'code'],
-            'name' => ['اسم الموظف', 'الاسم', 'employee name', 'name'],
+            'name' => ['الموظفين', 'الموظفون', 'الاسماء', 'اسم الموظف', 'الاسم', 'employee name', 'name'],
             'insurance_number' => ['الرقم التأميني', 'رقم التأمين', 'رقم التأمينات', 'رقم التأمين الاجتماعي', 'insurance number', 'insurance no', 'social insurance number', 'رقم المؤمن عليه', 'insured number', 'social security number'],
             'insured_salary' => ['الأجر التأميني', 'أجر الاشتراك', 'مبلغ الاشتراك', 'اشتراك التأمينات', 'الأجر التأميني الشهري', 'insurance wage', 'insured salary', 'insurance subscription', 'المرتب التأميني', 'الراتب التأميني', 'أجر الاشتراك التأميني', 'insurance salary', 'insured wage', 'contribution salary'],
             'office' => ['مكتب التأمينات', 'مكتب التأمين', 'جهة التأمين', 'insurance office', 'منطقة التأمينات', 'social insurance office'],
