@@ -193,7 +193,7 @@ class AttendanceImportPreviewTest extends TestCase
             ]],
         ]));
         $response = $this->import($token, $units[0], $key);
-        $response->assertSessionHas('attendance_import_errors', fn ($errors) => str_contains(implode(' ', $errors), 'كود الموظف مطلوب'));
+        $response->assertStatus(422)->assertSee('كود الموظف');
         $this->assertSame(0, Attendance::where('employee_id', $this->day->id)->count());
     }
 
@@ -204,11 +204,9 @@ class AttendanceImportPreviewTest extends TestCase
             ['I1', '2026-11-03', '', '', 'غائب'],
         ])));
         $response = $this->import($token, $units[0], $key);
-        $response->assertSessionHas('attendance_import_errors', fn ($errors) => str_contains(implode(' ', $errors), 'بلا بصمات'));
+        $response->assertSessionHas('attendance_import_errors', fn ($errors) => str_contains(implode(' ', $errors), 'وقت الحضور مطلوب'));
         $rows = Attendance::where('employee_id', $this->day->id)->get();
-        $this->assertCount(1, $rows, 'only the explicit Absent row is imported');
-        $this->assertSame('Absent', $rows[0]->status);
-        $this->assertSame('2026-11-03', $rows[0]->attendance_date->toDateString());
+        $this->assertCount(0, $rows, 'status-only rows cannot fabricate absence; both times are required');
     }
 
     public function test_changing_mapping_requires_fresh_preview_before_commit(): void
@@ -633,18 +631,18 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertSame('عامر سالم جمعه', $this->day->fresh()->full_name);
     }
 
-    public function test_unknown_attendance_status_is_rejected_in_preview_and_commit_not_saved_raw(): void
+    public function test_unknown_status_input_is_ignored_and_missing_times_are_rejected(): void
     {
         [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
             ['I1', '2026-11-20', '', '', 'حالة غريبة'],
         ])));
-        $this->assertStringContainsString('حالة الحضور', $html);
-        $this->assertStringContainsString('غير معروفة', $html);
+        $this->assertStringNotContainsString('name="map_sheet-0[status]"', $html);
+        $this->assertStringContainsString('وقت الحضور مطلوب', $html);
         $this->import($token, $units[0], $key)->assertRedirect();
         $this->assertSame(0, Attendance::count());
     }
 
-    public function test_status_only_aliases_map_to_existing_canonical_states(): void
+    public function test_status_only_aliases_do_not_override_required_times(): void
     {
         [$token, $units, , $key] = $this->preview($this->workbook($this->dailyRows([
             ['I1', '2026-11-20', '', '', 'اجازه'],
@@ -652,7 +650,7 @@ class AttendanceImportPreviewTest extends TestCase
             ['I1', '2026-11-22', '', '', 'حضور'],
         ])));
         $this->import($token, $units[0], $key)->assertRedirect();
-        $this->assertSame(['Leave', 'Absent', 'Present'], Attendance::where('employee_id', $this->day->id)->orderBy('attendance_date')->pluck('status')->all());
+        $this->assertSame([], Attendance::where('employee_id', $this->day->id)->orderBy('attendance_date')->pluck('status')->all());
     }
 
     public function test_normalized_code_collisions_are_rejected_and_leading_zero_codes_stay_distinct(): void
@@ -730,4 +728,20 @@ class AttendanceImportPreviewTest extends TestCase
         $this->import($token, $units[0], $key)->assertRedirect();
         $this->assertSame(2, Attendance::count());
     }
+    public function test_daily_without_date_uses_reviewed_manual_date_and_rejects_changed_date(): void
+    {
+        [$token,$units,$html] = $this->preview($this->workbook([['name'=>'يومي','rows'=>[
+            ['code','الحضور','الانصراف','الحالة'],['I1','09:30','17:00','Absent'],
+        ]]]));
+        $this->assertStringContainsString('تاريخ موحّد', $html);
+        $options=['default_date'=>'2026-11-20'];
+        [,,, $key] = $this->rePreview($token,$units[0],[],$options);
+        $this->import($token,$units[0],$key,[],['default_date'=>'2026-11-21'])->assertStatus(422);
+        $this->assertSame(0,Attendance::count());
+        $this->import($token,$units[0],$key,[],$options)->assertRedirect();
+        $record=Attendance::where('employee_id',$this->day->id)->firstOrFail();
+        $this->assertSame('2026-11-20',$record->attendance_date->toDateString());
+        $this->assertSame('Late',$record->status);
+    }
+
 }
