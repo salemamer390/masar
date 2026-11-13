@@ -15,6 +15,7 @@
     </div>
     <h6>ملاحظات مهمة</h6>
     <div class="import-note mb-3">تقرير التنزيل يضم كل رسائل الرفض والمراجعة، وليس أول ٢٥ فقط. التقرير متاح لصاحب الرفع في شركته لمدة ٣٠ دقيقة، وسجل الاستيراد محفوظ للمراجعة.</div>
+    @if(!empty($report['warnings']))<div class="alert alert-warning small"><ul class="mb-0">@foreach($report['warnings'] as $warning)<li>{{ $warning }}</li>@endforeach</ul></div>@endif
     @if($report['errors'])<ul class="small text-danger">@foreach($report['errors'] as $message)<li>{{ $message }}</li>@endforeach</ul>@endif
     @if($report['error_count']>25)<div class="small text-muted mb-3">المعروض أول ٢٥ رسالة. حمّل التقرير لرؤية الكل.</div>@endif
     <div class="d-flex flex-wrap gap-2">
