@@ -15,6 +15,7 @@ use Tests\TestCase;
 class UnifiedEmploymentStartTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
     private Company $company;
     private int $status;
 
@@ -160,12 +161,12 @@ class UnifiedEmploymentStartTest extends TestCase
     public function test_import_accepts_canonical_only_and_rejects_conflicting_legacy_dates(): void
     {
         $path = tempnam(sys_get_temp_dir(),'start').'.xlsx';
-        (new XlsxWriter())->writeSheets($path,[['name'=>'الموظفين','rows'=>[
+        (new XlsxWriter())->writeSheets($path,$this->completeEmployeeSheets([['name'=>'الموظفين','rows'=>[
             ['الكود','الاسم الكامل','بداية العقد','تاريخ التعيين'],
             ['SC1','Start Canonical','2026-11-15',''],
             ['SC2','Start Conflict','2026-11-15','2026-11-10'],
             ['SC3','Start Legacy','','2026-11-17'],
-        ]], ['name'=>'ملخص','rows'=>[['بند','قيمة'],['إجمالي','3']]]]);
+        ]], ['name'=>'ملخص','rows'=>[['بند','قيمة'],['إجمالي','3']]]]));
         $file=UploadedFile::fake()->createWithContent('start.xlsx',file_get_contents($path)); unlink($path);
         $params=['file'=>$file,'ack_updates'=>'1'];
         $preview=$this->postJson('/employees/import/preview',$params)->assertSuccessful();
