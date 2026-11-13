@@ -306,4 +306,24 @@ class EmployeeImportDomainOnlyTest extends TestCase
         }
     }
 
+    public function test_missing_date_with_optional_name_and_c_in_out_is_attendance_not_people(): void
+    {
+        $file=$this->xlsx([['name'=>'بيانات','rows'=>[
+            ['code','الموظفين','c/in','c/out'],['104','عامر سالم جمعه','09:00','17:00'],
+        ]]]);
+        $preview=$this->postJson('/employees/import/preview',['file'=>$file])->assertOk();
+        $this->assertSame('attendance',$preview->json('sheets.0.kind'));
+        $this->assertStringContainsString('التاريخ',$preview->json('mapping_error'));
+        $this->assertTrue($preview->json('domain_only'));
+    }
+
+    public function test_domain_preview_does_not_hide_sixth_precise_row_error(): void
+    {
+        $rows=[['code','التاريخ','in','out']];
+        for($i=1;$i<=6;$i++) $rows[]=['missing-'.$i,'2026-11-12','09:00','17:00'];
+        $preview=$this->postJson('/employees/import/preview',['file'=>$this->xlsx([['name'=>'الحضور','rows'=>$rows]])])->assertOk();
+        $this->assertCount(6,$preview->json('domains.attendance.errors'));
+        $this->assertStringContainsString('الصف 7',$preview->json('domains.attendance.errors.5'));
+    }
+
 }
