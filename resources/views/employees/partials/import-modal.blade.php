@@ -1,14 +1,14 @@
 <div class="modal fade" id="employeesImportModal" tabindex="-1" aria-labelledby="employeesImportTitle" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
-        <div class="modal-content">
+        <div class="modal-content odir-import">
             <div class="modal-header flex-wrap gap-2">
                 <div>
                     <h5 class="modal-title mb-1" id="employeesImportTitle"><i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد الموظفين من Excel') }}</h5>
-                    <div class="d-flex flex-wrap gap-3 small" data-import-steps>
-                        <span data-step-id="upload">{{ __('1. رفع الملف') }}</span>
-                        <span data-step-id="sheets">{{ __('2. الأوراق وأنواعها') }}</span>
-                        <span data-step-id="preview">{{ __('3. المراجعة (بدون حفظ)') }}</span>
-                        <span data-step-id="result">{{ __('4. النتيجة') }}</span>
+                    <div class="import-stepper" data-import-steps>
+                        <span data-step-id="upload"><b class="step-number">1</b> {{ __('رفع الملف') }}</span>
+                        <span data-step-id="sheets"><b class="step-number">2</b> {{ __('الأوراق وأنواعها') }}</span>
+                        <span data-step-id="preview"><b class="step-number">3</b> {{ __('المراجعة') }}</span>
+                        <span data-step-id="result"><b class="step-number">4</b> {{ __('النتيجة') }}</span>
                     </div>
                 </div>
                 <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}" data-import-close></button>
@@ -35,11 +35,11 @@
                         <div class="form-text">{{ __('الحد الأقصى 5 ميجابايت و3000 صف. الحقل الوحيد المطلوب هو «الاسم الكامل»، ولا يهم ترتيب الأعمدة.') }}</div>
                     </div>
                     <div class="fw-semibold mb-2">{{ __('إذا كان الموظف موجودًا مسبقًا (نفس الرقم القومي أو الكود):') }}</div>
-                    <div class="form-check mb-1">
+                    <div class="form-check import-choice mb-2">
                         <input class="form-check-input" type="radio" name="import_duplicates" id="importDupUpdate" value="update" checked>
                         <label class="form-check-label" for="importDupUpdate">{{ __('تحديث بياناته بما في الملف') }} <span class="text-muted">{{ __('(الخلايا الفارغة لا تمسح بيانات حالية)') }}</span></label>
                     </div>
-                    <div class="form-check">
+                    <div class="form-check import-choice">
                         <input class="form-check-input" type="radio" name="import_duplicates" id="importDupSkip" value="skip">
                         <label class="form-check-label" for="importDupSkip">{{ __('تخطيه وعدم تعديل بياناته') }}</label>
                     </div>
@@ -48,7 +48,7 @@
                 {{-- Step 2: sheets and their types --}}
                 <div data-import-step="sheets" hidden>
                     <p class="text-muted small mb-3">{{ __('التطبيق يقترح نوع كل ورقة، والاختيار النهائي ليك: غيّر النوع لو القراءة غلط أو اختر «تجاهل». الاختيار هنا هو اللي بيحدد أين تُحفظ بيانات كل ورقة فعلًا — الأوراق المساعدة والمتجاهَلة لا تُستورد نهائيًا.') }}</p>
-                    <div data-import-sheets-list></div>
+                    <div class="file-chip mb-3" data-import-filename></div><div data-import-sheets-list></div>
                 </div>
 
                 {{-- Step 3: review --}}
@@ -78,11 +78,7 @@
 
                 {{-- Step 3: result --}}
                 <div data-import-step="result" hidden>
-                    <div class="text-center py-3">
-                        <i class="bi bi-check-circle-fill text-success" style="font-size:3rem"></i>
-                        <h5 class="mt-2 mb-1">{{ __('اكتمل الاستيراد') }}</h5>
-                        <div class="text-muted" data-import-result-text></div>
-                    </div>
+                    <div class="small text-muted mb-3" data-import-result-text></div>
                     <div data-import-result-extra></div>
                     <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
                         <a class="btn btn-outline-primary btn-sm" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> {{ __('عرض الموظفين') }}</a>
@@ -102,6 +98,9 @@
     </div>
 </div>
 
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/import-wizard.css') }}?v=1">
+@endpush
 @push('scripts')
 <script src="{{ asset('js/import-dropzone.js') }}?v={{ filemtime(public_path('js/import-dropzone.js')) }}"></script>
 <script>
@@ -136,7 +135,7 @@
     let busy = false;
     let needsReload = false;
     let lastData = null;
-    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' };
+    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' };
     let sheetsStepUsed = false;
     let table = { tab: 'all', query: '', limit: PAGE };
 
@@ -198,6 +197,7 @@
         body.append('mappings', JSON.stringify(state.mappings));
         body.append('sheet_kinds', JSON.stringify(state.sheetKinds));
         body.append('domain_mappings', JSON.stringify(state.domainMappings));
+        body.append('employee_mappings', JSON.stringify(state.employeeMappings));
         body.append('penalty_fixes', JSON.stringify(state.penaltyFixes));
         body.append('review_token', state.reviewToken || '');
         body.append('ack_dates', withAck && ackBox() && ackBox().checked ? '1' : '0');
@@ -369,7 +369,7 @@
         sheets.forEach((sheet) => {
             const value = String(sheet.index);
             const hint = sheet.eligible
-                ? window.masarT('يُستورد الموظفون الموجودون في هذه الورقة فقط، وتُتجاهل باقي الأوراق.')
+                ? window.masarT('يُستورد الموظفون الموجودون في هذه الورقة فقط، مع احترام الأنواع المحددة لباقي الأوراق.')
                 : window.masarT('ليست ورقة بيانات موظفين: يلزم الاسم الكامل ومعه بيانات تعريفية مثل الرقم القومي أو تاريخ بداية العقد.');
             html += '<div class="form-check mb-1"><input class="form-check-input" type="radio" name="import_sheet" id="importSheet' + esc(value) + '" value="' + esc(value) + '"' +
                 (selected === value ? ' checked' : '') + (sheet.eligible ? '' : ' disabled') + '>' +
@@ -432,7 +432,7 @@
     }
 
     // ---- 3) information -----------------------------------------------------
-    function infoHtml(data, mappingInDecisions) {
+    function infoHtml(data, mappingInDecisions, allowCorrections = true) {
         let html = '';
         const detail = (title, body, open) => '<details class="border rounded mb-2"' + (open ? ' open' : '') + '><summary class="p-2" style="cursor:pointer">' + title + '</summary><div class="p-2 pt-0 small">' + body + '</div></details>';
         if (data.capacity) {
@@ -465,7 +465,7 @@
             if (key === 'penalties' && d.excluded > 0) { line += ' · <span class="text-muted">' + num(d.excluded) + window.masarStaticHtml(' صف استبعدته</span>'); }
             line += '</div>';
             const penaltyFailures = key === 'penalties' ? (d.failures || []) : [];
-            if (penaltyFailures.length) {
+            if (penaltyFailures.length && allowCorrections) {
                 const types = data.penalty_types || [];
                 line += penaltyFailures.map((f) => {
                     const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
@@ -599,37 +599,66 @@
         return '';
     }
 
-    function renderSheetsStep(data) {
-        const sheets = data.sheets || [];
-        let html = '';
-        sheets.forEach((sheet) => {
-            const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
-            const corrected = state.sheetKinds[sheet.name] && state.sheetKinds[sheet.name] !== sheet.detected_kind;
-            const sheetId = 'sheetBody' + sheets.indexOf(sheet);
-            html += '<div class="border rounded p-2 mb-2">'
-                + '<div class="d-flex flex-wrap align-items-center gap-2">'
-                + '<button type="button" class="btn btn-sm btn-link p-0 text-decoration-none" data-sheet-toggle="' + sheetId + window.masarStaticHtml('" title="عرض/إخفاء التفاصيل"><i class="bi bi-chevron-down"></i></button>')
-                + '<div class="fw-semibold"><i class="bi bi-file-earmark-spreadsheet text-success"></i> ' + esc(sheet.name) + ' <span class="text-muted small">(' + num(sheet.rows) + window.masarStaticHtml(' صف)</span></div>')
-                + '<select class="form-select form-select-sm ms-auto" style="max-width:230px" data-sheet-kind="' + esc(sheet.name) + '">' + sheetKindOptions(chosen) + '</select>'
-                + '</div>'
-                + '<div id="' + sheetId + '" hidden>'
-                + '<div class="small mt-1 ' + (corrected ? 'text-warning-emphasis' : 'text-muted') + window.masarStaticHtml('">اقتراح التطبيق: ') + esc((data.kind_labels || {})[sheet.detected_kind] || window.masarT('غير معروفة')) + (corrected ? window.masarT(' — اخترت نوعًا مختلفًا وسيُحترم اختيارك') : '') + '</div>'
-                + domainMappingEditor(data, sheet, chosen)
-                + ((sheet.sample || []).length
-                    ? '<div class="table-responsive mt-1"><table class="table table-sm table-bordered mb-0 small text-muted"><tbody>'
-                      + sheet.sample.map((row) => '<tr>' + row.map((cell) => '<td class="text-truncate" style="max-width:140px">' + esc(cell) + '</td>').join('') + '</tr>').join('')
-                      + '</tbody></table></div>'
-                    : '')
-                + '</div></div>';
+    function employeeMappingEditor(data, sheet) {
+        const columns = sheet.employee_config?.columns || [];
+        if (!columns.length) return window.masarT('لا توجد أعمدة قابلة للربط. راجع الملف.');
+        const chosen = state.employeeMappings[sheet.name] || {};
+        let html = '<div class="table-responsive"><table class="table import-mapping"><thead><tr><th>العمود في ملفك</th><th>الحقل في النظام</th><th>عينة البيانات</th></tr></thead><tbody>';
+        columns.forEach(col => {
+            const selected = chosen[col.index] !== undefined ? chosen[col.index] : (col.field || '');
+            html += '<tr><td>' + esc(col.header) + '</td><td><select class="form-select form-select-sm" data-employee-field="' + col.index + '" data-employee-sheet="' + esc(sheet.name) + '"><option value="">تجاهل هذا العمود</option>'
+                + (data.fields || []).map(field => '<option value="' + esc(field.key) + '"' + (selected === field.key ? ' selected' : '') + '>' + esc(field.label) + '</option>').join('')
+                + '</select></td><td class="small text-muted">' + (col.samples || []).map(esc).join(' • ') + '</td></tr>';
         });
-        html += window.masarStaticHtml('<div class="form-text"><i class="bi bi-info-circle"></i> الأوراق من نوع «تجاهل» أو «غير معروفة» لا تدخل أي استيراد فعلي.</div>');
-        sheetsList.innerHTML = html;
+        return html + '</tbody></table></div><div class="form-text">الاسم الكامل مطلوب (أو أجزاء الاسم). الأعمدة غير المربوطة لن تُحفظ. راجع الربط قبل المتابعة.</div>';
     }
 
-    function needsSheetsStep(data) {
+    function renderSheetsStep(data) {
         const sheets = data.sheets || [];
-        if (sheets.length <= 1 && (sheets[0]?.kind || 'employees') === 'employees') { return false; }
-        return sheets.length > 0;
+        q('[data-import-filename]').textContent = fileInput.files[0]?.name || '';
+        let html = '<div class="table-responsive"><table class="table import-sheets"><thead><tr><th>#</th><th>اسم الورقة</th><th>نوع الورقة</th><th>ربط الأعمدة</th><th>تجاهل</th></tr></thead><tbody>';
+        sheets.forEach((sheet, index) => {
+            const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
+            const config = sheet.domain_config;
+            const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
+            const id = 'sheetBody' + index;
+            const ignored = chosen === 'ignore';
+            html += '<tr><td>' + (index+1) + '</td><td><button type="button" class="btn btn-link p-0" data-sheet-toggle="' + id + '" aria-expanded="false" aria-controls="' + id + '"><i class="bi bi-chevron-down"></i> ' + esc(sheet.name) + '</button><div class="text-muted small">' + num(sheet.rows) + ' صف</div></td>'
+                + '<td><select class="form-select form-select-sm" data-sheet-kind="' + esc(sheet.name) + '">' + sheetKindOptions(chosen) + '</select></td>'
+                + '<td><span class="mapping-chip">' + (ignored ? 'متجاهلة' : 'تم ربط ' + num(mapped) + ' عمودًا') + '</span><button type="button" class="btn btn-link btn-sm" data-sheet-toggle="' + id + '" aria-expanded="false" aria-controls="' + id + '">عرض / تعديل الربط</button></td>'
+                + '<td><input type="checkbox" class="form-check-input" data-ignore-sheet="' + esc(sheet.name) + '" aria-label="تجاهل ورقة ' + esc(sheet.name) + '"' + (ignored?' checked':'') + '></td></tr>';
+            html += '<tr id="' + id + '" hidden><td colspan="5"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
+                + (ignored ? '<p>هذه الورقة لن تُستورد.</p>' : chosen === 'employees' ? employeeMappingEditor(data, sheet) : domainMappingEditor(data,sheet,chosen))
+                + ((sheet.sample || []).length ? '<div class="small fw-semibold mt-3">عينة البيانات</div><div class="table-responsive"><table class="table table-sm small"><tbody>' + sheet.sample.map(row=>'<tr>'+row.map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>').join('') + '</tbody></table></div>' : '')
+                + '</div></td></tr>';
+        });
+        html += '</tbody></table></div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
+        sheetsList.innerHTML = html + infoHtml(data, true);
+    }
+
+    function needsSheetsStep(data) { return (data.sheets || []).length > 0; }
+
+    function domainReviewHtml(data) {
+        let html = '';
+        const note = (text) => '<div class="import-note mb-2">' + text + '</div>';
+        const capacity = data.capacity;
+        if (capacity) html += note('حد الباقة: ' + num(capacity.projected) + ' من ' + num(capacity.limit) + ' موظف بعد الاستيراد.');
+        const labels = {departments:'أقسام',jobs:'وظائف',branches:'فروع'};
+        Object.entries(data.new_lookups || {}).forEach(([key,values])=>{
+            if (values?.length) html += note('سيتم إنشاء ' + esc(labels[key] || key) + ': ' + values.map(esc).join('، '));
+        });
+        Object.entries(data.domains || {}).forEach(([kind,result])=>{
+            let text = '<strong>' + esc((data.kind_labels || {})[kind] || kind) + '</strong>: ' + num(result.imported) + ' صف صالح، ' + num(result.skipped) + ' مرفوض، ' + num(result.excluded || 0) + ' مستبعد.';
+            (result.errors || []).forEach(e=>text+='<div class="small text-danger">'+esc(e)+'</div>');
+            (result.warnings || []).forEach(e=>text+='<div class="small text-warning-emphasis">'+esc(e)+'</div>');
+            html += note(text);
+        });
+        if (data.review_sheets?.length) html += note('لن تُستورد الأوراق غير المعروفة: ' + data.review_sheets.map(s=>esc(s.name)).join('، '));
+        return html;
+    }
+
+    function summaryCards(items) {
+        return '<div class="import-stats">' + items.map(([label,count,tone])=>'<div class="import-stat ' + tone + '"><span>' + label + '</span><strong>' + num(count || 0) + '</strong></div>').join('') + '</div>';
     }
 
     function renderPreview(data) {
@@ -637,13 +666,16 @@
         table = { tab: data.summary.error > 0 ? 'errors' : 'all', query: '', limit: PAGE };
         box.search.value = '';
 
-        box.verdict.innerHTML = verdictHtml(data);
-        const suggestions = (data.columns || []).some((col) => !col.field && col.suggestion);
-        const mappingInDecisions = data.needs_mapping || suggestions;
-        const decisions = sheetsCard(data) + (mappingInDecisions ? mappingCard(data, true) : '') + updateAckCard(data) + ackCard(data);
-        const count = (sheetsCard(data) ? 1 : 0) + (mappingInDecisions ? 1 : 0) + (data.summary.update ? 1 : 0) + (data.summary.defaulted_dates ? 1 : 0);
-        box.decisions.innerHTML = decisions ? window.masarStaticHtml('<div class="fw-semibold mb-2"><i class="bi bi-hand-index"></i> قرارات مطلوبة (') + count + ')</div>' + decisions : '';
-        box.info.innerHTML = infoHtml(data, mappingInDecisions);
+        const summary = data.summary;
+        box.verdict.innerHTML = '<div class="import-section-title">مراجعة البيانات قبل الاستيراد</div><p class="text-muted small">راجع الصفوف ونتائج التحقق. لن تُحفظ الصفوف المرفوضة كموظفين.</p>'
+            + summaryCards([['إجمالي الصفوف',summary.total,'neutral'],['موظفون جدد',summary.create,'good'],['تحديث بيانات',summary.update,'blue'],['أخطاء',summary.error,'bad']]);
+        box.decisions.innerHTML = updateAckCard(data) + ackCard(data)
+            + (data.needs_mapping ? '<div class="alert alert-warning">أكمل ربط الاسم في مرحلة الأوراق أولًا.</div>' : '')
+            + (data.capacity?.exceeded ? '<div class="alert alert-danger">الاستيراد يتجاوز حد باقتك. عدّل الملف أو اختيار الأوراق.</div>' : '');
+        box.info.innerHTML = '<div class="d-flex gap-2 flex-wrap mb-3">'
+            + (summary.error ? '<button type="button" class="btn btn-outline-danger btn-sm" data-import-rejected>تحميل الصفوف المرفوضة (Excel)</button>' : '')
+            + '<button type="button" class="btn btn-light btn-sm" data-import-report>تحميل تقرير التحقق</button></div>'
+            + domainReviewHtml(data);
 
         box.tableWrap.hidden = !!data.needs_mapping || (!data.domain_only && importableCount(data) === 0);
         renderTabs();
@@ -667,7 +699,9 @@
 
         const failed = r.failed || [];
         const warnings = r.warnings || [];
-        let html = '';
+        let html = '<div class="import-success"><i class="bi bi-check-circle-fill"></i><div><strong>اكتمل الاستيراد</strong><div class="small">تم حفظ الصفوف الصالحة. راجع الملاحظات أدناه.</div></div></div>'
+            + summaryCards([['موظفون جدد',r.created,'good'],['تم تحديثهم',r.updated,'blue'],['متخطى / بدون تغيير',(r.skipped||0)+(r.unchanged||0),'neutral'],['مرفوض / تعذر حفظه',(data.summary?.error||0)+failed.length,'bad']])
+            + '<h6 class="mt-4">ملاحظات مهمة</h6>';
         const distributedErrors = [];
         const distributedWarnings = [];
         Object.values(data.distributed || {}).forEach((group) => {
@@ -697,6 +731,7 @@
         if (warnings.length) {
             html += '<div class="alert alert-light border small">' + num(warnings.length) + window.masarStaticHtml(' تنبيه (مثل مدير مباشر غير موجود). <button type="button" class="btn btn-link btn-sm p-0" data-import-report>تحميل التقرير</button></div>');
         }
+        html += data.batches_url ? '<div class="mt-3"><a class="btn btn-primary" href="' + esc(data.batches_url) + '">فتح صفحة مراجعة الاستيراد</a></div>' : '';
         q('[data-import-result-extra]').innerHTML = html;
     }
 
@@ -705,7 +740,7 @@
         fileInput.dispatchEvent(new Event('change'));
         lastData = null;
         lastResult = null;
-        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' };
+        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' };
         sheetsStepUsed = false;
         sheetsList.innerHTML = '';
         box.verdict.innerHTML = '';
@@ -729,6 +764,7 @@
         setBusy(true, button, label);
         try {
             const data = await send(urls.preview, false);
+            const openSheets = [...sheetsList.querySelectorAll('tr[id]:not([hidden])')].map(el=>el.id);
             lastData = data;
             // Bind the commit to what this preview showed: keep the
             // server-issued review token so the commit echoes the reviewed
@@ -744,6 +780,7 @@
                 sheetsStepUsed = true;
                 renderSheetsStep(data);
                 showStep('sheets');
+                openSheets.forEach(id=>{const el=document.getElementById(id);if(el) el.hidden=false;});
             }
         } catch (error) {
             showAlert(error.message);
@@ -754,7 +791,7 @@
     }
 
     // ---- events ---------------------------------------------------------------
-    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
     btn.preview.addEventListener('click', () => {
         const fromSheets = !steps.sheets.hidden;
         runPreview(btn.preview, fromSheets ? window.masarT('جارٍ تحديث المراجعة...') : window.masarT('جارٍ فحص الملف...'), false, fromSheets ? 'preview' : null);
@@ -771,10 +808,26 @@
         const body = sheetsList.querySelector('#' + toggle.getAttribute('data-sheet-toggle'));
         if (!body) { return; }
         body.hidden = !body.hidden;
+        sheetsList.querySelectorAll('[data-sheet-toggle="' + body.id + '"]').forEach(el=>el.setAttribute('aria-expanded',String(!body.hidden)));
         const icon = toggle.querySelector('i');
         if (icon) { icon.className = body.hidden ? 'bi bi-chevron-down' : 'bi bi-chevron-up'; }
     });
     sheetsList.addEventListener('change', (event) => {
+        const employeeField = event.target.closest('[data-employee-field]');
+        if (employeeField) {
+            const name = employeeField.dataset.employeeSheet;
+            const all = [...sheetsList.querySelectorAll('[data-employee-field]')].filter(el=>el.dataset.employeeSheet===name);
+            const selected = all.map(el=>el.value).filter(Boolean);
+            if (new Set(selected).size !== selected.length) { showAlert('لا يمكن ربط حقل واحد بأكثر من عمود في نفس الورقة.'); return; }
+            state.employeeMappings[name] = Object.fromEntries(all.map(el=>[el.dataset.employeeField,el.value]));
+            runPreview(null, '', false, 'reload-sheets'); return;
+        }
+        const ignore = event.target.closest('[data-ignore-sheet]');
+        if (ignore) {
+            const sheet = lastData.sheets.find(s=>s.name===ignore.dataset.ignoreSheet);
+            state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : sheet.detected_kind;
+            runPreview(null, '', false, 'reload-sheets'); return;
+        }
         const fieldSelect = event.target.closest('select[data-domain-field]');
         if (fieldSelect) {
             const sheetName = fieldSelect.getAttribute('data-domain-sheet');
@@ -783,19 +836,14 @@
             else { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = parseInt(fieldSelect.value, 10); }
             return;
         }
+        if (event.target.matches('input[name="import_sheet"]')) { state.sheet=event.target.value;runPreview(null,'',false,'reload-sheets');return; }
         const select = event.target.closest('select[data-sheet-kind]');
         if (!select) { return; }
         const name = select.getAttribute('data-sheet-kind');
         state.sheetKinds[name] = select.value;
         // Reload the detected column mapping for the newly chosen type, staying here.
         runPreview(null, '', false, 'reload-sheets');
-        const corrected = lastData && (lastData.sheets || []).find((sheet) => sheet.name === name);
-        const note = select.closest('.border').querySelector('.small');
-        if (note && corrected) {
-            const changed = select.value !== corrected.detected_kind;
-            note.className = 'small mt-1 ' + (changed ? 'text-warning-emphasis' : 'text-muted');
-            note.textContent = window.masarT('اقتراح التطبيق: ') + ((lastData.kind_labels || {})[corrected.detected_kind] || window.masarT('غير معروفة')) + (changed ? window.masarT(' — اخترت نوعًا مختلفًا وسيُحترم اختيارك') : '');
-        }
+
     });
 
     function onChange(event) {
