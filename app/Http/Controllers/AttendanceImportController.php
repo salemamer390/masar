@@ -202,7 +202,7 @@ class AttendanceImportController extends Controller
                     if (($row['issue'] ?? null) !== 'extra') $imported++; else $deferred++;
                 } catch (\Throwable $exception) {
                     $skippedRows++;
-                    if (count($errors) < 25) $errors[] = "{$row['ref']}: {$exception->getMessage()}";
+                    $errors[] = "{$row['ref']}: {$exception->getMessage()}";
                 }
             }
 
@@ -214,7 +214,7 @@ class AttendanceImportController extends Controller
                     $refreshWarnings++;
                 }
             }
-            if ($refreshWarnings > 0 && count($errors) < 25) {
+            if ($refreshWarnings > 0) {
                 $errors[] = "تعذر تحديث مسودات الرواتب المفتوحة لـ {$refreshWarnings} موظفًا؛ السجلات استُوردت، أعد حساب المسودات يدويًا.";
             }
 
@@ -224,10 +224,89 @@ class AttendanceImportController extends Controller
                 . ($deferred ? " وحفظ {$deferred} يومًا باستثناءات للمراجعة" : '')
                 . ($skippedRows ? " وتخطي {$skippedRows} سجل بأخطاء" : '')
                 . ($refreshWarnings ? " مع تنبيه في تحديث مسودات الرواتب" : '') . '.';
-            return redirect()->route('attendance.index')->with('toast', $message)->with('attendance_import_errors', $errors);
+            $reportToken = (string) Str::uuid();
+            Storage::disk('local')->put("imports/{$reportToken}.json", json_encode([
+                'company_id' => (int) $request->user()->company_id, 'user_id' => (int) $request->user()->id,
+                'created_at' => now()->toIso8601String(),
+            ]));
+            Storage::disk('local')->put("imports/{$reportToken}.report", encrypt([
+                'fileName' => $fileName, 'message' => $message, 'imported' => $imported,
+                'deferred' => $deferred, 'failed' => $skippedRows, 'error_count' => count($errors),
+                'errors' => array_slice($errors, 0, 25),
+                'export' => $this->errorExportRows($errors, $unit, $sheets),
+                'batch_id' => $batch->id,
+            ]));
+            if ($request->input('wizard') === '1') return redirect()->route('attendance.import.result', $reportToken);
+            return redirect()->route('attendance.index')->with('toast', $message)->with('attendance_import_errors', array_slice($errors, 0, 25))
+                ->with('attendance_import_report', route('attendance.import.result', $reportToken));
         } finally {
             $lock->release();
         }
+    }
+
+    /** Download every validation message with the assigned source cells. Never re-imports data. */
+    public function rejected(Request $request)
+    {
+        $request->validate(['import_token' => ['required', 'uuid'], 'unit' => ['required', 'string'], 'map' => ['nullable', 'array'], 'options' => ['nullable', 'array']]);
+        $temp = $this->loadTempImport((string) $request->input('import_token'), $request);
+        abort_unless($temp, 410, __('انتهت صلاحية الملف. أعد رفعه.'));
+        [$sheets] = $temp;
+        [$units] = $this->buildUnits($this->analyzer->analyze($sheets));
+        $unit = collect($units)->firstWhere('key', $request->input('unit'));
+        abort_unless($unit, 422);
+        $map = $this->applyPostedMap($unit['map'], $this->sanitisePostedMap($request->input('map', [])), count($unit['headers']));
+        $options = $this->normaliseOptions($this->sanitisePostedOptions($request->input('options', [])));
+        $unit['map'] = $map;
+        [, $errors] = $this->parseUnit($unit, $map, $sheets, $options);
+        return $this->downloadErrorRows($this->errorExportRows($errors, $unit, $sheets));
+    }
+
+    public function result(Request $request, string $token)
+    {
+        $report = $this->loadReport($request, $token);
+        return response()->view('attendance.import-result', ['report' => $report, 'reportToken' => $token])->header('Cache-Control', 'private, no-store');
+    }
+
+    public function resultRejected(Request $request, string $token)
+    {
+        return $this->downloadErrorRows($this->loadReport($request, $token)['export']);
+    }
+
+    private function loadReport(Request $request, string $token): array
+    {
+        abort_unless(Str::isUuid($token), 404);
+        $disk = Storage::disk('local');
+        $meta = $disk->exists("imports/{$token}.json") ? json_decode($disk->get("imports/{$token}.json"), true) : null;
+        abort_unless(is_array($meta) && (int) ($meta['company_id'] ?? 0) === (int) $request->user()->company_id
+            && (int) ($meta['user_id'] ?? 0) === (int) $request->user()->id, 404);
+        abort_if(Carbon::parse($meta['created_at'])->lt(now()->subMinutes(self::TOKEN_TTL_MINUTES)), 410, __('انتهت صلاحية تقرير الاستيراد. راجع سجل الاستيراد.'));
+        abort_unless($disk->exists("imports/{$token}.report"), 404);
+        return decrypt($disk->get("imports/{$token}.report"));
+    }
+
+    private function downloadErrorRows(array $rows)
+    {
+        $path = tempnam(sys_get_temp_dir(), 'attendance-rejected-');
+        (new \App\Services\Imports\XlsxWriter())->write($path, ['الورقة / الصف', 'سبب الرفض أو المراجعة', 'قيم الأعمدة المرتبطة'], $rows);
+        return response()->download($path, 'attendance-rejected.xlsx', ['Cache-Control' => 'private, no-store'])->deleteFileAfterSend(true);
+    }
+
+    private function errorExportRows(array $errors, array $unit, array $sheets): array
+    {
+        $result = [];
+        foreach ($errors as $error) {
+            $source = ''; $values = [];
+            if (preg_match('/«(.+?)»\s*\/\s*الصف (\d+)/u', $error, $match)) {
+                $source = $match[1] . ' / ' . $match[2];
+                $sheet = collect($sheets)->firstWhere('name', $match[1]);
+                $row = $sheet['rows'][(int) $match[2]] ?? [];
+                foreach ($unit['map'] as $field => $index) {
+                    $values[] = ($this->fieldLabels()[$field] ?? $field) . ': ' . ($row[$index] ?? '');
+                }
+            }
+            $result[] = [$source, (string) $error, implode(' | ', $values)];
+        }
+        return $result;
     }
 
     /** Render the preview page; posted map/options overrides drive the shown stats/sample for the selected unit. */
@@ -262,10 +341,10 @@ class AttendanceImportController extends Controller
     /** @return array{0: array, 1: string}|null sheets + original file name when the token is valid for this user. */
     private function loadTempImport(string $token, Request $request): ?array
     {
-        $file = collect(Storage::disk('local')->files('imports'))->first(fn ($f) => str_starts_with(basename($f), $token . '.') && !str_ends_with($f, '.json'));
+        $file = collect(Storage::disk('local')->files('imports'))->first(fn ($f) => str_starts_with(basename($f), $token . '.') && in_array(pathinfo($f, PATHINFO_EXTENSION), ['xlsx', 'csv', 'txt'], true));
         $metaRaw = Storage::disk('local')->exists("imports/{$token}.json") ? Storage::disk('local')->get("imports/{$token}.json") : null;
         $meta = $metaRaw ? json_decode($metaRaw, true) : null;
-        if (!$file || !is_array($meta)) { $this->deleteTempImport($token); return null; }
+        if (!$file || !is_array($meta)) return null;
         if ((int) ($meta['company_id'] ?? 0) !== (int) $request->user()->company_id) return null;
         if ((int) ($meta['user_id'] ?? 0) !== (int) $request->user()->id) return null;
         try { $createdAt = isset($meta['created_at']) ? Carbon::parse($meta['created_at']) : null; } catch (\Throwable) { $createdAt = null; }
@@ -463,7 +542,7 @@ class AttendanceImportController extends Controller
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
-        return [$rows, array_slice($errors, 0, 25)];
+        return [$rows, $errors];
     }
 
     private function parsePunches(array $unit, array $map, array $sheets, array $options): array
@@ -505,7 +584,7 @@ class AttendanceImportController extends Controller
             }
             $rows[] = ['employee' => $employees[(int) $day['key']], 'date' => $day['date'], 'check_in' => $day['check_in'], 'check_out' => $day['check_out'], 'status' => 'Present', 'ref' => $ref, 'punches' => $day['punches'], 'issue' => count($day['punches']) > 2 ? 'extra' : (count($day['punches']) === 1 ? 'missing' : null)];
         }
-        return [$rows, array_slice($errors, 0, 25)];
+        return [$rows, $errors];
     }
 
     private function parsePerEmployee(array $unit, array $map, array $sheets, array $options): array
@@ -539,7 +618,7 @@ class AttendanceImportController extends Controller
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
-        return [$rows, array_slice($errors, 0, 25)];
+        return [$rows, $errors];
     }
 
     /** Preview card data for one unit: resolution stats, sample rows, overwrite counts, early errors. */
@@ -560,7 +639,7 @@ class AttendanceImportController extends Controller
             'overwrites_manual' => $overwrites['manual'],
             'deferred_existing' => count(array_filter($rows, fn ($row) => ($row['issue'] ?? null) === 'extra' && isset($existing[$row['employee']->id.'|'.$row['date']]))),
             'ambiguous_dates' => $this->unitHasAmbiguousDates($unit, $unit['map'], $sheets),
-            'sample' => array_slice(array_map(fn ($row) => [
+            'sample' => array_map(fn ($row) => [
                 'employee' => $row['employee']->full_name,
                 'code' => $row['employee']->employee_code,
                 'date' => $row['date'],
@@ -568,7 +647,7 @@ class AttendanceImportController extends Controller
                 'check_out' => ($row['issue'] ?? null) === 'extra' ? 'مراجعة البصمات الزائدة' : ($row['check_out'] ?? '—'),
                 'exists' => isset($existing[$row['employee']->id . '|' . $row['date']]),
                 'deferred' => ($row['issue'] ?? null) === 'extra',
-            ], $rows), 0, 5),
+            ], $rows),
             'errors' => $errors,
         ];
     }
