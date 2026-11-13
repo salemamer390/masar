@@ -135,7 +135,7 @@
     let busy = false;
     let needsReload = false;
     let lastData = null;
-    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' };
+    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' };
     let sheetsStepUsed = false;
     let table = { tab: 'all', query: '', limit: PAGE };
 
@@ -677,7 +677,7 @@
             + '<button type="button" class="btn btn-light btn-sm" data-import-report>تحميل تقرير التحقق</button></div>'
             + domainReviewHtml(data);
 
-        box.tableWrap.hidden = !!data.needs_mapping || (!data.domain_only && importableCount(data) === 0);
+        box.tableWrap.hidden = !!data.needs_mapping;
         renderTabs();
         renderTable();
 
@@ -740,7 +740,7 @@
         fileInput.dispatchEvent(new Event('change'));
         lastData = null;
         lastResult = null;
-        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' };
+        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' };
         sheetsStepUsed = false;
         sheetsList.innerHTML = '';
         box.verdict.innerHTML = '';
@@ -791,7 +791,7 @@
     }
 
     // ---- events ---------------------------------------------------------------
-    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
     btn.preview.addEventListener('click', () => {
         const fromSheets = !steps.sheets.hidden;
         runPreview(btn.preview, fromSheets ? window.masarT('جارٍ تحديث المراجعة...') : window.masarT('جارٍ فحص الملف...'), false, fromSheets ? 'preview' : null);
@@ -818,21 +818,22 @@
             const name = employeeField.dataset.employeeSheet;
             const all = [...sheetsList.querySelectorAll('[data-employee-field]')].filter(el=>el.dataset.employeeSheet===name);
             const selected = all.map(el=>el.value).filter(Boolean);
-            if (new Set(selected).size !== selected.length) { showAlert('لا يمكن ربط حقل واحد بأكثر من عمود في نفس الورقة.'); return; }
+            if (new Set(selected).size !== selected.length) { employeeField.value = state.employeeMappings[name]?.[employeeField.dataset.employeeField] ?? lastData.sheets.find(s=>s.name===name)?.employee_config?.columns.find(c=>String(c.index)===employeeField.dataset.employeeField)?.field ?? ''; showAlert('لا يمكن ربط حقل واحد بأكثر من عمود في نفس الورقة.'); return; }
             state.employeeMappings[name] = Object.fromEntries(all.map(el=>[el.dataset.employeeField,el.value]));
             runPreview(null, '', false, 'reload-sheets'); return;
         }
         const ignore = event.target.closest('[data-ignore-sheet]');
         if (ignore) {
             const sheet = lastData.sheets.find(s=>s.name===ignore.dataset.ignoreSheet);
-            state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : sheet.detected_kind;
+            if (ignore.checked) state.ignoredKinds[sheet.name] = state.sheetKinds[sheet.name] || sheet.kind;
+            state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : (state.ignoredKinds[sheet.name] || sheet.detected_kind);
             runPreview(null, '', false, 'reload-sheets'); return;
         }
         const fieldSelect = event.target.closest('select[data-domain-field]');
         if (fieldSelect) {
             const sheetName = fieldSelect.getAttribute('data-domain-sheet');
             state.domainMappings[sheetName] = state.domainMappings[sheetName] || {};
-            if (fieldSelect.value === '') { delete state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')]; }
+            if (fieldSelect.value === '') { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = ''; }
             else { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = parseInt(fieldSelect.value, 10); }
             return;
         }
@@ -840,6 +841,7 @@
         const select = event.target.closest('select[data-sheet-kind]');
         if (!select) { return; }
         const name = select.getAttribute('data-sheet-kind');
+        if (select.value === 'ignore') state.ignoredKinds[name] = state.sheetKinds[name] || lastData.sheets.find(s=>s.name===name)?.kind;
         state.sheetKinds[name] = select.value;
         // Reload the detected column mapping for the newly chosen type, staying here.
         runPreview(null, '', false, 'reload-sheets');
@@ -890,6 +892,7 @@
         if (event.target.closest('[data-import-report]')) { downloadReport(); }
     }
 
+    sheetsList.addEventListener('change', (event)=>{ if(event.target.closest('[data-penalty-fix]')) onChange(event); });
     [box.decisions, box.info].forEach((el) => { el.addEventListener('change', onChange); el.addEventListener('click', onClick); });
     box.verdict.addEventListener('click', onClick);
     q('[data-import-result-extra]').addEventListener('click', onClick);
