@@ -150,7 +150,37 @@ class WorkbookLeavePenaltyImporter
     private function mapHeaders(array $headers): array
     {
         $aliases = ['code' => ['كود الموظف', 'الكود', 'كود', 'employee code', 'code'], 'name' => ['اسم الموظف', 'employee name', 'name'], 'leave_type' => ['نوع الإجازة', 'leave type', 'تصنيف الإجازة', 'vacation type', 'leave category'], 'start' => ['من تاريخ', 'start date', 'بداية الإجازة', 'تاريخ بداية الإجازة', 'إجازة من', 'leave start date', 'from date', 'vacation from'], 'end' => ['إلى تاريخ', 'end date', 'نهاية الإجازة', 'تاريخ نهاية الإجازة', 'إجازة إلى', 'leave end date', 'to date', 'vacation to'], 'days' => ['عدد الأيام', 'days', 'عدد أيام الإجازة', 'أيام الإجازة', 'مدة الإجازة', 'leave days', 'number of leave days', 'vacation days', 'leave duration'], 'status' => ['حالة الطلب', 'حالة القرار', 'status', 'حالة الإجازة', 'موقف الطلب', 'leave status', 'request status'], 'reason' => ['ملاحظات', 'السبب', 'reason', 'سبب الإجازة', 'سبب الطلب', 'leave reason', 'request reason', 'وصف المخالفة', 'وصف الجزاء'], 'penalty_type' => ['نوع الجزاء', 'penalty type', 'الجزاء', 'الإجراء التأديبي', 'disciplinary action', 'sanction type'], 'date' => ['تاريخ القرار', 'التاريخ', 'penalty date', 'decision date'], 'deduction' => ['أيام الخصم المطبقة', 'تعديل يدوي لأيام الخصم', 'أيام الخصم', 'deduction days', 'أيام الجزاء', 'عدد أيام الجزاء', 'penalty days', 'suspension days']];
-        $map = []; foreach ($headers as $index => $header) { $key = $this->normalise($header); foreach ($aliases as $field => $values) if (in_array($key, array_map(fn ($value) => $this->normalise($value), $values), true)) { $map[$field] = $index; break; } } return $map;
+        $map = [];
+        foreach ($headers as $index => $header) {
+            $key = $this->normalise($header);
+            foreach ($aliases as $field => $values) {
+                if (in_array($key, array_map(fn ($value) => $this->normalise($value), $values), true)) {
+                    $map[$field] = $index;
+                    break;
+                }
+            }
+        }
+        // Generic day/unit and description headings only have this meaning in a
+        // penalty sheet. Do not steal leave-day columns or replace explicit fields.
+        if (isset($map['penalty_type']) && !isset($map['leave_type'])) {
+            $quantityAliases = array_map(fn ($value) => $this->normalise($value), [
+                'عدد الأيام/الوحدات', 'عدد الايام/الوحدات', 'عدد الأيام والوحدات', 'عدد الايام والوحدات',
+                'عدد الأيام أو الوحدات', 'عدد الايام او الوحدات', 'عدد الأيام', 'عدد الايام',
+                'عدد الوحدات', 'أيام الخصم', 'ايام الخصم', 'عدد أيام الخصم', 'عدد ايام الخصم',
+                'days/units', 'number of days/units', 'number of days', 'number of units',
+            ]);
+            foreach ($headers as $index => $header) {
+                $key = $this->normalise($header);
+                if (!isset($map['deduction']) && in_array($key, $quantityAliases, true)) {
+                    $map['deduction'] = $index;
+                }
+                if (!isset($map['reason']) && in_array($key, ['الوصف', 'description'], true)) {
+                    $map['reason'] = $index;
+                }
+            }
+        }
+
+        return $map;
     }
 
     private function employee(mixed $code, mixed $name): ?Employee { if (filled($code)) { $code = trim((string) $code); $employee = Employee::where('employee_code', $code)->first(); if (!$employee) { throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.'); } if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) { throw new \RuntimeException('كود الموظف لا يطابق الاسم.'); } return $employee; } if (!filled($name)) { return null; } $matches = Employee::where('full_name', trim((string) $name))->get(); if ($matches->count() > 1) { throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.'); } return $matches->first(); }

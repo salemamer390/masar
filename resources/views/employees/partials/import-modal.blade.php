@@ -1,108 +1,75 @@
-<div class="modal fade" id="employeesImportModal" tabindex="-1" aria-labelledby="employeesImportTitle" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
-        <div class="modal-content odir-import">
-            <div class="modal-header flex-wrap gap-2">
-                <div>
-                    <h5 class="modal-title mb-1" id="employeesImportTitle"><i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد الموظفين من Excel') }}</h5>
-                    <div class="import-stepper" data-import-steps>
-                        <span data-step-id="upload"><b class="step-number">1</b> {{ __('رفع الملف') }}</span>
-                        <span data-step-id="sheets"><b class="step-number">2</b> {{ __('الأوراق وأنواعها') }}</span>
-                        <span data-step-id="preview"><b class="step-number">3</b> {{ __('المراجعة') }}</span>
-                        <span data-step-id="result"><b class="step-number">4</b> {{ __('النتيجة') }}</span>
-                    </div>
-                </div>
-                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}" data-import-close></button>
-            </div>
-
-            <div class="modal-body">
-                <div class="alert alert-danger py-2 small" data-import-alert hidden role="alert"></div>
-
-                <div data-import-progress hidden class="mb-3" role="status" aria-live="polite">
-                    <div data-import-progress-label class="small mb-1">{{ __('جارٍ رفع الملف...') }}</div>
-                    <progress data-import-progress-bar max="100" class="w-100" aria-label="{{ __('تقدم رفع الملف') }}"></progress>
-                    <small class="text-muted">{{ __('نسبة الرفع تعكس البيانات المرسلة فقط. فحص الصفوف على الخادم يستمر بعدها دون نسبة تقديرية.') }}</small>
-                </div>
-
-                {{-- Step 1: upload --}}
-                <div data-import-step="upload">
-                    <p class="text-muted small mb-3">{{ __('ارفع ملف Excel (xlsx) أو CSV يحتوي على بيانات الموظفين. سيتم فحص الملف أولًا وعرض النتيجة، ولن يُحفظ شيء قبل تأكيدك.') }}</p>
-                    <a class="btn btn-outline-success btn-sm mb-3" href="{{ route('employees.import.template') }}">
-                        <i class="bi bi-download"></i> {{ __('تحميل نموذج Excel الجاهز') }}
-                    </a>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold" for="employeesImportFile">{{ __('ملف الموظفين') }}</label>
-                        <input type="file" id="employeesImportFile" class="form-control" accept=".xlsx,.csv">
-                        <div class="form-text">{{ __('الحد الأقصى 5 ميجابايت و3000 صف. الحقل الوحيد المطلوب هو «الاسم الكامل»، ولا يهم ترتيب الأعمدة.') }}</div>
-                    </div>
-                    <div class="fw-semibold mb-2">{{ __('إذا كان الموظف موجودًا مسبقًا (نفس الرقم القومي أو الكود):') }}</div>
-                    <div class="form-check import-choice mb-2">
-                        <input class="form-check-input" type="radio" name="import_duplicates" id="importDupUpdate" value="update" checked>
-                        <label class="form-check-label" for="importDupUpdate">{{ __('تحديث بياناته بما في الملف') }} <span class="text-muted">{{ __('(الخلايا الفارغة لا تمسح بيانات حالية)') }}</span></label>
-                    </div>
-                    <div class="form-check import-choice">
-                        <input class="form-check-input" type="radio" name="import_duplicates" id="importDupSkip" value="skip">
-                        <label class="form-check-label" for="importDupSkip">{{ __('تخطيه وعدم تعديل بياناته') }}</label>
-                    </div>
-                </div>
-
-                {{-- Step 2: sheets and their types --}}
-                <div data-import-step="sheets" hidden>
-                    <p class="text-muted small mb-3">{{ __('التطبيق يقترح نوع كل ورقة، والاختيار النهائي ليك: غيّر النوع لو القراءة غلط أو اختر «تجاهل». الاختيار هنا هو اللي بيحدد أين تُحفظ بيانات كل ورقة فعلًا — الأوراق المساعدة والمتجاهَلة لا تُستورد نهائيًا.') }}</p>
-                    <div class="file-chip mb-3" data-import-filename></div><div data-import-sheets-list></div>
-                </div>
-
-                {{-- Step 3: review --}}
-                <div data-import-step="preview" hidden>
-                    <div data-import-verdict class="mb-3"></div>
-                    <div data-import-decisions></div>
-                    <div data-import-info class="mb-3"></div>
-                    <div data-import-table-wrap>
-                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                            <div class="btn-group btn-group-sm flex-wrap" role="group" data-import-tabs></div>
-                            <input type="search" class="form-control form-control-sm" style="max-width:220px" placeholder="{{ __('بحث بالاسم أو رقم الصف') }}" data-import-search>
-                        </div>
-                        <div class="table-responsive border rounded" style="max-height:320px;overflow:auto">
-                            <table class="table table-sm align-middle mb-0">
-                                <thead class="table-light" style="position:sticky;top:0">
-                                    <tr><th style="width:64px">{{ __('الصف') }}</th><th>{{ __('الاسم') }}</th><th style="width:90px">{{ __('العملية') }}</th><th>{{ __('ملاحظات') }}</th></tr>
-                                </thead>
-                                <tbody data-import-rows></tbody>
-                            </table>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <span class="form-text m-0" data-import-count></span>
-                            <button type="button" class="btn btn-link btn-sm" data-import-more hidden>{{ __('عرض المزيد') }}</button>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Step 3: result --}}
-                <div data-import-step="result" hidden>
-                    <div class="small text-muted mb-3" data-import-result-text></div>
-                    <div data-import-result-extra></div>
-                    <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
-                        <a class="btn btn-outline-primary btn-sm" href="{{ route('employees.index') }}"><i class="bi bi-people"></i> {{ __('عرض الموظفين') }}</a>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" data-import-another><i class="bi bi-arrow-repeat"></i> {{ __('استيراد ملف آخر') }}</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal" data-import-cancel>{{ __('إلغاء') }}</button>
-                <button type="button" class="btn btn-light" data-import-back hidden>{{ __('رجوع') }}</button>
-                <button type="button" class="btn btn-primary" data-import-preview><i class="bi bi-search"></i> <span>{{ __('فحص الملف') }}</span></button>
-                <button type="button" class="btn btn-success" data-import-commit hidden><i class="bi bi-check2-circle"></i> <span>{{ __('تأكيد الاستيراد') }}</span></button>
-                <button type="button" class="btn btn-primary" data-import-finish hidden>{{ __('إغلاق وتحديث الصفحة') }}</button>
-            </div>
-        </div>
-    </div>
+<div aria-hidden="true" aria-labelledby="employeesImportTitle" class="modal fade" data-bs-backdrop="static" id="employeesImportModal" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable import-dialog">
+<div class="modal-content import-modal">
+<div class="modal-header">
+<div class="modal-heading"><span class="heading-icon"><i class="bi bi-cloud-arrow-up"></i></span><div><h2 class="modal-title" id="employeesImportTitle">استيراد الموظفين</h2><p>استيراد بيانات الموظفين من ملف Excel أو CSV</p></div></div>
+<button aria-label="إغلاق" class="btn-close ms-0 me-auto" data-bs-dismiss="modal" data-import-close="" type="button"></button>
+</div>
+<div class="modal-body"><div class="inline-alert" data-import-alert="" hidden="" role="alert"></div><div aria-live="polite" data-import-progress="" hidden="" role="status"><div class="small mb-1" data-import-progress-label="">جارٍ رفع الملف...</div><progress class="w-100" data-import-progress-bar="" max="100"></progress></div>
+<div class="stepper" data-import-steps="" id="stepper">
+<div class="step active" data-step-id="upload"><span>1</span><b>رفع الملف</b></div>
+<div class="step" data-step-id="sheets"><span>2</span><b>الأوراق وأنواعها</b></div>
+<div class="step" data-step-id="preview"><span>3</span><b>المراجعة</b></div>
+<div class="step" data-step-id="result"><span>4</span><b>النتيجة</b></div>
+</div>
+<section class="wizard-panel" data-import-step="upload">
+<div class="section-title"><div><h3>المرحلة الأولى: رفع الملف</h3><p>ارفع ملف الموظفين، ثم اختر طريقة التعامل مع الموظفين الموجودين بالفعل.</p></div><span class="section-icon"><i class="bi bi-file-earmark-spreadsheet"></i></span></div>
+<a class="btn btn-outline-success btn-sm mb-3" href="{{ route('employees.import.template') }}"><i class="bi bi-download ms-1"></i>تحميل نموذج Excel الجاهز</a><label class="drop-zone" for="employeesImportFile" id="dropZone" tabindex="0" role="button" aria-label="اختيار ملف الموظفين">
+<input accept=".xlsx,.csv" hidden="" id="employeesImportFile" type="file"/>
+<span class="upload-art"><i class="bi bi-file-earmark-excel"></i><i class="bi bi-filetype-csv"></i></span>
+<strong id="dropTitle">اسحب ملفك هنا، أو اختر ملفًا من جهازك</strong>
+<small>الصيغ المدعومة: Excel (.xlsx) و CSV (.csv)</small>
+<span class="btn btn-outline-primary mt-3">اختيار ملف <i class="bi bi-folder2-open me-1"></i></span>
+</label>
+<div class="file-selected d-none" id="fileSelected"><i class="bi bi-file-earmark-excel"></i><div><strong id="fileName"></strong><small id="fileMeta"></small></div><button class="icon-btn danger" id="removeFile" title="إزالة الملف" type="button"><i class="bi bi-trash"></i></button></div>
+<div class="choice-heading"><i class="bi bi-info-circle"></i> عند وجود موظف بنفس الكود أو الرقم القومي:</div>
+<div class="duplicate-options">
+<label class="duplicate-card selected"><input checked="" id="importDupUpdate" name="import_duplicates" type="radio" value="update"/><span class="radio-dot"></span><div><strong>تحديث بياناته</strong><small>تحديث بيانات الموظف الموجود بالبيانات الجديدة</small></div></label>
+<label class="duplicate-card"><input id="importDupSkip" name="import_duplicates" type="radio" value="skip"/><span class="radio-dot"></span><div><strong>تخطيه</strong><small>عدم استيراد بياناته وترك البيانات الحالية كما هي</small></div></label>
 </div>
 
+</section>
+<section class="wizard-panel" data-import-step="sheets" hidden="">
+<div class="section-title"><div><h3>الأوراق وأنواعها</h3><p>حدد نوع كل ورقة، وراجع ربط الأعمدة أو اختر تجاهل الأوراق غير المطلوبة.</p></div><span class="section-icon"><i class="bi bi-table"></i></span></div>
+<div class="file-summary" data-import-filename=""></div>
+<div data-import-sheets-list=""></div>
+<div class="inline-alert info">راجع نوع كل ورقة وربط الأعمدة قبل المتابعة. الأوراق المتجاهلة لا تُستورد.</div>
+</section>
+<section class="wizard-panel" data-import-step="preview" hidden="">
+<div class="section-title"><div><h3>مراجعة البيانات قبل الاستيراد</h3><p>راجع ملخص النتائج والأخطاء. لن يتم حفظ أي بيانات في هذه المرحلة.</p></div><span class="section-icon"><i class="bi bi-clipboard-check"></i></span></div>
+<div class="inline-alert info"><i class="bi bi-shield-check"></i><span><strong>وضع المراجعة فقط:</strong> لم يتم حفظ أي بيانات في النظام حتى الآن.</span></div>
+<div data-import-verdict=""></div><div data-import-decisions=""></div><div data-import-info=""></div>
+
+<div data-import-table-wrap=""><div class="review-toolbar">
+<strong>تفاصيل التحقق من البيانات</strong>
+<div class="filter-pills" data-import-tabs=""></div>
+</div><input class="form-control form-control-sm mb-2" data-import-search="" placeholder="بحث بالاسم أو رقم الصف" style="max-width:220px" type="search"/>
+<div class="table-responsive review-table-wrap">
+<table class="table review-table align-middle">
+<thead><tr><th>#</th><th>اسم الموظف</th><th>كود الموظف</th><th>الإجراء</th><th>حالة التحقق</th><th>السبب / الملاحظات</th></tr></thead>
+<tbody data-import-rows=""></tbody>
+</table>
+</div>
+<div class="review-foot"><span data-import-count="">لا توجد بيانات للمراجعة</span><button class="btn btn-sm btn-outline-danger" data-import-rejected=""><i class="bi bi-file-earmark-excel ms-1"></i>تحميل الصفوف المرفوضة</button><button class="btn btn-link btn-sm" data-import-more="" hidden="" type="button">عرض المزيد</button></div>
+</div></section>
+<section class="wizard-panel" data-import-step="result" hidden=""><div class="result-heading"><span class="success-check"><i class="bi bi-check-lg"></i></span><h3>نتيجة استيراد الموظفين</h3><p>اكتملت معالجة الملف. راجع ملخص النتائج أدناه.</p></div><div class="d-none" data-import-result-text=""></div><div data-import-result-extra=""></div><div class="d-none"><button data-import-another="" type="button">استيراد ملف آخر</button></div></section>
+</div>
+<div class="modal-footer wizard-footer">
+<button class="btn btn-light border" data-bs-dismiss="modal" data-import-cancel="" type="button">إلغاء</button>
+<div class="footer-right">
+<button class="btn btn-outline-secondary" data-import-back="" hidden="" type="button"><i class="bi bi-arrow-right ms-2"></i>السابق</button>
+<button class="btn btn-primary" data-import-preview="" disabled="" type="button"><span>فحص الملف</span> <i class="bi bi-search me-2"></i></button>
+<button class="btn btn-success" data-import-commit="" hidden="" type="button"><span>تأكيد الاستيراد</span> <i class="bi bi-check2 me-2"></i></button>
+<button class="btn btn-primary" data-bs-dismiss="modal" data-import-finish="" hidden="" type="button">إغلاق <i class="bi bi-check2 me-2"></i></button>
+</div>
+</div>
+</div>
+</div>
+</div>
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/import-wizard.css') }}?v=1">
+<link rel="stylesheet" href="{{ asset('css/employee-import-reference.css') }}?v={{ filemtime(public_path('css/employee-import-reference.css')) }}">
 @endpush
 @push('scripts')
-<script src="{{ asset('js/import-dropzone.js') }}?v={{ filemtime(public_path('js/import-dropzone.js')) }}"></script>
 <script>
 (function () {
     const modalEl = document.getElementById('employeesImportModal');
@@ -119,7 +86,25 @@
     const steps = { upload: q('[data-import-step="upload"]'), sheets: q('[data-import-step="sheets"]'), preview: q('[data-import-step="preview"]'), result: q('[data-import-step="result"]') };
     const sheetsList = q('[data-import-sheets-list]');
     const fileInput = q('#employeesImportFile');
-    window.MasarImportDropzone?.init(fileInput, { maxBytes: 5 * 1024 * 1024, i18n: { title: @js(__('اسحب الملف وأفلته هنا، أو اضغط للاختيار')), badType: @js(__('نوع الملف غير مدعوم. المسموح: ')), tooBig: @js(__('الملف أكبر من الحجم المسموح (')), oneFile: @js(__('ارفع ملفًا واحدًا فقط.')) } });
+    const dropZone = q('#dropZone');
+    const updateFile = () => {
+        const file = fileInput.files[0];
+        q('#fileSelected').classList.toggle('d-none', !file);
+        q('#dropTitle').textContent = file ? 'تم اختيار الملف بنجاح' : 'اسحب ملفك هنا، أو اختر ملفًا من جهازك';
+        q('#fileName').textContent = file?.name || '';
+        q('#fileMeta').textContent = file ? (file.size/1024).toFixed(1) + ' KB' : '';
+        q('[data-import-preview]').disabled = !file;
+    };
+    fileInput.addEventListener('change', updateFile);
+    dropZone.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();fileInput.click();}});
+    q('#removeFile').addEventListener('click',()=>{fileInput.value='';fileInput.dispatchEvent(new Event('change'));});
+    ['dragover','dragleave','drop'].forEach(name=>dropZone.addEventListener(name,event=>{
+        event.preventDefault();dropZone.classList.toggle('dragover',name==='dragover');
+        if(name==='drop') {
+            if(event.dataTransfer.files.length!==1){showAlert('ارفع ملفًا واحدًا فقط.');return;}
+            const dt=new DataTransfer();dt.items.add(event.dataTransfer.files[0]);fileInput.files=dt.files;fileInput.dispatchEvent(new Event('change'));
+        }
+    }));
     const alertBox = q('[data-import-alert]');
     const box = {
         verdict: q('[data-import-verdict]'), decisions: q('[data-import-decisions]'), info: q('[data-import-info]'),
@@ -163,7 +148,7 @@
         modalEl.querySelectorAll('[data-step-id]').forEach((el) => {
             const idx = order.indexOf(el.getAttribute('data-step-id'));
             const cur = order.indexOf(name);
-            el.className = idx === cur ? 'fw-bold text-primary' : (idx < cur ? 'text-success' : 'text-muted');
+            el.className = 'step' + (idx === cur ? ' active' : (idx < cur ? ' done' : ''));
         });
     }
 
@@ -304,10 +289,8 @@
     let lastResult = null;
 
     const actionBadge = {
-        create: window.masarStaticHtml('<span class="badge bg-success">جديد</span>'),
-        update: window.masarStaticHtml('<span class="badge bg-primary">تحديث</span>'),
-        skip: window.masarStaticHtml('<span class="badge bg-secondary">تخطي</span>'),
-        error: window.masarStaticHtml('<span class="badge bg-danger">خطأ</span>'),
+        create:'<span class="tag new">جديد</span>',update:'<span class="tag update">تحديث</span>',
+        skip:'<span class="tag skip">متخطى</span>',error:'<span class="tag error">خطأ</span>'
     };
 
     // ---- 1) verdict ---------------------------------------------------------
@@ -522,9 +505,9 @@
 
     function renderTabs() {
         const s = lastData.summary;
-        const tabs = [['all', window.masarT('الكل'), s.total], ['errors', window.masarT('أخطاء'), s.error], ['warnings', window.masarT('تنبيهات'), s.warnings], ['create', window.masarT('جديد'), s.create], ['update', window.masarT('تحديث'), s.update], ['skip', window.masarT('تخطي'), s.skip]]
-            .filter((tab) => tab[0] === 'all' || tab[2] > 0);
-        box.tabs.innerHTML = tabs.map((tab) => '<button type="button" class="btn btn-outline-secondary' + (table.tab === tab[0] ? ' active' : '') + '" data-tab="' + tab[0] + '">' + tab[1] + ' (' + num(tab[2]) + ')</button>').join('');
+        const tabs = [['all','الكل',s.total],['create','جديد',s.create],['update','تحديث',s.update],['skip','متخطى',s.skip],['errors','أخطاء',s.error]];
+        if(s.warnings) tabs.push(['warnings','تنبيهات',s.warnings]);
+        box.tabs.innerHTML=tabs.map(([key,label,count])=>'<button type="button" class="'+(table.tab===key?'active':'')+'" data-tab="'+key+'">'+label+' ('+num(count)+')</button>').join('');
     }
 
     function changesHtml(row) {
@@ -536,12 +519,10 @@
     }
 
     function renderTable() {
-        const rows = filteredRows();
-        box.rows.innerHTML = rows.slice(0, table.limit).map((row) =>
-            '<tr><td>' + esc(row.line) + '</td><td>' + esc(row.name || '—') + (row.sheet ? window.masarStaticHtml('<div class="text-muted small">ورقة: ') + esc(row.sheet) + '</div>' : '') + '</td><td>' + (actionBadge[row.action] || '') + changesHtml(row) + '</td><td>' + messagesHtml(row) + '</td></tr>'
-        ).join('') || window.masarStaticHtml('<tr><td colspan="4" class="text-center text-muted py-3">لا توجد صفوف مطابقة.</td></tr>');
-        box.count.textContent = window.masarT('يعرض ') + num(Math.min(table.limit, rows.length)) + window.masarT(' من ') + num(rows.length) + window.masarT(' صف');
-        box.more.hidden = rows.length <= table.limit;
+        const rows=filteredRows();
+        box.rows.innerHTML=rows.slice(0,table.limit).map(row=>'<tr><td>'+esc(row.line)+'</td><td>'+esc(row.name||'—')+(row.sheet?'<div class="text-muted small">'+esc(row.sheet)+'</div>':'')+'</td><td>'+esc(row.code||'—')+'</td><td>'+(actionBadge[row.action]||'')+'</td><td class="'+(row.action==='error'?'invalid':'valid')+'">'+(row.action==='error'?'غير صالح':'✓ صالح')+'</td><td>'+messagesHtml(row)+changesHtml(row)+'</td></tr>').join('')||'<tr><td colspan="6" class="text-center text-secondary py-4">لا توجد صفوف في هذا التصنيف</td></tr>';
+        box.count.textContent='عرض '+num(Math.min(table.limit,rows.length))+' من إجمالي '+num(rows.length)+' صف';
+        box.more.hidden=rows.length<=table.limit;
     }
 
     // ---- preview / result ---------------------------------------------------
@@ -616,17 +597,14 @@
     function renderSheetsStep(data) {
         const sheets = data.sheets || [];
         q('[data-import-filename]').textContent = fileInput.files[0]?.name || '';
-        let html = '<div class="table-responsive"><table class="table import-sheets"><thead><tr><th>#</th><th>اسم الورقة</th><th>نوع الورقة</th><th>ربط الأعمدة</th><th>تجاهل</th></tr></thead><tbody>';
+        let html = '<div class="table-responsive sheet-table-wrap"><table class="table sheet-table align-middle"><thead><tr><th>#</th><th>اسم الورقة</th><th>عدد الصفوف</th><th>نوع الورقة</th><th>الإجراء</th></tr></thead><tbody>';
         sheets.forEach((sheet, index) => {
             const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
             const config = sheet.domain_config;
             const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
             const id = 'sheetBody' + index;
             const ignored = chosen === 'ignore';
-            html += '<tr><td>' + (index+1) + '</td><td><button type="button" class="btn btn-link p-0" data-sheet-toggle="' + id + '" aria-expanded="false" aria-controls="' + id + '"><i class="bi bi-chevron-down"></i> ' + esc(sheet.name) + '</button><div class="text-muted small">' + num(sheet.rows) + ' صف</div></td>'
-                + '<td><select class="form-select form-select-sm" data-sheet-kind="' + esc(sheet.name) + '">' + sheetKindOptions(chosen) + '</select></td>'
-                + '<td><span class="mapping-chip">' + (ignored ? 'متجاهلة' : 'تم ربط ' + num(mapped) + ' عمودًا') + '</span><button type="button" class="btn btn-link btn-sm" data-sheet-toggle="' + id + '" aria-expanded="false" aria-controls="' + id + '">عرض / تعديل الربط</button></td>'
-                + '<td><input type="checkbox" class="form-check-input" data-ignore-sheet="' + esc(sheet.name) + '" aria-label="تجاهل ورقة ' + esc(sheet.name) + '"' + (ignored?' checked':'') + '></td></tr>';
+            html += '<tr><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'">عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
             html += '<tr id="' + id + '" hidden><td colspan="5"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
                 + (ignored ? '<p>هذه الورقة لن تُستورد.</p>' : chosen === 'employees' ? employeeMappingEditor(data, sheet) : domainMappingEditor(data,sheet,chosen))
                 + ((sheet.sample || []).length ? '<div class="small fw-semibold mt-3">عينة البيانات</div><div class="table-responsive"><table class="table table-sm small"><tbody>' + sheet.sample.map(row=>'<tr>'+row.map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>').join('') + '</tbody></table></div>' : '')
@@ -661,21 +639,26 @@
         return '<div class="import-stats">' + items.map(([label,count,tone])=>'<div class="import-stat ' + tone + '"><span>' + label + '</span><strong>' + num(count || 0) + '</strong></div>').join('') + '</div>';
     }
 
+    function statCards(items) {
+        return '<div class="stats-grid">'+items.map(([label,count,tone,sub,icon])=>'<div class="stat-card '+tone+'"><span>'+label+'</span><strong>'+num(count||0)+'</strong>'+(sub?'<small>'+sub+'</small>':'')+'<i class="bi bi-'+icon+'"></i></div>').join('')+'</div>';
+    }
+
     function renderPreview(data) {
         lastData = data;
-        table = { tab: data.summary.error > 0 ? 'errors' : 'all', query: '', limit: PAGE };
+        table = { tab:'all', query:'', limit:PAGE };
         box.search.value = '';
 
         const summary = data.summary;
-        box.verdict.innerHTML = '<div class="import-section-title">مراجعة البيانات قبل الاستيراد</div><p class="text-muted small">راجع الصفوف ونتائج التحقق. لن تُحفظ الصفوف المرفوضة كموظفين.</p>'
-            + summaryCards([['إجمالي الصفوف',summary.total,'neutral'],['موظفون جدد',summary.create,'good'],['تحديث بيانات',summary.update,'blue'],['أخطاء',summary.error,'bad']]);
+        box.verdict.innerHTML = statCards([
+            ['صفوف جديدة',summary.create,'blue','ستُضاف كموظفين جدد','person-plus'],
+            ['صفوف للتحديث',summary.update,'green','موظفون موجودون','pencil-square'],
+            ['صفوف متخطاة',summary.skip,'gray','وفق اختيارك','skip-forward'],
+            ['صفوف بها أخطاء',summary.error,'red','تحتاج إلى تصحيح','exclamation-circle']
+        ]);
         box.decisions.innerHTML = updateAckCard(data) + ackCard(data)
             + (data.needs_mapping ? '<div class="alert alert-warning">أكمل ربط الاسم في مرحلة الأوراق أولًا.</div>' : '')
             + (data.capacity?.exceeded ? '<div class="alert alert-danger">الاستيراد يتجاوز حد باقتك. عدّل الملف أو اختيار الأوراق.</div>' : '');
-        box.info.innerHTML = '<div class="d-flex gap-2 flex-wrap mb-3">'
-            + (summary.error ? '<button type="button" class="btn btn-outline-danger btn-sm" data-import-rejected>تحميل الصفوف المرفوضة (Excel)</button>' : '')
-            + '<button type="button" class="btn btn-light btn-sm" data-import-report>تحميل تقرير التحقق</button></div>'
-            + domainReviewHtml(data);
+        box.info.innerHTML = domainReviewHtml(data);
 
         box.tableWrap.hidden = !!data.needs_mapping;
         renderTabs();
@@ -697,42 +680,24 @@
         if (r.skipped) { parts.push(num(r.skipped) + window.masarT(' تم تخطيهم')); }
         q('[data-import-result-text]').textContent = parts.join(' • ');
 
-        const failed = r.failed || [];
-        const warnings = r.warnings || [];
-        let html = '<div class="import-success"><i class="bi bi-check-circle-fill"></i><div><strong>اكتمل الاستيراد</strong><div class="small">تم حفظ الصفوف الصالحة. راجع الملاحظات أدناه.</div></div></div>'
-            + summaryCards([['موظفون جدد',r.created,'good'],['تم تحديثهم',r.updated,'blue'],['متخطى / بدون تغيير',(r.skipped||0)+(r.unchanged||0),'neutral'],['مرفوض / تعذر حفظه',(data.summary?.error||0)+failed.length,'bad']])
-            + '<h6 class="mt-4">ملاحظات مهمة</h6>';
-        const distributedErrors = [];
-        const distributedWarnings = [];
-        Object.values(data.distributed || {}).forEach((group) => {
-            (group?.errors || []).forEach((message) => distributedErrors.push(message));
-            (group?.warnings || []).forEach((message) => distributedWarnings.push(message));
-            Object.values(group || {}).forEach((bucket) => (bucket?.errors || []).forEach((message) => distributedErrors.push(message)));
+        const failed=r.failed||[], warnings=r.warnings||[], notes=[];
+        const rejected=(data.summary?.error||0)+failed.length;
+        if(rejected)notes.push('لم يتم استيراد '+num(rejected)+' صف بسبب أخطاء. حمّل المرفوضات أو افتح صفحة المراجعة للتصحيح.');
+        if(warnings.length)notes.push('يوجد '+num(warnings.length)+' تنبيه. راجع التقرير وتفاصيل الاستيراد.');
+        Object.entries(data.distributed||{}).forEach(([kind,group])=>{
+            (group?.errors||[]).forEach(message=>notes.push(message));
+            (group?.warnings||[]).forEach(message=>notes.push(message));
+            Object.values(group||{}).forEach(bucket=>(bucket?.errors||[]).forEach(message=>notes.push(message)));
         });
-        if (distributedErrors.length) {
-            html += window.masarStaticHtml('<div class="alert alert-warning small"><strong>أخطاء توزيع الأوراق:</strong><ul class="mb-0">') + distributedErrors.slice(0, 10).map((message) => '<li>' + esc(message) + '</li>').join('') + '</ul></div>';
-        }
-        if (distributedWarnings.length) {
-            html += window.masarStaticHtml('<div class="alert alert-warning small"><strong>تنبيهات الطلبات:</strong><ul class="mb-0">') + distributedWarnings.slice(0, 10).map((message) => '<li>' + esc(message) + '</li>').join('') + '</ul></div>';
-        }
-        if (Number(data.distributed_attendance_count || 0) > 0) html += window.masarStaticHtml('<div class="alert alert-success small"><i class="bi bi-calendar-check"></i> تم توزيع ') + num(data.distributed_attendance_count) + window.masarStaticHtml(' سجل حضور وانصراف تلقائيًا.</div>');
-        if (Number(data.distributed_leave_count || 0) > 0 || Number(data.distributed_penalty_count || 0) > 0) html += window.masarStaticHtml('<div class="alert alert-success small"><i class="bi bi-diagram-3"></i> تم توزيع ') + num(data.distributed_leave_count || 0) + window.masarT(' إجازة و') + num(data.distributed_penalty_count || 0) + window.masarStaticHtml(' جزاء تلقائيًا.</div>');
-        if (Number(data.distributed_request_count || 0) > 0) html += window.masarStaticHtml('<div class="alert alert-success small"><i class="bi bi-cash-coin"></i> تم توزيع ') + num(data.distributed_request_count) + window.masarStaticHtml(' طلب تلقائيًا.</div>');
-        if (Number(data.distributed_insurance_count || 0) > 0) html += window.masarStaticHtml('<div class="alert alert-success small"><i class="bi bi-shield-check"></i> تم توزيع ') + num(data.distributed_insurance_count) + window.masarStaticHtml(' سجل تأمينات تلقائيًا.</div>');
-        if (data.summary && data.summary.error > 0) {
-            html += window.masarStaticHtml('<div class="alert alert-warning small">لم يتم استيراد ') + num(data.summary.error) + window.masarT(' صف بسبب أخطاء في بياناتها.') +
-                window.masarStaticHtml(' <button type="button" class="btn btn-sm btn-outline-dark ms-2" data-import-rejected><i class="bi bi-file-earmark-excel"></i> تحميل الصفوف المرفوضة لتصحيحها</button>') +
-                (data.batches_url ? ' <a class="btn btn-sm btn-outline-primary ms-2" href="' + esc(data.batches_url) + window.masarStaticHtml('"><i class="bi bi-inbox"></i> راجع الأسباب في صفحة المراجعة</a>') : '') +
-                window.masarStaticHtml('<div class="mt-1 text-muted">صفحة المراجعة توضح سبب رفض كل صف: صفوف الموظفين تُصحَّح منها مباشرة، وصفوف الحضور والإجازات والجزاءات والطلبات والتأمينات تُصحَّح من شاشاتها أو بإعادة رفع الملف بعد التصحيح.</div>') + '</div>';
-        }
-        if (failed.length) {
-            html += window.masarStaticHtml('<div class="alert alert-danger small">تعذّر حفظ ') + num(failed.length) + window.masarStaticHtml(' صف:<ul class="mb-0">') + failed.slice(0, 10).map((f) => window.masarStaticHtml('<li>الصف ') + esc(f.line) + ' (' + esc(f.name) + '): ' + esc((f.messages || []).join(' ')) + '</li>').join('') + '</ul></div>';
-        }
-        if (warnings.length) {
-            html += '<div class="alert alert-light border small">' + num(warnings.length) + window.masarStaticHtml(' تنبيه (مثل مدير مباشر غير موجود). <button type="button" class="btn btn-link btn-sm p-0" data-import-report>تحميل التقرير</button></div>');
-        }
-        html += data.batches_url ? '<div class="mt-3"><a class="btn btn-primary" href="' + esc(data.batches_url) + '">فتح صفحة مراجعة الاستيراد</a></div>' : '';
-        q('[data-import-result-extra]').innerHTML = html;
+        [['حضور وانصراف',data.distributed_attendance_count],['إجازة',data.distributed_leave_count],['جزاء',data.distributed_penalty_count],['طلب',data.distributed_request_count],['تأمينات',data.distributed_insurance_count]].forEach(([label,count])=>{if(count)notes.push('تم توزيع '+num(count)+' سجل '+label+' تلقائيًا.');});
+        failed.forEach(item=>notes.push('الصف '+item.line+': '+(item.messages||[]).join(' ')));
+        if(!notes.length)notes.push('تم حفظ الصفوف الصالحة وفق الاختيارات التي أكّدتها.');
+        let html='<div class="result-banner"><i class="bi bi-check-circle-fill"></i><div><strong>اكتملت عملية الاستيراد</strong><small>تم حفظ النتائج وفقًا للاختيارات التي أكّدتها.</small></div></div>'
+            +statCards([['موظفون جدد',r.created,'blue','','person-plus'],['تم تحديثهم',r.updated,'green','','arrow-repeat'],['تم تخطيهم',(r.skipped||0)+(r.unchanged||0),'gray','','skip-forward'],['تعذر حفظهم',rejected,'red','','exclamation-triangle']])
+            +'<div class="result-notes"><strong><i class="bi bi-info-circle ms-2"></i>ملاحظات مهمة</strong><ul>'+notes.map(note=>'<li>'+esc(note)+'</li>').join('')+'</ul></div>'
+            +'<div class="result-actions"><button type="button" class="btn btn-outline-danger" data-import-rejected'+(!rejected?' disabled':'')+'><i class="bi bi-download ms-2"></i>تحميل المرفوضات</button>'
+            +(data.batches_url?'<a class="btn btn-outline-primary" href="'+esc(data.batches_url)+'"><i class="bi bi-eye ms-2"></i>فتح مراجعة الاستيراد</a>':'')+'</div>';
+        q('[data-import-result-extra]').innerHTML=html;
     }
 
     function reset() {
@@ -857,7 +822,7 @@
             state.penaltyFixes[fixSheet] = state.penaltyFixes[fixSheet] || {};
             if (fixSelect.value === '') { delete state.penaltyFixes[fixSheet][fixLine]; }
             else { state.penaltyFixes[fixSheet][fixLine] = fixSelect.value; }
-            runPreview(null, '', true);
+            runPreview(null, '', false, 'reload-sheets');
             return;
         }
         if (target.matches('input[name="import_sheet"]')) {
@@ -895,6 +860,7 @@
     sheetsList.addEventListener('change', (event)=>{ if(event.target.closest('[data-penalty-fix]')) onChange(event); });
     [box.decisions, box.info].forEach((el) => { el.addEventListener('change', onChange); el.addEventListener('click', onClick); });
     box.verdict.addEventListener('click', onClick);
+    box.tableWrap.addEventListener('click', onClick);
     q('[data-import-result-extra]').addEventListener('click', onClick);
 
     box.tabs.addEventListener('click', (event) => {

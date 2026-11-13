@@ -494,4 +494,22 @@ class EmployeeWorkbookImportTest extends TestCase
         $this->assertSame(1, HrRequest::where('employee_id', $unique->id)->count());
         $this->assertAmbiguousAndConflictingRowsParked('requests');
     }
+    public function test_employee_page_uses_reference_modal_components_with_live_import_hooks(): void
+    {
+        $response=$this->get('/employees');
+        $response->assertOk()->assertSee('employee-import-reference.css',false);
+        $dom=new \DOMDocument();
+        @$dom->loadHTML('<?xml encoding="utf-8" ?>'.$response->getContent());
+        $xpath=new \DOMXPath($dom);
+        $root='//*[@id="employeesImportModal"]';
+        $this->assertSame(4,$xpath->query($root.'//*[@data-import-step]')->length);
+        $this->assertSame(4,$xpath->query($root.'//*[@data-step-id]')->length);
+        $this->assertSame(6,$xpath->query($root.'//*[@data-import-table-wrap]//thead/tr/th')->length);
+        $this->assertSame('.xlsx,.csv',$xpath->query($root.'//*[@id="employeesImportFile"]')->item(0)->getAttribute('accept'));
+        $this->assertSame(0,$xpath->query($root.'//*[@data-import-step="preview"]//select')->length);
+        $this->assertSame(1,$xpath->query($root.'//*[@data-import-sheets-list]')->length);
+        $this->assertSame(1,$xpath->query($root.'//*[@data-import-commit]')->length);
+        $this->assertSame(1,$xpath->query($root.'//a[contains(@href,"/employees/import/template")]')->length);
+    }
+
 }
