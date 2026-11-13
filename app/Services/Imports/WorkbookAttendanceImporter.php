@@ -17,6 +17,7 @@ use Carbon\Carbon;
  */
 class WorkbookAttendanceImporter
 {
+    private ?AttendanceImportEmployeeMatcher $employeeMatcher = null;
     public function __construct(
         private readonly SpreadsheetReader $reader,
         private readonly HrOperationalSettingsService $settings,
@@ -43,8 +44,9 @@ class WorkbookAttendanceImporter
 
     public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, ?array $onlySheets = null, ?array $configs = null): array
     {
+        $this->employeeMatcher = new AttendanceImportEmployeeMatcher();
         $sheets = $this->reader->readAll($path, $extension);
-        $imported = 0; $skipped = 0; $errors = []; $failures = []; $affected = [];
+        $imported = 0; $skipped = 0; $errors = []; $failures = []; $affected = []; $warnings = [];
         foreach ($sheets as $sheet) {
             if ($onlySheets !== null && !in_array((string) $sheet['name'], $onlySheets, true)) continue;
             $config = $configs[$sheet['name']] ?? null;
@@ -62,12 +64,16 @@ class WorkbookAttendanceImporter
                 try {
                     $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو بياناته غير مكتملة.');
+                    if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $row[$map['name'] ?? -1] ?? null)) { $warnings[] = "{$sheet['name']} / الصف {$line}: $warning"; }
                     $date = $this->date($row[$map['date']] ?? null);
                     if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
                     $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
-                    $status = $this->status($row[$map['status'] ?? -1] ?? '') ?: (($in || $out) ? 'Present' : 'Absent');
+                    if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف.');
+                    $status = $this->status($row[$map['status'] ?? -1] ?? '');
+                    if ($status === null) throw new \RuntimeException('حالة الحضور غير معروفة؛ راجعها، لم يُستورد الصف.');
+                    $status = $status ?: (($in || $out) ? 'Present' : 'Absent');
                     $metrics = app(\App\Services\AttendanceMetricsService::class)->metrics($employee, $in, $out, $status);
                     Attendance::updateOrCreate(
                         ['employee_id' => $employee->id, 'attendance_date' => $date],
@@ -83,7 +89,7 @@ class WorkbookAttendanceImporter
             }
         }
         foreach (array_unique($affected) as $employeeId) $payrollRuns->refreshEmployeeInOpenDrafts($employeeId);
-        return compact('imported', 'skipped', 'errors', 'failures');
+        return compact('imported', 'skipped', 'errors', 'failures', 'warnings');
     }
 
     private function splitHeader(array $rows): array
@@ -122,8 +128,8 @@ class WorkbookAttendanceImporter
     private function employee(mixed $code, mixed $name): ?Employee
     {
         if (filled($code)) {
-            $code = trim((string) $code);
-            $employee = Employee::where('employee_code', $code)->first();
+            $code = app(ImportValueNormalizer::class)->identifier((string) $code);
+            $employee = ($this->employeeMatcher ??= new AttendanceImportEmployeeMatcher())->byCode($code);
             // A supplied code is a load-bearing identifier: an unknown code is
             // rejected with an explicit reason, never swapped for a name match.
             if (!$employee) throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.');
@@ -139,11 +145,11 @@ class WorkbookAttendanceImporter
         return $matches->first();
     }
 
-    private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
-    private function status(mixed $value): string { $key = $this->normalise($value); return match (true) { in_array($key, ['متأخر', 'late'], true) => 'Late', in_array($key, ['غائب', 'absent'], true) => 'Absent', in_array($key, ['إجازة', 'leave'], true) => 'Leave', in_array($key, ['حاضر', 'present'], true) => 'Present', default => trim((string) $value) }; }
-    private function person(mixed $value): string { return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim((string) $value))); }
-    private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
-    private function time(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->format('H:i') : null; } catch (\Throwable) { return null; } }
+    private function normalise(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
+    private function status(mixed $value): ?string { return app(ImportValueNormalizer::class)->attendanceStatus($value); }
+    private function person(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
+    private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse(app(ImportValueNormalizer::class)->digits((string) $value))->toDateString() : null; } catch (\Throwable) { return null; } }
+    private function time(mixed $value): ?string { return app(ImportValueNormalizer::class)->time($value); }
     private function late(?string $value, string $start): int { if (!$value) return 0; return max(0, Carbon::parse($value)->diffInMinutes(Carbon::parse($start), false) * -1); }
     private function early(?string $value, string $end): int { if (!$value) return 0; return max(0, Carbon::parse($end)->diffInMinutes(Carbon::parse($value), false)); }
     private function worked(?string $in, ?string $out): ?float { if (!$in || !$out) return null; return round(Carbon::parse($in)->diffInMinutes(Carbon::parse($out)) / 60, 2); }
