@@ -604,7 +604,7 @@
             const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
             const id = 'sheetBody' + index;
             const ignored = chosen === 'ignore';
-            html += '<tr><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'">عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
+            html += '<tr class="sheet-summary-row" data-sheet-row-toggle="'+id+'" tabindex="0" aria-expanded="false" aria-controls="'+id+'"><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'">عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
             html += '<tr id="' + id + '" hidden><td colspan="5"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
                 + (ignored ? '<p>هذه الورقة لن تُستورد.</p>' : chosen === 'employees' ? employeeMappingEditor(data, sheet) : domainMappingEditor(data,sheet,chosen))
                 + ((sheet.sample || []).length ? '<div class="small fw-semibold mt-3">عينة البيانات</div><div class="table-responsive"><table class="table table-sm small"><tbody>' + sheet.sample.map(row=>'<tr>'+row.map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>').join('') + '</tbody></table></div>' : '')
@@ -767,15 +767,30 @@
         const onPreview = !steps.preview.hidden;
         showStep(onPreview && sheetsStepUsed ? 'sheets' : 'upload');
     });
+    function toggleSheetDetails(id) {
+        if (busy) { return; }
+        const body = document.getElementById(id);
+        if (!body || !sheetsList.contains(body)) { return; }
+        body.hidden = !body.hidden;
+        const expanded = String(!body.hidden);
+        sheetsList.querySelectorAll('[data-sheet-toggle="' + id + '"], [data-sheet-row-toggle="' + id + '"]').forEach(el => {
+            el.setAttribute('aria-expanded', expanded);
+            const icon = el.querySelector('i.bi-chevron-down, i.bi-chevron-up');
+            if (icon) { icon.className = body.hidden ? 'bi bi-chevron-down' : 'bi bi-chevron-up'; }
+        });
+    }
     sheetsList.addEventListener('click', (event) => {
         const toggle = event.target.closest('[data-sheet-toggle]');
-        if (!toggle) { return; }
-        const body = sheetsList.querySelector('#' + toggle.getAttribute('data-sheet-toggle'));
-        if (!body) { return; }
-        body.hidden = !body.hidden;
-        sheetsList.querySelectorAll('[data-sheet-toggle="' + body.id + '"]').forEach(el=>el.setAttribute('aria-expanded',String(!body.hidden)));
-        const icon = toggle.querySelector('i');
-        if (icon) { icon.className = body.hidden ? 'bi bi-chevron-down' : 'bi bi-chevron-up'; }
+        if (toggle) { toggleSheetDetails(toggle.dataset.sheetToggle); return; }
+        // Dropdowns, ignore labels and other controls keep their own actions.
+        if (event.target.closest('button, a, input, select, textarea, label, [contenteditable="true"]')) { return; }
+        const row = event.target.closest('[data-sheet-row-toggle]');
+        if (row) { toggleSheetDetails(row.dataset.sheetRowToggle); }
+    });
+    sheetsList.addEventListener('keydown', (event) => {
+        if (!event.target.matches('[data-sheet-row-toggle]') || !['Enter', ' '].includes(event.key)) { return; }
+        event.preventDefault();
+        toggleSheetDetails(event.target.dataset.sheetRowToggle);
     });
     sheetsList.addEventListener('change', (event) => {
         const employeeField = event.target.closest('[data-employee-field]');
