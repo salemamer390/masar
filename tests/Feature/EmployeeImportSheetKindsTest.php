@@ -23,6 +23,7 @@ use Tests\TestCase;
 class EmployeeImportSheetKindsTest extends TestCase
 {
     use DatabaseTransactions;
+    use \Tests\CompleteEmployeeImportFixtures;
 
     private User $user;
     private Company $company;
@@ -49,13 +50,13 @@ class EmployeeImportSheetKindsTest extends TestCase
     private function workbook(array $extraSheets): UploadedFile
     {
         $path = tempnam(sys_get_temp_dir(), 'wk') . '.xlsx';
-        (new XlsxWriter())->writeSheets($path, array_merge([[
+        (new XlsxWriter())->writeSheets($path, $this->completeEmployeeSheets(array_merge([[
             'name' => 'الموظفين',
             'rows' => [
                 ['الكود', 'الاسم الكامل', 'رقم الهاتف'],
                 ['401', 'أحمد سالم', '01012345678'],
             ],
-        ]], $extraSheets));
+        ]], $extraSheets)));
 
         return UploadedFile::fake()->createWithContent('workbook.xlsx', file_get_contents($path));
     }
