@@ -55,18 +55,25 @@ Route::middleware(['throttle:120,1', \App\Http\Middleware\RequireSecureFingerpri
         Route::post('/punches', [\App\Http\Controllers\Fingerprint\BridgeApiController::class, 'punches'])->name('punches');
     });
 
-// Marketing pages are Blade views; legacy .html URLs remain compatible.
-Route::get('/', [MarketingSiteController::class, 'home']);
-Route::get('/index.html', [MarketingSiteController::class, 'home']);
-Route::get('/features.html', [MarketingSiteController::class, 'features']);
-Route::get('/privacy.html', [MarketingSiteController::class, 'privacy']);
-Route::get('/terms.html', [MarketingSiteController::class, 'terms']);
-Route::get('/login.html', fn () => redirect()->route('login'));
+// Canonical marketing URLs. Keep legacy bookmarks working through redirects.
+Route::get('/', [MarketingSiteController::class, 'home'])->name('site.home');
+Route::get('/features', [MarketingSiteController::class, 'features'])->name('site.features');
+Route::get('/privacy', [MarketingSiteController::class, 'privacy'])->name('site.privacy');
+Route::get('/terms', [MarketingSiteController::class, 'terms'])->name('site.terms');
+Route::get('/signup', [MarketingSiteController::class, 'signup'])->name('site.signup');
+Route::get('/contact', [MarketingSiteController::class, 'contact'])->name('site.contact');
 
-Route::get('/signup.html', [MarketingSiteController::class, 'signup'])->name('site.signup');
-Route::get('/contact.html', [MarketingSiteController::class, 'contact'])->name('site.contact');
+foreach ([
+    'index' => 'site.home', 'features' => 'site.features', 'privacy' => 'site.privacy',
+    'terms' => 'site.terms', 'login' => 'login', 'signup' => 'site.signup',
+    'contact' => 'site.contact', 'forgot-password' => 'password.request',
+] as $legacy => $canonical) {
+    Route::get('/'.$legacy.'.html', fn (\Illuminate\Http\Request $request) =>
+        redirect()->route($canonical, $request->query(), 301));
+}
+
 Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->middleware('throttle:5,1')->name('site.contact.submit');
-Route::get('/forgot-password.html', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
+Route::get('/forgot-password', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
 Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
