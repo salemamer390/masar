@@ -55,38 +55,12 @@ Route::middleware(['throttle:120,1', \App\Http\Middleware\RequireSecureFingerpri
         Route::post('/punches', [\App\Http\Controllers\Fingerprint\BridgeApiController::class, 'punches'])->name('punches');
     });
 
-// Public marketing pages. Keep the supplied HTML design intact and only add
-// the Laravel behavior needed for authentication and contact forms.
-$sitePage = static function (string $page) {
-    if (Auth::check()) {
-        return redirect()->route('dashboard');
-    }
-
-    $path = base_path('masar_hr_multi_page_site/' . $page);
-    abort_unless(is_file($path), 404);
-    $html = file_get_contents($path);
-    if ($page === 'privacy.html') {
-        $privacy = base_path('masar_hr_multi_page_site/privacy-content.html');
-        if (is_file($privacy)) {
-            $content = file_get_contents($privacy);
-            $html = preg_replace('~<main[^>]*>.*?</main>~s', '<main class="shell">' . $content . '</main>', $html, 1);
-        }
-    }
-    $html = preg_replace('~<a[^>]+href="(?:pricing|how-it-works)\.html"[^>]*>.*?</a>~u', '', $html);
-    $html = preg_replace('~<p class="note">.*?</p>~u', '', $html);
-    $html = \App\Support\MarketingLocalizer::translate($html);
-
-    return response($html)
-        ->header('Content-Type', 'text/html; charset=UTF-8')
-        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
-        ->header('Pragma', 'no-cache');
-};
-
-Route::get('/', fn () => Auth::check() ? redirect()->route('dashboard') : $sitePage('index.html'));
-Route::get('/index.html', fn () => Auth::check() ? redirect()->route('dashboard') : $sitePage('index.html'));
-Route::get('/features.html', fn () => $sitePage('features.html'));
-Route::get('/privacy.html', fn () => $sitePage('privacy.html'));
-Route::get('/terms.html', fn () => $sitePage('terms.html'));
+// Marketing pages are Blade views; legacy .html URLs remain compatible.
+Route::get('/', [MarketingSiteController::class, 'home']);
+Route::get('/index.html', [MarketingSiteController::class, 'home']);
+Route::get('/features.html', [MarketingSiteController::class, 'features']);
+Route::get('/privacy.html', [MarketingSiteController::class, 'privacy']);
+Route::get('/terms.html', [MarketingSiteController::class, 'terms']);
 Route::get('/login.html', fn () => redirect()->route('login'));
 
 Route::get('/signup.html', [MarketingSiteController::class, 'signup'])->name('site.signup');
@@ -142,8 +116,6 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
     Route::post('/company/renewals', [SubscriptionRenewalController::class, 'store'])
         ->middleware('permission:users.view')
         ->name('company.renewals.store');
-
-    Route::get('/', fn() => redirect()->route('dashboard'));
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])
