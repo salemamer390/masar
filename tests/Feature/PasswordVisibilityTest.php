@@ -8,7 +8,7 @@ class PasswordVisibilityTest extends TestCase
 {
     public function test_all_guest_password_forms_load_the_shared_toggle_without_changing_inputs(): void
     {
-        foreach (['/login', '/owner/login', '/signup.html', '/reset-password/test-token'] as $url) {
+        foreach (['/login', '/owner/login', '/signup', '/reset-password/test-token'] as $url) {
             $response = $this->get($url)->assertOk()->assertSee('password-visibility.js', false);
             $response->assertSee('type="password"', false)->assertSee('name="password"', false);
             $this->assertSame(1, substr_count($response->getContent(), 'password-visibility.js'));
