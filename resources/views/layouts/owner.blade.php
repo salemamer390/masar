@@ -68,5 +68,6 @@
     </div>
   @endif
   @stack('scripts')
+<script src="{{ asset('password-visibility.js') }}" defer></script>
 </body>
 </html>

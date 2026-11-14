@@ -67,5 +67,6 @@
       <button type="submit" class="btn btn-primary btn-login w-100">{{ __('دخول') }}</button>
     </form>
   </div>
+<script src="{{ asset('password-visibility.js') }}" defer></script>
 </body>
 </html>

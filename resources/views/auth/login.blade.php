@@ -140,5 +140,6 @@ window.addEventListener('pageshow', function (event) {
   if (modal && window.bootstrap) bootstrap.Modal.getOrCreateInstance(modal).hide();
 });
 </script>
+<script src="{{ asset('password-visibility.js') }}" defer></script>
 </body>
 </html>
