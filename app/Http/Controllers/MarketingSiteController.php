@@ -122,6 +122,7 @@ JS);
             $html = preg_replace('~<button class="btn primary full">.*?</button>~s', '<div class="field"><label>كلمة المرور الجديدة</label><input name="password" type="password" required minlength="8" autocomplete="new-password"></div><div class="field"><label>تأكيد كلمة المرور</label><input name="password_confirmation" type="password" required minlength="8" autocomplete="new-password"></div><button class="btn primary full">حفظ كلمة المرور</button>', $html, 1);
         }
 
+        $html = str_replace('</body>', '<script src="' . e(asset('password-visibility.js')) . '" defer></script></body>', $html);
         $html = MarketingLocalizer::translate($html);
 
         return response($html)
