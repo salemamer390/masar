@@ -32,6 +32,7 @@
   @unless($isRtlInterface)
   <link href="{{ asset('ltr.css') }}?v={{ @filemtime(public_path('ltr.css')) }}" rel="stylesheet">
   @endunless
+<link href="{{ asset('odir-brand.css') }}" rel="stylesheet">
 @include('components.interface-i18n')
 </head>
 <body>
