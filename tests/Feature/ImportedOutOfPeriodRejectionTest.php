@@ -193,17 +193,26 @@ class ImportedOutOfPeriodRejectionTest extends TestCase
         $this->assertStringContainsString('الجزاءات', $response->json('mapping_error'));
     }
 
-    public function test_sheets_step_marks_incomplete_sheet_red(): void
+    public function test_sheets_step_groups_each_sheet_as_a_card(): void
     {
         $source = file_get_contents(resource_path('views/employees/partials/import-modal.blade.php'));
         $this->assertStringContainsString('incomplete_sheets', $source);
-        $this->assertStringContainsString('sheet-summary-missing', $source);
-        $this->assertStringContainsString('sheet-summary-ignored', $source);
+        $this->assertStringContainsString('sheet-card-missing', $source);
+        $this->assertStringContainsString('sheet-card-ignored', $source);
+        $this->assertStringContainsString('sheet-card-head', $source);
+        $this->assertStringContainsString('sheet-card-body', $source);
+        $this->assertStringContainsString('sheet-missing-badge', $source);
         $this->assertStringContainsString('بيانات ناقصة في:', $source);
         $this->assertStringContainsString('mapping-field-card', $source);
         $this->assertStringContainsString('mappingNeedsAttention', $source);
         $this->assertStringContainsString('is-ready', $source);
-        $this->assertStringContainsString('body.hidden = false', $source);
+        $this->assertStringContainsString("classList.add('open')", $source);
+        $this->assertStringContainsString('grid-template-rows: 0fr', $source);
+        // Ignored sheets must collapse closed, not stay expanded.
+        $this->assertStringContainsString("(state.sheetKinds[sh.name]||sh.kind)==='ignore') return;", $source);
+        // The old red row highlight and the duplicate yellow banner are gone.
+        $this->assertStringNotContainsString('sheet-summary-missing', $source);
+        $this->assertStringNotContainsString('حقول مطلوبة غير مربوطة', $source);
     }
 
 }
