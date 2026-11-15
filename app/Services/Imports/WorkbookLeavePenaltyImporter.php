@@ -104,7 +104,7 @@ class WorkbookLeavePenaltyImporter
                 app(\App\Services\LeaveBalanceService::class)->sync($employee, Carbon::parse($start));
                 app(\App\Services\EmployeeLeaveStatusService::class)->sync();
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
-            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
+            } catch (\Throwable $exception) { $result['skipped']++; if ($exception instanceof OutsidePayrollPeriodException) $result['out_of_period_count'] = ($result['out_of_period_count'] ?? 0) + 1; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()], 'reason_code' => $exception instanceof OutsidePayrollPeriodException ? 'outside_payroll_period' : null]; }
         }
     }
 
@@ -140,7 +140,7 @@ class WorkbookLeavePenaltyImporter
                 $status = 'Approved';
                 $penalty = Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $type->name, 'action' => $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $penalty->id;
-            } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
+            } catch (\Throwable $exception) { $result['skipped']++; if ($exception instanceof OutsidePayrollPeriodException) $result['out_of_period_count'] = ($result['out_of_period_count'] ?? 0) + 1; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()], 'reason_code' => $exception instanceof OutsidePayrollPeriodException ? 'outside_payroll_period' : null]; }
         }
     }
 

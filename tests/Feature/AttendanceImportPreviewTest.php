@@ -121,6 +121,35 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertStringStartsWith('09:12', (string) $rows[0]->check_in);
     }
 
+    public function test_daily_preview_warns_about_old_dates_and_commit_only_saves_current_dates(): void
+    {
+        [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
+            ['I1', '2026-10-31', '09:00', '17:00', 'حاضر'],
+            ['I1', '2026-11-01', '09:00', '17:00', 'حاضر'],
+        ])));
+        $this->assertStringContainsString('فترة المرتب الحالية', $html);
+        $this->import($token, $units[0], $key)->assertRedirect(route('attendance.index'));
+        $this->assertSame(0, Attendance::where('employee_id', $this->day->id)->whereDate('attendance_date', '2026-10-31')->count());
+        $this->assertSame(1, Attendance::where('employee_id', $this->day->id)->whereDate('attendance_date', '2026-11-01')->count());
+    }
+
+    public function test_raw_punch_preview_rejects_days_before_the_payroll_period(): void
+    {
+        [$token, $units, $html, $key] = $this->preview($this->workbook([
+            ['name' => 'البصمات', 'rows' => [
+                ['رقم الموظف', 'التاريخ والوقت'],
+                ['I1', '2026-10-31 09:00:00'],
+                ['I1', '2026-10-31 17:00:00'],
+                ['I1', '2026-11-01 09:00:00'],
+                ['I1', '2026-11-01 17:00:00'],
+            ]],
+        ]));
+        $this->assertStringContainsString('فترة المرتب الحالية', $html);
+        $this->import($token, $units[0], $key)->assertRedirect(route('attendance.index'));
+        $this->assertSame(0, Attendance::where('employee_id', $this->day->id)->whereDate('attendance_date', '2026-10-31')->count());
+        $this->assertSame(1, Attendance::where('employee_id', $this->day->id)->whereDate('attendance_date', '2026-11-01')->count());
+    }
+
     public function test_raw_punches_group_into_one_overnight_record(): void
     {
         [$token, $units, , $key] = $this->preview($this->workbook([
@@ -281,7 +310,7 @@ class AttendanceImportPreviewTest extends TestCase
     public function test_ambiguous_text_dates_require_an_explicit_format(): void
     {
         $csv = "كود الموظف,التاريخ,الحضور,الانصراف\n"
-            . "I1,03/04/2026,09:00,17:00\n";
+            . "I1,03/11/2026,09:00,17:00\n";
         $file = UploadedFile::fake()->createWithContent('attendance.csv', $csv);
         [$token, $units, $html, $key] = $this->preview($file);
         $this->assertStringContainsString('تنسيق التاريخ النصي', $html);
@@ -294,7 +323,7 @@ class AttendanceImportPreviewTest extends TestCase
         [, , , $formatKey] = $this->rePreview($token, $units[0], [], ['date_format' => 'dmy']);
         $this->import($token, $units[0], $formatKey, [], ['date_format' => 'dmy']);
         $row = Attendance::where('employee_id', $this->day->id)->first();
-        $this->assertSame('2026-04-03', $row->attendance_date->toDateString(), 'd/m honored, not guessed m/d');
+        $this->assertSame('2026-11-03', $row->attendance_date->toDateString(), 'd/m honored, not guessed m/d');
     }
 
     public function test_impossible_text_dates_are_rejected_not_rolled_over(): void

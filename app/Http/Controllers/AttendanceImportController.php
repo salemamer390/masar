@@ -535,6 +535,7 @@ class AttendanceImportController extends Controller
                 if (!$employee) { $errors[] = "$ref: $error"; continue; }
                 $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? ($options['default_date'] ?? null), $options['date_format'], $ambiguous);
                 if (!$date) { $errors[] = "$ref: " . ($ambiguous ? 'تاريخ نصي غامض — حدد تنسيق التاريخ من خيارات الورقة.' : 'تاريخ الحضور غير صالح.'); continue; }
+                try { app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور'); } catch (\RuntimeException $e) { $errors[] = "$ref: {$e->getMessage()}"; continue; }
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {
@@ -582,6 +583,7 @@ class AttendanceImportController extends Controller
         $rows = [];
         foreach ($result['days'] as $day) {
             $ref = "«بصمات» {$day['date']}";
+            try { app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($day['date'], 'الحضور'); } catch (\RuntimeException $e) { $errors[] = "$ref: {$e->getMessage()}"; continue; }
             if (($day['punch_count'] ?? 0) > 2) {
                 $errors[] = "$ref: اليوم يحتوي " . $day['punch_count'] . " بصمات؛ سيُحفظ اليوم للمراجعة في الاستثناءات بكل بصماته، دون إنشاء سجل حضور تلقائيًا.";
             }
@@ -607,6 +609,7 @@ class AttendanceImportController extends Controller
                     }
                     continue;
                 }
+                try { app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور'); } catch (\RuntimeException $e) { $errors[] = "$ref: {$e->getMessage()}"; continue; }
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
                 $checkOut = $this->parseTime($row[$map['check_out'] ?? -1] ?? null);
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {

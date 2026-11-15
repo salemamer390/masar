@@ -46,7 +46,7 @@ class WorkbookAttendanceImporter
     {
         $this->employeeMatcher = new AttendanceImportEmployeeMatcher();
         $sheets = $this->reader->readAll($path, $extension);
-        $imported = 0; $skipped = 0; $errors = []; $failures = []; $affected = []; $warnings = [];
+        $imported = 0; $skipped = 0; $outOfPeriod = 0; $errors = []; $failures = []; $affected = []; $warnings = [];
         foreach ($sheets as $sheet) {
             if ($onlySheets !== null && !in_array((string) $sheet['name'], $onlySheets, true)) continue;
             $config = $configs[$sheet['name']] ?? null;
@@ -73,6 +73,7 @@ class WorkbookAttendanceImporter
                     if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $row[$map['name'] ?? -1] ?? null)) { $warnings[] = "{$sheet['name']} / الصف {$line}: $warning"; }
                     $date = $this->date($row[$map['date'] ?? -1] ?? ($config['default_date'] ?? null));
                     if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
+                    app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور');
                     $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
@@ -87,13 +88,14 @@ class WorkbookAttendanceImporter
                     $imported++;
                 } catch (\Throwable $exception) {
                     $skipped++;
+                    if ($exception instanceof OutsidePayrollPeriodException) $outOfPeriod++;
                     if (count($errors) < 25) $errors[] = "{$sheet['name']} / الصف {$line}: {$exception->getMessage()}";
-                    if (count($failures) < 100) $failures[] = ['sheet' => $sheet['name'], 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]];
+                    if (count($failures) < 100) $failures[] = ['sheet' => $sheet['name'], 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()], 'reason_code' => $exception instanceof OutsidePayrollPeriodException ? 'outside_payroll_period' : null];
                 }
             }
         }
         foreach (array_unique($affected) as $employeeId) $payrollRuns->refreshEmployeeInOpenDrafts($employeeId);
-        return compact('imported', 'skipped', 'errors', 'failures', 'warnings');
+        return compact('imported', 'skipped', 'errors', 'failures', 'warnings') + ['out_of_period_count' => $outOfPeriod];
     }
 
     private function splitHeader(array $rows): array

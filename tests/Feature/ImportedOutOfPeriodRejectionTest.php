@@ -121,6 +121,40 @@ class ImportedOutOfPeriodRejectionTest extends TestCase
         $this->assertSame(0, Penalty::whereDate('penalty_date', '2026-10-31')->count());
     }
 
+    public function test_old_attendance_is_rejected_but_current_one_imports(): void
+    {
+        $domains = $this->preview($this->xlsx([['name' => 'الحضور والانصراف', 'rows' => [
+            ['كود الموظف', 'اسم الموظف', 'التاريخ', 'وقت الحضور', 'وقت الانصراف'],
+            ['104', 'عامر سالم جمعه', '2026-10-31', '09:00', '17:00'],
+            ['104', 'عامر سالم جمعه', '2026-11-01', '09:00', '17:00'],
+        ]]]));
+        $this->assertSame(1, $domains['attendance']['imported']);
+        $this->assertSame(1, $domains['attendance']['skipped']);
+        $this->assertStringContainsString('فترة المرتب الحالية', $domains['attendance']['errors'][0]);
+        $this->assertSame('الحضور والانصراف', $domains['attendance']['failures'][0]['sheet']);
+        $this->assertSame(2, $domains['attendance']['failures'][0]['line']);
+        $this->assertSame(1, $domains['attendance']['out_of_period_count']);
+        $this->assertSame('01/11', $domains['attendance']['period_start']);
+        $this->assertSame([], $domains['attendance']['row_failures']);
+    }
+
+    public function test_commit_never_saves_the_old_attendance_rows(): void
+    {
+        $file = $this->xlsx([['name' => 'الحضور والانصراف', 'rows' => [
+            ['كود الموظف', 'اسم الموظف', 'التاريخ', 'وقت الحضور', 'وقت الانصراف'],
+            ['104', 'عامر سالم جمعه', '2026-10-31', '09:00', '17:00'],
+            ['104', 'عامر سالم جمعه', '2026-11-01', '09:00', '17:00'],
+        ]]]);
+        $preview = $this->postJson(route('employees.import.preview'), ['file' => $file])->assertOk()->json();
+        $this->postJson(route('employees.import.store'), [
+            'file' => $file,
+            'review_token' => $preview['review_token'],
+            'sheet_kinds' => json_encode(['الحضور والانصراف' => 'attendance']),
+        ])->assertOk()->assertJsonPath('distributed_attendance_count', 1);
+        $this->assertSame(1, \App\Models\Attendance::whereDate('attendance_date', '2026-11-01')->count());
+        $this->assertSame(0, \App\Models\Attendance::whereDate('attendance_date', '2026-10-31')->count());
+    }
+
     public function test_custom_26_to_25_cycle_uses_company_period(): void
     {
         DB::table('hr_operational_settings')->where('company_id', $this->company->id)->where('setting_key', 'payroll_period_start_day')->update(['setting_value' => '26']);
