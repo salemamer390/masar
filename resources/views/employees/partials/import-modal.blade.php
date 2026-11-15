@@ -455,6 +455,70 @@
     }
 
     // ---- 3) information -----------------------------------------------------
+    // One card per data domain: headline chips with what will import, and the
+    // rejected rows grouped under their sheet with a clear row badge, the row's
+    // own values, its reason, and - for penalties - the correction picker.
+    function domainCardsHtml(data, allowCorrections) {
+        const labels = {attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), requests: window.masarT('الطلبات'), insurance: window.masarT('التأمينات')};
+        const icons = {attendance: 'calendar2-check', leaves: 'calendar2-x', penalties: 'exclamation-octagon', requests: 'inbox', insurance: 'shield-check'};
+        const domains = data.domains || {};
+        const kinds = Object.keys(labels).filter((key) => domains[key]);
+        if (!kinds.length) return '';
+        return '<div class="domain-cards">' + kinds.map((key) => {
+            const d = domains[key];
+            const failures = (d.row_failures || d.failures || []).filter(f => f.reason_code !== 'outside_payroll_period');
+            const errors = (d.errors || []).filter(e => !String(e).includes('فترة المرتب الحالية'));
+            const expandable = failures.length || errors.length || (d.warnings || []).length;
+            let card = '<div class="domain-card">' + (expandable ? '<button type="button" class="domain-card-head" data-domain-toggle aria-expanded="false">' : '<div class="domain-card-head">')
+                + '<span class="domain-card-title"><i class="bi bi-' + icons[key] + '"></i> ' + esc((data.kind_labels || {})[key] || labels[key]) + '</span>'
+                + '<span class="domain-chips">'
+                + '<span class="domain-chip ok"><i class="bi bi-check-lg"></i>' + num(d.imported) + window.masarT(' سيُستورد') + '</span>'
+                + (d.skipped > 0 ? '<span class="domain-chip bad"><i class="bi bi-x-lg"></i>' + num(d.skipped) + window.masarT(' مرفوض') + '</span>' : '')
+                + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
+                + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
+            if (d.out_of_period_count > 0) {
+                const periodLabels = {attendance:'الحضور', leaves:'الإجازات', penalties:'الجزاءات', requests:'الطلبات'};
+                card += '<div class="domain-period-notice"><i class="bi bi-info-circle"></i> ' + esc(periodLabels[key] || labels[key]) + window.masarT(' قبل ') + esc(d.period_start) + window.masarT(' لن يتم حفظه لأنه خارج فترة المرتب') + '</div>';
+            }
+            if (expandable) card += '<div class="domain-collapse" inert><div class="domain-collapse-inner"><div class="domain-scroll">';
+            if (failures.length) {
+                const bySheet = {};
+                failures.forEach((f) => { (bySheet[f.sheet] = bySheet[f.sheet] || []).push(f); });
+                card += Object.entries(bySheet).map(([sheet, rows]) => {
+                    let group = '<div class="domain-sheet"><div class="domain-sheet-name"><i class="bi bi-file-earmark-spreadsheet"></i> «' + esc(sheet) + '»</div>';
+                    group += rows.map((f) => {
+                        const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
+                        const who = vals.filter((v) => String(v).trim() !== '').slice(0, 2).map(esc).join(' / ');
+                        let row = '<div class="reject-row"><span class="reject-line">' + window.masarT('صف') + ' ' + num(f.line) + '</span>'
+                            + '<div class="reject-body">'
+                            + (who ? '<div class="reject-who">' + who + '</div>' : '')
+                            + '<div class="reject-reason">' + (f.errors || []).map(esc).join(window.masarT('؛ ')) + '</div>';
+                        if (key === 'penalties' && allowCorrections) {
+                            const chosenFix = ((state.penaltyFixes || {})[f.sheet] || {})[f.line] || '';
+                            row += '<div class="reject-fix"><span>' + window.masarT('صحّح نوع الجزاء أو استبعد الصف:') + '</span>'
+                                + '<select class="form-select form-select-sm" data-penalty-fix="1" data-penalty-sheet="' + esc(f.sheet) + '" data-penalty-line="' + esc(f.line) + '">'
+                                + window.masarStaticHtml('<option value="">— بدون قرار —</option>')
+                                + '<option value="__exclude__"' + (chosenFix === '__exclude__' ? ' selected' : '') + window.masarStaticHtml('>استبعاد الصف نهائيًا</option>')
+                                + (data.penalty_types || []).map((t) => '<option value="' + esc(t) + '"' + (chosenFix === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('')
+                                + '</select></div>';
+                        }
+                        return row + '</div></div>';
+                    }).join('');
+                    return group + '</div>';
+                }).join('');
+            } else if (errors.length) {
+                card += '<div class="domain-errors">' + errors.map((message) => '<div class="reject-reason">' + esc(message) + '</div>').join('') + '</div>';
+            }
+            if (failures.length && (d.skipped - (d.out_of_period_count || 0)) > failures.length) {
+                card += '<div class="domain-warnings">' + window.masarT('المعروض أول ') + num(failures.length) + window.masarT(' من ') + num(d.skipped - (d.out_of_period_count || 0)) + window.masarT(' صف مرفوض.') + '</div>';
+            }
+            if ((d.warnings || []).length) {
+                card += '<div class="domain-warnings">' + d.warnings.map((message) => '<div><i class="bi bi-exclamation-triangle"></i> ' + esc(message) + '</div>').join('') + '</div>';
+            }
+            return card + (expandable ? '</div></div></div>' : '') + '</div>';
+        }).join('') + '</div>';
+    }
+
     function infoHtml(data, mappingInDecisions, allowCorrections = true) {
         let html = '';
         const detail = (title, body, open) => '<details class="border rounded mb-2"' + (open ? ' open' : '') + '><summary class="p-2" style="cursor:pointer">' + title + '</summary><div class="p-2 pt-0 small">' + body + '</div></details>';
@@ -464,38 +528,9 @@
             html += detail(window.masarStaticHtml('<i class="bi bi-plus-circle"></i> سيتم إنشاء ') + created.map((x) => num(x[1].length) + ' ' + x[0]).join(window.masarT(' و')) + window.masarT(' تلقائيًا'),
                 created.map((x) => '<div><strong>' + x[0] + ':</strong> ' + x[1].slice(0, 15).map(esc).join(window.masarT('، ')) + (x[1].length > 15 ? '…' : '') + '</div>').join(''), false);
         }
-        const domainLabels = {attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), requests: window.masarT('الطلبات'), insurance: window.masarT('التأمينات')};
-        const domains = data.domains || {};
-        const domainLines = Object.keys(domainLabels).filter((key) => domains[key]).map((key) => {
-            const d = domains[key];
-            let line = '<div><i class="bi bi-check-circle text-success"></i> ' + domainLabels[key] + window.masarStaticHtml(': سيُستورد <strong>') + num(d.imported) + window.masarStaticHtml('</strong> سجل');
-            if (d.skipped > 0) { line += ' · <span class="text-danger">' + num(d.skipped) + window.masarStaticHtml(' صف مرفوض</span>'); }
-            if (key === 'penalties' && d.excluded > 0) { line += ' · <span class="text-muted">' + num(d.excluded) + window.masarStaticHtml(' صف استبعدته</span>'); }
-            line += '</div>';
-            const penaltyFailures = key === 'penalties' ? (d.failures || []) : [];
-            if (penaltyFailures.length && allowCorrections) {
-                const types = data.penalty_types || [];
-                line += penaltyFailures.map((f) => {
-                    const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
-                    const who = vals.filter((v) => String(v).trim() !== '').slice(0, 2).map(esc).join(' / ');
-                    const chosenFix = ((state.penaltyFixes || {})[f.sheet] || {})[f.line] || '';
-                    const sel = '<select class="form-select form-select-sm d-inline-block w-auto" data-penalty-fix="1" data-penalty-sheet="' + esc(f.sheet) + '" data-penalty-line="' + esc(f.line) + '">'
-                        + window.masarStaticHtml('<option value="">— بدون قرار —</option>')
-                        + '<option value="__exclude__"' + (chosenFix === '__exclude__' ? ' selected' : '') + window.masarStaticHtml('>استبعاد الصف نهائيًا</option>')
-                        + types.map((t) => '<option value="' + esc(t) + '"' + (chosenFix === t ? ' selected' : '') + '>' + esc(t) + '</option>').join('') + '</select>';
-                    return '<div class="small text-danger ms-3">' + esc(f.sheet) + window.masarT(' / صف ') + num(f.line) + (who ? ' (' + who + ')' : '') + ': ' + esc((f.errors || [])[0] || '') + '</div>'
-                        + window.masarStaticHtml('<div class="small ms-3 mb-1">صحّح نوع الجزاء أو استبعد الصف: ') + sel + '</div>';
-                }).join('');
-            } else if (d.errors && d.errors.length) {
-                line += d.errors.map((message) => '<div class="small text-danger ms-3">' + esc(message) + '</div>').join('');
-            }
-            if (d.warnings && d.warnings.length) {
-                line += d.warnings.map((message) => '<div class="small text-warning ms-3">' + esc(message) + '</div>').join('');
-            }
-            return line;
-        });
-        if (domainLines.length) {
-            html += detail(window.masarStaticHtml('<i class="bi bi-diagram-2"></i> ما سيحدث في باقي أوراق الملف (تجربة كاملة بدون حفظ)'), domainLines.join(''), true);
+        const domainsHtml = domainCardsHtml(data, allowCorrections);
+        if (domainsHtml) {
+            html += detail(window.masarStaticHtml('<i class="bi bi-diagram-2"></i> ما سيحدث في باقي أوراق الملف (تجربة كاملة بدون حفظ)'), domainsHtml, true);
         }
         const review = data.review_sheets || [];
         if (review.length) {
@@ -699,12 +734,7 @@
         Object.entries(data.new_lookups || {}).forEach(([key,values])=>{
             if (values?.length) html += note('سيتم إنشاء ' + esc(labels[key] || key) + ': ' + values.map(esc).join('، '));
         });
-        Object.entries(data.domains || {}).forEach(([kind,result])=>{
-            let text = '<strong>' + esc((data.kind_labels || {})[kind] || kind) + '</strong>: ' + num(result.imported) + ' صف صالح، ' + num(result.skipped) + ' مرفوض، ' + num(result.excluded || 0) + ' مستبعد.';
-            (result.errors || []).forEach(e=>text+='<div class="small text-danger">'+esc(e)+'</div>');
-            (result.warnings || []).forEach(e=>text+='<div class="small text-warning-emphasis">'+esc(e)+'</div>');
-            html += note(text);
-        });
+        html += domainCardsHtml(data, false);
         if (data.review_sheets?.length) html += note('لن تُستورد الأوراق غير المعروفة: ' + data.review_sheets.map(s=>esc(s.name)).join('، '));
         return html;
     }
@@ -789,6 +819,39 @@
         showStep('upload');
     }
 
+    let domainCardsRequest = 0;
+    async function refreshDomainCards() {
+        const requestId = ++domainCardsRequest;
+        try {
+            const data = await send(urls.preview, false);
+            if (requestId !== domainCardsRequest) { return; }
+            lastData = data;
+            state.reviewToken = data.review_token || '';
+            const container = sheetsList.querySelector('.domain-cards');
+            const expandedCards = container ? [...container.querySelectorAll('.domain-card')].map((c, i) => c.classList.contains('is-expanded') ? i : -1).filter((i) => i >= 0) : [];
+            const scrollTops = container ? [...container.querySelectorAll('.domain-scroll')].map((el) => el.scrollTop) : [];
+            const html = domainCardsHtml(data, true);
+            if (container && html) { container.outerHTML = html; }
+            else if (container) { container.remove(); }
+            const fresh = sheetsList.querySelector('.domain-cards');
+            if (fresh) {
+                [...fresh.querySelectorAll('.domain-card')].forEach((card, i) => {
+                    if (!expandedCards.includes(i)) { return; }
+                    card.classList.add('is-expanded');
+                    const head = card.querySelector('[data-domain-toggle]');
+                    const collapse = card.querySelector('.domain-collapse');
+                    if (head) {
+                        head.setAttribute('aria-expanded', 'true');
+                        head.querySelector('.domain-toggle-label').innerHTML = window.masarT('إخفاء التفاصيل') + ' <i class="bi bi-chevron-down"></i>';
+                    }
+                    if (collapse) { collapse.inert = false; }
+                    const scroller = card.querySelector('.domain-scroll');
+                    if (scroller && scrollTops[i]) { scroller.scrollTop = scrollTops[i]; }
+                });
+            }
+        } catch (error) { showAlert(error.message); }
+    }
+
     async function runPreview(button, label, stayOnPreview, mode = null) {
         if (busy) { return; }
         showAlert('');
@@ -814,6 +877,8 @@
             // commit treat them as employee tables.
             state.reviewToken = data.review_token || '';
             if (mode === 'preview' || !needsSheetsStep(data)) {
+                // Keep the correction cards current when returning from review.
+                if (sheetsStepUsed) renderSheetsStep(data);
                 renderPreview(data);
                 showStep('preview');
             } else {
@@ -831,6 +896,16 @@
     }
 
     // ---- events ---------------------------------------------------------------
+    modalEl.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-domain-toggle]');
+        if (!button) return;
+        const card = button.closest('.domain-card');
+        const expanded = button.getAttribute('aria-expanded') !== 'true';
+        button.setAttribute('aria-expanded', String(expanded));
+        card.classList.toggle('is-expanded', expanded);
+        card.querySelector('.domain-collapse').inert = !expanded;
+        button.querySelector('.domain-toggle-label').innerHTML = window.masarT(expanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i>';
+    });
     fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, sheetDates: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
     btn.preview.addEventListener('click', () => {
         const fromSheets = !steps.sheets.hidden;
@@ -921,7 +996,9 @@
             state.penaltyFixes[fixSheet] = state.penaltyFixes[fixSheet] || {};
             if (fixSelect.value === '') { delete state.penaltyFixes[fixSheet][fixLine]; }
             else { state.penaltyFixes[fixSheet][fixLine] = fixSelect.value; }
-            runPreview(null, '', false, 'reload-sheets');
+            // Quiet background refresh: only the result cards swap, the page
+            // and its mapping controls stay exactly as they are.
+            refreshDomainCards();
             return;
         }
         if (target.matches('input[name="import_sheet"]')) {

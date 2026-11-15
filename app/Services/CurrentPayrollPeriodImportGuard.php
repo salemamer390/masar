@@ -27,7 +27,7 @@ class CurrentPayrollPeriodImportGuard
     public function ensureWithinCurrentPeriod(string|Carbon $date, string $label = 'السجل'): void
     {
         if ($this->isBeforeCurrentPeriod($date)) {
-            throw new \RuntimeException("{$label} بتاريخ قبل بداية فترة المرتب الحالية ({$this->currentStart()->format('Y-m-d')})؛ مرتب تلك الفترة أُقفل بالفعل.");
+            throw new \App\Services\Imports\OutsidePayrollPeriodException("{$label} بتاريخ قبل بداية فترة المرتب الحالية ({$this->currentStart()->format('Y-m-d')})؛ مرتب تلك الفترة أُقفل بالفعل.");
         }
     }
 

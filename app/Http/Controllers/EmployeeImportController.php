@@ -108,9 +108,13 @@ class EmployeeImportController extends Controller
                 $domains[$domain] = [
                     'imported' => $imported,
                     'skipped' => $skipped,
+                    'out_of_period_count' => (int) ($data['out_of_period_count'] ?? 0),
+                    'period_start' => app(\App\Services\CurrentPayrollPeriodImportGuard::class)->currentStart()->format('d/m'),
                     'errors' => (array) ($data['errors'] ?? []),
                     'warnings' => array_slice((array) ($data['warnings'] ?? []), 0, 10),
-                ] + ($domain === 'penalties' ? ['failures' => array_slice((array) ($data['failures'] ?? []), 0, 25), 'excluded' => (int) ($data['excluded'] ?? 0)] : []);
+                    'failures' => array_slice((array) ($data['failures'] ?? []), 0, 25),
+                    'row_failures' => array_slice(array_values(array_filter((array) ($data['failures'] ?? []), static fn ($failure) => ($failure['reason_code'] ?? null) !== 'outside_payroll_period')), 0, 25),
+                ] + ($domain === 'penalties' ? ['excluded' => (int) ($data['excluded'] ?? 0)] : []);
             }
         }
 
