@@ -68,11 +68,29 @@
 </div>
 @push('styles')
 <style>
-.sheet-summary-missing > td { background: linear-gradient(90deg, rgba(220,53,69,.045), transparent 45%) !important; box-shadow: inset 4px 0 0 #dc3545; }
-.sheet-summary-missing .fw-bold button { color: #842029 !important; }
-.sheet-summary-ignored > td { opacity: .48; background: #f8f9fa !important; }
-.sheet-summary-ignored { cursor: not-allowed; }
-.sheet-summary-ignored .sheet-ignore, .sheet-summary-ignored .sheet-ignore * { opacity: 1 !important; cursor: pointer !important; }
+.sheet-cards { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.sheet-card { border: 1px solid var(--border, #dee2e6); border-radius: 14px; background: #fff; overflow: hidden; transition: border-color .18s ease, box-shadow .18s ease; }
+.sheet-card:hover, .sheet-card:focus-within { border-color: #c3cad4; box-shadow: 0 1px 4px rgba(16,24,40,.06); }
+.sheet-card-head { display: grid; grid-template-columns: auto minmax(0,1fr) auto minmax(150px,auto) auto; align-items: center; gap: 14px; padding: 12px 16px; cursor: pointer; }
+.sheet-card-index { width: 26px; height: 26px; border-radius: 8px; background: #f1f3f7; color: #5b6472; font-weight: 700; font-size: .8rem; display: inline-flex; align-items: center; justify-content: center; }
+.sheet-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.sheet-card-title > button { background: none; border: 0; padding: 0; font-weight: 700; color: #124a92; display: inline-flex; align-items: center; gap: 6px; }
+.sheet-card-title > button:disabled { color: #6c757d; cursor: not-allowed; }
+.sheet-card-title > button i { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 1px solid #9cbef0; border-radius: 8px; background: #eaf3ff; color: #124a92; font-size: 17px; }
+.sheet-card-title > button:disabled i { border-color: #dee2e6; background: #f1f3f5; color: #868e96; }
+.sheet-card-rows { color: #6c757d; font-size: .82rem; white-space: nowrap; }
+.sheet-card-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.sheet-card-body { display: grid; grid-template-rows: 0fr; opacity: 0; background: #fcfcfd; padding: 0 16px; border-top: 1px solid transparent; transition: grid-template-rows .3s ease, opacity .25s ease, padding .3s ease, border-color .3s ease; }
+.sheet-card-body > .sheet-details { overflow: hidden; min-height: 0; }
+.sheet-card-body.open { grid-template-rows: 1fr; opacity: 1; padding: 14px 16px; border-top-color: var(--border, #e9ecef); }
+@media (prefers-reduced-motion: reduce) { .sheet-card-body { transition: none; } }
+.sheet-card-missing { border-color: #f0c36d; }
+.sheet-card-missing .sheet-card-head { background: linear-gradient(270deg, rgba(255,193,7,.08), transparent 55%); }
+.sheet-missing-badge { display: inline-flex; align-items: center; gap: 5px; color: #997404; background: #fff3cd; border: 1px solid #ffe69c; border-radius: 999px; padding: 3px 10px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+.sheet-card-ignored { border-style: dashed; }
+.sheet-card-ignored .sheet-card-head { opacity: .48; background: #f8f9fa; cursor: not-allowed; }
+.sheet-card-ignored .sheet-ignore, .sheet-card-ignored .sheet-ignore * { opacity: 1 !important; cursor: pointer !important; }
+@media (max-width: 720px) { .sheet-card-head { grid-template-columns: auto minmax(0,1fr); row-gap: 10px; } }
 .mapping-field-card { border: 1px solid var(--border, #dee2e6); border-radius: 12px; padding: 10px; background: #fff; min-height: 100%; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
 .mapping-field-card label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mapping-field-card.is-required.is-missing { border-color: #dc3545; background: #fff8f8; box-shadow: 0 0 0 3px rgba(220,53,69,.08); animation: mappingNeedsAttention 1.35s ease-in-out infinite; }
@@ -440,26 +458,11 @@
     function infoHtml(data, mappingInDecisions, allowCorrections = true) {
         let html = '';
         const detail = (title, body, open) => '<details class="border rounded mb-2"' + (open ? ' open' : '') + '><summary class="p-2" style="cursor:pointer">' + title + '</summary><div class="p-2 pt-0 small">' + body + '</div></details>';
-        if (data.capacity) {
-            const c = data.capacity;
-            html += detail(window.masarStaticHtml('<i class="bi bi-speedometer2"></i> حد الباقة: ') + num(c.projected) + window.masarT(' من ') + num(c.limit) + window.masarT(' موظف بعد الاستيراد'),
-                window.masarT('باقة ') + esc(c.plan) + window.masarT(' — المسجل حاليًا ') + num(c.current) + window.masarT('، والمتاح قبل الاستيراد ') + num(c.available) + '.', !!c.exceeded);
-        }
         const nl = data.new_lookups || {};
         const created = [[window.masarT('أقسام'), nl.departments], [window.masarT('وظائف'), nl.jobs], [window.masarT('فروع'), nl.branches]].filter((x) => x[1] && x[1].length);
         if (created.length) {
             html += detail(window.masarStaticHtml('<i class="bi bi-plus-circle"></i> سيتم إنشاء ') + created.map((x) => num(x[1].length) + ' ' + x[0]).join(window.masarT(' و')) + window.masarT(' تلقائيًا'),
                 created.map((x) => '<div><strong>' + x[0] + ':</strong> ' + x[1].slice(0, 15).map(esc).join(window.masarT('، ')) + (x[1].length > 15 ? '…' : '') + '</div>').join(''), false);
-        }
-        const sheets = data.sheets || [];
-        if (sheets.length > 1 && !data.needs_mapping && !data.merge_available) {
-            html += detail(window.masarStaticHtml('<i class="bi bi-layers"></i> تم اختيار ورقة تلقائيًا'),
-                sheets.map((sheet) => '<div>' + (sheet.eligible ? '<i class="bi bi-check-circle text-success"></i> ' : '<i class="bi bi-dash-circle text-muted"></i> ') + window.masarT('ورقة «') + esc(sheet.name) + '» — ' + (sheet.eligible ? window.masarT('مؤهلة للاستيراد (') + num(sheet.rows) + window.masarT(' صف)') : window.masarT('ليست ورقة بيانات موظفين وتم تجاهلها')) + '</div>').join(''), false);
-        }
-        const kinds = data.kind_labels || {employees: window.masarT('بيانات الموظفين'), attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), advances: window.masarT('السلف'), requests: window.masarT('طلبات (إضافي / مكافآت / إذن / مأمورية)'), auxiliary: window.masarT('تجاهل'), unknown: window.masarT('غير معروفة')};
-        const classified = sheets.filter((sheet) => sheet.kind && sheet.kind !== 'unknown');
-        if (classified.length) {
-            html += detail(window.masarStaticHtml('<i class="bi bi-diagram-3"></i> خريطة أوراق الملف'), classified.map((sheet) => window.masarStaticHtml('<div><i class="bi bi-check-circle text-success"></i> ورقة «') + esc(sheet.name) + '» ← <strong>' + esc(kinds[sheet.kind] || kinds.unknown) + '</strong></div>').join(''), true);
         }
         const domainLabels = {attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), requests: window.masarT('الطلبات'), insurance: window.masarT('التأمينات')};
         const domains = data.domains || {};
@@ -640,7 +643,7 @@
     function renderSheetsStep(data) {
         const sheets = data.sheets || [];
         q('[data-import-filename]').textContent = fileInput.files[0]?.name || '';
-        let html = '<div class="table-responsive sheet-table-wrap"><table class="table sheet-table align-middle"><thead><tr><th>#</th><th>الشيت في ملفك</th><th>عدد الصفوف</th><th>الحقل في النظام</th><th>الإجراء</th></tr></thead><tbody>';
+        let html = '<div class="sheet-cards">';
         sheets.forEach((sheet, index) => {
             const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
             const config = sheet.domain_config;
@@ -648,25 +651,34 @@
             const id = 'sheetBody' + index;
             const ignored = chosen === 'ignore';
             const missingFields = (!ignored && (sheet.missing_fields || []).length) ? sheet.missing_fields : [];
-            html += '<tr class="sheet-summary-row'+(missingFields.length?' sheet-summary-missing':'')+(ignored?' sheet-summary-ignored':'')+'" data-sheet-row-toggle="'+id+'" tabindex="0" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' aria-disabled="true"':'')+'><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'>عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
-            html += '<tr id="' + id + '" hidden><td colspan="5"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
+            html += '<div class="sheet-card'+(missingFields.length?' sheet-card-missing':'')+(ignored?' sheet-card-ignored':'')+'">'
+                + '<div class="sheet-card-head" data-sheet-row-toggle="'+id+'" tabindex="0" role="button" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' aria-disabled="true"':'')+'>'
+                + '<span class="sheet-card-index">'+num(index+1)+'</span>'
+                + '<div class="sheet-card-title"><button type="button" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button>'
+                + (missingFields.length ? '<span class="sheet-missing-badge"><i class="bi bi-exclamation-triangle-fill"></i>حقول ناقصة</span>' : '')
+                + '</div>'
+                + '<span class="sheet-card-rows">'+num(sheet.rows)+' صف</span>'
+                + '<select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'" aria-label="الحقل في النظام">'+sheetKindOptions(chosen)+'</select>'
+                + '<div class="sheet-card-actions"><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label>'
+                + '<button type="button" class="btn btn-link btn-sm p-0" data-sheet-toggle="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'>عرض / تعديل الربط ('+num(mapped)+')</button></div>'
+                + '</div>'
+                + '<div class="sheet-card-body" id="' + id + '"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
                 + (sheet.transposed ? '<div class="alert alert-info small py-2"><i class="bi bi-arrow-repeat"></i> هذه الورقة مقلوبة (الحقول مكتوبة في صفوف) — قرأها التطبيق تلقائيًا كجدول عادي؛ راجع الربط أدناه.</div>' : '')
-                + (!ignored && sheet.missing_fields?.length ? '<div class="alert alert-warning small">حقول مطلوبة غير مربوطة: '+sheet.missing_fields.map(esc).join('، ')+'؛ حدد الأعمدة أدناه.</div>' : '')
                 + (ignored ? '<p>هذه الورقة لن تُستورد.</p>' : chosen === 'employees' ? employeeMappingEditor(data, sheet) : domainMappingEditor(data,sheet,chosen))
                 + ((sheet.sample || []).length ? '<div class="small fw-semibold mt-3">عينة البيانات</div><div class="table-responsive"><table class="table table-sm small"><tbody>' + sheet.sample.map(row=>'<tr>'+row.map(cell=>'<td>'+esc(cell)+'</td>').join('')+'</tr>').join('') + '</tbody></table></div>' : '')
-                + '</div></td></tr>';
+                + '</div></div></div>';
         });
-        html += '</tbody></table></div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
+        html += '</div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
         const incomplete = (data.incomplete_sheets || []);
         if (incomplete.length) {
-            showAlert('بيانات ناقصة في: ' + incomplete.map(sheet=>'«'+sheet.name+'» ('+sheet.missing.join('، ')+')').join('؛ ') + '. الأوراق المحددة بإطار أحمر تحتاج إلى استكمال الأعمدة قبل المتابعة.');
+            showAlert('بيانات ناقصة في: ' + incomplete.map(sheet=>'«'+sheet.name+'» ('+sheet.missing.join('، ')+')').join('؛ ') + '. الأوراق المعلّمة بشارة «حقول ناقصة» تحتاج إلى استكمال الأعمدة قبل المتابعة.');
         }
         sheetsList.innerHTML = html + infoHtml(data, true);
         (data.sheets || []).forEach((sheet, index) => {
             if (state.sheetKinds[sheet.name] === 'ignore' || !(sheet.missing_fields || []).length) return;
             const body = document.getElementById('sheetBody' + index);
             if (body) {
-                body.hidden = false;
+                body.classList.add('open');
                 sheetsList.querySelectorAll('[data-sheet-toggle="sheetBody' + index + '"], [data-sheet-row-toggle="sheetBody' + index + '"]').forEach(el => {
                     el.setAttribute('aria-expanded', 'true');
                     const icon = el.querySelector('i.bi-chevron-down, i.bi-chevron-up');
@@ -791,7 +803,7 @@
         setBusy(true, button, label);
         try {
             const data = await send(urls.preview, false);
-            const openSheets = [...sheetsList.querySelectorAll('tr[id]:not([hidden])')].map(el=>el.id);
+            const openSheets = [...sheetsList.querySelectorAll('.sheet-card-body.open')].map(el=>el.id);
             lastData = data;
             if (mode === 'preview' && (data.mapping_error || data.file_errors?.length)) { renderSheetsStep(data); showStep('sheets'); showAlert(data.mapping_error || data.file_errors.join('؛ ')); return; }
             // Bind the commit to what this preview showed: keep the
@@ -808,7 +820,7 @@
                 sheetsStepUsed = true;
                 renderSheetsStep(data);
                 showStep('sheets');
-                openSheets.forEach(id=>{const el=document.getElementById(id);if(el) el.hidden=false;});
+                openSheets.forEach(id=>{const el=document.getElementById(id);if(!el) return;const idx=parseInt(id.replace('sheetBody',''),10);const sh=(data.sheets||[])[idx];if(sh&&(state.sheetKinds[sh.name]||sh.kind)==='ignore') return;el.classList.add('open');});
             }
         } catch (error) {
             showAlert(error.message);
@@ -834,12 +846,12 @@
         if (busy) { return; }
         const body = document.getElementById(id);
         if (!body || !sheetsList.contains(body)) { return; }
-        body.hidden = !body.hidden;
-        const expanded = String(!body.hidden);
+        const expanded = !body.classList.contains('open');
+        body.classList.toggle('open', expanded);
         sheetsList.querySelectorAll('[data-sheet-toggle="' + id + '"], [data-sheet-row-toggle="' + id + '"]').forEach(el => {
-            el.setAttribute('aria-expanded', expanded);
+            el.setAttribute('aria-expanded', String(expanded));
             const icon = el.querySelector('i.bi-chevron-down, i.bi-chevron-up');
-            if (icon) { icon.className = body.hidden ? 'bi bi-chevron-down' : 'bi bi-chevron-up'; }
+            if (icon) { icon.className = expanded ? 'bi bi-chevron-up' : 'bi bi-chevron-down'; }
         });
     }
     sheetsList.addEventListener('click', (event) => {
@@ -848,10 +860,10 @@
         // Dropdowns, ignore labels and other controls keep their own actions.
         if (event.target.closest('button, a, input, select, textarea, label, [contenteditable="true"]')) { return; }
         const row = event.target.closest('[data-sheet-row-toggle]');
-        if (row && !row.classList.contains('sheet-summary-ignored')) { toggleSheetDetails(row.dataset.sheetRowToggle); }
+        if (row && !row.classList.contains('sheet-card-ignored')) { toggleSheetDetails(row.dataset.sheetRowToggle); }
     });
     sheetsList.addEventListener('keydown', (event) => {
-        if (!event.target.matches('[data-sheet-row-toggle]') || event.target.classList.contains('sheet-summary-ignored') || !['Enter', ' '].includes(event.key)) { return; }
+        if (!event.target.matches('[data-sheet-row-toggle]') || event.target.classList.contains('sheet-card-ignored') || !['Enter', ' '].includes(event.key)) { return; }
         event.preventDefault();
         toggleSheetDetails(event.target.dataset.sheetRowToggle);
     });
