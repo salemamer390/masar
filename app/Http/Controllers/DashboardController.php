@@ -32,11 +32,26 @@ class DashboardController extends Controller
         $payroll = $can('payroll.view') ? $this->dashboard->payroll($user, $month) : null;
         $documents = $can('documents.view') ? $this->dashboard->documentCompleteness($user) : null;
         $expiringDocuments = $can('documents.view') ? $this->dashboard->expiringDocuments($user) : collect();
-        $recentLeaves = $can('leaves.view') ? Leave::with(['employee', 'leaveType'])->whereIn('status', ['Approved', 'Rejected'])->latest('approved_at')->latest('updated_at')->latest('id')->limit(7)->get() : collect();
+        // Dashboard cards show a fixed number of rows; the card footer opens a
+        // modal with the full list, so each card also carries its real total.
+        $recentLeavesTotal = 0;
+        if ($can('leaves.view')) {
+            $recentLeavesBase = Leave::whereIn('status', ['Approved', 'Rejected']);
+            $recentLeavesTotal = (clone $recentLeavesBase)->count();
+            $recentLeaves = $recentLeavesBase->with(['employee', 'leaveType'])->latest('approved_at')->latest('updated_at')->latest('id')->limit(7)->get();
+        } else {
+            $recentLeaves = collect();
+        }
         $recentEmployees = collect();
+        $recentEmployeesTotal = 0;
         if ($can('employees.view')) {
             $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereBetween('hire_date', [$currentMonth, $currentMonth->copy()->endOfMonth()])->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();
-            if ($recentEmployees->isEmpty()) $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();
+            if ($recentEmployees->isNotEmpty()) {
+                $recentEmployeesTotal = $this->dashboard->employeesFor($user)->whereNotNull('hire_date')->whereBetween('hire_date', [$currentMonth, $currentMonth->copy()->endOfMonth()])->whereDate('hire_date', '<=', $today)->count();
+            } else {
+                $recentEmployees = $this->dashboard->employeesFor($user)->with(['job', 'status'])->whereNotNull('hire_date')->whereDate('hire_date', '<=', $today)->latest('hire_date')->latest('id')->limit(7)->get();
+                $recentEmployeesTotal = $this->dashboard->employeesFor($user)->whereNotNull('hire_date')->whereDate('hire_date', '<=', $today)->count();
+            }
         }
         $recentMovements = $can('movements.view') ? MovementRecord::with(['employee', 'movementType'])->latest('movement_date')->latest('id')->limit(5)->get() : collect();
 
@@ -68,6 +83,6 @@ class DashboardController extends Controller
 
         $payrollYears = $can('payroll.view') ? \App\Models\PayrollRun::query()->selectRaw('YEAR(payroll_month) year')->distinct()->orderByDesc('year')->pluck('year') : collect();
         if ($payrollYears->isEmpty()) $payrollYears = collect([$today->year]);
-        return view('dashboard.index', compact('today', 'month', 'heroMetrics', 'attendance', 'payroll', 'documents', 'expiringDocuments', 'recentLeaves', 'recentEmployees', 'recentMovements', 'attentionItems', 'activities', 'quickActions', 'payrollYears'));
+        return view('dashboard.index', compact('today', 'month', 'heroMetrics', 'attendance', 'payroll', 'documents', 'expiringDocuments', 'recentLeaves', 'recentLeavesTotal', 'recentEmployeesTotal', 'recentEmployees', 'recentMovements', 'attentionItems', 'activities', 'quickActions', 'payrollYears'));
     }
 }
