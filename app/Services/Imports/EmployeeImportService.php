@@ -246,6 +246,10 @@ class EmployeeImportService
 
         $this->companyId = $companyId;
         $aliases = $this->aliasMap($companyId);
+        $workbookSheetCount = count($sheets);
+        foreach ($sheets as $index => $sheet) {
+            [$sheets[$index]['rows'], $sheets[$index]['transposed']] = $this->normalizeSheetOrientation($sheet['rows'], $aliases, $manual, $workbookSheetCount);
+        }
         $infos = [];
         foreach ($sheets as $index => $sheet) {
             [$headerRow, $map, $entries, $used] = $this->detectHeader($sheet['rows'], $aliases, $manual, $employeeMappings[$sheet['name']] ?? null);
@@ -278,6 +282,7 @@ class EmployeeImportService
                 'eligible' => $eligible,
                 'kind' => $kind,
                 'detected_kind' => $detected,
+                'transposed' => (bool) ($sheets[$index]['transposed'] ?? false),
                 'sample' => $this->sheetSample($sheets[$index]['rows'], $info['header_row']),
                 'employee_config' => $this->employeeConfig($sheets[$index]['rows'], $info),
             ];
@@ -551,6 +556,101 @@ class EmployeeImportService
      * @param array<int, array<int, string>> $rows
      * @param array<string, string> $used fields mapped from the detected header row
      */
+    /**
+     * Vertical sheets list the field labels down the first column and carry
+     * one person's values per following column (common when people copy a
+     * payroll card or profile into a sheet). Detected by comparing alias hits
+     * down the first column against the best header row across: when the
+     * labels clearly live in the first column, rotate the grid into the
+     * normal table shape (labels become the header row, each value column
+     * becomes one data row) so detection, mapping review, and import all run
+     * unchanged on it. Normal sheets keep their shape untouched: their first
+     * column holds values (names, codes), which never match field aliases.
+     *
+     * In multi-sheet workbooks a narrow two-column card (one label column,
+     * one value column) keeps its shape: those are payroll profile/report
+     * cards, deliberately never read as employee tables. A single-sheet file
+     * is always the user's import candidate, so it transposes either way.
+     *
+     * @param array<int, array<int, mixed>> $rows
+     * @param array<string, string> $aliases
+     * @return array{0: array<int, array<int, mixed>>, 1: bool}
+     */
+    private function normalizeSheetOrientation(array $rows, array $aliases, array $manual = [], int $workbookSheetCount = 1): array
+    {
+        if ($rows === []) {
+            return [$rows, false];
+        }
+        $labelColumn = null;
+        $scanned = 0;
+        foreach ($rows as $cells) {
+            foreach ($cells as $column => $value) {
+                if (trim((string) $value) !== '' && ($labelColumn === null || $column < $labelColumn)) {
+                    $labelColumn = $column;
+                }
+            }
+            if (++$scanned >= 15) {
+                break;
+            }
+        }
+        if ($labelColumn === null) {
+            return [$rows, false];
+        }
+        // The same matcher the header scan uses (exact dictionary, learned
+        // aliases, contextual word-meaning), so a label like «الراتب الشهري
+        // الصافي» counts even though it is not a verbatim alias.
+        $labelMatches = 0;
+        $bestRowMatches = 0;
+        $scanned = 0;
+        foreach ($rows as $cells) {
+            if (++$scanned > 15) {
+                break;
+            }
+            [, $labelUsed] = $this->mapRow([$labelColumn => $cells[$labelColumn] ?? ''], $aliases, $manual);
+            $labelMatches += count($labelUsed);
+            [, $rowUsed] = $this->mapRow(array_diff_key($cells, [$labelColumn => true]), $aliases, $manual);
+            $bestRowMatches = max($bestRowMatches, count($rowUsed));
+        }
+        if ($labelMatches < 2 || $labelMatches <= $bestRowMatches) {
+            return [$rows, false];
+        }
+        $valueColumns = [];
+        foreach ($rows as $cells) {
+            foreach ($cells as $column => $value) {
+                if ($column !== $labelColumn && trim((string) $value) !== '') {
+                    $valueColumns[$column] = true;
+                }
+            }
+        }
+        if ($valueColumns === []) {
+            return [$rows, false];
+        }
+        if ($workbookSheetCount > 1 && count($valueColumns) < 2) {
+            return [$rows, false];
+        }
+        $transposed = [];
+        $header = [];
+        $rowIndex = 0;
+        foreach ($rows as $cells) {
+            $rowIndex++;
+            $header[$rowIndex] = trim((string) ($cells[$labelColumn] ?? ''));
+        }
+        $transposed[1] = $header;
+        $line = 1;
+        foreach (array_keys($valueColumns) as $column) {
+            $line++;
+            $dataRow = [];
+            $rowIndex = 0;
+            foreach ($rows as $cells) {
+                $rowIndex++;
+                $dataRow[$rowIndex] = $cells[$column] ?? '';
+            }
+            $transposed[$line] = $dataRow;
+        }
+
+        return [$transposed, true];
+    }
+
     private function isVerticalProfile(array $rows, array $used): bool
     {
         if (count($used) >= 2) {
