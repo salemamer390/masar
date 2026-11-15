@@ -57,6 +57,21 @@ class LeaveSettingsSingleSourceTest extends TestCase
         return Employee::create(['employee_code' => $code, 'first_name' => 'E', 'full_name' => 'E'.$code, 'company_id' => $c->id, 'status_id' => $this->st->id, 'hire_date' => $hire]);
     }
 
+    /**
+     * A future date that is a real working day. The shipped weekly rest
+     * pattern is Friday-only ('0000100'); a single-day leave that lands on a
+     * rest day is correctly refused with "no working days" before the
+     * early-grant checks these tests exercise, which made the class fail on
+     * some calendar days. Test holidays are never seeded, so skipping Friday
+     * is enough here.
+     */
+    private function workingDay(int $daysAhead): string
+    {
+        $d = now()->addDays($daysAhead);
+        while ($d->dayOfWeekIso === 5) $d->addDay();
+        return $d->toDateString();
+    }
+
     private function request(User $u, Employee $e, LeaveType $t, string $s, string $en, array $extra = [])
     {
         $this->actingAs($u);
@@ -89,20 +104,20 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_casual_is_limited_to_two_days_per_request_and_has_no_six_month_wait(): void
     {
         $new = $this->emp($this->a, 'L2', now()->subMonth()->toDateString());
-        $this->request($this->ua, $new, $this->casual, now()->addDays(3)->toDateString(), now()->addDays(3)->toDateString())->assertOk(); // 1 day, 1 month of service: allowed
+        $this->request($this->ua, $new, $this->casual, $this->workingDay(3), $this->workingDay(3))->assertOk(); // 1 day, 1 month of service: allowed
         $old = $this->emp($this->a, 'L3', '2020-01-01');
         $three = $this->request($this->ua, $old, $this->casual, '2026-12-06', '2026-12-08'); // Sun-Tue = 3 days
         $three->assertStatus(422);
         $this->assertStringContainsString('الحد الأقصى للطلب الواحد 2', json_encode($three->json('errors'), JSON_UNESCAPED_UNICODE));
         $this->request($this->ua, $old, $this->casual, '2026-12-06', '2026-12-07')->assertOk();
         // Annual keeps its 6-month wait for the same new employee.
-        $this->request($this->ua, $new, $this->annual, now()->addDays(10)->toDateString(), now()->addDays(10)->toDateString())->assertStatus(422);
+        $this->request($this->ua, $new, $this->annual, $this->workingDay(10), $this->workingDay(10))->assertStatus(422);
     }
 
     public function test_early_grant_checkbox_persists_and_overrides_only_the_wait_time(): void
     {
         $new = $this->emp($this->a, 'L4', now()->subMonths(2)->toDateString());
-        $d = now()->addDays(20)->toDateString();
+        $d = $this->workingDay(20);
         // Blocked first, and the answer tells the screen it may offer the confirm button.
         $this->request($this->ua, $new, $this->annual, $d, $d)->assertStatus(422)->assertJsonValidationErrors(['start_date', 'early_grant_available']);
         $ok = $this->request($this->ua, $new, $this->annual, $d, $d, ['is_early_grant' => 1, 'early_grant_reason' => 'موافقة الإدارة']);
@@ -115,7 +130,7 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_confirming_only_the_wait_keeps_the_balance_check_and_creates_nothing_when_refused(): void
     {
         $new = $this->emp($this->a, 'W1', now()->subMonths(2)->toDateString()); // 15 days entitlement, under the 6-month wait
-        $s = now()->addDays(20)->toDateString();
+        $s = $this->workingDay(20);
         $e = now()->addDays(50)->toDateString(); // well over 15 working days
         $confirm = ['is_early_grant' => 1, 'early_wait_only' => 1, 'early_grant_reason' => 'wait only'];
         $r = $this->request($this->ua, $new, $this->annual, $s, $e, $confirm);
@@ -127,7 +142,7 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_confirming_the_wait_creates_exactly_one_leave_when_balance_is_enough(): void
     {
         $new = $this->emp($this->a, 'W2', now()->subMonths(2)->toDateString());
-        $d = now()->addDays(20)->toDateString();
+        $d = $this->workingDay(20);
         $this->request($this->ua, $new, $this->annual, $d, $d)->assertStatus(422); // the warning step: nothing saved
         $this->assertSame(0, Leave::where('employee_id', $new->id)->count()); // cancel = stop here
         $this->request($this->ua, $new, $this->annual, $d, $d, ['is_early_grant' => 1, 'early_wait_only' => 1, 'early_grant_reason' => 'سبب'])->assertOk();
@@ -138,7 +153,7 @@ class LeaveSettingsSingleSourceTest extends TestCase
     public function test_the_old_explicit_early_grant_path_is_unchanged_and_still_skips_balance(): void
     {
         $new = $this->emp($this->a, 'W3', now()->subMonths(2)->toDateString());
-        $this->request($this->ua, $new, $this->annual, now()->addDays(20)->toDateString(), now()->addDays(50)->toDateString(), ['is_early_grant' => 1, 'early_grant_reason' => 'advance'])->assertOk();
+        $this->request($this->ua, $new, $this->annual, $this->workingDay(20), now()->addDays(50)->toDateString(), ['is_early_grant' => 1, 'early_grant_reason' => 'advance'])->assertOk();
     }
 
     public function test_a_user_without_approve_permission_cannot_confirm_an_exception(): void
@@ -146,7 +161,7 @@ class LeaveSettingsSingleSourceTest extends TestCase
         $role = Role::create(['name' => 'plain', 'display_name' => 'P', 'company_id' => $this->a->id]);
         $plain = User::create(['name' => 'P', 'email' => 'plain@example.test', 'password' => bcrypt('x'), 'role_id' => $role->id, 'company_id' => $this->a->id, 'is_active' => true]);
         $new = $this->emp($this->a, 'W4', now()->subMonths(2)->toDateString());
-        $d = now()->addDays(20)->toDateString();
+        $d = $this->workingDay(20);
         $r = $this->request($plain, $new, $this->annual, $d, $d, ['is_early_grant' => 1, 'early_wait_only' => 1, 'early_grant_reason' => 'x']);
         $this->assertContains($r->status(), [401, 403]);
         $this->assertSame(0, Leave::where('employee_id', $new->id)->count());
@@ -154,7 +169,7 @@ class LeaveSettingsSingleSourceTest extends TestCase
 
     public function test_early_grant_is_ignored_when_that_company_turned_the_switch_off(): void
     {
-        $d = now()->addDays(20)->toDateString();
+        $d = $this->workingDay(20);
         DB::table('leave_policy_settings')->where('company_id', $this->a->id)->where('setting_key', 'allow_early_leave')->update(['setting_value' => '1']);
         DB::table('leave_policy_settings')->where('company_id', $this->b->id)->where('setting_key', 'allow_early_leave')->update(['setting_value' => '0']);
         $nb = $this->emp($this->b, 'L5', now()->subMonths(2)->toDateString());
