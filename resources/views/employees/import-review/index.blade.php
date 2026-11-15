@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title',__('مراجعة صفوف استيراد الموظفين'))
 @section('content')
-<div class="d-flex justify-content-between mb-3"><h3>{{ __('صفوف الاستيراد المرفوضة') }} <span class="badge bg-warning text-dark">{{ $count }}</span></h3><a class="btn btn-light" href="{{ route('employees.index') }}">{{ __('الموظفون') }}</a></div>
+<div class="d-flex justify-content-between mb-3"><h3>{{ __('صفوف الاستيراد المرفوضة') }} <span class="badge bg-warning text-dark">{{ $count }}</span></h3><div class="d-flex gap-2"><a class="btn btn-outline-warning" href="{{ route('employees.import-outofperiod.index') }}">{{ __('سجلات مستوردة بتاريخ قديم') }}</a><a class="btn btn-light" href="{{ route('employees.index') }}">{{ __('الموظفون') }}</a></div></div>
 <p class="text-muted">{{ __('الملف الأصلي لا يُحفظ. تبقى فقط الصفوف المرفوضة (مشفرة) لتصحيحها هنا مع تسجيل من عدّل ومتى ولماذا.') }}</p>
 <div class="table-responsive"><table class="table"><thead><tr><th>{{ __('الملف') }}</th><th>{{ __('النوع') }}</th><th>{{ __('الورقة') }}</th><th>{{ __('الصف') }}</th><th>{{ __('الاسم') }}</th><th>{{ __('سبب الرفض') }}</th><th></th></tr></thead><tbody>
 @forelse($rows as $row)

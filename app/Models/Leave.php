@@ -11,6 +11,7 @@ class Leave extends Model
     use BelongsToCompany;
     use \App\Models\Concerns\ImmediatelyEffective;
     protected $fillable = [
+        'import_batch_id',
         'employee_id',
         'leave_type_id',
         'start_date',

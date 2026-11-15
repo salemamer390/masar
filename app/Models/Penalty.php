@@ -11,6 +11,7 @@ class Penalty extends Model
     use BelongsToCompany;
     use \App\Models\Concerns\ImmediatelyEffective;
     protected $fillable = [
+        'import_batch_id',
         'employee_id',
         'penalty_type_id',
         'penalty_date',

@@ -53,6 +53,14 @@ class EmployeeImportController extends Controller
         return response()->json(['success' => true] + $this->payload($analysis) + [
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
             'mapping_error' => $this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null),
+            'incomplete_sheets' => array_values(array_filter(array_map(
+                fn (array $sheet) => empty($sheet['missing_fields']) ? null : [
+                    'name' => (string) ($sheet['name'] ?? ''),
+                    'kind' => (string) ($sheet['kind'] ?? 'unknown'),
+                    'missing' => array_values((array) $sheet['missing_fields']),
+                ],
+                $analysis['sheets'] ?? []
+            ))),
             'penalty_types' => PenaltyType::withoutGlobalScopes()->orderBy('name')->pluck('name'),
             'review_token' => $this->reviewToken($request, $analysis, $companyId),
         ]);
@@ -412,6 +420,19 @@ class EmployeeImportController extends Controller
             if (!empty($result['created_ids'])) {
                 Employee::withoutGlobalScopes()->where('company_id', $companyId)
                     ->whereIn('id', $result['created_ids'])->update(['import_batch_id' => $batch->id]);
+            }
+
+            if (Schema::hasColumn('leaves', 'import_batch_id')) {
+                $ids = array_map('intval', (array) data_get($distributed, 'leaves.created_ids', []));
+                if ($ids !== []) \App\Models\Leave::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $ids)->update(['import_batch_id' => $batch->id]);
+            }
+            if (Schema::hasColumn('penalties', 'import_batch_id')) {
+                $ids = array_map('intval', (array) data_get($distributed, 'penalties.created_ids', []));
+                if ($ids !== []) \App\Models\Penalty::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $ids)->update(['import_batch_id' => $batch->id]);
+            }
+            if (Schema::hasColumn('hr_requests', 'import_batch_id')) {
+                $ids = array_map('intval', (array) data_get($distributed, 'requests.created_ids', []));
+                if ($ids !== []) \App\Models\HrRequest::withoutGlobalScopes()->where('company_id', $companyId)->whereIn('id', $ids)->update(['import_batch_id' => $batch->id]);
             }
             if (!empty($result['movement_ids'])) {
                 MovementRecord::withoutGlobalScopes()->whereIn('id', $result['movement_ids'])

@@ -12,6 +12,7 @@ class HrRequest extends Model
     use BelongsToCompany;
     use \App\Models\Concerns\ImmediatelyEffective;
     protected $fillable = [
+        'import_batch_id',
         'employee_id',
         'request_type',
         'request_type_id',
