@@ -54,6 +54,7 @@ class WorkbookRequestImporter
                     $employee = $this->employee($row[$map['code']] ?? null, $row[$map['name'] ?? -1] ?? null);
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                     $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح.');
+                    app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الطلب');
                     $guard->ensureOpen($date);
                     $source = $this->source($row, $map, $headers);
                     if (!$source) throw new \RuntimeException('نوع الطلب غير معروف.');
@@ -86,6 +87,7 @@ class WorkbookRequestImporter
                         if (isset($map['end']) && filled($row[$map['end']] ?? null) && !$end) throw new \RuntimeException('تاريخ الانتهاء غير صالح.');
                         if ($end) {
                             if (Carbon::parse($end)->lt(Carbon::parse($date))) throw new \RuntimeException('تاريخ الانتهاء يجب ألا يسبق تاريخ الطلب.');
+                            app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureRangeWithinCurrentPeriod($date, $end, 'الطلب');
                             $payload['end_date'] = $end;
                         }
                         $from = $this->time($row[$map['from'] ?? -1] ?? null);
@@ -97,8 +99,8 @@ class WorkbookRequestImporter
                         }
                     }
                     $warning = $this->duplicatePolicy($employee, $type, $source, $date, $payload['overtime_period'] ?? null);
-                    HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);
-                    $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
+                    $hrRequest = HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);
+                    $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $hrRequest->id;
                     if ($warning && count($result['warnings']) < 50) $result['warnings'][] = "{$sheet['name']} / الصف {$line}: {$warning}";
                 } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet['name']} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet['name'], 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
             }

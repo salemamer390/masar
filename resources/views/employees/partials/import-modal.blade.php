@@ -67,6 +67,27 @@
 </div>
 </div>
 @push('styles')
+<style>
+.sheet-summary-missing > td { background: linear-gradient(90deg, rgba(220,53,69,.045), transparent 45%) !important; box-shadow: inset 4px 0 0 #dc3545; }
+.sheet-summary-missing .fw-bold button { color: #842029 !important; }
+.sheet-summary-ignored > td { opacity: .48; background: #f8f9fa !important; }
+.sheet-summary-ignored { cursor: not-allowed; }
+.sheet-summary-ignored .sheet-ignore, .sheet-summary-ignored .sheet-ignore * { opacity: 1 !important; cursor: pointer !important; }
+.mapping-field-card { border: 1px solid var(--border, #dee2e6); border-radius: 12px; padding: 10px; background: #fff; min-height: 100%; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.mapping-field-card label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mapping-field-card.is-required.is-missing { border-color: #dc3545; background: #fff8f8; box-shadow: 0 0 0 3px rgba(220,53,69,.08); animation: mappingNeedsAttention 1.35s ease-in-out infinite; }
+.mapping-field-card.is-required.is-ready { border-color: #198754; background: #f6fffa; box-shadow: 0 0 0 3px rgba(25,135,84,.08); animation: none; }
+.mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.mapping-field-card.is-missing .field-state { color: #842029; background: #f8d7da; }
+.mapping-field-card.is-ready .field-state { color: #0f5132; background: #d1e7dd; }
+.required-field-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
+.required-field-chip.is-missing { color: #842029; border-color: #dc3545; background: #fff8f8; animation: mappingNeedsAttention 1.35s ease-in-out infinite; }
+.required-field-chip.is-ready { color: #0f5132; border-color: #198754; background: #f6fffa; animation: none; }
+@keyframes mappingNeedsAttention { 0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,.2); } 50% { box-shadow: 0 0 0 6px rgba(220,53,69,.04); } }
+@media (prefers-reduced-motion: reduce) { .mapping-field-card.is-required.is-missing, .required-field-chip.is-missing { animation: none; } }
+</style>
+@endpush
+@push('styles')
 <link rel="stylesheet" href="{{ asset('css/employee-import-reference.css') }}?v={{ filemtime(public_path('css/employee-import-reference.css')) }}">
 @endpush
 @push('scripts')
@@ -554,11 +575,14 @@
         html += '<div class="row g-1">';
         Object.keys(fields).forEach((field) => {
             const selected = chosenMap[field] !== undefined ? chosenMap[field] : (detectedMap[field] !== undefined ? detectedMap[field] : '');
-            html += '<div class="col-6 col-md-4"><label class="form-label small mb-0">' + esc(fields[field]) + (required.includes(field) ? ' <span class="text-danger">*</span>' : '') + '</label>'
+            const isRequired = required.includes(field);
+            const stateClass = isRequired ? (String(selected) === '' ? ' is-required is-missing' : ' is-required is-ready') : '';
+            const stateChip = isRequired ? '<span class="field-state">' + (String(selected) === '' ? window.masarT('مطلوب') : window.masarT('تم')) + '</span>' : '';
+            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1">' + esc(fields[field]) + (isRequired ? ' <span class="text-danger">*</span>' : '') + stateChip + '</label>'
                 + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
                 + window.masarStaticHtml('<option value="">— بدون —</option>')
                 + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || (window.masarT('عمود ') + (index + 1))) + '</option>').join('')
-                + '</select></div>';
+                + '</select></div></div>';
         });
         html += '</div>' + (chosen === 'attendance' ? '<label class="form-label small mt-2">تاريخ موحّد يدويًا (إذا لم يوجد عمود تاريخ)<input type="date" class="form-control form-control-sm" data-sheet-date="'+esc(sheet.name)+'" value="'+esc(state.sheetDates?.[sheet.name] || config?.default_date || '')+'"></label>' : '') + '</div>';
         return html;
@@ -591,7 +615,19 @@
         const columns = sheet.employee_config?.columns || [];
         if (!columns.length) return window.masarT('لا توجد أعمدة قابلة للربط. راجع الملف.');
         const chosen = state.employeeMappings[sheet.name] || {};
-        let html = '<div class="table-responsive"><table class="table import-mapping"><thead><tr><th>العمود في ملفك</th><th>الحقل في النظام</th><th>عينة البيانات</th></tr></thead><tbody>';
+        const selected = columns.map(c => chosen[c.index] !== undefined ? chosen[c.index] : (c.field || '')).filter(Boolean);
+        const fieldsByKey = Object.fromEntries((data.fields || []).map(field => [field.key, field.label]));
+        const requiredStates = (data.required_employee_fields || []).map(field => {
+            const ready = field === 'full_name'
+                ? selected.some(value => ['full_name', 'first_name', 'last_name'].includes(value))
+                : (field === 'contract_start_date' ? selected.some(value => ['contract_start_date', 'hire_date'].includes(value)) : selected.includes(field));
+            return { label: fieldsByKey[field] || field, ready };
+        });
+        const salaryReady = selected.some(value => ['gross_salary', 'net_salary'].includes(value));
+        requiredStates.push({ label: window.masarT('الراتب الإجمالي أو الصافي'), ready: salaryReady });
+        let html = '<div class="d-flex flex-wrap gap-2 mb-3" data-required-field-states>'
+            + requiredStates.map(item => '<span class="required-field-chip ' + (item.ready ? 'is-ready' : 'is-missing') + '"><i class="bi bi-' + (item.ready ? 'check-circle-fill' : 'exclamation-circle-fill') + '"></i>' + esc(item.label) + '</span>').join('')
+            + '</div><div class="table-responsive"><table class="table import-mapping"><thead><tr><th>العمود في ملفك</th><th>الحقل في النظام</th><th>عينة البيانات</th></tr></thead><tbody>';
         columns.forEach(col => {
             const selected = chosen[col.index] !== undefined ? chosen[col.index] : (col.field || '');
             html += '<tr><td>' + esc(col.header) + '</td><td><select class="form-select form-select-sm" data-employee-field="' + col.index + '" data-employee-sheet="' + esc(sheet.name) + '"><option value="">تجاهل هذا العمود</option>'
@@ -611,7 +647,8 @@
             const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
             const id = 'sheetBody' + index;
             const ignored = chosen === 'ignore';
-            html += '<tr class="sheet-summary-row" data-sheet-row-toggle="'+id+'" tabindex="0" aria-expanded="false" aria-controls="'+id+'"><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'">عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
+            const missingFields = (!ignored && (sheet.missing_fields || []).length) ? sheet.missing_fields : [];
+            html += '<tr class="sheet-summary-row'+(missingFields.length?' sheet-summary-missing':'')+(ignored?' sheet-summary-ignored':'')+'" data-sheet-row-toggle="'+id+'" tabindex="0" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' aria-disabled="true"':'')+'><td>'+(index+1)+'</td><td class="fw-bold"><button type="button" class="btn btn-link p-0" data-sheet-toggle="'+id+'" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'><i class="bi bi-chevron-down"></i> '+esc(sheet.name)+'</button></td><td>'+num(sheet.rows)+'</td><td><select class="form-select form-select-sm" data-sheet-kind="'+esc(sheet.name)+'">'+sheetKindOptions(chosen)+'</select></td><td><label class="sheet-ignore"><input type="checkbox" class="form-check-input" data-ignore-sheet="'+esc(sheet.name)+'"'+(ignored?' checked':'')+'> تجاهل</label><button type="button" class="btn btn-link btn-sm p-0 mt-1" data-sheet-toggle="'+id+'"'+(ignored?' disabled tabindex="-1"':'')+'>عرض / تعديل الربط ('+num(mapped)+')</button></td></tr>';
             html += '<tr id="' + id + '" hidden><td colspan="5"><div class="sheet-details"><div class="small text-muted mb-2">اقتراح التطبيق: ' + esc((data.kind_labels || {})[sheet.detected_kind] || 'غير معروفة') + '</div>'
                 + (sheet.transposed ? '<div class="alert alert-info small py-2"><i class="bi bi-arrow-repeat"></i> هذه الورقة مقلوبة (الحقول مكتوبة في صفوف) — قرأها التطبيق تلقائيًا كجدول عادي؛ راجع الربط أدناه.</div>' : '')
                 + (!ignored && sheet.missing_fields?.length ? '<div class="alert alert-warning small">حقول مطلوبة غير مربوطة: '+sheet.missing_fields.map(esc).join('، ')+'؛ حدد الأعمدة أدناه.</div>' : '')
@@ -620,7 +657,23 @@
                 + '</div></td></tr>';
         });
         html += '</tbody></table></div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
+        const incomplete = (data.incomplete_sheets || []);
+        if (incomplete.length) {
+            showAlert('بيانات ناقصة في: ' + incomplete.map(sheet=>'«'+sheet.name+'» ('+sheet.missing.join('، ')+')').join('؛ ') + '. الأوراق المحددة بإطار أحمر تحتاج إلى استكمال الأعمدة قبل المتابعة.');
+        }
         sheetsList.innerHTML = html + infoHtml(data, true);
+        (data.sheets || []).forEach((sheet, index) => {
+            if (state.sheetKinds[sheet.name] === 'ignore' || !(sheet.missing_fields || []).length) return;
+            const body = document.getElementById('sheetBody' + index);
+            if (body) {
+                body.hidden = false;
+                sheetsList.querySelectorAll('[data-sheet-toggle="sheetBody' + index + '"], [data-sheet-row-toggle="sheetBody' + index + '"]').forEach(el => {
+                    el.setAttribute('aria-expanded', 'true');
+                    const icon = el.querySelector('i.bi-chevron-down, i.bi-chevron-up');
+                    if (icon) icon.className = 'bi bi-chevron-up';
+                });
+            }
+        });
     }
 
     function needsSheetsStep(data) { return (data.sheets || []).length > 0; }
@@ -795,10 +848,10 @@
         // Dropdowns, ignore labels and other controls keep their own actions.
         if (event.target.closest('button, a, input, select, textarea, label, [contenteditable="true"]')) { return; }
         const row = event.target.closest('[data-sheet-row-toggle]');
-        if (row) { toggleSheetDetails(row.dataset.sheetRowToggle); }
+        if (row && !row.classList.contains('sheet-summary-ignored')) { toggleSheetDetails(row.dataset.sheetRowToggle); }
     });
     sheetsList.addEventListener('keydown', (event) => {
-        if (!event.target.matches('[data-sheet-row-toggle]') || !['Enter', ' '].includes(event.key)) { return; }
+        if (!event.target.matches('[data-sheet-row-toggle]') || event.target.classList.contains('sheet-summary-ignored') || !['Enter', ' '].includes(event.key)) { return; }
         event.preventDefault();
         toggleSheetDetails(event.target.dataset.sheetRowToggle);
     });
@@ -827,6 +880,13 @@
             state.domainMappings[sheetName] = state.domainMappings[sheetName] || {};
             if (fieldSelect.value === '') { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = ''; }
             else { state.domainMappings[sheetName][fieldSelect.getAttribute('data-domain-field')] = parseInt(fieldSelect.value, 10); }
+            const card = fieldSelect.closest('.mapping-field-card');
+            if (card && card.classList.contains('is-required')) {
+                card.classList.toggle('is-missing', fieldSelect.value === '');
+                card.classList.toggle('is-ready', fieldSelect.value !== '');
+                const chip = card.querySelector('.field-state');
+                if (chip) chip.textContent = fieldSelect.value === '' ? window.masarT('مطلوب') : window.masarT('تم');
+            }
             return;
         }
         if (event.target.matches('input[name="import_sheet"]')) { state.sheet=event.target.value;runPreview(null,'',false,'reload-sheets');return; }

@@ -519,7 +519,11 @@ class EmployeeImportService
         // Bare "start date" is not a leaves marker: in an employees sheet it is the
         // hire date, so only leave-specific markers classify a sheet as leaves.
         if ($has(['نوعالإجازة', 'من تاريخ', 'إلى تاريخ', 'leave type'])) return 'leaves';
-        if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])) return 'penalties';
+        // A recognizable domain table stays in that domain even when required
+        // columns are absent, so review can name the real gap instead of
+        // blaming employee fields on a penalties sheet.
+        if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])
+            || ($has(['تاريخ القرار', 'decision date', 'penalty date']) && $has(['كود الموظف', 'اسم الموظف', 'employee code', 'employee name']))) return 'penalties';
         if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
         if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'نوع الطلب', 'overtime', 'bonus', 'commission', 'incentive', 'profit', 'permission', 'mission', 'request type', 'إذن', 'مأمورية'])) return 'requests';
         // Insurance-record sheets need markers beyond الرقم التأميني, which is a

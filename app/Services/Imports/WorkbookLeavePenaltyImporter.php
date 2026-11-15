@@ -84,6 +84,7 @@ class WorkbookLeavePenaltyImporter
                 if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                 $start = $this->date($row[$map['start']] ?? null); $end = $this->date($row[$map['end']] ?? null);
                 if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة.');
+                app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureRangeWithinCurrentPeriod($start, $end, 'الإجازة');
                 $guard->ensureRangeOpen($start, $end);
                 $typeName = trim((string) ($row[$map['leave_type']] ?? ''));
                 $type = LeaveType::where('is_active', true)->where('name', $typeName)->first() ?: LeaveType::where('is_active', true)->where('name', 'like', '%'.$typeName.'%')->first();
@@ -99,6 +100,7 @@ class WorkbookLeavePenaltyImporter
                     app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
                 }
                 $leave->save();
+                $result['created_ids'][] = (int) $leave->id;
                 app(\App\Services\LeaveBalanceService::class)->sync($employee, Carbon::parse($start));
                 app(\App\Services\EmployeeLeaveStatusService::class)->sync();
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
@@ -121,6 +123,7 @@ class WorkbookLeavePenaltyImporter
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
                 if (!$employee) throw new \RuntimeException('كود الموظف غير موجود.');
                 $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود.');
+                app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الجزاء');
                 $guard->ensureOpen($date);
                 $typeName = trim((string) ($row[$map['penalty_type']] ?? ''));
                 $fixedType = $penaltyFixes[$sheet][$line] ?? null;
@@ -135,8 +138,8 @@ class WorkbookLeavePenaltyImporter
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
                 if ($exists) throw new \RuntimeException('سجل الجزاء موجود بالفعل.');
                 $status = 'Approved';
-                Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $type->name, 'action' => $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
-                $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++;
+                $penalty = Penalty::create(['employee_id' => $employee->id, 'penalty_type_id' => $type->id, 'penalty_date' => $date, 'title' => $type->name, 'reason' => $type->name, 'action' => $type->name, 'amount' => 0, 'deduction_days' => $days, 'status' => $status, 'issued_by' => auth()->id()]);
+                $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $penalty->id;
             } catch (\Throwable $exception) { $result['skipped']++; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()]]; }
         }
     }

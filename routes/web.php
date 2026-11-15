@@ -161,6 +161,12 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
         Route::delete('/import-rows/{row}', [\App\Http\Controllers\EmployeeImportReviewController::class, 'destroy'])
             ->middleware('permission:employees.import')
             ->name('import-rows.destroy');
+        Route::get('/import-outofperiod', [\App\Http\Controllers\ImportedOutOfPeriodRecordController::class, 'index'])
+            ->middleware('permission:employees.import')
+            ->name('import-outofperiod.index');
+        Route::delete('/import-outofperiod', [\App\Http\Controllers\ImportedOutOfPeriodRecordController::class, 'destroy'])
+            ->middleware('permission:employees.import')
+            ->name('import-outofperiod.destroy');
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware('permission:employees.view')
             ->name('index');
