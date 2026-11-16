@@ -5912,6 +5912,21 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 #payrollPrototype .approved-summary-cards.approved-summary-cards .employee-kpi strong {
   font-size: clamp(16px, 14cqw, 38px) !important;
 }
+
+/* Supporting copy is readable at the existing size, without changing tracks. */
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards small {
+  font-weight: 700 !important;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group :is(.stat-card, .employee-kpi, .reference-kpi) small {
+  color: #52627a !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards > :is(.stat-card, .employee-kpi, .reference-kpi) small {
+  opacity: 1;
+}
+body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group :is(.stat-card, .employee-kpi, .reference-kpi) small {
+  color: #cbd5e1 !important;
+}
 /* ============================================================
    04 — Guided first-login tour (public/js/tour.js)
    A dimmed backdrop with a cutout highlight over the current

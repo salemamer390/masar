@@ -63,6 +63,18 @@ class StyleAssetsTest extends TestCase
         $this->assertStringContainsString('grid-template-rows: minmax(41px, auto) auto minmax(36px, 1fr)', $css);
     }
 
+    public function test_summary_supporting_copy_has_shared_readable_weight_and_contrast(): void
+    {
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $section = substr($css, strpos($css, '/* Supporting copy is readable'));
+        $this->assertStringContainsString('font-weight: 700 !important', $section);
+        $this->assertStringContainsString('color: #52627a !important', $section);
+        $this->assertStringContainsString('color: #cbd5e1 !important', $section);
+        $this->assertStringContainsString('opacity: 1', $section);
+        $this->assertStringNotContainsString('font-size:', $section);
+        $this->assertStringNotContainsString('grid-template', $section);
+    }
+
     public function test_extracted_page_styles_exist_and_are_static_css(): void
     {
         $pages = ['attendance/index'=>7, 'requests/index'=>2, 'payroll/settings'=>3,
