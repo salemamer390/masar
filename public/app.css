@@ -5905,6 +5905,13 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
   margin: 0 !important;
   min-height: 36px;
 }
+/* Salary totals need room for grouped decimals rather than wrapping mid-value. */
+#payrollPrototype .approved-summary-cards .employee-kpi {
+  container-type: inline-size;
+}
+#payrollPrototype .approved-summary-cards.approved-summary-cards .employee-kpi strong {
+  font-size: clamp(16px, 14cqw, 38px) !important;
+}
 /* ============================================================
    04 — Guided first-login tour (public/js/tour.js)
    A dimmed backdrop with a cutout highlight over the current

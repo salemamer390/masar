@@ -40,6 +40,11 @@ class StyleAssetsTest extends TestCase
             $this->assertStringContainsString('$loop->index === 1', $view, $page);
             $this->assertStringContainsString('$loop->last && !$loop->first', $view, $page);
         }
+        $salarySummary = file_get_contents(resource_path('views/payroll/partials/employee-salaries-body.blade.php'));
+        $this->assertStringContainsString('stats kpi-summary-strip approved-summary-cards', $salarySummary);
+        $this->assertStringContainsString('class="summary-card-group"', $salarySummary);
+        $this->assertStringContainsString('stat employee-kpi', $salarySummary);
+        $this->assertStringContainsString('$summaryStats[$summaryStat[1]]', $salarySummary);
         $css = file_get_contents(resource_path('styles/03-design-system.css'));
         $this->assertStringContainsString('--summary-lead: #1769e0', $css);
         $this->assertStringContainsString('repeat(var(--summary-columns), minmax(0, 1fr))', $css);

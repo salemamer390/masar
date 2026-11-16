@@ -4,7 +4,7 @@
 
 @section('content')
 @php
-    $pageBody = view('payroll.partials.employee-salaries-body')->render();
+    $pageBody = view('payroll.partials.employee-salaries-body', ['summaryStats' => $prototypeStats, 'summaryMonth' => $month])->render();
     $peopleJson = json_encode($prototypePeople, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     $monthIndex = max(0, min(11, (int) $month->format('n') - 1));
     $arabicMonthLabel = $month->locale(app()->getLocale())->translatedFormat('F Y');
