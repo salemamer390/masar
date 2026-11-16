@@ -392,6 +392,18 @@
     });
   });
 
+  // Bold the numerals inside KPI explanatory text (النص التوضيحي) for legibility.
+  document.addEventListener('DOMContentLoaded', () => {
+    const subs = '.stat-grid.compact .stat-card small, .attendance-stat-grid .stat-card small, .employee-kpi small, .reference-kpi-grid--six .reference-kpi small, .ui-kpi-card small';
+    document.querySelectorAll(subs).forEach((el) => {
+      if (el.querySelector('b')) return;
+      const text = el.textContent;
+      if (!/\d/.test(text)) return;
+      const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      el.innerHTML = esc.replace(/\+?\d[\d,./:+\-]*/g, '<b class="kpi-sub-num">$&</b>');
+    });
+  });
+
   // CSRF setup for Fetch API
   const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
