@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <link rel="icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
-  <link rel="shortcut icon" type="image/png" href="{{ asset('images/odir-hr-logo.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon-16.png') }}?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=2">
+  <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=2">
   <title>ODIR Platform Admin — @yield('title', __('إدارة الشركات'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
