@@ -221,3 +221,19 @@
 #employeesImportModal .domain-period-notice{padding:8px 14px;font-size:12px;line-height:1.7;color:#92400e;background:#fffbeb;border-top:1px solid #f5e4b5}
 @media(prefers-reduced-motion:reduce){#employeesImportModal .domain-collapse,#employeesImportModal .domain-toggle-label i{transition:none}}
 @media(max-width:600px){#employeesImportModal .domain-card-head{gap:8px}#employeesImportModal .domain-card-title{width:100%}#employeesImportModal .domain-scroll{max-height:300px}#employeesImportModal .reject-row{gap:6px;padding:8px}#employeesImportModal .reject-fix select{min-width:0;max-width:100%;width:100%}}
+
+/* Compact mapping uses the existing sheet controls and state. */
+#employeesImportModal .employee-mapping-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+#employeesImportModal .employee-mapping-grid .mapping-field-card { min-width:0; scroll-margin-block:28px; }
+#employeesImportModal .mapping-samples { display:block; color:#64748b; margin-top:7px; overflow-wrap:anywhere; line-height:1.7; }
+#employeesImportModal .sheet-needs-attention .sheet-card-head { animation:sheetMissingFlash 450ms ease-in-out 2; }
+@keyframes sheetMissingFlash { 0%,100% { background-color:transparent; } 45%,65% { background-color:#f8d7da; box-shadow:inset 0 0 0 2px #dc3545; } }
+@media(max-width:1000px) { #employeesImportModal .employee-mapping-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:560px) { #employeesImportModal .employee-mapping-grid { grid-template-columns:minmax(0,1fr); } }
+@media(prefers-reduced-motion:reduce) { #employeesImportModal .sheet-needs-attention .sheet-card-head { animation:none; outline:2px solid #dc3545; outline-offset:-2px; } }
+body.preview-dark #employeesImportModal :is(.import-modal,.sheet-card,.sheet-card-body,.mapping-field-card) { background:var(--dm-surface,#182337); color:var(--dm-text,#e2e8f0); border-color:var(--dm-border,#334155); }
+body.preview-dark #employeesImportModal .sheet-card-head { background:var(--dm-surface-2,#1f2c46); }
+body.preview-dark #employeesImportModal .mapping-field-card :is(label,.form-label) { color:var(--dm-text,#e2e8f0) !important; }
+body.preview-dark #employeesImportModal .mapping-samples { color:var(--dm-muted,#a8b4c7); }
+body.preview-dark #employeesImportModal .mapping-field-card.is-missing { background:#361f2a; border-color:#f87171; }
+body.preview-dark #employeesImportModal :is(.import-modal,.modal-header,.modal-footer,.sheet-card,.sheet-card-body,.sheet-details) { background:var(--dm-surface,#182337) !important; border-color:var(--dm-border,#334155) !important; }
