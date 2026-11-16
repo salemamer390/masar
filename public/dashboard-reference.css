@@ -167,7 +167,7 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 
 /* Calm KPI strip overrides - dashboard hero metrics share the plain-row design from app.css. */
 .reference-kpi-grid--six{display:flex!important;flex-wrap:wrap;align-items:stretch;gap:0;row-gap:14px}
-.reference-kpi-grid--six .reference-kpi{--kpi-num-top:#274a75;--kpi-num-bot:#0f2540;flex:1 1 0%;min-width:0;min-height:0!important;padding:4px 14px!important;gap:0;column-gap:7px;flex-wrap:wrap;align-items:center;align-content:flex-start;direction:rtl;background:transparent!important;border:0!important;border-radius:8px!important;box-shadow:none!important;color:#0f2540;transition:background-color .18s ease}
+.reference-kpi-grid--six .reference-kpi{--kpi-num-top:#274a75;--kpi-num-bot:#0f2540;flex:1 1 0%;min-width:0;min-height:0!important;padding:4px 14px!important;gap:0;column-gap:7px;flex-wrap:wrap;align-items:center;align-content:flex-start;direction:rtl!important;background:transparent!important;border:0!important;border-radius:8px!important;box-shadow:none!important;color:#0f2540;transition:background-color .18s ease}
 .reference-kpi-grid--six .reference-kpi:first-child{padding-inline-start:2px!important}
 .reference-kpi-grid--six .reference-kpi:before{content:none!important;display:none!important}
 .reference-kpi-grid--six .reference-kpi+.reference-kpi{border-inline-start:1px solid #dbe2ec!important;border-radius:0!important}
