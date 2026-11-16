@@ -50,7 +50,7 @@ class LaunchBlockerFixesTest extends TestCase
         ]);
 
         $response->assertStatus(422);
-        $this->assertSame('لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.', $response->json('errors.penalty_type_id.0'));
+        $this->assertSame('اكتب نوع الجزاء أو اختره من القائمة.', $response->json('errors.penalty_type_name.0'));
         $this->assertSame(0, Penalty::where('employee_id', $employee->id)->count());
     }
 
@@ -85,6 +85,7 @@ class LaunchBlockerFixesTest extends TestCase
             'employee_id' => $employee->id,
             'penalty_date' => today()->toDateString(),
             'reason' => 'ملاحظة سلوكية',
+            'penalty_type_name' => 'لفت نظر',
         ])->assertOk();
 
         $this->assertSame($type->id, Penalty::where('employee_id', $employee->id)->firstOrFail()->penalty_type_id);

@@ -10,6 +10,8 @@ use App\Services\PayrollPeriodGuard;
 use App\Services\PayrollRunService;
 use App\Services\HrOperationalSettingsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PenaltyController extends Controller
 {
@@ -38,58 +40,29 @@ class PenaltyController extends Controller
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
-        $validated = $request->validate([
-            'employee_id' => ['required', 'exists:employees,id'],
-            'penalty_type_id' => ['nullable', new \App\Rules\VisibleModel(\App\Models\PenaltyType::class)],
-            'penalty_type_name' => ['nullable', 'string'],
-            'penalty_date' => ['required', 'date'],
-            'reason' => ['required', 'string', 'max:500'],
-            'details' => ['nullable', 'string'],
-            'amount' => ['nullable', 'numeric', 'min:0'],
-            'deduction_days' => ['nullable', 'numeric', 'min:0'],
-        ], [
-            'employee_id.required' => __('الموظف مطلوب.'),
-            'penalty_date.required' => __('تاريخ الجزاء مطلوب.'),
-            'reason.required' => __('سبب المخالفة مطلوب.'),
-        ]);
+        $validated = $this->validatePenalty($request);
         $periodGuard->ensureOpen($validated['penalty_date']);
         $employee = Employee::findOrFail($validated['employee_id']);
 
-        if (empty($validated['penalty_type_id'])) {
-            $name = $request->input('penalty_type_name', 'لفت نظر');
-            $type = PenaltyType::where('name', 'like', "%{$name}%")->first();
-            if (!$type) {
-                // No usable penalty type: report it clearly instead of falling back
-                // to a hard-coded id that may not exist (foreign-key failure).
-                $message = __('لا يوجد نوع جزاء مطابق. أضف نوع جزاء من البيانات الأساسية (قوائم الجزاءات) ثم أعد المحاولة.');
-                return $request->wantsJson()
-                    ? response()->json(['message' => $message, 'errors' => ['penalty_type_id' => [$message]]], 422)
-                    : back()->withErrors(['penalty_type_id' => $message])->withInput();
-            }
-            $validated['penalty_type_id'] = $type->id;
-        }
-
-        $typeObj = PenaltyType::find($validated['penalty_type_id']);
-        $title = $typeObj ? $typeObj->name : 'إجراء تأديبي';
-
-        $penalty = Penalty::create([
-            'employee_id' => $validated['employee_id'],
-            'penalty_type_id' => $validated['penalty_type_id'],
-            'penalty_date' => $validated['penalty_date'],
-            'title' => $title,
-            'reason' => $validated['reason'],
-            'action' => $validated['details'] ?? $validated['reason'],
-            'amount' => $validated['amount'] ?? 0,
-            'deduction_days' => array_key_exists('deduction_days', $validated) ? $validated['deduction_days'] : $typeObj?->default_deduction_days,
-            // Penalties affect payroll immediately; there is no separate
-            // approval step in the HR request workflow.
-            'status' => 'Approved',
-            'issued_by' => auth()->id(),
-        ]);
-        $payrollRuns->refreshEmployeeInOpenDrafts((int) $penalty->employee_id);
-
-        $emp = $employee;
-        ActivityLog::record('penalty_create', "تم تسجيل إجراء تأديبي ({$title}) بحق الموظف ({$emp?->full_name}).", $penalty);
+        $penalty = DB::transaction(function () use ($validated, $request, $employee, $payrollRuns): Penalty {
+            $type = $this->resolvePenaltyType($validated);
+            $penalty = Penalty::create([
+                'employee_id' => $employee->id,
+                'penalty_type_id' => $type->id,
+                'penalty_date' => $validated['penalty_date'],
+                'title' => $type->name,
+                'reason' => $validated['reason'],
+                'action' => $validated['reason'],
+                'amount' => $request->has('deduct_from_salary') ? 0 : ($validated['amount'] ?? 0),
+                'deduction_days' => $this->deductionDays($request, $validated, $type),
+                // Entries are immediately effective, with no approval queue.
+                'status' => 'Approved',
+                'issued_by' => auth()->id(),
+            ]);
+            $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id);
+            ActivityLog::record('penalty_create', "تم تسجيل إجراء تأديبي ({$type->name}) بحق الموظف ({$employee->full_name}).", $penalty);
+            return $penalty;
+        });
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -121,38 +94,91 @@ class PenaltyController extends Controller
 
     public function update(Request $request, Penalty $penalty, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)
     {
-        $validated = $request->validate([
-            'employee_id' => ['required', 'exists:employees,id'],
-            'penalty_type_id' => ['required', new \App\Rules\VisibleModel(\App\Models\PenaltyType::class)],
-            'penalty_date' => ['required', 'date'],
-            'reason' => ['required', 'string', 'max:500'],
-            'details' => ['nullable', 'string'],
-            'amount' => ['nullable', 'numeric', 'min:0'],
-            'deduction_days' => ['nullable', 'numeric', 'min:0'],
-        ]);
+        $validated = $this->validatePenalty($request);
         $periodGuard->ensureOpen($penalty->penalty_date);
         $periodGuard->ensureOpen($validated['penalty_date']);
+        $employee = Employee::findOrFail($validated['employee_id']);
 
-        Employee::findOrFail($validated['employee_id']);
-        $type = PenaltyType::findOrFail($validated['penalty_type_id']);
-        $before = $penalty->toArray();
-        $penalty->update([
-            'employee_id' => $validated['employee_id'],
-            'penalty_type_id' => $type->id,
-            'penalty_date' => $validated['penalty_date'],
-            'title' => $type->name,
-            'reason' => $validated['reason'],
-            'action' => $validated['details'] ?? $validated['reason'],
-            'amount' => $validated['amount'] ?? 0,
-            'deduction_days' => array_key_exists('deduction_days', $validated) ? $validated['deduction_days'] : $type->default_deduction_days,
-            // التعديل يعيد الإجراء للمراجعة حتى لا يعتمد أثر مالي قديم على بيانات جديدة.
-            'status' => 'Approved', 'closed_at' => now(),
-        ]);
-        $payrollRuns->refreshEmployeeInOpenDrafts((int) $penalty->employee_id);
-        ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$penalty->employee?->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
+        DB::transaction(function () use ($request, $validated, $penalty, $employee, $payrollRuns): void {
+            $type = $this->resolvePenaltyType($validated);
+            $before = $penalty->toArray();
+            $oldEmployeeId = (int) $penalty->employee_id;
+            $penalty->update([
+                'employee_id' => $employee->id,
+                'penalty_type_id' => $type->id,
+                'penalty_date' => $validated['penalty_date'],
+                'title' => $type->name,
+                'reason' => $validated['reason'],
+                // Historical details and legacy monetary metadata stay intact.
+                // Payroll uses deduction_days, not this legacy amount column.
+                'amount' => $request->has('deduct_from_salary') ? $penalty->amount : ($validated['amount'] ?? $penalty->amount),
+                'deduction_days' => $this->deductionDays($request, $validated, $type),
+                'status' => 'Approved', 'closed_at' => now(),
+            ]);
+            $payrollRuns->refreshEmployeeInOpenDrafts($oldEmployeeId);
+            if ($oldEmployeeId !== (int) $employee->id) {
+                $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id);
+            }
+            ActivityLog::record('penalty_update', "تم تعديل الإجراء التأديبي للموظف ({$employee->full_name}).", $penalty, $before, $penalty->toArray(), 'discipline');
+        });
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Penalty updated.', 'penalty' => $penalty->fresh()->load(['employee.department', 'penaltyType'])])
-            : back()->with('toast', __('تم تحديث الإجراء وإعادته للمراجعة.'));
+            : back()->with('toast', __('تم تحديث الإجراء التأديبي.'));
+    }
+
+    private function validatePenalty(Request $request): array
+    {
+        if (is_string($request->input('penalty_type_name'))) {
+            $request->merge(['penalty_type_name' => preg_replace('/\s+/u', ' ', trim((string) $request->input('penalty_type_name')))]);
+        }
+        return $request->validate([
+            'employee_id' => ['required', 'integer', new \App\Rules\VisibleModel(Employee::class)],
+            'penalty_type_id' => ['nullable', 'integer', new \App\Rules\VisibleModel(PenaltyType::class)],
+            'penalty_type_name' => ['required_without:penalty_type_id', 'nullable', 'string', 'max:100'],
+            'penalty_date' => ['required', 'date'],
+            'reason' => ['required', 'string', 'max:500'],
+            'deduct_from_salary' => ['sometimes', 'boolean'],
+            'deduction_days' => [Rule::requiredIf($request->boolean('deduct_from_salary')), 'nullable', 'numeric', 'max:999.99', $request->boolean('deduct_from_salary') ? 'min:0.01' : 'min:0', $request->boolean('deduct_from_salary') ? 'decimal:0,2' : 'numeric'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
+        ], [
+            'penalty_type_name.required_without' => __('اكتب نوع الجزاء أو اختره من القائمة.'),
+            'deduction_days.required' => __('حدد عدد أيام الخصم.'),
+            'deduction_days.min' => __('عدد أيام الخصم يجب ألا يقل عن 0.01 يوم.'),
+            'deduction_days.decimal' => __('عدد أيام الخصم يقبل منزلتين عشريتين كحد أقصى.'),
+        ]);
+    }
+
+    private function resolvePenaltyType(array $validated): PenaltyType
+    {
+        if (!empty($validated['penalty_type_id'])) {
+            return PenaltyType::findOrFail($validated['penalty_type_id']);
+        }
+        // Exact name matching only. LIKE could accidentally select a different
+        // sanction, and new types must never be created in another tenant.
+        $name = $validated['penalty_type_name'];
+        $companyId = auth()->user()->company_id;
+        if ($companyId) {
+            \App\Models\Company::whereKey($companyId)->lockForUpdate()->first();
+        }
+        $type = PenaltyType::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])
+            ->orderByRaw('company_id IS NULL')->first();
+        if ($type) return $type;
+        $type = PenaltyType::create([
+            'name' => $name, 'company_id' => $companyId,
+            'is_active' => true, 'default_deduction_days' => 0,
+        ]);
+        ActivityLog::record('master_create', "تمت إضافة نوع جزاء ({$name}) من نموذج تسجيل الجزاء.", $type);
+        return $type;
+    }
+
+    private function deductionDays(Request $request, array $validated, PenaltyType $type): float
+    {
+        if ($request->has('deduct_from_salary')) {
+            return $request->boolean('deduct_from_salary') ? (float) $validated['deduction_days'] : 0.0;
+        }
+        // Preserve the existing API/import contract for older clients. The
+        // web forms always submit an explicit checkbox value, including off.
+        return (float) ($validated['deduction_days'] ?? $type->default_deduction_days ?? 0);
     }
 
     public function destroy(Penalty $penalty, Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)

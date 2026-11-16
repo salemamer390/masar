@@ -159,7 +159,7 @@
     let busy = false;
     let needsReload = false;
     let lastData = null;
-    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, sheetDates: {}, reviewToken: '' };
+    let state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' };
     let sheetsStepUsed = false;
     let table = { tab: 'all', query: '', limit: PAGE };
 
@@ -221,7 +221,6 @@
         body.append('mappings', JSON.stringify(state.mappings));
         body.append('sheet_kinds', JSON.stringify(state.sheetKinds));
         body.append('domain_mappings', JSON.stringify(state.domainMappings));
-        body.append('sheet_dates', JSON.stringify(state.sheetDates || {}));
         body.append('employee_mappings', JSON.stringify(state.employeeMappings));
         body.append('penalty_fixes', JSON.stringify(state.penaltyFixes));
         body.append('review_token', state.reviewToken || '');
@@ -622,7 +621,7 @@
                 + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || (window.masarT('عمود ') + (index + 1))) + '</option>').join('')
                 + '</select></div></div>';
         });
-        html += '</div>' + (chosen === 'attendance' ? '<label class="form-label small mt-2">تاريخ موحّد يدويًا (إذا لم يوجد عمود تاريخ)<input type="date" class="form-control form-control-sm" data-sheet-date="'+esc(sheet.name)+'" value="'+esc(state.sheetDates?.[sheet.name] || config?.default_date || '')+'"></label>' : '') + '</div>';
+        html += '</div></div>';
         return html;
     }
 
@@ -642,7 +641,7 @@
             const fields = (data.domain_fields || {})[kind];
             if (!fields) continue;
             const map = Object.assign({}, sheet.domain_config?.map || {}, state.domainMappings[sheet.name] || {});
-            const missing = ((data.required_domain_fields || {})[kind] || []).filter(field => !(kind === 'attendance' && field === 'date' && state.sheetDates?.[sheet.name]) && (map[field] === undefined || map[field] === '' || map[field] === null));
+            const missing = ((data.required_domain_fields || {})[kind] || []).filter(field => (map[field] === undefined || map[field] === '' || map[field] === null));
             if (['leaves','requests','advances'].includes(kind) && (map.code === undefined || map.code === '') && (map.name === undefined || map.name === '')) missing.push('كود أو اسم الموظف');
             if (missing.length) return 'الشيت «'+sheet.name+'»: أكمل ربط الحقول المطلوبة ('+missing.map(f => fields[f] || f).join('، ')+').';
         }
@@ -809,7 +808,7 @@
         fileInput.dispatchEvent(new Event('change'));
         lastData = null;
         lastResult = null;
-        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, sheetDates: {}, reviewToken: '' };
+        state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' };
         sheetsStepUsed = false;
         sheetsList.innerHTML = '';
         box.verdict.innerHTML = '';
@@ -906,7 +905,7 @@
         card.querySelector('.domain-collapse').inert = !expanded;
         button.querySelector('.domain-toggle-label').innerHTML = window.masarT(expanded ? 'إخفاء التفاصيل' : 'عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i>';
     });
-    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, sheetDates: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
+    fileInput.addEventListener('change', () => { state = { sheet: 'auto', mappings: {}, sheetKinds: {}, domainMappings: {}, employeeMappings: {}, ignoredKinds: {}, penaltyFixes: {}, reviewToken: '' }; sheetsStepUsed = false; lastData = null; });
     btn.preview.addEventListener('click', () => {
         const fromSheets = !steps.sheets.hidden;
         runPreview(btn.preview, fromSheets ? window.masarT('جارٍ تحديث المراجعة...') : window.masarT('جارٍ فحص الملف...'), false, fromSheets ? 'preview' : null);
@@ -943,8 +942,6 @@
         toggleSheetDetails(event.target.dataset.sheetRowToggle);
     });
     sheetsList.addEventListener('change', (event) => {
-        const date = event.target.closest('[data-sheet-date]');
-        if (date) { state.sheetDates ||= {}; state.sheetDates[date.dataset.sheetDate] = date.value; runPreview(null, '', false, 'reload-sheets'); return; }
         const employeeField = event.target.closest('[data-employee-field]');
         if (employeeField) {
             const name = employeeField.dataset.employeeSheet;
