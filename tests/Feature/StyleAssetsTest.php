@@ -66,13 +66,35 @@ class StyleAssetsTest extends TestCase
     public function test_summary_supporting_copy_has_shared_readable_weight_and_contrast(): void
     {
         $css = file_get_contents(resource_path('styles/03-design-system.css'));
-        $section = substr($css, strpos($css, '/* Supporting copy is readable'));
+        $section = explode('/* Selected mobile option 3:', substr($css, strpos($css, '/* Supporting copy is readable')))[0];
         $this->assertStringContainsString('font-weight: 700 !important', $section);
         $this->assertStringContainsString('color: #52627a !important', $section);
         $this->assertStringContainsString('color: #cbd5e1 !important', $section);
         $this->assertStringContainsString('opacity: 1', $section);
         $this->assertStringNotContainsString('font-size:', $section);
         $this->assertStringNotContainsString('grid-template', $section);
+    }
+
+    public function test_mobile_summaries_keep_native_swipe_and_all_metric_markup(): void
+    {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests', 'payroll/partials/employee-salaries-body'] as $page) {
+            $path = str_contains($page, 'partials') ? $page : $page.'/index';
+            $view = file_get_contents(resource_path('views/'.$path.'.blade.php'));
+            $this->assertSame(1, substr_count($view, 'class="summary-swipe-hint"'), $page);
+            $this->assertStringContainsString('tabindex="0"', $view, $page);
+        }
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $mobile = substr($css, strpos($css, '/* Selected mobile option 3:'));
+        $this->assertStringContainsString('@media (max-width: 760px)', $mobile);
+        $this->assertStringContainsString('overflow-x: auto !important', $mobile);
+        $this->assertStringContainsString('scroll-snap-type: x proximity', $mobile);
+        $this->assertStringContainsString('flex-wrap: nowrap !important', $mobile);
+        $this->assertStringContainsString('font-size: clamp(17px, 9cqw, 24px)', $mobile);
+        $this->assertStringContainsString('white-space: nowrap !important', $mobile);
+        $this->assertStringContainsString('display: contents', $mobile);
+        $this->assertStringContainsString('flex: 0 0 clamp(138px, 38vw, 200px)', $mobile);
+        $this->assertStringContainsString('clip-path: none', $mobile);
+        $this->assertStringContainsString('.summary-card-money', $mobile);
     }
 
     public function test_extracted_page_styles_exist_and_are_static_css(): void

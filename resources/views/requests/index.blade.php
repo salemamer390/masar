@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">{{ __('تفاصيل الطلبات') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 
-<div class="stat-grid compact kpi-summary-strip approved-summary-cards">
+<div class="stat-grid compact kpi-summary-strip approved-summary-cards" tabindex="0" role="region" aria-label="{{ __('ملخص الإحصائيات، اسحب لعرض المزيد') }}">
     @foreach([
         [__('إجمالي الطلبات'), $stats['all'], 'blue', 'file-earmark-text'],
 
@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     @if($loop->last && !$loop->first)</div>@endif
 @endforeach
 </div>
+<p class="summary-swipe-hint" aria-hidden="true">{{ __('اسحب لعرض باقي الإحصائيات') }} <span dir="ltr">↔</span></p>
 
 <form class="filter-bar" method="GET">
     <div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="{{ __('ابحث بالموظف أو عنوان الطلب...') }}"></div>

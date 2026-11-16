@@ -5927,6 +5927,103 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group :is(.stat-card, .employee-kpi, .reference-kpi) small {
   color: #cbd5e1 !important;
 }
+
+
+/* Selected mobile option 3: native horizontal scrolling, not stacked cards.
+   display:contents keeps existing metric links, handlers and desktop grouping. */
+.summary-swipe-hint { display: none; }
+@media (max-width: 760px) {
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 3px;
+    scrollbar-width: thin;
+    padding: 3px 3px 8px !important;
+    margin-bottom: 0 !important;
+  }
+  .kpi-summary-strip.approved-summary-cards .summary-card-group {
+    display: contents;
+  }
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-card, .employee-kpi, .reference-kpi) {
+    flex: 0 0 clamp(138px, 38vw, 200px);
+    width: clamp(138px, 38vw, 200px);
+    min-height: 106px !important;
+    padding: 12px 13px !important;
+    grid-row: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 41px auto;
+    gap: 5px !important;
+    border: 1px solid #e6ebf2 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    scroll-snap-align: start;
+  }
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards > :is(.stat-card, .employee-kpi, .reference-kpi) {
+    background: var(--summary-lead) !important;
+  }
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-icon, .employee-kpi-icon, .reference-kpi-icon) {
+    display: none !important;
+  }
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-card > div:last-child > b, .employee-kpi strong, .reference-kpi strong) {
+    font-size: 26px !important;
+    margin: 0 !important;
+  }
+  /* Descriptions stay available to assistive technology; mobile prioritizes
+     the label and value. Currency/period on salary totals remains visible. */
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards small {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  #payrollPrototype .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .employee-kpi,
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-money,
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .reference-kpi:has(.kpi-money-value) {
+    flex-basis: clamp(210px, 66vw, 260px);
+    width: clamp(210px, 66vw, 260px);
+  }
+  #payrollPrototype .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .employee-kpi {
+    grid-template-rows: 41px auto 20px;
+  }
+  #payrollPrototype .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .employee-kpi small {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  /* Keep grouped salary decimals on one line, including the narrowest phones. */
+  #payrollPrototype .approved-summary-cards .employee-kpi,
+  .approved-summary-cards .summary-card-money,
+  .approved-summary-cards .reference-kpi:has(.kpi-money-value) {
+    container-type: inline-size;
+  }
+  #payrollPrototype .approved-summary-cards.approved-summary-cards.approved-summary-cards .employee-kpi strong,
+  .approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-money > div:last-child > b,
+  .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .reference-kpi .kpi-money-value {
+    font-size: clamp(17px, 9cqw, 24px) !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal;
+  }
+  .summary-swipe-hint {
+    display: block;
+    margin: 6px 3px 18px;
+    color: #52627a;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  body.preview-dark .summary-swipe-hint { color: #cbd5e1; }
+  body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group > :is(.stat-card, .employee-kpi, .reference-kpi) {
+    background: var(--dm-surface, #172235) !important;
+    border-color: var(--dm-border, #334155) !important;
+  }
+}
 /* ============================================================
    04 — Guided first-login tour (public/js/tour.js)
    A dimmed backdrop with a cutout highlight over the current
