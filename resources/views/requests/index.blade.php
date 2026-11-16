@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">{{ __('تفاصيل الطلبات') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 
-<div class="stat-grid compact">
+<div class="stat-grid compact kpi-summary-strip">
     @foreach([
         [__('إجمالي الطلبات'), $stats['all'], 'blue', 'file-earmark-text'],
 

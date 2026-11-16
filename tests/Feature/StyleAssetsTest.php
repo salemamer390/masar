@@ -15,6 +15,22 @@ class StyleAssetsTest extends TestCase
         $this->assertSame($css, file_get_contents(public_path('app.css')));
     }
 
+    public function test_all_page_kpi_strips_opt_into_the_shared_boundary_policy(): void
+    {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests'] as $page) {
+            $view = file_get_contents(resource_path('views/'.$page.'/index.blade.php'));
+            $this->assertSame(1, substr_count($view, 'kpi-summary-strip'), $page);
+        }
+
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $this->assertStringContainsString('.kpi-summary-strip.kpi-summary-strip', $css);
+        $this->assertStringContainsString('border-inline-start: 1px solid #dbe2ec !important', $css);
+        $this->assertStringContainsString(':nth-child(even)', $css);
+        $this->assertStringContainsString('-webkit-text-fill-color: currentColor', $css);
+        $dashboard = file_get_contents(public_path('dashboard-reference.css'));
+        $this->assertStringNotContainsString('border-inline-start:1px solid #dbe2ec', $dashboard);
+    }
+
     public function test_extracted_page_styles_exist_and_are_static_css(): void
     {
         $pages = ['attendance/index'=>7, 'requests/index'=>2, 'payroll/settings'=>3,
