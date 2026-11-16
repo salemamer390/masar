@@ -5860,6 +5860,58 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group :is(.employee-kpi.red strong, .reference-kpi.red strong, .stat-card:has(.stat-icon.red) > div:last-child > b) {
   color: #f87171 !important;
 }
+
+/* Share title, number and description tracks so wrapped labels cannot lower
+   one number relative to its neighbours. Each mobile row shares its own tracks. */
+.kpi-summary-strip.approved-summary-cards .summary-card-group {
+  row-gap: 10px;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-card, .employee-kpi, .reference-kpi) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  grid-template-rows: minmax(41px, auto) auto minmax(36px, 1fr);
+  gap: 10px 6px !important;
+  align-items: start !important;
+  align-content: stretch !important;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards .summary-card-group > :is(.stat-card, .employee-kpi, .reference-kpi) {
+  padding-inline: 14px !important;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-icon, .employee-kpi-icon, .reference-kpi-icon) {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: start;
+  line-height: 20.4px !important;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-card > div:last-child > span, .employee-kpi > span:last-child > b, .reference-kpi > span:last-child > b) {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 41px;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards :is(.stat-card > div:last-child > b, .employee-kpi strong, .reference-kpi strong) {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  align-self: start;
+  margin: 0 !important;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35 !important;
+}
+.kpi-summary-strip.approved-summary-cards.approved-summary-cards.approved-summary-cards small {
+  grid-row: 3;
+  grid-column: 1 / -1;
+  align-self: start;
+  margin: 0 !important;
+  min-height: 36px;
+}
+/* Salary totals need room for grouped decimals rather than wrapping mid-value. */
+#payrollPrototype .approved-summary-cards .employee-kpi {
+  container-type: inline-size;
+}
+#payrollPrototype .approved-summary-cards.approved-summary-cards .employee-kpi strong {
+  font-size: clamp(16px, 14cqw, 38px) !important;
+}
 /* ============================================================
    04 — Guided first-login tour (public/js/tour.js)
    A dimmed backdrop with a cutout highlight over the current
