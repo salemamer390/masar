@@ -1125,3 +1125,66 @@ body.preview-dark .masar-tour-popover .tour-btn-ghost {
 body.preview-dark .masar-tour-popover .tour-btn-ghost:hover {
   color: var(--dm-text);
 }
+
+/* Calm KPI strip - dark theme adaptations (strip base lives in app.css). */
+body.preview-dark .stat-grid.compact .stat-card,
+body.preview-dark .attendance-stat-grid .stat-card,
+body.preview-dark .employee-kpi,
+body.preview-dark .reference-kpi-grid--six .reference-kpi {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  --kpi-num-top: #e8eef7;
+  --kpi-num-bot: #c3cfe0;
+}
+body.preview-dark .employee-kpi.red,
+body.preview-dark .reference-kpi-grid--six .reference-kpi.red,
+body.preview-dark .stat-grid.compact .stat-card:has(.stat-icon.red),
+body.preview-dark .attendance-stat-grid .stat-card:has(.stat-icon.red) {
+  --kpi-num-top: #f87171;
+  --kpi-num-bot: #dc2626;
+}
+body.preview-dark .stat-grid.compact .stat-card:hover,
+body.preview-dark .attendance-stat-grid .stat-card:hover,
+body.preview-dark .employee-kpi:hover,
+body.preview-dark .reference-kpi-grid--six .reference-kpi:hover {
+  background: rgba(148,163,184,.08) !important;
+  color: var(--dm-text);
+}
+body.preview-dark .stat-grid.compact .stat-card + .stat-card,
+body.preview-dark .attendance-stat-grid .stat-card + .stat-card,
+body.preview-dark .employee-kpi-grid .employee-kpi + .employee-kpi,
+body.preview-dark .reference-kpi-grid--six .reference-kpi + .reference-kpi {
+  border-inline-start-color: rgba(148,163,184,.22) !important;
+}
+body.preview-dark .stat-grid.compact .stat-icon,
+body.preview-dark .attendance-stat-grid .stat-icon,
+body.preview-dark .employee-kpi-icon,
+body.preview-dark .reference-kpi-grid--six .reference-kpi-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+body.preview-dark .employee-kpi b { color: var(--dm-muted) !important; }
+body.preview-dark .employee-kpi small,
+body.preview-dark .employee-kpi.blue small,
+body.preview-dark .employee-kpi.green small,
+body.preview-dark .employee-kpi.orange small,
+body.preview-dark .employee-kpi.purple small,
+body.preview-dark .employee-kpi.red small {
+  color: var(--dm-muted) !important;
+}
+body.preview-dark .kpi-sub-num { color: #d7e0ec !important; }
+body.preview-dark .stat-grid.compact .stat-card b,
+body.preview-dark .attendance-stat-grid .stat-card b,
+body.preview-dark .employee-kpi strong,
+body.preview-dark .reference-kpi-grid--six .reference-kpi strong {
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.45));
+}
+@media (max-width: 700px) {
+  body.preview-dark .stat-grid.compact .stat-card,
+  body.preview-dark .attendance-stat-grid .stat-card,
+  body.preview-dark .employee-kpi,
+  body.preview-dark .reference-kpi-grid--six .reference-kpi {
+    border-top-color: rgba(148,163,184,.22) !important;
+  }
+}

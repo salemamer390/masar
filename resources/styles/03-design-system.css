@@ -740,6 +740,32 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   .payroll-employee-kpi-grid,
   .employee-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 }
+/* Neutralize legacy per-tone card fills so the strip stays plain. */
+.employee-kpi.blue, .employee-kpi.green, .employee-kpi.orange, .employee-kpi.purple, .employee-kpi.red,
+.ui-kpi-card.blue, .ui-kpi-card.green, .ui-kpi-card.orange, .ui-kpi-card.purple, .ui-kpi-card.red,
+.reference-kpi-grid--six .reference-kpi.blue, .reference-kpi-grid--six .reference-kpi.green,
+.reference-kpi-grid--six .reference-kpi.orange, .reference-kpi-grid--six .reference-kpi.purple,
+.reference-kpi-grid--six .reference-kpi.red, .reference-kpi-grid--six .reference-kpi.money,
+.stat-grid.compact .stat-card:has(.stat-icon.blue), .stat-grid.compact .stat-card:has(.stat-icon.green),
+.stat-grid.compact .stat-card:has(.stat-icon.orange), .stat-grid.compact .stat-card:has(.stat-icon.purple),
+.stat-grid.compact .stat-card:has(.stat-icon.red),
+.attendance-stat-grid .stat-card:has(.stat-icon.blue), .attendance-stat-grid .stat-card:has(.stat-icon.green),
+.attendance-stat-grid .stat-card:has(.stat-icon.orange), .attendance-stat-grid .stat-card:has(.stat-icon.purple),
+.attendance-stat-grid .stat-card:has(.stat-icon.red) {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.employee-kpi.blue:hover, .employee-kpi.green:hover, .employee-kpi.orange:hover, .employee-kpi.purple:hover, .employee-kpi.red:hover,
+.ui-kpi-card.blue:hover, .ui-kpi-card.green:hover, .ui-kpi-card.orange:hover, .ui-kpi-card.purple:hover, .ui-kpi-card.red:hover,
+.reference-kpi-grid--six .reference-kpi.blue:hover, .reference-kpi-grid--six .reference-kpi.green:hover,
+.reference-kpi-grid--six .reference-kpi.orange:hover, .reference-kpi-grid--six .reference-kpi.purple:hover,
+.reference-kpi-grid--six .reference-kpi.red:hover, .reference-kpi-grid--six .reference-kpi.money:hover,
+.stat-grid.compact .stat-card:has(.stat-icon):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon):hover {
+  background: #f2f4f8 !important;
+  border-color: transparent !important;
+}
+
 @media (max-width: 700px) {
   .stat-grid.compact,
   .payroll-employee-kpi-grid,
@@ -1095,3 +1121,338 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
 /* Wide tables scroll horizontally on small screens instead of being clipped. */
 .table-panel { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 .table-panel > table, .table-panel .table-responsive > table { min-width: 640px; }
+
+/* ==========================================================================
+   Calm KPI summary strip
+   Plain-row page summaries (no cards): a small tone-colored floating icon
+   beside the label, a navy gradient number with soft depth, darker-gray
+   explanatory text with bold numerals, and hairline dividers between stats.
+   Red stays reserved for warning numbers. Hover lifts the icon gently and
+   tints the number toward the stat tone without moving the row.
+   ========================================================================== */
+@property --kpi-num-top {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #274a75;
+}
+@property --kpi-num-bot {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0f2540;
+}
+
+.stat-grid.compact,
+.employee-kpi-grid,
+.reference-kpi-grid--six,
+.attendance-stat-grid {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0;
+  row-gap: 14px;
+}
+
+.stat-grid.compact .stat-card,
+.attendance-stat-grid .stat-card,
+.employee-kpi,
+.reference-kpi-grid--six .reference-kpi {
+  --kpi-num-top: #274a75;
+  --kpi-num-bot: #0f2540;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  column-gap: 7px;
+  direction: rtl;
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0 !important;
+  padding: 4px 14px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #0f2540;
+  overflow: visible;
+  isolation: auto;
+  transition: background-color .18s ease;
+}
+.stat-grid.compact .stat-card:first-child,
+.attendance-stat-grid .stat-card:first-child,
+.employee-kpi:first-child,
+.reference-kpi-grid--six .reference-kpi:first-child {
+  padding-inline-start: 2px !important;
+}
+.stat-grid.compact .stat-card:before,
+.attendance-stat-grid .stat-card:before,
+.employee-kpi:before,
+.reference-kpi-grid--six .reference-kpi:before {
+  content: none !important;
+  display: none !important;
+}
+.stat-grid.compact .stat-card + .stat-card,
+.attendance-stat-grid .stat-card + .stat-card,
+.employee-kpi-grid .employee-kpi + .employee-kpi,
+.reference-kpi-grid--six .reference-kpi + .reference-kpi {
+  border-inline-start: 1px solid #dbe2ec !important;
+  border-radius: 0 !important;
+}
+.stat-grid.compact .stat-card + .stat-card:hover,
+.attendance-stat-grid .stat-card + .stat-card:hover,
+.employee-kpi-grid .employee-kpi + .employee-kpi:hover,
+.reference-kpi-grid--six .reference-kpi + .reference-kpi:hover {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+/* Flatten the text wrapper so icon, label, number and subtitle share one flow. */
+.stat-grid.compact .stat-card > div:last-child,
+.attendance-stat-grid .stat-card > div:last-child,
+.employee-kpi > span:last-child,
+.reference-kpi-grid--six .reference-kpi > span:last-child,
+.ui-kpi-card .ui-kpi-content {
+  display: contents;
+}
+
+.stat-grid.compact .stat-icon,
+.attendance-stat-grid .stat-icon,
+.employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi-icon,
+.ui-kpi-icon {
+  order: 1;
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto;
+  padding: 0;
+  background: transparent !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  font-size: 15px !important;
+  line-height: 1;
+  transition: transform .2s ease;
+}
+.stat-grid.compact .stat-icon.blue,
+.attendance-stat-grid .stat-icon.blue,
+.employee-kpi.blue .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.blue .reference-kpi-icon {
+  color: #3b82f6 !important;
+  text-shadow: 0 2px 4px rgba(59,130,246,.45), 0 1px 0 rgba(255,255,255,.6);
+}
+.stat-grid.compact .stat-icon.green,
+.attendance-stat-grid .stat-icon.green,
+.employee-kpi.green .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.green .reference-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.money .reference-kpi-icon {
+  color: #10b981 !important;
+  text-shadow: 0 2px 4px rgba(16,185,129,.45), 0 1px 0 rgba(255,255,255,.6);
+}
+.stat-grid.compact .stat-icon.orange,
+.attendance-stat-grid .stat-icon.orange,
+.employee-kpi.orange .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.orange .reference-kpi-icon {
+  color: #f59e0b !important;
+  text-shadow: 0 2px 4px rgba(245,158,11,.5), 0 1px 0 rgba(255,255,255,.6);
+}
+.stat-grid.compact .stat-icon.purple,
+.attendance-stat-grid .stat-icon.purple,
+.employee-kpi.purple .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.purple .reference-kpi-icon {
+  color: #8b5cf6 !important;
+  text-shadow: 0 2px 4px rgba(139,92,246,.45), 0 1px 0 rgba(255,255,255,.6);
+}
+.stat-grid.compact .stat-icon.red,
+.attendance-stat-grid .stat-icon.red,
+.employee-kpi.red .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi.red .reference-kpi-icon {
+  color: #ef4444 !important;
+  text-shadow: 0 2px 4px rgba(239,68,68,.45), 0 1px 0 rgba(255,255,255,.6);
+}
+
+.stat-grid.compact .stat-card span,
+.attendance-stat-grid .stat-card span,
+.employee-kpi b,
+.reference-kpi-grid--six .reference-kpi b,
+.ui-kpi-content b {
+  order: 2;
+  min-width: 0;
+  font-size: 12.5px !important;
+  font-weight: 600;
+  color: #475569 !important;
+  line-height: 1.35;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.stat-grid.compact .stat-card b,
+.attendance-stat-grid .stat-card b,
+.employee-kpi strong,
+.reference-kpi-grid--six .reference-kpi strong,
+.ui-kpi-content strong {
+  order: 3;
+  flex-basis: 100%;
+  display: block;
+  font-size: 26px !important;
+  font-weight: 800;
+  letter-spacing: -.5px;
+  line-height: 1.3;
+  margin: 1px 0 !important;
+  background: linear-gradient(180deg, var(--kpi-num-top) 0%, var(--kpi-num-bot) 75%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 2px rgba(15,37,64,.28));
+  transition: --kpi-num-top .25s ease, --kpi-num-bot .25s ease;
+}
+
+/* Warning stats keep red numbers; every other stat keeps navy until hover. */
+.employee-kpi.red,
+.reference-kpi-grid--six .reference-kpi.red,
+.stat-grid.compact .stat-card:has(.stat-icon.red),
+.attendance-stat-grid .stat-card:has(.stat-icon.red) {
+  --kpi-num-top: #e05252;
+  --kpi-num-bot: #b42323;
+}
+
+.stat-grid.compact .stat-card small,
+.attendance-stat-grid .stat-card small,
+.employee-kpi small,
+.reference-kpi-grid--six .reference-kpi small,
+.ui-kpi-content small {
+  order: 4;
+  flex-basis: auto;
+  width: 0;
+  min-width: 100%;
+  display: block !important;
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  line-height: 1.4;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+.stat-grid.compact .stat-card small b,
+.attendance-stat-grid .stat-card small b,
+.employee-kpi small b,
+.reference-kpi-grid--six .reference-kpi small b,
+.ui-kpi-content small b,
+.kpi-sub-num {
+  display: inline !important;
+  font-size: inherit !important;
+  margin: 0 !important;
+  font-weight: 700;
+  color: #3f4f63 !important;
+}
+
+/* Hover: faint wash, the icon rises, the number takes the stat tone. */
+.stat-grid.compact .stat-card:hover,
+.attendance-stat-grid .stat-card:hover,
+.employee-kpi:hover,
+.reference-kpi-grid--six .reference-kpi:hover {
+  background: #f2f4f8 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+  color: #0f2540;
+}
+.stat-grid.compact .stat-card:hover .stat-icon,
+.attendance-stat-grid .stat-card:hover .stat-icon,
+.employee-kpi:hover .employee-kpi-icon,
+.reference-kpi-grid--six .reference-kpi:hover .reference-kpi-icon {
+  transform: translateY(-2px);
+}
+.employee-kpi.blue:hover,
+.reference-kpi-grid--six .reference-kpi.blue:hover,
+.stat-grid.compact .stat-card:has(.stat-icon.blue):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon.blue):hover {
+  --kpi-num-top: #5b9dff;
+  --kpi-num-bot: #1769e0;
+}
+.employee-kpi.green:hover,
+.reference-kpi-grid--six .reference-kpi.green:hover,
+.reference-kpi-grid--six .reference-kpi.money:hover,
+.stat-grid.compact .stat-card:has(.stat-icon.green):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon.green):hover {
+  --kpi-num-top: #34d399;
+  --kpi-num-bot: #0d9668;
+}
+.employee-kpi.orange:hover,
+.reference-kpi-grid--six .reference-kpi.orange:hover,
+.stat-grid.compact .stat-card:has(.stat-icon.orange):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon.orange):hover {
+  --kpi-num-top: #fbbf24;
+  --kpi-num-bot: #d97706;
+}
+.employee-kpi.purple:hover,
+.reference-kpi-grid--six .reference-kpi.purple:hover,
+.stat-grid.compact .stat-card:has(.stat-icon.purple):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon.purple):hover {
+  --kpi-num-top: #a78bfa;
+  --kpi-num-bot: #7c3aed;
+}
+.employee-kpi.red:hover,
+.reference-kpi-grid--six .reference-kpi.red:hover,
+.stat-grid.compact .stat-card:has(.stat-icon.red):hover,
+.attendance-stat-grid .stat-card:has(.stat-icon.red):hover {
+  --kpi-num-top: #e05252;
+  --kpi-num-bot: #b42323;
+}
+
+.employee-kpi:focus-visible,
+.reference-kpi-grid--six .reference-kpi:focus-visible {
+  outline: 2px solid #1769e0;
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .stat-grid.compact,
+  .employee-kpi-grid,
+  .reference-kpi-grid--six,
+  .attendance-stat-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+  }
+  .stat-grid.compact .stat-card,
+  .attendance-stat-grid .stat-card,
+  .employee-kpi,
+  .reference-kpi-grid--six .reference-kpi {
+    padding: 10px 14px !important;
+    border-inline-start: 0 !important;
+    border-top: 1px solid #dbe2ec !important;
+    border-radius: 0 !important;
+  }
+  .stat-grid.compact .stat-card b,
+  .attendance-stat-grid .stat-card b,
+  .employee-kpi strong,
+  .reference-kpi-grid--six .reference-kpi strong {
+    font-size: 21px !important;
+  }
+  .stat-grid.compact .stat-card small,
+  .attendance-stat-grid .stat-card small,
+  .employee-kpi small,
+  .reference-kpi-grid--six .reference-kpi small {
+    font-size: 10.5px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-grid.compact .stat-icon,
+  .attendance-stat-grid .stat-icon,
+  .employee-kpi-icon,
+  .reference-kpi-grid--six .reference-kpi-icon,
+  .stat-grid.compact .stat-card b,
+  .attendance-stat-grid .stat-card b,
+  .employee-kpi strong,
+  .reference-kpi-grid--six .reference-kpi strong {
+    transition: none !important;
+  }
+  .stat-grid.compact .stat-card:hover .stat-icon,
+  .attendance-stat-grid .stat-card:hover .stat-icon,
+  .employee-kpi:hover .employee-kpi-icon,
+  .reference-kpi-grid--six .reference-kpi:hover .reference-kpi-icon {
+    transform: none !important;
+  }
+}
