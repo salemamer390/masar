@@ -757,20 +757,19 @@ class AttendanceImportPreviewTest extends TestCase
         $this->import($token, $units[0], $key)->assertRedirect();
         $this->assertSame(2, Attendance::count());
     }
-    public function test_daily_without_date_uses_reviewed_manual_date_and_rejects_changed_date(): void
+    public function test_daily_without_date_requires_a_file_date_and_ignores_removed_manual_date(): void
     {
         [$token,$units,$html] = $this->preview($this->workbook([['name'=>'يومي','rows'=>[
             ['code','الحضور','الانصراف','الحالة'],['I1','09:30','17:00','Absent'],
         ]]]));
-        $this->assertStringContainsString('تاريخ موحّد', $html);
+        $this->assertStringNotContainsString('تاريخ موحّد', $html);
+        $this->assertStringNotContainsString('[default_date]', $html);
         $options=['default_date'=>'2026-11-20'];
-        [,,, $key] = $this->rePreview($token,$units[0],[],$options);
-        $this->import($token,$units[0],$key,[],['default_date'=>'2026-11-21'])->assertStatus(422);
+        [,, $html, $key] = $this->rePreview($token,$units[0],[],$options);
+        $this->assertStringContainsString('أكمل ربط الحقول المطلوبة', $html);
+        $this->assertStringContainsString('التاريخ', $html);
+        $this->import($token,$units[0],$key,[],$options)->assertStatus(422);
         $this->assertSame(0,Attendance::count());
-        $this->import($token,$units[0],$key,[],$options)->assertRedirect();
-        $record=Attendance::where('employee_id',$this->day->id)->firstOrFail();
-        $this->assertSame('2026-11-20',$record->attendance_date->toDateString());
-        $this->assertSame('Late',$record->status);
     }
 
 }

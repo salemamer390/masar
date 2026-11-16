@@ -71,7 +71,6 @@ $stats = $current['preview'];
             <div class="form-text text-danger">{{ __('وُجدت تواريخ نصية غامضة مثل 03/04/2026.') }}</div>
           </div>
           @endif
-          @if($unit['layout'] !== \App\Services\Imports\AttendanceSheetAnalyzer::LAYOUT_PUNCHES)<div class="col-6 col-md-4"><label class="form-label small">تاريخ موحّد يدويًا (إذا لم يوجد عمود تاريخ)<input type="date" class="form-control form-control-sm options-select" name="options_{{ $unit['key'] }}[default_date]" value="{{ $unit['options']['default_date'] ?? '' }}"></label></div>@endif
         </div>
 
 

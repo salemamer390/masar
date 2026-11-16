@@ -569,7 +569,6 @@ class EmployeeImportController extends Controller
             'mappings' => ['nullable', 'string', 'max:20000'],
             'sheet_kinds' => ['nullable', 'string', 'max:20000'],
             'domain_mappings' => ['nullable', 'string', 'max:20000'],
-            'sheet_dates' => ['nullable', 'string', 'max:10000'],
             'employee_mappings' => ['nullable', 'string', 'max:50000'],
             'ack_dates' => ['nullable', 'boolean'],
             'ack_updates' => ['nullable', 'boolean'],
@@ -609,7 +608,6 @@ class EmployeeImportController extends Controller
                 'mappings' => is_array($mappings) ? $mappings : [],
                 'sheet_kinds' => is_array($sheetKinds) ? $sheetKinds : [],
                 'domain_mappings' => is_array($domainMappings) ? $domainMappings : [],
-                'sheet_dates' => json_decode((string) $request->input('sheet_dates', '{}'), true) ?: [],
                 'employee_mappings' => json_decode((string) $request->input('employee_mappings', '{}'), true) ?: [],
             ]
         );

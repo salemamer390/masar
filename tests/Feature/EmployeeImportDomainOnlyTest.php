@@ -243,23 +243,30 @@ class EmployeeImportDomainOnlyTest extends TestCase
         }
     }
 
-    public function test_attendance_manual_date_and_optional_name_are_signed_and_status_input_is_ignored(): void
+    public function test_attendance_needs_a_file_date_and_ignores_the_removed_manual_date(): void
     {
         $file = $this->xlsx([['name'=>'الحضور','rows'=>[
             ['code','الحضور','الانصراف','الحالة'], ['104','09:20','17:00','غائب'],
         ]]]);
         $params = ['file'=>$file, 'sheet_kinds'=>json_encode(['الحضور'=>'attendance']), 'sheet_dates'=>json_encode(['الحضور'=>'2026-11-12'])];
-        $missing = $this->postJson('/employees/import/preview', array_diff_key($params, ['sheet_dates'=>true]))->assertOk();
-        $this->assertStringContainsString('التاريخ', $missing->json('mapping_error'));
+        $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
+        $this->assertStringContainsString('التاريخ', $preview->json('mapping_error'));
+        $this->assertSame(0, Attendance::count());
+    }
+
+    public function test_attendance_file_date_and_optional_name_work_and_status_input_is_ignored(): void
+    {
+        $file = $this->xlsx([['name'=>'الحضور','rows'=>[
+            ['code','التاريخ','الحضور','الانصراف','الحالة'], ['104','2026-11-12','09:20','17:00','غائب'],
+        ]]]);
+        $params = ['file'=>$file, 'sheet_kinds'=>json_encode(['الحضور'=>'attendance'])];
         $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
         $this->assertNull($preview->json('mapping_error'));
         $this->assertArrayNotHasKey('status', $preview->json('domain_fields.attendance'));
-        $tampered = $params; $tampered['sheet_dates'] = json_encode(['الحضور'=>'2026-11-13']);
-        $this->postJson('/employees/import', $tampered + ['review_token'=>$preview->json('review_token')])->assertStatus(422);
-        $this->postJson('/employees/import', $params + ['review_token'=>$preview->json('review_token')])->assertOk();
-        $attendance = Attendance::firstOrFail();
-        $this->assertSame('2026-11-12', $attendance->attendance_date->toDateString());
-        $this->assertSame('Late', $attendance->status);
+        // Preview executes the actual domain importer and rolls it back.
+        $this->assertSame(1, $preview->json('domains.attendance.imported'));
+        $this->assertSame(0, $preview->json('domains.attendance.skipped'));
+        $this->assertSame(0, Attendance::count());
     }
 
     public function test_penalties_require_values_and_ignore_removed_status_and_notes(): void

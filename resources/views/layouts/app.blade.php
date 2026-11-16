@@ -600,6 +600,7 @@
   });
 </script>
 @include('components.guided-tour')
+<script src="{{ asset('penalty-entry.js') }}?v={{ @filemtime(public_path('penalty-entry.js')) }}"></script>
 @stack('scripts')
 <script src="{{ asset('password-visibility.js') }}" defer></script>
 </body>

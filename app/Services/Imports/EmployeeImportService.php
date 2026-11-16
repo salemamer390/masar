@@ -217,7 +217,6 @@ class EmployeeImportService
         $confirmedKinds = $this->sanitizeSheetKinds($options['sheet_kinds'] ?? []);
         $domainMappings = $this->sanitizeDomainMappings($options['domain_mappings'] ?? []);
         $employeeMappings = is_array($options['employee_mappings'] ?? null) ? $options['employee_mappings'] : [];
-        $sheetDates = is_array($options['sheet_dates'] ?? null) ? $options['sheet_dates'] : [];
 
         $result = [
             'file_errors' => [],
@@ -306,10 +305,6 @@ class EmployeeImportService
                 if ($config !== null) {
                     $config['map'] = array_filter(array_merge($config['map'], $domainMappings[(string) $sheets[$index]['name']] ?? []), static fn ($column) => $column !== null);
                     $config['map'] = array_intersect_key($config['map'], self::domainFields($kind));
-                    if ($kind === 'attendance' && is_scalar($sheetDates[$sheets[$index]['name']] ?? null) && filled($sheetDates[$sheets[$index]['name']] ?? null)) {
-                        try { $config['default_date'] = $this->parseDate((string) $sheetDates[$sheets[$index]['name']]); }
-                        catch (InvalidArgumentException) { $config['date_error'] = 'التاريخ اليدوي غير صالح؛ استخدم YYYY-MM-DD.'; }
-                    }
                     $entry['domain_config'] = $config;
                 }
             }

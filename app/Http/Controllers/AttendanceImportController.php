@@ -406,7 +406,7 @@ class AttendanceImportController extends Controller
         // Only inputs that change the interpretation belong in the key: the column map and the
         // text-date format. The overwrite acknowledgement is commit-time consent checked in
         // store(), so toggling it must not invalidate the preview.
-        $interpretation = ['date_format' => $options['date_format'] ?? '', 'default_date' => $options['default_date'] ?? ''];
+        $interpretation = ['date_format' => $options['date_format'] ?? ''];
         return hash('sha256', $token . '|' . $unitKey . '|' . json_encode($map) . '|' . json_encode($interpretation));
     }
 
@@ -427,14 +427,12 @@ class AttendanceImportController extends Controller
         $clean = [];
         if (array_key_exists('overwrite', $options)) $clean['overwrite'] = (bool) $options['overwrite'];
         if (array_key_exists('date_format', $options) && in_array($options['date_format'], ['dmy', 'mdy'], true)) $clean['date_format'] = $options['date_format'];
-        if (array_key_exists('default_date', $options)) $clean['default_date'] = (string) $options['default_date'];
         return $clean;
     }
 
     private function normaliseOptions(array $options): array
     {
         return [
-            'default_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($options['default_date'] ?? '')) ? (string) $options['default_date'] : '',
             'overwrite' => !empty($options['overwrite']),
             'date_format' => in_array($options['date_format'] ?? '', ['dmy', 'mdy'], true) ? $options['date_format'] : '',
         ];
@@ -500,7 +498,7 @@ class AttendanceImportController extends Controller
             AttendanceSheetAnalyzer::LAYOUT_PER_EMPLOYEE => ['date', 'check_in', 'check_out'],
             default => [],
         };
-        $missing = array_filter($required, fn ($field) => !isset($map[$field]) && !($field === 'date' && !empty($options['default_date'])));
+        $missing = array_filter($required, fn ($field) => !isset($map[$field]));
         return $missing ? 'أكمل ربط الحقول المطلوبة: ' . implode('، ', array_map(fn ($field) => $this->fieldLabels()[$field], $missing)) . '.' : null;
     }
 
@@ -533,7 +531,7 @@ class AttendanceImportController extends Controller
                 $ref = "«{$sheet['name']}» / الصف {$line}";
                 [$employee, $error] = $this->resolveEmployee($row[$map['employee_code'] ?? -1] ?? null, $row[$map['employee_name'] ?? -1] ?? null);
                 if (!$employee) { $errors[] = "$ref: $error"; continue; }
-                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? ($options['default_date'] ?? null), $options['date_format'], $ambiguous);
+                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? null, $options['date_format'], $ambiguous);
                 if (!$date) { $errors[] = "$ref: " . ($ambiguous ? 'تاريخ نصي غامض — حدد تنسيق التاريخ من خيارات الورقة.' : 'تاريخ الحضور غير صالح.'); continue; }
                 try { app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور'); } catch (\RuntimeException $e) { $errors[] = "$ref: {$e->getMessage()}"; continue; }
                 $checkIn = $this->parseTime($row[$map['check_in'] ?? -1] ?? null);
@@ -601,7 +599,7 @@ class AttendanceImportController extends Controller
             if (!$employee) { $errors[] = "«{$sheet['name']}»: $error"; continue; }
             foreach ($this->dataRows($sheet, $sheets) as $line => $row) {
                 $ref = "«{$sheet['name']}» / الصف {$line}";
-                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? ($options['default_date'] ?? null), $options['date_format'], $ambiguous);
+                $date = $this->parseDateStrict($row[$map['date'] ?? -1] ?? null, $options['date_format'], $ambiguous);
                 if (!$date) {
                     // Per-employee sheets often repeat metadata under the table; only real failures surface.
                     if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) >= 2) {
