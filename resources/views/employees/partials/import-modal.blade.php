@@ -697,10 +697,10 @@
             if (icon) icon.className = expanded ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
         });
     }
-    async function drawAttentionToMissingSheet() {
+    async function drawAttentionToMissingSheet(preferredBody = null) {
         cancelSheetAttention();
         const version = attentionVersion;
-        const body = [...sheetsList.querySelectorAll('.sheet-card-missing:not(.sheet-card-ignored) .sheet-card-body')][0];
+        const body = preferredBody || sheetsList.querySelector('.sheet-card-missing:not(.sheet-card-ignored) .sheet-card-body');
         if (!body) return;
         const header = body.closest('.sheet-card').querySelector('.sheet-card-head');
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -728,6 +728,24 @@
             target.scrollIntoView({block:'center', behavior: reduced ? 'instant' : 'smooth'});
             target.focus({preventScroll:true});
         }
+    }
+
+    function restoreSheetProgress(openSheets, correctedSheet, wasMissing, data) {
+        cancelSheetAttention();
+        const index = (data.sheets || []).findIndex(sheet => sheet.name === correctedSheet);
+        const correctedBody = index < 0 ? null : document.getElementById('sheetBody' + index);
+        const completed = wasMissing && correctedBody && !correctedBody.closest('.sheet-card').matches('.sheet-card-missing, .sheet-card-ignored');
+        openSheets.forEach(id => {
+            const body = document.getElementById(id);
+            if (body && !body.closest('.sheet-card-ignored') && !(completed && body === correctedBody)) setSheetExpanded(body, true);
+        });
+        if (!completed) return;
+        setSheetExpanded(correctedBody, false);
+        const bodies = [...sheetsList.querySelectorAll('.sheet-card-body')];
+        const ordered = [...bodies.slice(index + 1), ...bodies.slice(0, index)];
+        const next = ordered.find(body => body.closest('.sheet-card-missing:not(.sheet-card-ignored)'));
+        if (next) drawAttentionToMissingSheet(next);
+        else correctedBody.closest('.sheet-card').querySelector('.sheet-card-head').focus({preventScroll:true});
     }
 
     function renderSheetsStep(data) {
@@ -898,7 +916,7 @@
         } catch (error) { showAlert(error.message); }
     }
 
-    async function runPreview(button, label, stayOnPreview, mode = null) {
+    async function runPreview(button, label, stayOnPreview, mode = null, correctedSheet = null) {
         if (busy) { return; }
         showAlert('');
         const file = fileInput.files[0];
@@ -911,6 +929,7 @@
         if (file.size > 5 * 1024 * 1024) { showAlert(window.masarT('حجم الملف يجب ألا يتجاوز 5 ميجابايت.')); return; }
         setBusy(true, button, label);
         try {
+            const wasMissing = !!lastData?.sheets?.find(sheet => sheet.name === correctedSheet)?.missing_fields?.length;
             const data = await send(urls.preview, false);
             const openSheets = [...sheetsList.querySelectorAll('.sheet-card-body.open')].map(el=>el.id);
             lastData = data;
@@ -932,8 +951,7 @@
                 renderSheetsStep(data);
                 showStep('sheets');
                 if (mode === 'reload-sheets') {
-                    cancelSheetAttention();
-                    openSheets.forEach(id => {const el=document.getElementById(id); if(el && !el.closest('.sheet-card-ignored')) setSheetExpanded(el,true);});
+                    restoreSheetProgress(openSheets, correctedSheet, wasMissing, data);
                 }
             }
         } catch (error) {
@@ -995,7 +1013,7 @@
             const map = Object.fromEntries(columns.map(c => [c.index, state.employeeMappings[name]?.[c.index] ?? c.field ?? '']));
             map[missingField.value] = missingField.dataset.employeeMissingField;
             state.employeeMappings[name] = map;
-            runPreview(null, '', false, 'reload-sheets');
+            runPreview(null, '', false, 'reload-sheets', name);
             return;
         }
         const employeeField = event.target.closest('[data-employee-field]');
@@ -1005,7 +1023,7 @@
             const selected = all.map(el=>el.value).filter(Boolean);
             if (new Set(selected).size !== selected.length) { employeeField.value = state.employeeMappings[name]?.[employeeField.dataset.employeeField] ?? lastData.sheets.find(s=>s.name===name)?.employee_config?.columns.find(c=>String(c.index)===employeeField.dataset.employeeField)?.field ?? ''; showAlert('لا يمكن ربط حقل واحد بأكثر من عمود في نفس الورقة.'); return; }
             state.employeeMappings[name] = Object.fromEntries(all.map(el=>[el.dataset.employeeField,el.value]));
-            runPreview(null, '', false, 'reload-sheets'); return;
+            runPreview(null, '', false, 'reload-sheets', name); return;
         }
         const ignore = event.target.closest('[data-ignore-sheet]');
         if (ignore) {
@@ -1027,6 +1045,7 @@
                 const chip = card.querySelector('.field-state');
                 if (chip) chip.textContent = fieldSelect.value === '' ? window.masarT('مطلوب') : window.masarT('تم');
             }
+            runPreview(null, '', false, 'reload-sheets', sheetName);
             return;
         }
         if (event.target.matches('input[name="import_sheet"]')) { state.sheet=event.target.value;runPreview(null,'',false,'reload-sheets');return; }

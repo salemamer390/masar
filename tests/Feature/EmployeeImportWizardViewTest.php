@@ -30,4 +30,18 @@ class EmployeeImportWizardViewTest extends TestCase
         $this->assertStringContainsString('sheetMissingFlash 900ms ease-in-out 2', $css);
         $this->assertStringNotContainsString('infinite', substr($view, strpos($view, '.mapping-field-card'), strpos($view, '</style>') - strpos($view, '.mapping-field-card')));
     }
+    public function test_sheet_progress_waits_for_completion_and_skips_finished_or_ignored_sheets(): void
+    {
+        $view = file_get_contents(resource_path('views/employees/partials/import-modal.blade.php'));
+        $this->assertStringContainsString('function restoreSheetProgress(openSheets, correctedSheet, wasMissing, data)', $view);
+        $this->assertStringContainsString('const completed = wasMissing && correctedBody', $view);
+        $this->assertStringContainsString('if (!completed) return;', $view);
+        $this->assertStringContainsString('setSheetExpanded(correctedBody, false)', $view);
+        $this->assertStringContainsString('...bodies.slice(index + 1), ...bodies.slice(0, index)', $view);
+        $this->assertStringContainsString("body.closest('.sheet-card-missing:not(.sheet-card-ignored)')", $view);
+        $this->assertStringContainsString('if (next) drawAttentionToMissingSheet(next)', $view);
+        $this->assertStringContainsString('restoreSheetProgress(openSheets, correctedSheet, wasMissing, data)', $view);
+        $this->assertStringContainsString("runPreview(null, '', false, 'reload-sheets', sheetName)", $view);
+        $this->assertEquals(2, substr_count($view, "runPreview(null, '', false, 'reload-sheets', name)"));
+    }
 }
