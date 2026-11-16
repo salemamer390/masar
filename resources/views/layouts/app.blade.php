@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=2">
   <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=2">
-  <title>{{ config('app.name', 'ODIR HR') }} — @yield('title', __('إدارة الموارد البشرية'))</title>
+  <title>{{ config('app.brand', 'ODIR HR') }} — @yield('title', __('إدارة الموارد البشرية'))</title>
   
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">

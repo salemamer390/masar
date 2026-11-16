@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Product Brand Name
+    |--------------------------------------------------------------------------
+    |
+    | Shown in browser tab titles. Kept separate from the legacy APP_NAME
+    | so an old APP_NAME value in a deployed .env cannot leak back into
+    | the product's visible branding.
+    |
+    */
+
+    'brand' => env('APP_BRAND', 'ODIR HR'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
