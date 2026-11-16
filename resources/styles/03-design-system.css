@@ -1339,6 +1339,9 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
 .reference-kpi-grid--six .reference-kpi small b,
 .ui-kpi-content small b,
 .kpi-sub-num {
+  display: inline !important;
+  font-size: inherit !important;
+  margin: 0 !important;
   font-weight: 700;
   color: #3f4f63 !important;
 }
