@@ -75,6 +75,23 @@ class CompanyIsolationTest extends TestCase
         $response->assertDontSee('Employee Bravo B');
     }
 
+    public function test_employee_index_keeps_favicon_in_head_and_modals_in_body(): void
+    {
+        $html = $this->actingAs($this->userA)->get(route('employees.index'))
+            ->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/^\s*<!doctype html>/i', $html);
+        $this->assertSame(1, preg_match('/<head\b[^>]*>(.*?)<\/head>/is', $html, $head));
+        $this->assertStringContainsString('rel="icon"', $head[1]);
+        $this->assertStringContainsString('images/favicon-32.png', $head[1]);
+        $bodyStart = strpos($html, '<body');
+        $this->assertNotFalse($bodyStart);
+        foreach (['employeeListStatusModal', 'employeeMaternityModal'] as $id) {
+            $this->assertSame(1, substr_count($html, 'id="'.$id.'"'));
+            $this->assertGreaterThan($bodyStart, strpos($html, 'id="'.$id.'"'));
+        }
+    }
+
     public function test_employee_show_returns_404_for_other_company(): void
     {
         $this->actingAs($this->userA)
