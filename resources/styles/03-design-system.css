@@ -1150,7 +1150,9 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   align-items: stretch;
   gap: 0;
   row-gap: 14px;
+  padding-top: 12px;
   padding-bottom: 12px;
+  border-top: 1px solid #e6ebf2;
   border-bottom: 1px solid #e6ebf2;
 }
 
