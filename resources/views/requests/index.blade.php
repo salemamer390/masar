@@ -99,18 +99,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <div class="modal fade" id="requestCardDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="requestCardTitle">{{ __('تفاصيل الطلبات') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="requestCardBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 
-<div class="stat-grid compact kpi-summary-strip">
+<div class="stat-grid compact kpi-summary-strip approved-summary-cards">
     @foreach([
         [__('إجمالي الطلبات'), $stats['all'], 'blue', 'file-earmark-text'],
 
         [__('طلبات مؤكدة'), $stats['approved'], 'green', 'check-circle'],
         [__('طلبات ملغاة'), $stats['rejected'], 'red', 'x-circle'],
     ] as $statIndex => $stat)
+@if($loop->index === 1)<div class="summary-card-group" style="--summary-columns: {{ $loop->count - 1 }}">@endif
+
         <div class="stat-card clickable-card request-kpi-card" data-request-kpi="{{ $statIndex }}">
             <div class="stat-icon {{ $stat[2] }}"><i class="bi bi-{{ $stat[3] }}"></i></div>
             <div><span>{{ $stat[0] }}</span><b>{{ format_number($stat[1]) }}</b><small>{{ __('حسب النطاق المسموح لك') }}</small></div>
         </div>
-    @endforeach
+    @if($loop->last && !$loop->first)</div>@endif
+@endforeach
 </div>
 
 <form class="filter-bar" method="GET">

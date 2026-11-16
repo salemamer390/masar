@@ -24,7 +24,7 @@
   </div>
 </div>
 @php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
-<div class="employee-kpi-grid kpi-summary-strip">
+<div class="employee-kpi-grid kpi-summary-strip approved-summary-cards">
   @foreach([
     [__('إجمالي الموظفين'), $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' '.__('نشط ·').' '.$employeeSummary['inactive'].' '.__('غير نشط') : __('جميع الموظفين نشطون'), 'blue', 'people-fill', route('employees.index')],
     [__('الموظفون النشطون'), $employeeSummary['active'], __('من إجمالي').' '.$employeeSummary['total'].' '.__('موظف'), 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],
@@ -33,11 +33,14 @@
     [__('غير مؤمن عليهم'), $employeeSummary['uninsured'], __('موظفون بلا سجل تأمين'), 'red', 'shield-x', route('insurance.index')],
     [__('في إجازة حاليًا'), $employeeSummary['on_leave'], __('إجازات معتمدة تشمل اليوم'), 'blue', 'calendar2-check-fill', route('leaves.index')],
   ] as $statIndex => $stat)
+@if($loop->index === 1)<div class="summary-card-group" style="--summary-columns: {{ $loop->count - 1 }}">@endif
+
   <a href="{{ $stat[5] }}" data-kpi-index="{{ $statIndex }}" class="employee-kpi employee-kpi-detail-trigger {{ $stat[3] }}">
     <span class="employee-kpi-icon"><i class="bi bi-{{ $stat[4] }}"></i></span>
     <span><b>{{ $stat[0] }}</b><strong>{{ $stat[1] }}</strong><small>{{ $stat[2] }}</small></span>
   </a>
-  @endforeach
+  @if($loop->last && !$loop->first)</div>@endif
+@endforeach
 </div>
 <div class="modal fade" id="employeeKpiDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="employeeKpiTitle">{{ __('تفاصيل الكارت') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="employeeKpiBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 <form method="GET" action="{{ route('employees.index') }}" class="filter-bar">

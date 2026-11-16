@@ -18,8 +18,10 @@ $actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa
   @endif
 </div>
 
-<div class="reference-kpi-grid reference-kpi-grid--six kpi-summary-strip">
+<div class="reference-kpi-grid reference-kpi-grid--six kpi-summary-strip approved-summary-cards">
   @forelse($heroMetrics as $metric)
+@if($loop->index === 1)<div class="summary-card-group" style="--summary-columns: {{ $loop->count - 1 }}">@endif
+
     <a href="{{ $metric['url'] }}" class="reference-kpi {{ $metric['tone'] }}" data-dashboard-detail="{{ $metric['key'] }}" data-detail-url="{{ route('dashboard.details', $metric['key']) }}" data-detail-icon="{{ $metric['icon'] }}">
       @php
 $kpiIcons = ['employees'=>'fa-users','present'=>'fa-user-check','absent'=>'fa-user-xmark','late'=>'fa-clock','payroll-cost'=>'fa-sack-dollar'];
@@ -27,7 +29,8 @@ $kpiIcons = ['employees'=>'fa-users','present'=>'fa-user-check','absent'=>'fa-us
       <span class="reference-kpi-icon"><i class="fa-solid {{ $kpiIcons[$metric['key']] ?? 'fa-chart-simple' }}"></i></span>
       <span><b>{{ $metric['label'] }}</b>@if($metric['key'] === 'payroll-cost')<strong class="kpi-money-value">{{ trim(str_replace('ج.م', '', $metric['value'])) }} <span class="kpi-currency">{{ __('ج.م') }}</span></strong>@else<strong>{{ $metric['value'] }}</strong>@endif<small>{{ $metric['hint'] }}</small></span>
     </a>
-  @empty<div class="panel p-4 text-muted">{{ __('لا توجد مؤشرات متاحة ضمن صلاحياتك.') }}</div>@endforelse
+  @if($loop->last && !$loop->first)</div>@endif
+@empty<div class="panel p-4 text-muted">{{ __('لا توجد مؤشرات متاحة ضمن صلاحياتك.') }}</div>@endforelse
 </div>
 
 <div class="dashboard-reference-layout">
