@@ -31,6 +31,24 @@ class StyleAssetsTest extends TestCase
         $this->assertStringNotContainsString('border-inline-start:1px solid #dbe2ec', $dashboard);
     }
 
+    public function test_approved_cards_use_one_lead_and_a_group_without_concept_palette(): void
+    {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests'] as $page) {
+            $view = file_get_contents(resource_path('views/'.$page.'/index.blade.php'));
+            $this->assertSame(1, substr_count($view, 'approved-summary-cards'), $page);
+            $this->assertSame(1, substr_count($view, 'class="summary-card-group"'), $page);
+            $this->assertStringContainsString('$loop->index === 1', $view, $page);
+            $this->assertStringContainsString('$loop->last && !$loop->first', $view, $page);
+        }
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $this->assertStringContainsString('--summary-lead: #1769e0', $css);
+        $this->assertStringContainsString('repeat(var(--summary-columns), minmax(0, 1fr))', $css);
+        $this->assertStringContainsString('body.preview-dark .kpi-summary-strip.approved-summary-cards', $css);
+        foreach (['#c15846', '#aba6a3', '#49dde4'] as $conceptColor) {
+            $this->assertStringNotContainsString($conceptColor, strtolower($css));
+        }
+    }
+
     public function test_extracted_page_styles_exist_and_are_static_css(): void
     {
         $pages = ['attendance/index'=>7, 'requests/index'=>2, 'payroll/settings'=>3,
