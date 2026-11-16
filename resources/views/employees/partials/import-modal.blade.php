@@ -686,7 +686,7 @@
     let attentionVersion = 0;
     function cancelSheetAttention() {
         attentionVersion++;
-        sheetsList.querySelectorAll('.sheet-needs-attention').forEach(el => el.classList.remove('sheet-needs-attention'));
+        sheetsList.querySelectorAll('.sheet-header-attention').forEach(el => el.classList.remove('sheet-header-attention'));
     }
     function setSheetExpanded(body, expanded) {
         body.classList.toggle('open', expanded);
@@ -702,18 +702,22 @@
         const version = attentionVersion;
         const body = [...sheetsList.querySelectorAll('.sheet-card-missing:not(.sheet-card-ignored) .sheet-card-body')][0];
         if (!body) return;
-        const card = body.closest('.sheet-card');
+        const header = body.closest('.sheet-card').querySelector('.sheet-card-head');
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         const active = () => version === attentionVersion && body.isConnected && !steps.sheets.hidden && modalEl.classList.contains('show');
         // Let the closed row paint before its finite red flash starts.
         await wait(140);
         if (!active()) return;
         setSheetExpanded(body, false);
-        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        card.classList.add('sheet-needs-attention');
-        await wait(reduced ? 180 : 900);
+        // Bring the exact sheet header into view before its warning starts.
+        header.scrollIntoView({block:'center', behavior:'instant'});
+        await wait(250);
         if (!active()) return;
-        card.classList.remove('sheet-needs-attention');
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        header.classList.add('sheet-header-attention');
+        await wait(reduced ? 400 : 1800);
+        if (!active()) return;
+        header.classList.remove('sheet-header-attention');
         await wait(180); // red is off before opening
         if (!active()) return;
         setSheetExpanded(body, true);

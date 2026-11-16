@@ -17,14 +17,17 @@ class EmployeeImportWizardViewTest extends TestCase
         $start = strpos($view, 'async function drawAttentionToMissingSheet');
         $flow = substr($view, $start, strpos($view, 'function renderSheetsStep', $start) - $start);
         $closed = strpos($flow, 'setSheetExpanded(body, false)');
-        $red = strpos($flow, "card.classList.add('sheet-needs-attention')");
-        $off = strpos($flow, "card.classList.remove('sheet-needs-attention')");
+        $red = strpos($flow, "header.classList.add('sheet-header-attention')");
+        $off = strpos($flow, "header.classList.remove('sheet-header-attention')");
         $open = strpos($flow, 'setSheetExpanded(body, true)');
         $scroll = strpos($flow, 'target.scrollIntoView');
         $this->assertTrue($closed < $red && $red < $off && $off < $open && $open < $scroll);
+        $this->assertStringContainsString('header.scrollIntoView', $flow);
+        $this->assertStringContainsString("querySelector('.sheet-card-head')", $flow);
+        $this->assertStringContainsString('.sheet-card-head.sheet-header-attention', $css);
         $this->assertStringContainsString('prefers-reduced-motion', $flow);
         $this->assertStringContainsString('version === attentionVersion', $flow);
-        $this->assertStringContainsString('sheetMissingFlash 450ms ease-in-out 2', $css);
+        $this->assertStringContainsString('sheetMissingFlash 900ms ease-in-out 2', $css);
         $this->assertStringNotContainsString('infinite', substr($view, strpos($view, '.mapping-field-card'), strpos($view, '</style>') - strpos($view, '.mapping-field-card')));
     }
 }
