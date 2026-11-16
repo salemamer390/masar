@@ -24,7 +24,7 @@
   </div>
 </div>
 @php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
-<div class="employee-kpi-grid kpi-summary-strip approved-summary-cards">
+<div class="employee-kpi-grid kpi-summary-strip approved-summary-cards" tabindex="0" role="region" aria-label="{{ __('ملخص الإحصائيات، اسحب لعرض المزيد') }}">
   @foreach([
     [__('إجمالي الموظفين'), $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' '.__('نشط ·').' '.$employeeSummary['inactive'].' '.__('غير نشط') : __('جميع الموظفين نشطون'), 'blue', 'people-fill', route('employees.index')],
     [__('الموظفون النشطون'), $employeeSummary['active'], __('من إجمالي').' '.$employeeSummary['total'].' '.__('موظف'), 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],
@@ -42,6 +42,7 @@
   @if($loop->last && !$loop->first)</div>@endif
 @endforeach
 </div>
+<p class="summary-swipe-hint" aria-hidden="true">{{ __('اسحب لعرض باقي الإحصائيات') }} <span dir="ltr">↔</span></p>
 <div class="modal fade" id="employeeKpiDetails" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h5 id="employeeKpiTitle">{{ __('تفاصيل الكارت') }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div id="employeeKpiBody" class="employee-kpi-detail-list"></div></div></div></div></div>
 <form method="GET" action="{{ route('employees.index') }}" class="filter-bar">
   <div class="search-table">

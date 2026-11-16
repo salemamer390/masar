@@ -63,6 +63,28 @@ class StyleAssetsTest extends TestCase
         $this->assertStringContainsString('grid-template-rows: minmax(41px, auto) auto minmax(36px, 1fr)', $css);
     }
 
+    public function test_mobile_summaries_keep_native_swipe_and_all_metric_markup(): void
+    {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests', 'payroll/partials/employee-salaries-body'] as $page) {
+            $path = str_contains($page, 'partials') ? $page : $page.'/index';
+            $view = file_get_contents(resource_path('views/'.$path.'.blade.php'));
+            $this->assertSame(1, substr_count($view, 'class="summary-swipe-hint"'), $page);
+            $this->assertStringContainsString('tabindex="0"', $view, $page);
+        }
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $mobile = substr($css, strpos($css, '/* Selected mobile option 3:'));
+        $this->assertStringContainsString('@media (max-width: 760px)', $mobile);
+        $this->assertStringContainsString('overflow-x: auto !important', $mobile);
+        $this->assertStringContainsString('scroll-snap-type: x proximity', $mobile);
+        $this->assertStringContainsString('flex-wrap: nowrap !important', $mobile);
+        $this->assertStringContainsString('font-size: clamp(17px, 9cqw, 24px)', $mobile);
+        $this->assertStringContainsString('white-space: nowrap !important', $mobile);
+        $this->assertStringContainsString('display: contents', $mobile);
+        $this->assertStringContainsString('flex: 0 0 clamp(138px, 38vw, 200px)', $mobile);
+        $this->assertStringContainsString('clip-path: none', $mobile);
+        $this->assertStringContainsString('.summary-card-money', $mobile);
+    }
+
     public function test_extracted_page_styles_exist_and_are_static_css(): void
     {
         $pages = ['attendance/index'=>7, 'requests/index'=>2, 'payroll/settings'=>3,

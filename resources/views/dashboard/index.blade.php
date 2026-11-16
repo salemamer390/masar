@@ -18,7 +18,7 @@ $actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa
   @endif
 </div>
 
-<div class="reference-kpi-grid reference-kpi-grid--six kpi-summary-strip approved-summary-cards">
+<div class="reference-kpi-grid reference-kpi-grid--six kpi-summary-strip approved-summary-cards" tabindex="0" role="region" aria-label="{{ __('ملخص الإحصائيات، اسحب لعرض المزيد') }}">
   @forelse($heroMetrics as $metric)
 @if($loop->index === 1)<div class="summary-card-group" style="--summary-columns: {{ $loop->count - 1 }}">@endif
 
@@ -32,6 +32,7 @@ $kpiIcons = ['employees'=>'fa-users','present'=>'fa-user-check','absent'=>'fa-us
   @if($loop->last && !$loop->first)</div>@endif
 @empty<div class="panel p-4 text-muted">{{ __('لا توجد مؤشرات متاحة ضمن صلاحياتك.') }}</div>@endforelse
 </div>
+<p class="summary-swipe-hint" aria-hidden="true">{{ __('اسحب لعرض باقي الإحصائيات') }} <span dir="ltr">↔</span></p>
 
 <div class="dashboard-reference-layout">
   @if($attendance)
