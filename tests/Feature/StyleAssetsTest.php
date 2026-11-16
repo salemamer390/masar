@@ -49,6 +49,15 @@ class StyleAssetsTest extends TestCase
         }
     }
 
+    public function test_summary_metric_rows_align_across_wrapped_titles(): void
+    {
+        $css = file_get_contents(resource_path('styles/03-design-system.css'));
+        $this->assertStringContainsString('grid-template-rows: subgrid', $css);
+        $this->assertStringContainsString('grid-row: span 3', $css);
+        $this->assertStringContainsString('font-variant-numeric: tabular-nums', $css);
+        $this->assertStringContainsString('grid-template-rows: minmax(41px, auto) auto minmax(36px, 1fr)', $css);
+    }
+
     public function test_extracted_page_styles_exist_and_are_static_css(): void
     {
         $pages = ['attendance/index'=>7, 'requests/index'=>2, 'payroll/settings'=>3,
