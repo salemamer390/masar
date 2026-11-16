@@ -1141,15 +1141,12 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   initial-value: #0f2540;
 }
 
-.stat-grid.compact,
-.employee-kpi-grid,
-.reference-kpi-grid--six,
-.attendance-stat-grid {
+.kpi-summary-strip.kpi-summary-strip {
   display: flex !important;
   flex-wrap: wrap;
   align-items: stretch;
-  gap: 0;
-  row-gap: 14px;
+  gap: 0 !important;
+  row-gap: 14px !important;
   padding-top: 12px;
   padding-bottom: 12px;
   border-top: 1px solid #e6ebf2;
@@ -1194,20 +1191,6 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   content: none !important;
   display: none !important;
 }
-.stat-grid.compact .stat-card + .stat-card,
-.attendance-stat-grid .stat-card + .stat-card,
-.employee-kpi-grid .employee-kpi + .employee-kpi,
-.reference-kpi-grid--six .reference-kpi + .reference-kpi {
-  border-inline-start: 1px solid #dbe2ec !important;
-  border-radius: 0 !important;
-}
-.stat-grid.compact .stat-card + .stat-card:hover,
-.attendance-stat-grid .stat-card + .stat-card:hover,
-.employee-kpi-grid .employee-kpi + .employee-kpi:hover,
-.reference-kpi-grid--six .reference-kpi + .reference-kpi:hover {
-  border-radius: 0 8px 8px 0 !important;
-}
-
 /* Flatten the text wrapper so icon, label, number and subtitle share one flow. */
 .stat-grid.compact .stat-card > div:last-child,
 .attendance-stat-grid .stat-card > div:last-child,
@@ -1346,6 +1329,9 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   display: inline !important;
   font-size: inherit !important;
   margin: 0 !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
   font-weight: 700;
   color: #3f4f63 !important;
 }
@@ -1411,10 +1397,7 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
 }
 
 @media (max-width: 700px) {
-  .stat-grid.compact,
-  .employee-kpi-grid,
-  .reference-kpi-grid--six,
-  .attendance-stat-grid {
+  .kpi-summary-strip.kpi-summary-strip {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 0 !important;
@@ -1424,8 +1407,6 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   .employee-kpi,
   .reference-kpi-grid--six .reference-kpi {
     padding: 10px 14px !important;
-    border-inline-start: 0 !important;
-    border-top: 1px solid #dbe2ec !important;
     border-radius: 0 !important;
   }
   .stat-grid.compact .stat-card b,
@@ -1458,5 +1439,26 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   .employee-kpi:hover .employee-kpi-icon,
   .reference-kpi-grid--six .reference-kpi:hover .reference-kpi-icon {
     transform: none !important;
+  }
+}
+
+/* Shared strip boundaries. Tone resets and hover may change backgrounds, but
+   must never erase the structural separators. All seven page strips opt in. */
+:is(.stat-grid.compact, .attendance-stat-grid, .employee-kpi-grid, .reference-kpi-grid--six).kpi-summary-strip > :is(.stat-card, .employee-kpi, .reference-kpi) {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+:is(.stat-grid.compact, .attendance-stat-grid, .employee-kpi-grid, .reference-kpi-grid--six).kpi-summary-strip > :is(.stat-card, .employee-kpi, .reference-kpi):nth-child(n + 2) {
+  border-inline-start: 1px solid #dbe2ec !important;
+}
+@media (max-width: 700px) {
+  :is(.stat-grid.compact, .attendance-stat-grid, .employee-kpi-grid, .reference-kpi-grid--six).kpi-summary-strip > :is(.stat-card, .employee-kpi, .reference-kpi):nth-child(n) {
+    border: 0 !important;
+  }
+  :is(.stat-grid.compact, .attendance-stat-grid, .employee-kpi-grid, .reference-kpi-grid--six).kpi-summary-strip > :is(.stat-card, .employee-kpi, .reference-kpi):nth-child(even) {
+    border-inline-start: 1px solid #dbe2ec !important;
+  }
+  :is(.stat-grid.compact, .attendance-stat-grid, .employee-kpi-grid, .reference-kpi-grid--six).kpi-summary-strip > :is(.stat-card, .employee-kpi, .reference-kpi):nth-child(n + 3) {
+    border-top: 1px solid #e6ebf2 !important;
   }
 }

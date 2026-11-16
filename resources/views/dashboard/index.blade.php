@@ -18,7 +18,7 @@ $actionIcons = ['موظف جديد'=>'fa-user-plus','تسجيل إجازة'=>'fa
   @endif
 </div>
 
-<div class="reference-kpi-grid reference-kpi-grid--six">
+<div class="reference-kpi-grid reference-kpi-grid--six kpi-summary-strip">
   @forelse($heroMetrics as $metric)
     <a href="{{ $metric['url'] }}" class="reference-kpi {{ $metric['tone'] }}" data-dashboard-detail="{{ $metric['key'] }}" data-detail-url="{{ route('dashboard.details', $metric['key']) }}" data-detail-icon="{{ $metric['icon'] }}">
       @php

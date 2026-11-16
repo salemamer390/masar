@@ -24,7 +24,7 @@
   </div>
 </div>
 @php($activeStatusId = $statuses->firstWhere('name', 'Active')?->id)
-<div class="employee-kpi-grid">
+<div class="employee-kpi-grid kpi-summary-strip">
   @foreach([
     [__('إجمالي الموظفين'), $employeeSummary['total'], $employeeSummary['inactive'] ? $employeeSummary['active'].' '.__('نشط ·').' '.$employeeSummary['inactive'].' '.__('غير نشط') : __('جميع الموظفين نشطون'), 'blue', 'people-fill', route('employees.index')],
     [__('الموظفون النشطون'), $employeeSummary['active'], __('من إجمالي').' '.$employeeSummary['total'].' '.__('موظف'), 'green', 'person-check-fill', route('employees.index', array_filter(['status_id' => $activeStatusId]))],

@@ -166,11 +166,11 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 @media (max-width:640px){.dashboard-modal-tools{flex-direction:column;align-items:stretch;gap:10px}.dashboard-modal-tools form{flex-wrap:wrap}.dashboard-modal-tools .form-control{min-width:0;flex:1 1 auto}}
 
 /* Calm KPI strip overrides - dashboard hero metrics share the plain-row design from app.css. */
-.reference-kpi-grid--six{display:flex!important;flex-wrap:wrap;align-items:stretch;gap:0;row-gap:14px;padding-top:12px;padding-bottom:12px;border-top:1px solid #e6ebf2;border-bottom:1px solid #e6ebf2}
+.reference-kpi-grid--six{display:flex!important;flex-wrap:wrap;align-items:stretch;gap:0;row-gap:14px}
 .reference-kpi-grid--six .reference-kpi{--kpi-num-top:#274a75;--kpi-num-bot:#0f2540;flex:1 1 0%;min-width:0;min-height:0!important;padding:4px 14px!important;gap:0;column-gap:7px;flex-wrap:wrap;align-items:center;align-content:flex-start;direction:rtl!important;background:transparent!important;border:0!important;border-radius:8px!important;box-shadow:none!important;color:#0f2540;transition:background-color .18s ease}
 .reference-kpi-grid--six .reference-kpi:first-child{padding-inline-start:2px!important}
 .reference-kpi-grid--six .reference-kpi:before{content:none!important;display:none!important}
-.reference-kpi-grid--six .reference-kpi+.reference-kpi{border-inline-start:1px solid #dbe2ec!important;border-radius:0!important}
+.reference-kpi-grid--six .reference-kpi+.reference-kpi{border-radius:0!important}
 .reference-kpi-grid--six .reference-kpi>span:last-child{display:contents}
 .reference-kpi-grid--six .reference-kpi-icon{order:1;display:block;width:auto!important;height:auto!important;min-width:0!important;flex:0 0 auto;background:transparent!important;border-radius:0;box-shadow:none!important;font-size:15px!important;line-height:1;transition:transform .2s ease}
 .reference-kpi-grid--six .reference-kpi.blue .reference-kpi-icon{color:#3b82f6!important;text-shadow:0 2px 4px rgba(59,130,246,.45),0 1px 0 rgba(255,255,255,.6)}
@@ -191,7 +191,7 @@ body:has(.reference-kpi-grid--six){background:var(--saas-page)}.content:has(.ref
 .reference-kpi-grid--six .reference-kpi.purple:hover{--kpi-num-top:#a78bfa;--kpi-num-bot:#7c3aed}
 .reference-kpi-grid--six .reference-kpi.red:hover{--kpi-num-top:#e05252;--kpi-num-bot:#b42323}
 .reference-kpi-grid--six .reference-kpi:focus-visible{outline:2px solid #1769e0;outline-offset:2px}
-@media(max-width:700px){.reference-kpi-grid--six{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important}.reference-kpi-grid--six .reference-kpi{padding:10px 14px!important;border-inline-start:0!important;border-top:1px solid #dbe2ec!important;border-radius:0!important}.reference-kpi-grid--six .reference-kpi strong{font-size:21px!important}.reference-kpi-grid--six .reference-kpi small{font-size:10.5px!important}}
+@media(max-width:700px){.reference-kpi-grid--six{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important}.reference-kpi-grid--six .reference-kpi{padding:10px 14px!important;border-radius:0!important}.reference-kpi-grid--six .reference-kpi strong{font-size:21px!important}.reference-kpi-grid--six .reference-kpi small{font-size:10.5px!important}}
 @media(prefers-reduced-motion:reduce){.reference-kpi-grid--six .reference-kpi-icon,.reference-kpi-grid--six .reference-kpi strong{transition:none!important}.reference-kpi-grid--six .reference-kpi:hover .reference-kpi-icon{transform:none!important}}
 
 /* Neutralize legacy per-tone fills on the hero metrics. */
