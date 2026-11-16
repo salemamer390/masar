@@ -5352,6 +5352,8 @@ body.masar-cards-hidden .payroll-employee-kpi-grid {
   align-items: stretch;
   gap: 0;
   row-gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6ebf2;
 }
 
 .stat-grid.compact .stat-card,
