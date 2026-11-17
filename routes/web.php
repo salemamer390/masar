@@ -644,6 +644,9 @@ Route::post('/owner/login', [\App\Http\Controllers\OwnerAuthController::class, '
 Route::post('/owner/logout', [\App\Http\Controllers\OwnerAuthController::class, 'logout'])->name('owner.logout');
 Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->group(function () {
     Route::get('/', [\App\Http\Controllers\OwnerDashboardController::class, 'index'])->name('index');
+    Route::post('/database-updates/run', [\App\Http\Controllers\OwnerDatabaseUpdateController::class, 'run'])
+        ->middleware('throttle:6,1')
+        ->name('database-updates.run');
     Route::post('/plans', [\App\Http\Controllers\OwnerDashboardController::class, 'storePlan'])->name('plans.store');
     Route::put('/plans/{plan}', [\App\Http\Controllers\OwnerDashboardController::class, 'updatePlan'])->name('plans.update');
     Route::post('/companies', [\App\Http\Controllers\OwnerDashboardController::class, 'storeCompany'])->name('companies.store');
