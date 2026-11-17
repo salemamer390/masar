@@ -1,0 +1,2 @@
+# Keep the reviewed owner-updater trial byte-identical on Windows checkouts.
+database/migrations/2026_11_17_000002_owner_updater_trial.php text eol=lf
