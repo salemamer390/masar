@@ -780,7 +780,7 @@ class EmployeeImportService
 
     public static function requiredEmployeeFields(): array
     {
-        return ['employee_code', 'full_name', 'national_id', 'job', 'contract_start_date', 'contract_end_date'];
+        return ['employee_code', 'full_name', 'national_id', 'job', 'contract_start_date'];
     }
 
     private function missingEmployeeFields(array $fields): array
@@ -1629,7 +1629,7 @@ class EmployeeImportService
             }
         };
 
-        foreach (['employee_code' => 'كود الموظف', 'national_id' => 'الرقم القومي', 'job' => 'الوظيفة', 'contract_end_date' => 'نهاية العقد'] as $field => $label) {
+        foreach (['employee_code' => 'كود الموظف', 'national_id' => 'الرقم القومي', 'job' => 'الوظيفة'] as $field => $label) {
             if ($get($field) === '') $errors[] = $label . ' مطلوب.';
         }
         if ($get('contract_start_date') === '' && $get('hire_date') === '') $errors[] = 'بداية العقد مطلوبة.';
@@ -1883,17 +1883,10 @@ class EmployeeImportService
             $errors[] = $exception->errors()['contract_start_date'][0];
         }
 
-        if ($isNew) {
-            $hire ??= date('Y-m-d');
-            $contractStart ??= $hire;
-            $contractEnd ??= $this->renewedContractEnd($contractStart);
-        } elseif ($hire !== null && $contractStart === null) {
-            $contractStart = $hire;
-        }
-        // A missing end date means an annually renewing contract, not a
-        // contract that expires one year after the original hire date.
-        if ($contractEnd === null && $contractStart !== null && $get('termination_date') === '') {
-            $contractEnd = $this->renewedContractEnd($contractStart);
+        // End date is optional. Match the employee form: one calendar year
+        // from the supplied canonical/legacy start, never today's renewal year.
+        if ($contractEnd === null && $get('contract_end_date') === '' && $contractStart !== null) {
+            $contractEnd = Carbon::parse($contractStart)->addYear()->toDateString();
         }
         if ($hire !== null) {
             $data['hire_date'] = $hire;
@@ -2070,17 +2063,6 @@ class EmployeeImportService
         $seen = ['nid' => [], 'code' => []];
 
         return $this->analyzeRow($raw, 0, $ctx, 'update', $seen, null);
-    }
-
-    private function renewedContractEnd(string $start): string
-    {
-        $startDate = Carbon::parse($start)->startOfDay();
-        $end = $startDate->copy()->addYear()->subDay();
-        $today = Carbon::today();
-        while ($end->lt($today)) {
-            $end->addYear();
-        }
-        return $end->toDateString();
     }
 
     /**

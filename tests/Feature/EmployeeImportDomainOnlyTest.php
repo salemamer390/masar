@@ -213,7 +213,7 @@ class EmployeeImportDomainOnlyTest extends TestCase
 
     public function test_employee_required_columns_stay_editable_and_commit_is_blocked_with_exact_labels(): void
     {
-        foreach (['كود', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'نهاية العقد', 'الراتب الإجمالي'] as $field) {
+        foreach (['كود', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'الراتب الإجمالي'] as $field) {
             $params = ['file' => $this->requiredEmployeeCsv([], [$field])];
             $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
             $this->assertNotEmpty($preview->json('sheets.0.employee_config.columns'));
@@ -229,8 +229,36 @@ class EmployeeImportDomainOnlyTest extends TestCase
             'كود' => '', 'الرقم القومي' => '', 'الوظيفة' => '', 'بداية العقد' => '', 'نهاية العقد' => '', 'الراتب الإجمالي' => '',
         ])])->assertOk();
         $text = implode(' ', $preview->json('rows.0.errors'));
-        foreach (['كود الموظف', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'نهاية العقد', 'الراتب الإجمالي أو الراتب الصافي'] as $label) $this->assertStringContainsString($label, $text);
+        foreach (['كود الموظف', 'الرقم القومي', 'الوظيفة', 'بداية العقد', 'الراتب الإجمالي أو الراتب الصافي'] as $label) $this->assertStringContainsString($label, $text);
         $this->assertSame('error', $preview->json('rows.0.action'));
+    }
+
+    public function test_optional_contract_end_uses_one_year_from_supplied_start_and_commits(): void
+    {
+        foreach ([['نهاية العقد'], []] as $omit) {
+            $params = ['file' => $this->requiredEmployeeCsv(['نهاية العقد'=>'', 'بداية العقد'=>'2020-03-15', 'كود'=> $omit ? 'ANNUAL1' : 'ANNUAL2'], $omit)];
+            $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
+            $this->assertNull($preview->json('mapping_error'));
+            $this->assertNotContains('contract_end_date', $preview->json('required_employee_fields'));
+            $this->assertSame(1, $preview->json('summary.create'));
+            $this->postJson('/employees/import', $params + ['review_token'=>$preview->json('review_token')])->assertSuccessful();
+            $employee = Employee::where('employee_code', $omit ? 'ANNUAL1' : 'ANNUAL2')->firstOrFail();
+            $this->assertSame('2020-03-15', $employee->hire_date->toDateString());
+            $this->assertSame('2021-03-15', $employee->contract_end_date->toDateString());
+            $employee->delete();
+        }
+    }
+
+    public function test_optional_end_preserves_explicit_value_and_rejects_invalid_dates(): void
+    {
+        $params = ['file'=>$this->requiredEmployeeCsv(['نهاية العقد'=>'2030-06-30'])];
+        $preview = $this->postJson('/employees/import/preview', $params)->assertOk();
+        $this->postJson('/employees/import', $params + ['review_token'=>$preview->json('review_token')])->assertSuccessful();
+        $this->assertSame('2030-06-30', Employee::where('employee_code','R501')->firstOrFail()->contract_end_date->toDateString());
+        foreach (['not-a-date', '2025-01-01'] as $end) {
+            $preview = $this->postJson('/employees/import/preview', ['file'=>$this->requiredEmployeeCsv(['نهاية العقد'=>$end, 'كود'=>'BADEND'])])->assertOk();
+            $this->assertSame('error', $preview->json('rows.0.action'));
+        }
     }
 
     public function test_gross_or_net_salary_is_sufficient_but_both_missing_is_not(): void
