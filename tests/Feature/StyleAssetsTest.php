@@ -87,6 +87,7 @@ class StyleAssetsTest extends TestCase
         $mobile = substr($css, strpos($css, '/* Selected mobile option 3:'));
         $this->assertStringContainsString('@media (max-width: 760px)', $mobile);
         $this->assertStringContainsString('overflow-x: auto !important', $mobile);
+        $this->assertStringContainsString('overflow-y: hidden !important', $mobile);
         $this->assertStringContainsString('scroll-snap-type: x proximity', $mobile);
         $this->assertStringContainsString('flex-wrap: nowrap !important', $mobile);
         $this->assertStringContainsString('font-size: clamp(17px, 9cqw, 24px)', $mobile);
