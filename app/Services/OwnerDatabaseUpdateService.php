@@ -41,52 +41,98 @@ class OwnerDatabaseUpdateService
             return $this->unavailableStatus($manifest['error'], $attempt, count($ran), $lastBatch);
         }
 
-        $migrations = collect(File::files(database_path('migrations')))
-            ->filter(fn ($file) => $file->getExtension() === 'php')
-            ->map(fn ($file) => $file->getBasename('.php'))
-            ->sort()
+        $migrationsRoot = realpath(database_path('migrations'));
+        if ($migrationsRoot === false) {
+            return $this->unavailableStatus(
+                __('تعذر تحديد مجلد migrations الرسمي، لذلك التنفيذ محظور افتراضيًا.'),
+                $attempt,
+                count($ran),
+                $lastBatch
+            );
+        }
+
+        $migrations = collect(File::files($migrationsRoot))
+            ->filter(fn ($file) => $file->getExtension() === 'php' && $file->isFile())
+            ->map(fn ($file) => ['file' => $file, 'name' => $file->getBasename('.php')])
+            ->sortBy('name')
             ->values();
 
         $eligible = [];
         $blocked = [];
+        $orderedPending = [];
 
-        foreach ($migrations->diff($ran)->values() as $name) {
+        foreach ($migrations as $migrationFile) {
+            $name = $migrationFile['name'];
+            if (in_array($name, $ran, true)) {
+                continue;
+            }
+
+            $file = $migrationFile['file'];
             $relativePath = 'database/migrations/'.$name.'.php';
-            $absolutePath = database_path('migrations/'.$name.'.php');
+            $absolutePath = $migrationsRoot.DIRECTORY_SEPARATOR.$name.'.php';
+            $realPath = $file->getRealPath();
+            $entry = [
+                'name' => $name,
+                'path' => $relativePath,
+                'eligible' => false,
+            ];
+
+            if ($file->isLink() || ! is_string($realPath) || ! str_starts_with($realPath, $migrationsRoot.DIRECTORY_SEPARATOR)) {
+                $entry['reason'] = 'outside_path';
+                $blocked[] = $entry;
+                $orderedPending[] = $entry;
+                continue;
+            }
 
             if (! array_key_exists($name, $manifest['migrations'])) {
-                $blocked[] = [
-                    'name' => $name,
-                    'path' => $relativePath,
-                    'reason' => 'unreviewed',
-                ];
+                $entry['reason'] = 'unreviewed';
+                $blocked[] = $entry;
+                $orderedPending[] = $entry;
                 continue;
             }
 
             $actualHash = @hash_file('sha256', $absolutePath);
             if ($actualHash === false) {
-                $blocked[] = [
-                    'name' => $name,
-                    'path' => $relativePath,
-                    'reason' => 'unreadable',
-                ];
+                $entry['reason'] = 'unreadable';
+                $blocked[] = $entry;
+                $orderedPending[] = $entry;
                 continue;
             }
 
             if (! hash_equals(strtolower($manifest['migrations'][$name]), strtolower($actualHash))) {
-                $blocked[] = [
-                    'name' => $name,
-                    'path' => $relativePath,
-                    'reason' => 'changed',
-                ];
+                $entry['reason'] = 'changed';
+                $blocked[] = $entry;
+                $orderedPending[] = $entry;
                 continue;
             }
 
+            $entry['eligible'] = true;
+            $entry['sha256'] = $actualHash;
             $eligible[] = [
-                'name' => $name,
-                'path' => $relativePath,
-                'sha256' => $actualHash,
+                'name' => $entry['name'],
+                'path' => $entry['path'],
+                'sha256' => $entry['sha256'],
             ];
+            $orderedPending[] = $entry;
+        }
+
+        $next = null;
+        $blocking = null;
+        $firstPending = $orderedPending[0] ?? null;
+        if ($firstPending) {
+            if ($firstPending['eligible']) {
+                $next = [
+                    'name' => $firstPending['name'],
+                    'path' => $firstPending['path'],
+                    'sha256' => $firstPending['sha256'],
+                ];
+            } else {
+                $blocking = [
+                    'name' => $firstPending['name'],
+                    'path' => $firstPending['path'],
+                    'reason' => $firstPending['reason'],
+                ];
+            }
         }
 
         return [
@@ -96,7 +142,8 @@ class OwnerDatabaseUpdateService
             'last_batch' => $lastBatch,
             'pending' => $eligible,
             'blocked' => $blocked,
-            'next' => $eligible[0] ?? null,
+            'next' => $next,
+            'blocking' => $blocking,
             'attempt' => $attempt,
         ];
     }
@@ -124,6 +171,18 @@ class OwnerDatabaseUpdateService
             $status = $this->status();
             if (! ($status['available'] ?? false)) {
                 return $this->failure('unavailable', $status['error'] ?? __('تعذر قراءة حالة قاعدة البيانات.'));
+            }
+
+            $blocking = $status['blocking'] ?? null;
+            if ($blocking) {
+                return $this->failure(
+                    'blocked_prerequisite',
+                    __('يوجد تحديث سابق :migration غير مصرح به أو يحتاج مراجعة. لن يتم تجاوزه لتنفيذ تحديث لاحق.', ['migration' => $blocking['name']]),
+                    [
+                        'migration' => $blocking['name'],
+                        'blocked_reason' => $blocking['reason'] ?? null,
+                    ]
+                );
             }
 
             $next = $status['next'] ?? null;

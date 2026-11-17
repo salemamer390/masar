@@ -141,7 +141,7 @@ class OwnerDatabaseUpdatesTest extends TestCase
         $response->assertSee('غير موجودة في قائمة المراجعة');
         $response->assertSee('2026_11_17_000004_changed_update');
         $response->assertSee('تغير محتواها بعد المراجعة');
-        $response->assertDontSee('تنفيذ التحديث التالي فقط');
+        $response->assertDontSee('/owner/database-updates/run', false);
     }
 
     public function test_owner_dashboard_shows_manual_review_state_without_a_run_form(): void
@@ -165,7 +165,35 @@ class OwnerDatabaseUpdatesTest extends TestCase
         $response->assertOk();
         $response->assertSee('التنفيذ متوقف للمراجعة اليدوية');
         $response->assertSee('2026_11_17_000001_first_pending_update');
-        $response->assertDontSee('تنفيذ التحديث التالي فقط');
+        $response->assertDontSee('/owner/database-updates/run', false);
+    }
+
+    public function test_owner_dashboard_does_not_offer_a_later_update_when_an_earlier_one_blocks_it(): void
+    {
+        $owner = $this->createOwner();
+        $this->fakeService([
+            'available' => true,
+            'error' => null,
+            'ran_count' => 20,
+            'last_batch' => 4,
+            'pending' => [
+                ['name' => '2026_11_17_000005_approved_later_update', 'path' => 'database/migrations/2026_11_17_000005_approved_later_update.php', 'sha256' => str_repeat('c', 64)],
+            ],
+            'blocked' => [
+                ['name' => '2026_11_17_000004_blocking_update', 'path' => 'database/migrations/2026_11_17_000004_blocking_update.php', 'reason' => 'unreviewed'],
+            ],
+            'next' => null,
+            'blocking' => ['name' => '2026_11_17_000004_blocking_update', 'path' => 'database/migrations/2026_11_17_000004_blocking_update.php', 'reason' => 'unreviewed'],
+            'attempt' => null,
+        ]);
+
+        $response = $this->actingAs($owner, 'owner')->get(route('owner.index'));
+
+        $response->assertOk();
+        $response->assertSee('يوجد تحديث سابق يمنع المتابعة');
+        $response->assertSee('2026_11_17_000004_blocking_update');
+        $response->assertSee('2026_11_17_000005_approved_later_update');
+        $response->assertDontSee('/owner/database-updates/run', false);
     }
 
     public function test_guest_and_company_user_cannot_run_database_update(): void

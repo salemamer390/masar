@@ -17,6 +17,9 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         '2099_01_01_000005_owner_update_service_failure_test',
         '2099_01_01_000006_owner_update_service_marker_test',
         '2099_01_01_000007_owner_update_service_lock_test',
+        '2099_01_01_000008_owner_update_service_blocked_prerequisite',
+        '2099_01_01_000009_owner_update_service_approved_after',
+        '2099_01_01_000010_owner_update_service_symlink_test',
     ];
 
     private string $manifestPath;
@@ -80,7 +83,7 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         $result = $service->runNext();
 
         $this->assertFalse($result['ok']);
-        $this->assertSame('no_reviewed_pending', $result['code']);
+        $this->assertSame('blocked_prerequisite', $result['code']);
         $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[2]]);
         $this->assertFileDoesNotExist($this->attemptPath());
     }
@@ -99,7 +102,7 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         $result = $service->runNext();
 
         $this->assertFalse($result['ok']);
-        $this->assertSame('no_reviewed_pending', $result['code']);
+        $this->assertSame('blocked_prerequisite', $result['code']);
         $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[3]]);
         $this->assertFileDoesNotExist($this->attemptPath());
     }
@@ -124,6 +127,63 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         $this->assertFalse($retry['ok']);
         $this->assertSame('manual_review_required', $retry['code']);
         $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[4]]);
+    }
+
+    public function test_it_does_not_skip_a_blocked_prerequisite_to_run_a_later_approved_migration(): void
+    {
+        $this->createTestMigration($this->testMigrations[7]);
+        $this->createTestMigration($this->testMigrations[8]);
+        $this->authorizeMigrations([$this->testMigrations[8]]);
+        $service = app(OwnerDatabaseUpdateService::class);
+
+        $status = $service->status();
+        $this->assertNull($status['next']);
+        $this->assertSame($this->testMigrations[7], $status['blocking']['name']);
+        $this->assertSame($this->testMigrations[8], $status['pending'][0]['name']);
+
+        $result = $service->runNext();
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('blocked_prerequisite', $result['code']);
+        $this->assertSame($this->testMigrations[7], $result['migration']);
+        $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[7]]);
+        $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[8]]);
+    }
+
+    public function test_it_blocks_a_symlink_or_outside_migration_path_even_when_hash_approved(): void
+    {
+        $outsidePath = storage_path('framework/outside-owner-update-service-migration.php');
+        file_put_contents($outsidePath, <<<'MIGRATION'
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+    }
+
+    public function down(): void
+    {
+    }
+};
+MIGRATION);
+        $symlinkPath = database_path('migrations/'.$this->testMigrations[9].'.php');
+        $this->assertTrue(symlink($outsidePath, $symlinkPath));
+        $this->authorizeMigrations([$this->testMigrations[9]]);
+        $service = app(OwnerDatabaseUpdateService::class);
+
+        $status = $service->status();
+        $this->assertCount(0, $status['pending']);
+        $this->assertSame('outside_path', $status['blocked'][0]['reason']);
+
+        $result = $service->runNext();
+
+        @unlink($outsidePath);
+        $this->assertFalse($result['ok']);
+        $this->assertSame('blocked_prerequisite', $result['code']);
+        $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[9]]);
     }
 
     public function test_a_running_attempt_marker_blocks_execution_as_uncertain(): void
