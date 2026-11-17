@@ -15,6 +15,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionRenewalRequest;
 use App\Models\User;
 use App\Notifications\PlatformCompanyAnnouncement;
+use App\Services\OwnerDatabaseUpdateService;
 use App\Notifications\SubscriptionRenewalProcessedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -29,7 +30,7 @@ use Illuminate\Support\Str;
  */
 class OwnerDashboardController extends Controller
 {
-    public function index()
+    public function index(OwnerDatabaseUpdateService $databaseUpdates)
     {
         $plans = SubscriptionPlan::orderBy('sort_order')->orderBy('employee_limit')->get();
         $companies = Company::with(['subscriptions.plan'])->latest()->get();
@@ -56,8 +57,9 @@ class OwnerDashboardController extends Controller
 
         // Data tab: read-only per-company record counts across the tenant tables.
         $dataStats = $this->perCompanyDataStats($companies->pluck('id')->all());
+        $databaseUpdateStatus = $databaseUpdates->status();
         $subscriptionActivity = ActivityLog::with('user')
-            ->where('module', 'subscriptions')
+            ->whereIn('module', ['subscriptions', 'database'])
             ->latest()
             ->limit(30)
             ->get();
@@ -66,7 +68,8 @@ class OwnerDashboardController extends Controller
             'plans', 'companies', 'renewalRequests', 'latestSubscriptions',
             'activeCompanies', 'activeSubscriptions', 'expiringSubscriptions',
             'pendingRenewals', 'approvedRevenue', 'companiesByPlan',
-            'totalEmployees', 'totalUsers', 'dataStats', 'subscriptionActivity'
+            'totalEmployees', 'totalUsers', 'dataStats', 'subscriptionActivity',
+            'databaseUpdateStatus'
         ));
     }
 
