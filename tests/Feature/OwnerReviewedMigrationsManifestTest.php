@@ -12,6 +12,7 @@ class OwnerReviewedMigrationsManifestTest extends TestCase
         '2026_11_11_100000_create_tour_steps_table',
         '2026_11_15_000001_add_import_batch_id_to_imported_operational_records',
         '2026_11_17_000002_owner_updater_trial',
+        '2026_11_17_000003_repair_innodb_and_fingerprint_command_relations',
     ];
 
     public function test_reviewed_manifest_matches_current_migration_files(): void
