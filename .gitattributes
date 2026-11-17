@@ -1,2 +1,5 @@
-# Keep the reviewed owner-updater trial byte-identical on Windows checkouts.
+# Keep reviewed owner-updater migrations byte-identical on Windows checkouts.
+database/migrations/2026_11_11_000001_add_push_modes_to_fingerprint_devices.php text eol=lf
+database/migrations/2026_11_11_100000_create_tour_steps_table.php text eol=lf
+database/migrations/2026_11_15_000001_add_import_batch_id_to_imported_operational_records.php text eol=lf
 database/migrations/2026_11_17_000002_owner_updater_trial.php text eol=lf

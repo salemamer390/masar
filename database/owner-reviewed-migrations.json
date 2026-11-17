@@ -1,6 +1,9 @@
 {
     "version": 1,
     "migrations": {
+        "2026_11_11_000001_add_push_modes_to_fingerprint_devices": "952f78e91fc5bd92225e9756cca999d414e16719b31a449852eb8f99a3f5ceb2",
+        "2026_11_11_100000_create_tour_steps_table": "a922f3833b10e55efb0cf87a14d4dd3a67d40fa65664196827b89501ebd47d2b",
+        "2026_11_15_000001_add_import_batch_id_to_imported_operational_records": "ffa8de0300826075f3aecb5adf74bcf0574e692066f1c34a717c95cec6102715",
         "2026_11_17_000002_owner_updater_trial": "40421d817c1dde8dd962353fe1a4ab0a58f3cf4bdb13537856ebbd96e3f7d9bd"
     }
 }
