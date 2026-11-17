@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 class OwnerDatabaseUpdateServiceTest extends TestCase
 {
-    private const LOCAL_TRIAL_MIGRATION = '2026_11_17_000001_owner_updater_trial';
+    private const LOCAL_TRIAL_MIGRATION = '2026_11_17_000002_owner_updater_trial';
 
     private array $testMigrations = [
         '2099_01_01_000001_owner_update_service_first_test',
