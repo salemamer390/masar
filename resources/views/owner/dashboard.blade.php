@@ -72,6 +72,9 @@
    $nextDatabaseUpdate=$databaseUpdateStatus['next'] ?? null;
    $databaseAttempt=$databaseUpdateStatus['attempt'] ?? null;
    $blockingDatabaseUpdate=$databaseUpdateStatus['blocking'] ?? null;
+   $databaseReadinessChecks=$databaseUpdateStatus['checks'] ?? [];
+   $readinessIcons=['ok'=>'bi-check-circle-fill','warning'=>'bi-exclamation-triangle-fill','failed'=>'bi-x-octagon-fill'];
+   $readinessLabels=['ok'=>__('جاهز'),'warning'=>__('انتبه'),'failed'=>__('متوقف')];
    $blockedReasonLabels=[
     'unreviewed'=>__('غير موجودة في قائمة المراجعة'),
     'changed'=>__('تغير محتواها بعد المراجعة'),
@@ -83,6 +86,9 @@
   <div class="owner-update-grid">
    <article class="owner-card update-status-card">
     <header><h2><i class="bi bi-database-gear"></i> {{ __('حالة التحديثات') }}</h2>@if(!($databaseUpdateStatus['available'] ?? false))<span class="owner-status rejected">{{ __('غير متاحة') }}</span>@elseif($databaseAttempt)<span class="owner-status rejected">{{ __('متوقفة للمراجعة') }}</span>@elseif($blockingDatabaseUpdate)<span class="owner-status rejected">{{ __('متوقفة بسبب تحديث سابق') }}</span>@elseif(count($databasePending))<span class="owner-status pending">{{ __('يوجد تحديثات مصرح بها') }}</span>@elseif(count($blockedDatabaseUpdates))<span class="owner-status rejected">{{ __('يوجد تحديثات محظورة') }}</span>@else<span class="owner-status approved">{{ __('محدثة') }}</span>@endif</header>
+     @if(session('database_update_audit_warning'))
+      <div class="update-unavailable"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>{{ __('تنبيه سجل العمليات') }}</strong><p>{{session('database_update_audit_warning')}}</p></div></div>
+     @endif
     @if(!($databaseUpdateStatus['available'] ?? false))
      <div class="update-unavailable"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>{{ __('لا يمكن تنفيذ التحديثات من هذه الصفحة الآن') }}</strong><p>{{$databaseUpdateStatus['error']}}</p></div></div>
     @else
@@ -92,7 +98,7 @@
       <div><span>{{ __('آخر دفعة') }}</span><strong>{{$databaseUpdateStatus['last_batch'] ? format_number($databaseUpdateStatus['last_batch']) : '—'}}</strong></div>
      </div>
      @if($databaseAttempt)
-      <div class="update-unavailable"><i class="bi bi-exclamation-octagon-fill"></i><div><strong>{{ __('التنفيذ متوقف للمراجعة اليدوية') }}</strong><p>{{ __('محاولة سابقة للتحديث :migration لم تكتمل أو تحتاج مراجعة. راجع قاعدة البيانات وسجل migrations يدويًا قبل السماح بأي محاولة أخرى.', ['migration' => $databaseAttempt['migration'] ?? __('غير معروف')]) }}</p></div></div>
+      <div class="update-unavailable"><i class="bi bi-exclamation-octagon-fill"></i><div><strong>{{ __('التنفيذ متوقف للمراجعة اليدوية') }}</strong><p>{{ __('محاولة سابقة للتحديث :migration لم تكتمل أو تحتاج مراجعة. راجع قاعدة البيانات وسجل migrations يدويًا قبل السماح بأي محاولة أخرى.', ['migration' => $databaseAttempt['migration'] ?? __('غير معروف')]) }}</p><ol class="recovery-steps"><li>{{ __('أوقف استخدام النظام مؤقتًا حتى لا تضاف بيانات أثناء المراجعة.') }}</li><li>{{ __('راجع قاعدة البيانات وجدول migrations وحدد هل التحديث اكتمل فعلًا أم توقف في المنتصف.') }}</li><li>{{ __('إذا احتجت الاستعادة، استخدم آخر Export كامل محفوظ من phpMyAdmin؛ هذا سيرجع كل الشركات إلى وقت النسخة.') }}</li><li>{{ __('بعد التأكد من الحالة، احذف ملف storage/framework/owner-database-updates-attempt.json يدويًا من الخادم. لا يوجد زر تصفير داخل الصفحة.') }}</li><li>{{ __('عند رفع ملفات الموقع لا تحذف أو تستبدل مجلد storage/framework حتى لا تضيع علامة الإيقاف قبل المراجعة.') }}</li></ol></div></div>
      @elseif($blockingDatabaseUpdate)
       <div class="update-unavailable"><i class="bi bi-sign-stop"></i><div><strong>{{ __('يوجد تحديث سابق يمنع المتابعة') }}</strong><p>{{ __('التحديث :migration غير مصرح به أو يحتاج مراجعة، ولن يتم تجاوزه لتنفيذ تحديث لاحق.', ['migration' => $blockingDatabaseUpdate['name']]) }}</p></div></div>
      @elseif($nextDatabaseUpdate)
@@ -100,7 +106,7 @@
       <form method="POST" action="{{route('owner.database-updates.run')}}" class="database-update-form">
        @csrf
        <label>{{ __('كلمة مرور حساب المالك الحالية') }}<input type="password" name="password" autocomplete="current-password" required>@error('password')<small class="field-error">{{$message}}</small>@enderror</label>
-       <label class="check-row"><input type="checkbox" name="confirm_backup" value="1" @checked(old('confirm_backup'))><span>{{ __('أؤكد أن لدي نسخة احتياطية حديثة من قاعدة البيانات.') }}</span></label>
+       <label class="check-row"><input type="checkbox" name="confirm_backup" value="1" @checked(old('confirm_backup'))><span>{{ __('أؤكد أنني سحبت Export كامل لقاعدة البيانات من phpMyAdmin وحفظته في مكان آمن.') }}</span></label>
        @error('confirm_backup')<small class="field-error">{{$message}}</small>@enderror
        <label class="check-row"><input type="checkbox" name="confirm_partial_risk" value="1" @checked(old('confirm_partial_risk'))><span>{{ __('أفهم أن تحديث MySQL قد يتوقف وهو مكتمل جزئيًا ويحتاج مراجعة يدوية.') }}</span></label>
        @error('confirm_partial_risk')<small class="field-error">{{$message}}</small>@enderror
@@ -121,7 +127,17 @@
      @endif
     @endif
    </article>
-   <aside class="owner-card help-card"><header><h2><i class="bi bi-shield-exclamation"></i> {{ __('قبل التنفيذ') }}</h2></header><ul><li>{{ __('احفظ نسخة احتياطية كاملة من قاعدة البيانات أولًا.') }}</li><li>{{ __('نفذ تحديثًا واحدًا ثم راجع الموقع قبل تنفيذ التالي.') }}</li><li>{{ __('لا تنفذ التحديث أثناء ذروة استخدام الموظفين.') }}</li><li>{{ __('لا يعمل أي تحديث غير موجود في قائمة المراجعة أو تغير محتواه بعد المراجعة.') }}</li><li>{{ __('إذا فشل تحديث أو انقطع تنفيذه تتوقف الصفحة حتى مراجعة قاعدة البيانات يدويًا.') }}</li><li>{{ __('هذه الصفحة لا تصلح إعداد قاعدة بيانات جديدة ولا تنفذ أوامر عشوائية.') }}</li></ul></aside>
+   <aside class="owner-card help-card">
+    <header><h2><i class="bi bi-clipboard2-check"></i> {{ __('فحص الجاهزية') }}</h2></header>
+    @if(count($databaseReadinessChecks))
+     <ul class="readiness-list">@foreach($databaseReadinessChecks as $check)<li class="readiness-{{$check['state']}}"><i class="bi {{$readinessIcons[$check['state']] ?? 'bi-info-circle-fill'}}"></i><div><strong>{{$check['label']}}</strong><small>{{$check['detail']}}</small></div><span>{{$readinessLabels[$check['state']] ?? $check['state']}}</span></li>@endforeach</ul>
+    @else
+     <p class="readiness-empty">{{ __('لم تتوفر فحوصات الجاهزية في هذه الحالة.') }}</p>
+    @endif
+    <div class="readiness-note"><i class="bi bi-hdd-network"></i> {{ __('احتفظ بمجلد storage/framework أثناء رفع ملفات الموقع؛ حذفه قد يخفي علامة إيقاف محاولة سابقة.') }}</div>
+    <h3 class="help-subtitle"><i class="bi bi-shield-exclamation"></i> {{ __('قبل التنفيذ') }}</h3>
+    <ul><li>{{ __('احفظ Export كامل من phpMyAdmin في مكان آمن قبل التحديث؛ الصفحة لا تنشئ النسخة ولا تتحقق منها.') }}</li><li>{{ __('نفذ تحديثًا واحدًا صغيرًا ومجربًا ثم راجع الموقع قبل تنفيذ التالي.') }}</li><li>{{ __('لا تنفذ التحديث أثناء ذروة استخدام الموظفين.') }}</li><li>{{ __('لا يعمل أي تحديث غير موجود في قائمة المراجعة أو تغير محتواه بعد المراجعة.') }}</li><li>{{ __('إذا فشل تحديث أو انقطع تنفيذه تتوقف الصفحة حتى مراجعة قاعدة البيانات يدويًا.') }}</li><li>{{ __('هذه الصفحة لا تصلح إعداد قاعدة بيانات جديدة ولا تنفذ أوامر عشوائية أو Backup أو Restore تلقائيًا.') }}</li></ul>
+   </aside>
   </div>
  </section>
 

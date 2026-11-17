@@ -15,6 +15,7 @@ class OwnerDatabaseUpdateService
     public function status(): array
     {
         $attempt = $this->attemptState();
+        $checks = [];
 
         try {
             $ran = DB::table('migrations')
@@ -22,34 +23,87 @@ class OwnerDatabaseUpdateService
                 ->pluck('migration')
                 ->all();
             $lastBatch = (int) DB::table('migrations')->max('batch');
+            $checks[] = $this->readinessCheck(
+                'migrations_table',
+                __('سجل migrations'),
+                'ok',
+                __('السجل متاح ويمكن مقارنة الملفات المنفذة بالمعلقة.')
+            );
         } catch (Throwable) {
+            $checks[] = $this->readinessCheck(
+                'migrations_table',
+                __('سجل migrations'),
+                'failed',
+                __('تعذر قراءة السجل من قاعدة البيانات.')
+            );
+
+            $checks = array_merge($checks, $this->environmentReadinessChecks($attempt));
+
             return $this->unavailableStatus(
                 __('تعذر قراءة سجل migrations. راجع قاعدة البيانات أو نفذ الإعداد الأساسي من بيئة آمنة.'),
-                $attempt
+                $attempt,
+                checks: $checks
             );
         }
 
         if (count($ran) === 0) {
+            $checks[] = $this->readinessCheck(
+                'migrations_baseline',
+                __('الإعداد الأساسي'),
+                'failed',
+                __('السجل فارغ؛ هذه الصفحة لا تستخدم لإعداد قاعدة بيانات جديدة.')
+            );
+
+            $checks = array_merge($checks, $this->environmentReadinessChecks($attempt));
+
             return $this->unavailableStatus(
                 __('هذه الصفحة لا تستخدم لإعداد قاعدة بيانات جديدة. نفذ الإعداد الأساسي من بيئة آمنة أولًا.'),
-                $attempt
+                $attempt,
+                checks: $checks
             );
         }
 
         $manifest = $this->loadReviewedManifest();
+        $checks[] = $this->readinessCheck(
+            'reviewed_manifest',
+            __('قائمة التحديثات المراجعة'),
+            $manifest['ok'] ? 'ok' : 'failed',
+            $manifest['ok']
+                ? __('الملف موجود وصالح، والتنفيذ مقيد ببصمات SHA-256 المسجلة فيه.')
+                : $manifest['error']
+        );
         if (! $manifest['ok']) {
-            return $this->unavailableStatus($manifest['error'], $attempt, count($ran), $lastBatch);
+            $checks = array_merge($checks, $this->environmentReadinessChecks($attempt));
+
+            return $this->unavailableStatus(
+                $manifest['error'],
+                $attempt,
+                count($ran),
+                $lastBatch,
+                $checks
+            );
         }
 
         $migrationsRoot = realpath(database_path('migrations'));
+        $checks[] = $this->readinessCheck(
+            'migrations_directory',
+            __('مجلد migrations الرسمي'),
+            $migrationsRoot === false ? 'failed' : 'ok',
+            $migrationsRoot === false
+                ? __('تعذر تحديد المسار الرسمي.')
+                : __('المسار الرسمي محدد، وأي رابط أو ملف خارج هذا المسار محظور.')
+        );
         if ($migrationsRoot === false) {
             return $this->unavailableStatus(
                 __('تعذر تحديد مجلد migrations الرسمي، لذلك التنفيذ محظور افتراضيًا.'),
                 $attempt,
                 count($ran),
-                $lastBatch
+                $lastBatch,
+                $checks
             );
         }
+
+        $checks = array_merge($checks, $this->environmentReadinessChecks($attempt));
 
         $migrations = collect(File::files($migrationsRoot))
             ->filter(fn ($file) => $file->getExtension() === 'php' && $file->isFile())
@@ -145,6 +199,7 @@ class OwnerDatabaseUpdateService
             'next' => $next,
             'blocking' => $blocking,
             'attempt' => $attempt,
+            'checks' => $checks,
         ];
     }
 
@@ -403,7 +458,63 @@ class OwnerDatabaseUpdateService
         return __('التنفيذ متوقف لأن محاولة سابقة للتحديث :migration لم تكتمل أو تحتاج مراجعة. راجع قاعدة البيانات وسجل migrations يدويًا قبل السماح بأي محاولة أخرى.', ['migration' => $migration]);
     }
 
-    private function unavailableStatus(string $error, ?array $attempt = null, int $ranCount = 0, ?int $lastBatch = null): array
+    /** @return array<int, array{key: string, label: string, state: string, detail: string}> */
+    private function environmentReadinessChecks(?array $attempt): array
+    {
+        $storagePath = storage_path('framework');
+        $storageReady = is_dir($storagePath) && is_writable($storagePath);
+        $rawLimit = ini_get('max_execution_time');
+        $seconds = is_numeric($rawLimit) ? (int) $rawLimit : null;
+        $limitDetail = match (true) {
+            $seconds === 0 => __('غير محدود في البيئة الحالية.'),
+            $seconds !== null => __(':seconds ثانية. نفذ تحديثات صغيرة مجربة فقط داخل هذا الحد.', ['seconds' => $seconds]),
+            default => __('تعذر قراءة حد تنفيذ PHP الحالي.'),
+        };
+
+        return [
+            $this->readinessCheck(
+                'storage_writable',
+                __('تخزين علامة الإيقاف'),
+                $storageReady ? 'ok' : 'failed',
+                $storageReady
+                    ? __('مجلد storage/framework قابل للكتابة ويمكنه حفظ علامة الإيقاف.')
+                    : __('مجلد storage/framework غير قابل للكتابة؛ يجب إصلاحه قبل التنفيذ.')
+            ),
+            $this->readinessCheck(
+                'attempt_marker',
+                __('علامة المحاولة السابقة'),
+                $attempt ? 'warning' : 'ok',
+                $attempt
+                    ? __('يوجد ملف إيقاف يحتاج مراجعة يدوية قبل أي تنفيذ جديد.')
+                    : __('لا توجد محاولة سابقة معلقة.')
+            ),
+            $this->readinessCheck(
+                'execution_time',
+                __('حد تنفيذ PHP'),
+                ($seconds !== null && $seconds > 0 && $seconds <= 60) ? 'warning' : 'ok',
+                $limitDetail
+            ),
+            $this->readinessCheck(
+                'manual_backup',
+                __('النسخة الاحتياطية الخارجية'),
+                'warning',
+                __('الصفحة لا تنشئ نسخة احتياطية ولا تستطيع التحقق منها؛ احفظ Export كامل من phpMyAdmin قبل التنفيذ.')
+            ),
+        ];
+    }
+
+    /** @return array{key: string, label: string, state: string, detail: string} */
+    private function readinessCheck(string $key, string $label, string $state, string $detail): array
+    {
+        return [
+            'key' => $key,
+            'label' => $label,
+            'state' => $state,
+            'detail' => $detail,
+        ];
+    }
+
+    private function unavailableStatus(string $error, ?array $attempt = null, int $ranCount = 0, ?int $lastBatch = null, array $checks = []): array
     {
         return [
             'available' => false,
@@ -414,6 +525,7 @@ class OwnerDatabaseUpdateService
             'blocked' => [],
             'next' => null,
             'attempt' => $attempt,
+            'checks' => $checks,
         ];
     }
 

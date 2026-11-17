@@ -7,6 +7,7 @@ use App\Services\OwnerDatabaseUpdateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Throwable;
 
 class OwnerDatabaseUpdateController extends Controller
 {
@@ -19,7 +20,7 @@ class OwnerDatabaseUpdateController extends Controller
         ], [
             'password.required' => __('أدخل كلمة مرور حساب المالك الحالية.'),
             'password.current_password' => __('كلمة مرور حساب المالك الحالية غير صحيحة.'),
-            'confirm_backup.accepted' => __('أكد أن لديك نسخة احتياطية حديثة قبل التنفيذ.'),
+            'confirm_backup.accepted' => __('أكد أنك سحبت Export كامل من phpMyAdmin وحفظته في مكان آمن قبل التنفيذ.'),
             'confirm_partial_risk.accepted' => __('أكد فهمك أن تحديث MySQL قد يتوقف وهو مكتمل جزئيًا.'),
         ]);
 
@@ -31,22 +32,31 @@ class OwnerDatabaseUpdateController extends Controller
         }
 
         $result = $updates->runNext();
-        $this->recordActivity($request, $result);
+        $auditRecorded = $this->recordActivity($request, $result);
 
         if ($result['ok']) {
-            return redirect()
+            $redirect = redirect()
                 ->route('owner.index')
                 ->with('open_owner_tab', 'database-updates')
                 ->with('toast', $result['message']);
+        } else {
+            $redirect = redirect()
+                ->route('owner.index')
+                ->with('open_owner_tab', 'database-updates')
+                ->withErrors(['database_update' => $result['message']]);
         }
 
-        return redirect()
-            ->route('owner.index')
-            ->with('open_owner_tab', 'database-updates')
-            ->withErrors(['database_update' => $result['message']]);
+        if (! $auditRecorded) {
+            $redirect->with(
+                'database_update_audit_warning',
+                __('تم تنفيذ أو إيقاف التحديث كما هو موضح، لكن تعذر حفظ العملية في سجل العمليات. راجع سجل أخطاء Laravel وقاعدة البيانات.')
+            );
+        }
+
+        return $redirect;
     }
 
-    private function recordActivity(Request $request, array $result): void
+    private function recordActivity(Request $request, array $result): bool
     {
         $migration = $result['migration'] ?? __('بدون تحديث');
         $needsReview = in_array($result['code'] ?? null, [
@@ -66,21 +76,29 @@ class OwnerDatabaseUpdateController extends Controller
             default => 'database_update_failed',
         };
 
-        ActivityLog::create([
-            'company_id' => null,
-            'user_id' => $request->user('owner')?->id,
-            'action' => $action,
-            'description' => $description,
-            'module' => 'database',
-            'new_values' => array_filter([
-                'result' => $result['code'] ?? null,
-                'migration' => $result['migration'] ?? null,
-                'pending_before' => $result['pending_before'] ?? null,
-                'pending_after' => $result['pending_after'] ?? null,
-                'exit_code' => $result['exit_code'] ?? null,
-                'output' => filled($result['output'] ?? null) ? Str::limit($result['output'], 500) : null,
-            ], fn ($value) => ! is_null($value)),
-            'ip_address' => $request->ip(),
-        ]);
+        try {
+            ActivityLog::create([
+                'company_id' => null,
+                'user_id' => $request->user('owner')?->id,
+                'action' => $action,
+                'description' => $description,
+                'module' => 'database',
+                'new_values' => array_filter([
+                    'result' => $result['code'] ?? null,
+                    'migration' => $result['migration'] ?? null,
+                    'pending_before' => $result['pending_before'] ?? null,
+                    'pending_after' => $result['pending_after'] ?? null,
+                    'exit_code' => $result['exit_code'] ?? null,
+                    'output' => filled($result['output'] ?? null) ? Str::limit($result['output'], 500) : null,
+                ], fn ($value) => ! is_null($value)),
+                'ip_address' => $request->ip(),
+            ]);
+
+            return true;
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
     }
 }
