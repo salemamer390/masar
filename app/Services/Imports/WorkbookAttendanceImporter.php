@@ -115,14 +115,12 @@ class WorkbookAttendanceImporter
 
     private function mapHeaders(array $headers): array
     {
-        $aliases = [
-            'code' => ['employee code', 'employee_code', 'code', 'كود', 'كود الموظف', 'الكود'],
-            'name' => ['الموظفين', 'الموظفون', 'الاسماء', 'الاسم', 'اسم الموظف', 'employee name', 'employee_name', 'name', 'اسم الموظف', 'الموظف'],
-            'date' => ['date', 'attendance date', 'attendance_date', 'التاريخ', 'تاريخ الحضور', 'يوم الحضور', 'work date'],
-            'in' => ['c/in', 'check in', 'check_in', 'in', 'الحضور', 'وقت الحضور', 'ساعة الحضور', 'وقت الدخول', 'تسجيل الدخول', 'بصمة الدخول', 'checkin', 'time in', 'clock in', 'entry time', 'punch in'],
-            'out' => ['c/out', 'check out', 'check_out', 'out', 'الانصراف', 'وقت الانصراف', 'ساعة الانصراف', 'وقت الخروج', 'تسجيل الخروج', 'بصمة الخروج', 'checkout', 'time out', 'clock out', 'exit time', 'punch out'],
-
-        ];
+        // Adapt canonical names only. Keep this importer's supported layout
+        // and last-column-wins behavior unchanged; raw punches stay unsupported.
+        $names = ['employee_code' => 'code', 'employee_name' => 'name', 'date' => 'date', 'check_in' => 'in', 'check_out' => 'out'];
+        $aliases = [];
+        $shared = AttendanceHeaderDictionary::forHeaders($headers);
+        foreach ($names as $canonical => $field) $aliases[$field] = $shared[$canonical];
         $map = [];
         foreach ($headers as $index => $header) {
             $key = $this->normalise($header);

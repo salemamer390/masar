@@ -361,4 +361,18 @@ class EmployeeImportDomainOnlyTest extends TestCase
         $this->assertStringContainsString('الصف 7',$preview->json('domains.attendance.errors.5'));
     }
 
+    public function test_attendance_aliases_shared_with_attendance_page_commit_from_employee_workbook(): void
+    {
+        $sheets = [['name' => 'الحضور والانصراف', 'rows' => [
+            ['badge no', 'full name', 'work date', 'first punch', 'last punch'],
+            ['104', 'عامر سالم جمعه', '2026-11-02', '09:00', '17:00'],
+        ]]];
+        $preview = $this->postJson('/employees/import/preview', ['file' => $this->xlsx($sheets), 'sheet_kinds' => json_encode(['الحضور والانصراف' => 'attendance'])]);
+        $preview->assertOk();
+        $this->assertTrue((bool) $preview->json('domain_only'));
+        $this->assertSame(['code' => 0, 'name' => 1, 'date' => 2, 'in' => 3, 'out' => 4], $preview->json('sheets.0.domain_config.map'));
+        $this->post('/employees/import', ['file' => $this->xlsx($sheets), 'sheet_kinds' => json_encode(['الحضور والانصراف' => 'attendance']), 'review_token' => $preview->json('review_token')])
+            ->assertOk()->assertJson(['success' => true]);
+        $this->assertSame(1, Attendance::whereDate('attendance_date', '2026-11-02')->count());
+    }
 }
