@@ -64,7 +64,14 @@ class OwnerDatabaseUpdatesTest extends TestCase
     private function fakeService(?array $status = null, ?array $runResult = null): FakeOwnerDatabaseUpdateService
     {
         $service = new FakeOwnerDatabaseUpdateService;
-        $service->statusResult = $status ?? [
+        $defaultChecks = [
+            ['key' => 'migrations_table', 'label' => 'سجل migrations', 'state' => 'ok', 'detail' => 'السجل متاح.'],
+            ['key' => 'reviewed_manifest', 'label' => 'قائمة التحديثات المراجعة', 'state' => 'ok', 'detail' => 'الملف صالح.'],
+            ['key' => 'storage_writable', 'label' => 'تخزين علامة الإيقاف', 'state' => 'ok', 'detail' => 'مجلد التخزين قابل للكتابة.'],
+            ['key' => 'execution_time', 'label' => 'حد تنفيذ PHP', 'state' => 'ok', 'detail' => '60 ثانية.'],
+            ['key' => 'manual_backup', 'label' => 'النسخة الاحتياطية الخارجية', 'state' => 'warning', 'detail' => 'احفظ Export كامل من phpMyAdmin قبل التنفيذ.'],
+        ];
+        $service->statusResult = array_merge(['checks' => $defaultChecks], $status ?? [
             'available' => true,
             'error' => null,
             'ran_count' => 20,
@@ -76,7 +83,7 @@ class OwnerDatabaseUpdatesTest extends TestCase
             'blocked' => [],
             'next' => ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php', 'sha256' => str_repeat('a', 64)],
             'attempt' => null,
-        ];
+        ]);
         $service->runResult = $runResult ?? [
             'ok' => true,
             'code' => 'completed',
@@ -114,6 +121,9 @@ class OwnerDatabaseUpdatesTest extends TestCase
         $response->assertSee('2026_11_17_000002_second_pending_update');
         $response->assertSee('كلمة مرور حساب المالك الحالية');
         $response->assertSee('تنفيذ التحديث التالي فقط');
+        $response->assertSee('فحص الجاهزية');
+        $response->assertSee('النسخة الاحتياطية الخارجية');
+        $response->assertSee('Export كامل من phpMyAdmin');
     }
 
     public function test_owner_dashboard_shows_blocked_updates_without_a_run_form(): void
@@ -165,6 +175,8 @@ class OwnerDatabaseUpdatesTest extends TestCase
         $response->assertOk();
         $response->assertSee('التنفيذ متوقف للمراجعة اليدوية');
         $response->assertSee('2026_11_17_000001_first_pending_update');
+        $response->assertSee('احذف ملف storage/framework/owner-database-updates-attempt.json يدويًا');
+        $response->assertSee('لا تحذف أو تستبدل مجلد storage/framework');
         $response->assertDontSee('/owner/database-updates/run', false);
     }
 
@@ -259,6 +271,33 @@ class OwnerDatabaseUpdatesTest extends TestCase
             'action' => 'database_update_completed',
             'module' => 'database',
         ]);
+    }
+
+    public function test_an_audit_write_failure_does_not_mask_a_successful_update_result(): void
+    {
+        $owner = $this->createOwner();
+        $service = $this->fakeService();
+        ActivityLog::creating(function (): void {
+            throw new \RuntimeException('Audit write failed for test.');
+        });
+
+        $response = $this->actingAs($owner, 'owner')->post(
+            route('owner.database-updates.run'),
+            $this->validConfirmation()
+        );
+
+        $response->assertRedirect(route('owner.index'));
+        $response->assertSessionHas('toast', 'تم تنفيذ التحديث 2026_11_17_000001_first_pending_update بنجاح.');
+        $response->assertSessionHas('database_update_audit_warning');
+        $response->assertSessionDoesntHaveErrors();
+        $this->assertSame(1, $service->runCalls);
+        $this->assertSame(0, ActivityLog::where('module', 'database')->count());
+
+        $this->actingAs($owner, 'owner')
+            ->get(route('owner.index'))
+            ->assertOk()
+            ->assertSee('تنبيه سجل العمليات')
+            ->assertSee('تعذر حفظ العملية في سجل العمليات');
     }
 
     public function test_manual_review_result_is_logged_as_attention_required(): void
