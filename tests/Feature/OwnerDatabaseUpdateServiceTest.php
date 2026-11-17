@@ -9,6 +9,8 @@ use Tests\TestCase;
 
 class OwnerDatabaseUpdateServiceTest extends TestCase
 {
+    private const LOCAL_TRIAL_MIGRATION = '2026_11_17_000001_owner_updater_trial';
+
     private array $testMigrations = [
         '2099_01_01_000001_owner_update_service_first_test',
         '2099_01_01_000002_owner_update_service_second_test',
@@ -30,6 +32,7 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         if (!\Schema::hasTable('migrations')) {
             Artisan::call('migrate');
         }
+        $this->markLocalTrialMigrationAsRun();
         $this->manifestPath = storage_path('framework/testing-owner-reviewed-migrations-'.getmypid().'.json');
         config()->set('owner.reviewed_migrations_path', $this->manifestPath);
         $this->writeManifest([]);
@@ -243,6 +246,24 @@ MIGRATION);
         $this->assertSame('locked', $result['code']);
         $this->assertDatabaseMissing('migrations', ['migration' => $this->testMigrations[6]]);
         $this->assertFileDoesNotExist($this->attemptPath());
+    }
+
+    private function markLocalTrialMigrationAsRun(): void
+    {
+        if (! file_exists(database_path('migrations/'.self::LOCAL_TRIAL_MIGRATION.'.php'))) {
+            return;
+        }
+
+        $exists = DB::table('migrations')
+            ->where('migration', self::LOCAL_TRIAL_MIGRATION)
+            ->exists();
+
+        if (! $exists) {
+            DB::table('migrations')->insert([
+                'migration' => self::LOCAL_TRIAL_MIGRATION,
+                'batch' => ((int) DB::table('migrations')->max('batch')) + 1,
+            ]);
+        }
     }
 
     private function createTestMigration(string $name, bool $valid = true): void
