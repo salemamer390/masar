@@ -71,6 +71,24 @@ class OwnerDatabaseUpdateServiceTest extends TestCase
         $this->assertSame($this->testMigrations[1], $after['next']['name']);
     }
 
+    public function test_status_includes_readiness_checks_without_changing_execution_safeguards(): void
+    {
+        $service = app(OwnerDatabaseUpdateService::class);
+
+        $status = $service->status();
+        $checks = collect($status['checks'])->keyBy('key');
+
+        $this->assertTrue($status['available']);
+        $this->assertSame('ok', $checks['migrations_table']['state']);
+        $this->assertSame('ok', $checks['reviewed_manifest']['state']);
+        $this->assertSame('ok', $checks['migrations_directory']['state']);
+        $this->assertSame('ok', $checks['storage_writable']['state']);
+        $this->assertSame('ok', $checks['attempt_marker']['state']);
+        $this->assertArrayHasKey('execution_time', $checks);
+        $this->assertSame('warning', $checks['manual_backup']['state']);
+        $this->assertStringContainsString('phpMyAdmin', $checks['manual_backup']['detail']);
+    }
+
     public function test_it_blocks_an_unreviewed_migration_by_default(): void
     {
         $this->createTestMigration($this->testMigrations[2]);
