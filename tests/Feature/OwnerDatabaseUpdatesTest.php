@@ -70,10 +70,12 @@ class OwnerDatabaseUpdatesTest extends TestCase
             'ran_count' => 20,
             'last_batch' => 4,
             'pending' => [
-                ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php'],
-                ['name' => '2026_11_17_000002_second_pending_update', 'path' => 'database/migrations/2026_11_17_000002_second_pending_update.php'],
+                ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php', 'sha256' => str_repeat('a', 64)],
+                ['name' => '2026_11_17_000002_second_pending_update', 'path' => 'database/migrations/2026_11_17_000002_second_pending_update.php', 'sha256' => str_repeat('b', 64)],
             ],
-            'next' => ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php'],
+            'blocked' => [],
+            'next' => ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php', 'sha256' => str_repeat('a', 64)],
+            'attempt' => null,
         ];
         $service->runResult = $runResult ?? [
             'ok' => true,
@@ -112,6 +114,58 @@ class OwnerDatabaseUpdatesTest extends TestCase
         $response->assertSee('2026_11_17_000002_second_pending_update');
         $response->assertSee('كلمة مرور حساب المالك الحالية');
         $response->assertSee('تنفيذ التحديث التالي فقط');
+    }
+
+    public function test_owner_dashboard_shows_blocked_updates_without_a_run_form(): void
+    {
+        $owner = $this->createOwner();
+        $this->fakeService([
+            'available' => true,
+            'error' => null,
+            'ran_count' => 20,
+            'last_batch' => 4,
+            'pending' => [],
+            'blocked' => [
+                ['name' => '2026_11_17_000003_unreviewed_update', 'path' => 'database/migrations/2026_11_17_000003_unreviewed_update.php', 'reason' => 'unreviewed'],
+                ['name' => '2026_11_17_000004_changed_update', 'path' => 'database/migrations/2026_11_17_000004_changed_update.php', 'reason' => 'changed'],
+            ],
+            'next' => null,
+            'attempt' => null,
+        ]);
+
+        $response = $this->actingAs($owner, 'owner')->get(route('owner.index'));
+
+        $response->assertOk();
+        $response->assertSee('لا توجد تحديثات مصرح بها للتنفيذ');
+        $response->assertSee('2026_11_17_000003_unreviewed_update');
+        $response->assertSee('غير موجودة في قائمة المراجعة');
+        $response->assertSee('2026_11_17_000004_changed_update');
+        $response->assertSee('تغير محتواها بعد المراجعة');
+        $response->assertDontSee('تنفيذ التحديث التالي فقط');
+    }
+
+    public function test_owner_dashboard_shows_manual_review_state_without_a_run_form(): void
+    {
+        $owner = $this->createOwner();
+        $this->fakeService([
+            'available' => true,
+            'error' => null,
+            'ran_count' => 20,
+            'last_batch' => 4,
+            'pending' => [
+                ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php', 'sha256' => str_repeat('a', 64)],
+            ],
+            'blocked' => [],
+            'next' => ['name' => '2026_11_17_000001_first_pending_update', 'path' => 'database/migrations/2026_11_17_000001_first_pending_update.php', 'sha256' => str_repeat('a', 64)],
+            'attempt' => ['status' => 'running', 'migration' => '2026_11_17_000001_first_pending_update', 'started_at' => '2026-11-17T10:00:00+02:00'],
+        ]);
+
+        $response = $this->actingAs($owner, 'owner')->get(route('owner.index'));
+
+        $response->assertOk();
+        $response->assertSee('التنفيذ متوقف للمراجعة اليدوية');
+        $response->assertSee('2026_11_17_000001_first_pending_update');
+        $response->assertDontSee('تنفيذ التحديث التالي فقط');
     }
 
     public function test_guest_and_company_user_cannot_run_database_update(): void
@@ -175,6 +229,34 @@ class OwnerDatabaseUpdatesTest extends TestCase
             'company_id' => null,
             'user_id' => $owner->id,
             'action' => 'database_update_completed',
+            'module' => 'database',
+        ]);
+    }
+
+    public function test_manual_review_result_is_logged_as_attention_required(): void
+    {
+        $owner = $this->createOwner();
+        $this->fakeService(null, [
+            'ok' => false,
+            'code' => 'manual_review_required',
+            'message' => 'التنفيذ متوقف للمراجعة اليدوية.',
+            'migration' => '2026_11_17_000001_first_pending_update',
+            'pending_before' => null,
+            'pending_after' => null,
+            'exit_code' => null,
+            'output' => null,
+        ]);
+
+        $response = $this->actingAs($owner, 'owner')->post(
+            route('owner.database-updates.run'),
+            $this->validConfirmation()
+        );
+
+        $response->assertSessionHasErrors('database_update');
+        $this->assertDatabaseHas('activity_logs', [
+            'company_id' => null,
+            'user_id' => $owner->id,
+            'action' => 'database_update_attention_required',
             'module' => 'database',
         ]);
     }

@@ -49,14 +49,27 @@ class OwnerDatabaseUpdateController extends Controller
     private function recordActivity(Request $request, array $result): void
     {
         $migration = $result['migration'] ?? __('بدون تحديث');
-        $description = $result['ok']
-            ? __('تم تنفيذ تحديث قاعدة البيانات :migration.', ['migration' => $migration])
-            : __('فشل تنفيذ تحديث قاعدة البيانات :migration.', ['migration' => $migration]);
+        $needsReview = in_array($result['code'] ?? null, [
+            'manual_review_required',
+            'failed',
+            'exception',
+            'marker_cleanup_failed',
+        ], true);
+        $description = match (true) {
+            $result['ok'] => __('تم تنفيذ تحديث قاعدة البيانات :migration.', ['migration' => $migration]),
+            $needsReview => __('توقف تنفيذ تحديث قاعدة البيانات :migration ويحتاج مراجعة يدوية قبل أي محاولة أخرى.', ['migration' => $migration]),
+            default => __('فشل تنفيذ تحديث قاعدة البيانات :migration.', ['migration' => $migration]),
+        };
+        $action = match (true) {
+            $result['ok'] => 'database_update_completed',
+            $needsReview => 'database_update_attention_required',
+            default => 'database_update_failed',
+        };
 
         ActivityLog::create([
             'company_id' => null,
             'user_id' => $request->user('owner')?->id,
-            'action' => $result['ok'] ? 'database_update_completed' : 'database_update_failed',
+            'action' => $action,
             'description' => $description,
             'module' => 'database',
             'new_values' => array_filter([

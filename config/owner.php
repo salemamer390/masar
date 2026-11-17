@@ -11,4 +11,13 @@ return [
         'trim',
         explode(',', (string) env('OWNER_EMAILS', ''))
     ))),
+
+    /*
+    | قائمة التحديثات المسموح بها من صفحة المالك. كل تحديث مستقبلي يحتاج
+    | مراجعة صريحة وتسجيل بصمة SHA-256 لملفه في ملف المراجعة المشار إليه.
+    */
+    'reviewed_migrations_path' => env(
+        'OWNER_REVIEWED_MIGRATIONS_PATH',
+        database_path('owner-reviewed-migrations.json')
+    ),
 ];

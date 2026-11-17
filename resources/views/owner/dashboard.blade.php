@@ -68,23 +68,32 @@
  <section class="owner-panel" data-panel="database-updates" hidden>
   @php
    $databasePending=$databaseUpdateStatus['pending'] ?? [];
+   $blockedDatabaseUpdates=$databaseUpdateStatus['blocked'] ?? [];
    $nextDatabaseUpdate=$databaseUpdateStatus['next'] ?? null;
+   $databaseAttempt=$databaseUpdateStatus['attempt'] ?? null;
+   $blockedReasonLabels=[
+    'unreviewed'=>__('غير موجودة في قائمة المراجعة'),
+    'changed'=>__('تغير محتواها بعد المراجعة'),
+    'unreadable'=>__('تعذر قراءة ملفها للتحقق'),
+   ];
   @endphp
-  <div class="section-toolbar"><div><h2>{{ __('تحديثات قاعدة البيانات') }}</h2><p>{{ __('تنفيذ تحديث واحد معلق فقط في كل مرة بعد تأكيد النسخة الاحتياطية.') }}</p></div></div>
+  <div class="section-toolbar"><div><h2>{{ __('تحديثات قاعدة البيانات') }}</h2><p>{{ __('تنفيذ تحديث واحد مراجع ببصمة ملفه فقط في كل مرة بعد تأكيد النسخة الاحتياطية.') }}</p></div></div>
   <div class="owner-update-grid">
    <article class="owner-card update-status-card">
-    <header><h2><i class="bi bi-database-gear"></i> {{ __('حالة التحديثات') }}</h2>@if($databaseUpdateStatus['available'] ?? false)<span class="owner-status {{count($databasePending) ? 'pending' : 'approved'}}">{{count($databasePending) ? __('يوجد تحديثات معلقة') : __('محدثة')}}</span>@else<span class="owner-status rejected">{{ __('غير متاحة') }}</span>@endif</header>
+    <header><h2><i class="bi bi-database-gear"></i> {{ __('حالة التحديثات') }}</h2>@if(!($databaseUpdateStatus['available'] ?? false))<span class="owner-status rejected">{{ __('غير متاحة') }}</span>@elseif($databaseAttempt)<span class="owner-status rejected">{{ __('متوقفة للمراجعة') }}</span>@elseif(count($databasePending))<span class="owner-status pending">{{ __('يوجد تحديثات مصرح بها') }}</span>@elseif(count($blockedDatabaseUpdates))<span class="owner-status rejected">{{ __('يوجد تحديثات محظورة') }}</span>@else<span class="owner-status approved">{{ __('محدثة') }}</span>@endif</header>
     @if(!($databaseUpdateStatus['available'] ?? false))
      <div class="update-unavailable"><i class="bi bi-exclamation-triangle-fill"></i><div><strong>{{ __('لا يمكن تنفيذ التحديثات من هذه الصفحة الآن') }}</strong><p>{{$databaseUpdateStatus['error']}}</p></div></div>
     @else
      <div class="update-summary">
-      <div><span>{{ __('تحديثات معلقة') }}</span><strong>{{format_number(count($databasePending))}}</strong></div>
-      <div><span>{{ __('تحديثات منفذة') }}</span><strong>{{format_number($databaseUpdateStatus['ran_count'])}}</strong></div>
+      <div><span>{{ __('تحديثات مصرح بها') }}</span><strong>{{format_number(count($databasePending))}}</strong></div>
+      <div><span>{{ __('تحديثات محظورة') }}</span><strong>{{format_number(count($blockedDatabaseUpdates))}}</strong></div>
       <div><span>{{ __('آخر دفعة') }}</span><strong>{{$databaseUpdateStatus['last_batch'] ? format_number($databaseUpdateStatus['last_batch']) : '—'}}</strong></div>
      </div>
-     @if($nextDatabaseUpdate)
+     @if($databaseAttempt)
+      <div class="update-unavailable"><i class="bi bi-exclamation-octagon-fill"></i><div><strong>{{ __('التنفيذ متوقف للمراجعة اليدوية') }}</strong><p>{{ __('محاولة سابقة للتحديث :migration لم تكتمل أو تحتاج مراجعة. راجع قاعدة البيانات وسجل migrations يدويًا قبل السماح بأي محاولة أخرى.', ['migration' => $databaseAttempt['migration'] ?? __('غير معروف')]) }}</p></div></div>
+     @elseif($nextDatabaseUpdate)
       <div class="next-update"><span>{{ __('التحديث التالي الذي سيتم تنفيذه') }}</span><code>{{$nextDatabaseUpdate['name']}}</code></div>
-      <div class="pending-list-wrap"><h3>{{ __('التحديثات المعلقة') }}</h3><ol class="pending-migration-list">@foreach(array_slice($databasePending,0,10) as $migration)<li><code>{{$migration['name']}}</code></li>@endforeach</ol>@if(count($databasePending)>10)<p class="muted">{{ __('ويوجد :count تحديثات أخرى بعدها.', ['count' => format_number(count($databasePending)-10)]) }}</p>@endif</div>
+      <div class="pending-list-wrap"><h3>{{ __('التحديثات المصرح بتنفيذها') }}</h3><ol class="pending-migration-list">@foreach(array_slice($databasePending,0,10) as $migration)<li><code>{{$migration['name']}}</code></li>@endforeach</ol>@if(count($databasePending)>10)<p class="muted">{{ __('ويوجد :count تحديثات أخرى بعدها.', ['count' => format_number(count($databasePending)-10)]) }}</p>@endif</div>
       <form method="POST" action="{{route('owner.database-updates.run')}}" class="database-update-form">
        @csrf
        <label>{{ __('كلمة مرور حساب المالك الحالية') }}<input type="password" name="password" autocomplete="current-password" required>@error('password')<small class="field-error">{{$message}}</small>@enderror</label>
@@ -94,14 +103,19 @@
        @error('confirm_partial_risk')<small class="field-error">{{$message}}</small>@enderror
        @error('database_update')<div class="database-update-error"><i class="bi bi-x-octagon-fill"></i> {{$message}}</div>@enderror
        <button class="btn btn-primary" type="submit"><i class="bi bi-play-circle"></i> {{ __('تنفيذ التحديث التالي فقط') }}</button>
-       <small class="muted">{{ __('كل عملية تنفذ أول تحديث معلق فقط، ولا تنفذ أي أمر أو SQL مكتوب يدويًا.') }}</small>
+       <small class="muted">{{ __('كل عملية تنفذ أول تحديث مراجع ومصرح به فقط، ولا تنفذ أي أمر أو SQL مكتوب يدويًا.') }}</small>
       </form>
+     @elseif(count($blockedDatabaseUpdates))
+      <div class="update-unavailable"><i class="bi bi-slash-circle"></i><div><strong>{{ __('لا توجد تحديثات مصرح بها للتنفيذ') }}</strong><p>{{ __('التحديثات المعروضة أدناه غير مراجعة أو تغير محتواها بعد المراجعة، لذلك تبقى محظورة افتراضيًا.') }}</p></div></div>
      @else
       <div class="update-complete"><i class="bi bi-check-circle-fill"></i><div><strong>{{ __('لا توجد تحديثات معلقة') }}</strong><p>{{ __('ملفات migrations وسجل قاعدة البيانات متطابقان حاليًا.') }}</p></div></div>
      @endif
+     @if(count($blockedDatabaseUpdates))
+      <div class="pending-list-wrap blocked-list-wrap"><h3>{{ __('تحديثات محظورة من التنفيذ') }}</h3><ol class="pending-migration-list blocked-migration-list">@foreach(array_slice($blockedDatabaseUpdates,0,10) as $migration)<li><code>{{$migration['name']}}</code><small class="blocked-reason">{{$blockedReasonLabels[$migration['reason']] ?? $migration['reason']}}</small></li>@endforeach</ol>@if(count($blockedDatabaseUpdates)>10)<p class="muted">{{ __('ويوجد :count تحديثات محظورة أخرى.', ['count' => format_number(count($blockedDatabaseUpdates)-10)]) }}</p>@endif</div>
+     @endif
     @endif
    </article>
-   <aside class="owner-card help-card"><header><h2><i class="bi bi-shield-exclamation"></i> {{ __('قبل التنفيذ') }}</h2></header><ul><li>{{ __('احفظ نسخة احتياطية كاملة من قاعدة البيانات أولًا.') }}</li><li>{{ __('نفذ تحديثًا واحدًا ثم راجع الموقع قبل تنفيذ التالي.') }}</li><li>{{ __('لا تنفذ التحديث أثناء ذروة استخدام الموظفين.') }}</li><li>{{ __('إذا فشل تحديث MySQL فقد يبقى جزء منه منفذًا، ولا تعيد المحاولة قبل مراجعة حالته.') }}</li><li>{{ __('هذه الصفحة لا تصلح إعداد قاعدة بيانات جديدة ولا تنفذ أوامر عشوائية.') }}</li></ul></aside>
+   <aside class="owner-card help-card"><header><h2><i class="bi bi-shield-exclamation"></i> {{ __('قبل التنفيذ') }}</h2></header><ul><li>{{ __('احفظ نسخة احتياطية كاملة من قاعدة البيانات أولًا.') }}</li><li>{{ __('نفذ تحديثًا واحدًا ثم راجع الموقع قبل تنفيذ التالي.') }}</li><li>{{ __('لا تنفذ التحديث أثناء ذروة استخدام الموظفين.') }}</li><li>{{ __('لا يعمل أي تحديث غير موجود في قائمة المراجعة أو تغير محتواه بعد المراجعة.') }}</li><li>{{ __('إذا فشل تحديث أو انقطع تنفيذه تتوقف الصفحة حتى مراجعة قاعدة البيانات يدويًا.') }}</li><li>{{ __('هذه الصفحة لا تصلح إعداد قاعدة بيانات جديدة ولا تنفذ أوامر عشوائية.') }}</li></ul></aside>
   </div>
  </section>
 

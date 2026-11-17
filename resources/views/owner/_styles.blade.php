@@ -77,6 +77,9 @@ a.owner-tab{text-decoration:none;text-align:center;display:flex;align-items:cent
 .pending-migration-list{margin:0;padding-inline-start:22px;max-height:210px;overflow:auto}
 .pending-migration-list li{padding:5px 0;color:#53627c}
 .pending-migration-list code{direction:ltr;display:inline-block;font-size:11px;overflow-wrap:anywhere}
+.blocked-list-wrap{background:#fffafb}
+.blocked-migration-list li{color:#7d4350}
+.blocked-reason{display:block;color:#b04a5d;font-size:10px;margin-top:2px}
 .database-update-form{padding:16px;display:grid;gap:12px}
 .database-update-form>label:not(.check-row){display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:#344461}
 .database-update-form input[type="password"]{width:100%;border:1px solid #dfe7f1;border-radius:7px;padding:9px 10px;font:inherit;outline:none}
