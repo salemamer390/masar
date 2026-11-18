@@ -126,10 +126,48 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.appendChild(modal); modal.querySelector('[name="status"]').value = leaveStatus(leave.status)[0] === 'ملغاة' ? 'Rejected' : 'Approved'; wireLeaveAjaxForms(modal); bootstrap.Modal.getOrCreateInstance(modal).show();
   };
   document.addEventListener('click', (event) => { const button = event.target.closest('.leave-edit-ajax'); if (!button) return; event.preventDefault(); ensureLeaveEditModal(leaveCache[button.dataset.leaveId]); });
+  // Keep the KPI summary cards in sync after create/edit/delete, which run
+  // through AJAX and never reload the page. Card order: approved this month,
+  // approved days, on leave today, rejected this month.
+  const adjustLeaveKpi = (index, delta) => {
+    const card = document.querySelectorAll('.kpi-summary-strip .stat-card b')[index];
+    if (!card) return;
+    const current = parseFloat(String(card.textContent).replace(/[^\d.-]/g, '')) || 0;
+    card.textContent = (current + delta).toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG');
+  };
+  const leaveIsEffective = (leave) => !['Rejected', 'Cancelled', 'Canceled'].includes(leave?.status);
+  const leaveYmdDate = (value) => { const date = new Date(window.masarYmd(value) || value); return Number.isNaN(date.getTime()) ? null : date; };
+  const leaveInCurrentMonth = (leave) => { const date = leaveYmdDate(leave?.start_date); const now = new Date(); return !!date && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear(); };
+  const leaveCoversToday = (leave) => { const start = leaveYmdDate(leave?.start_date); const end = leaveYmdDate(leave?.end_date); const today = new Date(); today.setHours(0, 0, 0, 0); return !!start && !!end && start <= today && end >= today; };
+  const trackLeaveKpi = (leave, delta) => {
+    if (!leave?.id) return;
+    if (leaveIsEffective(leave)) {
+      if (leaveInCurrentMonth(leave)) adjustLeaveKpi(0, delta);
+      adjustLeaveKpi(1, delta * (parseFloat(leave.days) || 0));
+      if (leaveCoversToday(leave)) adjustLeaveKpi(2, delta);
+    } else if (leave?.status === 'Rejected') {
+      adjustLeaveKpi(3, delta);
+    }
+  };
   document.addEventListener('masar:success', (event) => {
     const form = event.target; if (!(form instanceof HTMLFormElement)) return;
-    if (form.closest('#leaveModal') || form.closest('.modal[id^="editLeave"]')) { const leave = event.detail?.leave; upsertLeaveRow(leave); const modal = form.closest('.modal'); bootstrap.Modal.getInstance(modal)?.hide(); if (form.closest('#leaveModal')) form.reset(); }
-    if (form.querySelector('input[name="_method"][value="DELETE"]')) form.closest('tr')?.remove();
+    if (form.closest('#leaveModal') || form.closest('.modal[id^="editLeave"]')) {
+      const leave = event.detail?.leave;
+      const previous = leave?.id ? leaveCache[leave.id] : null;
+      const isNew = leave?.id && !leaveTableBody?.querySelector(`tr[data-leave-id="${leave.id}"]`);
+      upsertLeaveRow(leave);
+      if (leave?.id) {
+        if (isNew) trackLeaveKpi(leave, 1);
+        else if (previous) { trackLeaveKpi(previous, -1); trackLeaveKpi(leave, 1); }
+      }
+      const modal = form.closest('.modal'); bootstrap.Modal.getInstance(modal)?.hide(); if (form.closest('#leaveModal')) form.reset();
+    }
+    if (form.querySelector('input[name="_method"][value="DELETE"]')) {
+      const row = form.closest('tr');
+      const deletedLeave = leaveCache[row?.dataset.leaveId];
+      row?.remove();
+      if (deletedLeave) { trackLeaveKpi(deletedLeave, -1); delete leaveCache[deletedLeave.id]; }
+    }
   });
 </script>
 @endpush

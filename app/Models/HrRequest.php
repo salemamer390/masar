@@ -78,6 +78,7 @@ class HrRequest extends Model
         }
         if ($source === 'advance') return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
         if ($source === 'overtime') return number_format((float) data_get($this->payload, 'hours', 0) * 60, 0).' دقيقة';
+        if (in_array($source, ['bonus', 'incentive', 'commission', 'profit_share'], true) && data_get($this->payload, 'amount') !== null) return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
         if ($source === 'other' && data_get($this->payload, 'amount') !== null) return number_format((float) data_get($this->payload, 'amount', 0), 2).' ج.م';
         if (data_get($this->payload, 'days') !== null) return number_format((float) data_get($this->payload, 'days', 0), 2).' يوم';
         if (data_get($this->payload, 'hours') !== null) return number_format((float) data_get($this->payload, 'hours', 0), 2).' ساعة';
