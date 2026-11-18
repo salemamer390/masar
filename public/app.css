@@ -5938,6 +5938,7 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
     flex-wrap: nowrap !important;
     gap: 10px !important;
     overflow-x: auto !important;
+    overflow-y: hidden !important;
     overscroll-behavior-x: contain;
     scroll-snap-type: x proximity;
     scroll-padding-inline: 3px;
