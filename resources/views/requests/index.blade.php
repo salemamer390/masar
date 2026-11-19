@@ -386,7 +386,8 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   const escapeRequestHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
   // Date-only values (YYYY-MM-DD) render without a time part; datetime
   // values keep the time. This avoids a fake midnight time on day dates.
-  const requestDate = (value) => { const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', dateOnly ? { day: '2-digit', month: '2-digit', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  // Dates always use Latin digits (en-GB) to match the rest of the app.
+  const requestDate = (value) => { const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('en-GB', dateOnly ? { day: '2-digit', month: '2-digit', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   document.querySelectorAll('tr[data-request-date]').forEach((row) => {
     const dateCell = row.children[4];
     if (dateCell && row.dataset.requestDate) {
