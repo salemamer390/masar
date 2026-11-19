@@ -142,4 +142,35 @@ class OwnerCompanyManagementTest extends TestCase
         $this->get('/dashboard')->assertRedirect();
         $this->assertGuest();
     }
+
+    public function test_session_without_fingerprint_from_before_deploy_is_ended_by_owner_reset(): void
+    {
+        [$c, $users] = $this->company('legacy');
+        $manager = $users[0];
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+
+        // A session opened before deploy: authenticated, no password fingerprint, and no request since.
+        $this->actingAs($manager, 'web');
+        $this->assertNull(session('password_hash_web_' . $manager->id));
+
+        // Real Owner reset through the real route, as a separate request.
+        $this->owner()->put(route('owner.companies.manager-password', $c), ['password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])->assertRedirect();
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+
+        // The old session (still no fingerprint) makes its first request after the reset.
+        $fresh = User::find($manager->id);
+        $this->actingAs($fresh, 'web')->get('/dashboard')->assertRedirect(route('login'));
+        $this->assertGuest('web');
+    }
+
+    public function test_new_login_is_fingerprinted_immediately(): void
+    {
+        [$c, $users] = $this->company('fp');
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+        $this->post('/login', ['email' => $users[0]->email, 'password' => 'old-password'])->assertRedirect();
+        $this->assertNotNull(session('password_hash_web_' . $users[0]->id));
+    }
 }

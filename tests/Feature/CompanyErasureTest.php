@@ -109,11 +109,12 @@ class CompanyErasureTest extends TestCase
 
     public function test_erase_removes_only_the_selected_company_rows_and_files(): void
     {
-        $shared = ['plans' => DB::table('subscription_plans')->count(), 'perms' => DB::table('permissions')->count(), 'statuses' => DB::table('employee_statuses')->count()];
         $sharedBank = $this->row('banks', ['company_id' => null]);
         $sharedType = $this->row('leave_types', ['company_id' => null]);
         $a = $this->makeCompany('a');
         $b = $this->makeCompany('b');
+        // Snapshot shared tables after fixtures exist: the fixture itself may create the shared test plan on a fresh DB.
+        $shared = ['plans' => DB::table('subscription_plans')->count(), 'perms' => DB::table('permissions')->count(), 'statuses' => DB::table('employee_statuses')->count()];
         $before = $this->snapshot($b);
         $this->assertNotContains(false, $before);
         $companiesBefore = DB::table('companies')->count();

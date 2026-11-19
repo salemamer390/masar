@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ActivityLog;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,14 @@ use Illuminate\Support\Facades\Auth;
  */
 class EndSessionsAfterPasswordChange
 {
+    /** Fingerprint a session at login so it is covered from its first moment. */
+    public static function fingerprint(\Illuminate\Contracts\Auth\Authenticatable $user): void
+    {
+        if (session()->isStarted()) {
+            session()->put('password_hash_web_' . $user->getAuthIdentifier(), $user->getAuthPassword());
+        }
+    }
+
     public function handle(Request $request, Closure $next)
     {
         $guard = Auth::guard('web');
@@ -23,6 +32,17 @@ class EndSessionsAfterPasswordChange
         $key = 'password_hash_web_' . $user->getAuthIdentifier();
         $session = $request->session();
         if (!$session->has($key)) {
+            // A session opened before this check existed has no fingerprint. If the Owner has reset this
+            // account's password since (the reset is logged durably), that session predates the reset: end it.
+            // Every session created after deploy is fingerprinted at login, so this only ever hits old ones.
+            $resetLogged = ActivityLog::where('action', 'subscription_company_password_reset')
+                ->where('model_type', get_class($user))->where('model_id', $user->getKey())->exists();
+            if ($resetLogged) {
+                $guard->logout();
+                $session->invalidate();
+                $session->regenerateToken();
+                return redirect()->route('login');
+            }
             $session->put($key, $user->getAuthPassword());
         } elseif (!hash_equals($session->get($key), $user->getAuthPassword())) {
             $guard->logout();

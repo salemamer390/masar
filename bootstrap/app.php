@@ -33,6 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->booted(function () {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, function ($event) {
+            if ($event->guard === 'web') \App\Http\Middleware\EndSessionsAfterPasswordChange::fingerprint($event->user);
+        });
         // The interface and validation messages are Arabic; month and weekday names produced
         // by translatedFormat() keep their existing English output.
         \Illuminate\Support\Facades\Date::setLocale('en');
