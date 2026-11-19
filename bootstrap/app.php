@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'iclock/*',
             'api/fingerprint-bridge/*',
         ]);
+        // A password change (including an Owner reset) ends that user's other open sessions on any session driver.
+        $middleware->appendToGroup('web', \App\Http\Middleware\EndSessionsAfterPasswordChange::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SetLocale::class);
         $middleware->alias([

@@ -121,6 +121,10 @@ class UserController extends Controller
         }
 
         $user->save();
+        // Editing your own password must not end your own session (other sessions still end).
+        if (!empty($validated['password']) && (int) $user->id === (int) auth()->id()) {
+            session()->put('password_hash_web_' . $user->id, $user->getAuthPassword());
+        }
         if (array_key_exists('permissions', $validated)) $user->directPermissions()->sync($validated['permissions'] ?? []);
         ActivityLog::record('user_update', "تم تحديث بيانات المستخدم: {$user->name}.", $user);
 

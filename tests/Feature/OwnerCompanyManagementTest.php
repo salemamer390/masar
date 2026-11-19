@@ -122,4 +122,24 @@ class OwnerCompanyManagementTest extends TestCase
         Storage::disk('local')->assertExists('employees/9999/profile/p.jpg');
         $this->assertSame(0, DB::table('activity_logs')->where('description', 'like', '%Mgmt Co x%')->count());
     }
+
+    public function test_open_manager_session_is_ended_after_password_change_on_any_session_driver(): void
+    {
+        [$c, $users] = $this->company('z');
+        $manager = $users[0];
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+        $this->post('/login', ['email' => $manager->email, 'password' => 'old-password'])->assertRedirect();
+        $this->assertAuthenticatedAs($manager);
+        $this->get('/dashboard')->assertSuccessful();
+
+        // Same write the Owner reset performs on the manager row.
+        $manager->forceFill(['password' => 'Brand-New-Pass-1', 'remember_token' => 'rotated'])->save();
+
+        $this->app['auth']->forgetGuards(); // a real next request starts with a fresh guard
+
+        // The open session is rejected on its next request, whatever the session driver.
+        $this->get('/dashboard')->assertRedirect();
+        $this->assertGuest();
+    }
 }
