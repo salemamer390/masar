@@ -66,4 +66,11 @@ class PayrollRunProrationTest extends TestCase
         $r = $this->net(['bonus' => 1000], 15 / 30);
         $this->assertEqualsWithDelta(9856.43, $r['net_monthly'], 0.01);
     }
+
+    public function test_full_month_company_cost_includes_overtime_and_bonus(): void
+    {
+        $r = $this->net(['bonus' => 1000, 'ot_day_hours' => 2], 1.0);
+        // Fixed structure cost 28,667.25 + overtime (25,536 / 240 * 1.35 * 2 = 287.28) + bonus 1,000.
+        $this->assertEqualsWithDelta(29954.53, $r['employee_cost'], 0.01);
+    }
 }

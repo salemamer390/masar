@@ -1445,6 +1445,10 @@ class PayrollRunService
         $incomeTax = round($structureTax + $variableTax, 2);
         $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
         $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) * $insuranceMonths : 0.0;
+        // Company cost carries the month's earned overtime and bonuses on top of the
+        // fixed structure cost; advance disbursements stay outside wage cost.
+        $variableEmployerCost = (float) ($calculation['overtime_amount'] ?? 0)
+            + (float) ($calculation['bonus'] ?? 0);
         $deductions = $employeeInsurance + $incomeTax + $martyrsFund
             + (float) $calculation['absence_deduction'] + (float) $calculation['penalty_deduction']
             + (float) ($calculation['attendance_time_deduction'] ?? 0)
@@ -1458,10 +1462,10 @@ class PayrollRunService
             'martyrs_fund' => $martyrsFund,
             'employer_insurance' => $employerInsurance,
             'employee_cost' => !$insuranceDue
-                ? (float) $calculation['gross']
+                ? (float) $calculation['gross'] + $variableEmployerCost
                 : ($insuranceMonths === 1 && $salary->employee_cost !== null
-                    ? (float) $salary->employee_cost
-                    : (float) $calculation['gross'] + $employerInsurance),
+                    ? (float) $salary->employee_cost + $variableEmployerCost
+                    : (float) $calculation['gross'] + $employerInsurance + $variableEmployerCost),
             'monthly_deductions' => round($deductions, 2),
             'net_monthly' => round((float) $calculation['entitlements'] - $deductions, 2),
         ]);
