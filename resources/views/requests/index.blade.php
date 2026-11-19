@@ -366,10 +366,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     const dateValue = event.detail?.request?.request_date || event.detail?.request?.created_at;
     const row = requestTableBody?.querySelector(`tr[data-request-id="${form.dataset.editingId}"]`);
     const dateCell = row?.children[4];
-    if (dateCell && dateValue) {
-      const parsedDate = new Date(dateValue);
-      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
+    if (dateCell && dateValue) dateCell.textContent = requestDate(dateValue);
   }, true);
 
   // Stage 5: creation/deletion use the same guarded AJAX path as review actions.
@@ -387,12 +384,13 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
   const requestTableBody = document.querySelector('.table-panel table tbody');
   const canDeleteHrRequest = @json(auth()->user()?->hasPermission('requests.delete'));
   const escapeRequestHtml = (value) => String(value ?? '—').replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
-  const requestDate = (value) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  // Date-only values (YYYY-MM-DD) render without a time part; datetime
+  // values keep the time. This avoids a fake midnight time on day dates.
+  const requestDate = (value) => { const dateOnly = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', dateOnly ? { day: '2-digit', month: '2-digit', year: 'numeric' } : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   document.querySelectorAll('tr[data-request-date]').forEach((row) => {
     const dateCell = row.children[4];
     if (dateCell && row.dataset.requestDate) {
-      const parsedDate = new Date(row.dataset.requestDate);
-      if (!Number.isNaN(parsedDate.getTime())) dateCell.textContent = parsedDate.toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      dateCell.textContent = requestDate(row.dataset.requestDate);
     }
   });
   const requestRow = (item) => {
@@ -401,6 +399,33 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
     const detailUrl = `${requestBaseUrl}?request=${id}`;
     const remove = item.status === 'Pending' && canDeleteHrRequest ? `<form method="POST" action="${requestBaseUrl}/${id}" onsubmit="return confirm({{ Js::from(__('هل تريد حذف الطلب المعلق؟')) }})"><input type="hidden" name="_token" value="${escapeRequestHtml(csrfToken)}"><input type="hidden" name="_method" value="DELETE"><button class="btn btn-sm btn-outline-danger" title="${window.masarT('حذف')}"><i class="bi bi-trash"></i></button></form>` : '';
     return `<tr data-request-id="${id}"><td><a href="${detailUrl}" class="fw-bold">${escapeRequestHtml(item.title)}</a>${item.details ? `<div class="text-muted small mt-1">${escapeRequestHtml(item.details).slice(0, 70)}${String(item.details).length > 70 ? '…' : ''}</div>` : ''}</td><td><a href="${escapeRequestHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeRequestHtml(employee.full_name)}</a></td><td><span class="badge-soft info">${escapeRequestHtml(item.request_type_label)}</span></td><td>${requestDate(item.created_at)}</td><td><span class="badge-soft warning">${window.masarT('معلق')}</span></td><td><div class="d-flex gap-1 align-items-center"><a class="btn btn-sm btn-light" href="${detailUrl}" title="${window.masarT('التفاصيل')}"><i class="bi bi-eye"></i></a>${remove}</div></td></tr>`;
+  };
+  // Keep the KPI summary cards and their detail lists in sync after
+  // create/delete, which run through AJAX and never reload the page.
+  const requestKpiKeys = ['all', 'approved', 'rejected'];
+  const adjustRequestKpi = (key, delta) => {
+    const index = requestKpiKeys.indexOf(key);
+    if (index < 0) return;
+    const card = document.querySelector(`[data-request-kpi="${index}"] b`);
+    if (!card) return;
+    const current = parseInt(String(card.textContent).replace(/[^\d-]/g, ''), 10) || 0;
+    card.textContent = (current + delta).toLocaleString(document.documentElement.lang === 'en' ? 'en-GB' : 'ar-EG');
+  };
+  const requestKpiStatusKey = (status) => status === 'Rejected' ? 'rejected' : 'approved';
+  const trackCreatedRequest = (item) => {
+    adjustRequestKpi('all', 1);
+    adjustRequestKpi(requestKpiStatusKey(item.status), 1);
+    if (typeof requestCardData === 'object' && requestCardData) {
+      const entry = { id: item.id, title: item.title, status: item.status, employee_id: item.employee?.id, employee: { full_name: item.employee?.full_name, initials: String(item.employee?.full_name || '—').trim().split(/\s+/).slice(0, 2).map((part) => part[0] || '').join('') } };
+      ['all', requestKpiStatusKey(item.status)].forEach((key) => { if (Array.isArray(requestCardData[key])) requestCardData[key].unshift(entry); });
+    }
+  };
+  const trackDeletedRequest = (id) => {
+    if (!id) return;
+    const existing = (typeof requestCardData === 'object' && Array.isArray(requestCardData?.all) ? requestCardData.all : []).find((entry) => Number(entry.id) === Number(id));
+    adjustRequestKpi('all', -1);
+    adjustRequestKpi(existing?.status === 'Rejected' ? 'rejected' : 'approved', -1);
+    if (typeof requestCardData === 'object' && requestCardData) requestKpiKeys.forEach((key) => { if (Array.isArray(requestCardData[key])) requestCardData[key] = requestCardData[key].filter((entry) => Number(entry.id) !== Number(id)); });
   };
   const wireHrRequestAjaxForms = (root = document) => {
     root.querySelectorAll('#requestCreateModal form').forEach((form) => { form.dataset.ajax = 'true'; form.dataset.ajaxLabel = window.masarT('جارٍ الإرسال'); });
@@ -525,6 +550,7 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
           }
         }
         wireHrRequestAjaxForms(requestTableBody);
+        trackCreatedRequest(item);
       }
       bootstrap.Modal.getInstance(document.getElementById('requestCreateModal'))?.hide();
       form.reset();
@@ -534,7 +560,11 @@ const requestCardData=@json($requestCardDetails);const requestKeys=['all','appro
       cleanUrl.searchParams.delete('edit');
       window.history.replaceState({}, document.title, cleanUrl.pathname + (cleanUrl.search ? `?${cleanUrl.searchParams.toString()}` : '') + cleanUrl.hash);
     }
-    if (form.querySelector('input[name="_method"][value="DELETE"]') && form.action.includes('/requests/')) form.closest('tr')?.remove();
+    if (form.querySelector('input[name="_method"][value="DELETE"]') && form.action.includes('/requests/')) {
+      const deletedId = form.action.match(/\/requests\/(\d+)/)?.[1];
+      form.closest('tr')?.remove();
+      trackDeletedRequest(deletedId);
+    }
   });
 </script>
 @endpush
