@@ -114,3 +114,5 @@ body.preview-dark .allowance-chip b{color:var(--dm-text,#e8eef8)}
 .lv-scroll-hint{display:none;margin:6px 0 0;font-size:11px;color:var(--muted,#7c8aa5)}
 @media(max-width:900px){.lv-scroll-hint{display:block}}
 body.preview-dark .settings-unit .input-group-text{background:transparent;color:var(--dm-muted);border:0}
+html[dir="ltr"] .settings-unit .form-control{padding:.375rem 3.4rem .375rem .75rem;text-align:left}
+html[dir="ltr"] .settings-unit .input-group-text{left:auto;right:1px}
