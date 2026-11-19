@@ -312,6 +312,30 @@ class AttendancePeriodArchiveTest extends TestCase
         Carbon::setTestNow();
     }
 
+    public function test_settings_page_shows_full_current_cycle_dates_and_rolls_over(): void
+    {
+        $cases = [
+            ['2026-11-19', '26/10/2026', '25/11/2026'],
+            ['2026-11-26', '26/11/2026', '25/12/2026'],
+            ['2026-12-26', '26/12/2026', '25/01/2027'],
+            ['2027-01-25', '26/12/2026', '25/01/2027'],
+        ];
+        foreach ($cases as [$today, $from, $to]) {
+            Carbon::setTestNow($today . ' 09:00:00');
+            $html = $this->get(route('payroll.settings.index'))->assertOk()->getContent();
+            $this->assertStringContainsString($from, $html, $today);
+            $this->assertStringContainsString($to, $html, $today);
+            $this->assertStringNotContainsString('من الشهر السابق', $html);
+        }
+        $this->setting('payroll_period_start_day', '31');
+        $this->setting('payroll_period_end_day', '30');
+        Carbon::setTestNow('2027-03-10 09:00:00');
+        $html = $this->get(route('payroll.settings.index'))->assertOk()->getContent();
+        $this->assertStringContainsString('28/02/2027', $html, 'day 31 clamps to the short month');
+        $this->assertStringContainsString('30/03/2027', $html);
+        Carbon::setTestNow();
+    }
+
     public function test_boundary_change_needs_confirmation_then_closes_pending_period_now_atomically(): void
     {
         $this->attend('2026-11-10');
