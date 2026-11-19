@@ -19,6 +19,12 @@ class OwnerOnly
     public function handle(Request $request, Closure $next)
     {
         if (OwnerGate::allows(Auth::guard('owner')->user())) {
+            // Owner actions run as the owner account (no company), never as a
+            // company user who happens to be signed in on the web guard in the
+            // same browser. Otherwise the tenant guard compared the owner's
+            // target company with that unrelated company user and answered 403.
+            // Company users keep their isolation: they never reach this branch.
+            Auth::shouldUse('owner');
             return $next($request);
         }
 

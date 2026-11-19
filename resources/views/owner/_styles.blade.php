@@ -111,3 +111,24 @@ a.owner-tab{text-decoration:none;text-align:center;display:flex;align-items:cent
 @media(max-width:850px){.owner-stats,.owner-overview-grid,.owner-notification-grid,.owner-update-grid{grid-template-columns:1fr}.owner-heading{align-items:flex-start;flex-direction:column}}
 @media(max-width:600px){.owner-stats{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.owner-tab{flex:0 0 auto}}
 </style>
+<style>
+.company-actions{white-space:nowrap}
+.company-action-group{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start}
+.co-btn{position:relative;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:8px;padding:6px 11px;font:700 12px/1.2 Cairo,Tahoma,sans-serif;cursor:pointer;transition:background .15s,box-shadow .15s,transform .05s}
+.co-btn i{font-size:14px;line-height:1}
+.co-btn:focus-visible{outline:3px solid #1268f340;outline-offset:1px}
+.co-btn:active{transform:translateY(1px)}
+.co-btn-details{background:#e8f1ff;color:#0b5bd3;border-color:#c5dcff}
+.co-btn-details:hover{background:#1268f3;color:#fff;border-color:#1268f3}
+.co-btn-manage{background:#e6f7f4;color:#0b766d;border-color:#b6e8e1}
+.co-btn-manage:hover{background:#0d9488;color:#fff;border-color:#0d9488}
+.co-btn-reset{background:#fff4de;color:#9a5b00;border-color:#fbd89a}
+.co-btn-reset:hover{background:#e08a00;color:#fff;border-color:#e08a00}
+.co-btn-delete,.company-delete-btn{background:#fff;color:#c62030;border-color:#f3b3ba}
+.co-btn-delete:hover{background:#d92d43;color:#fff;border-color:#d92d43}
+.co-btn-delete{margin-inline-start:6px}
+@media(max-width:700px){.company-actions{white-space:nowrap}.company-action-group{flex-wrap:nowrap;gap:6px;min-width:0}.co-btn{width:38px;height:38px;padding:0;justify-content:center;flex:0 0 auto}.co-btn i{font-size:17px}.co-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.co-btn-delete{margin-inline-start:0}}
+.company-details{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:0}
+.company-details dt{font-size:12px;color:#778;font-weight:400}.company-details dd{margin:0;overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:640px){.company-details{grid-template-columns:1fr}}
+</style>
