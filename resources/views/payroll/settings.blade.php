@@ -568,7 +568,7 @@
     @if(session('period_notes'))<div class="alert alert-warning" role="status">@foreach(session('period_notes') as $line)<div>{{ $line }}</div>@endforeach</div>@endif
     @php($cycleStart = (int) ($operationalSettings['payroll_period_start_day'] ?? 1))@php($cycleEnd = (int) ($operationalSettings['payroll_period_end_day'] ?? 30))@php($graceDays = (int) ($operationalSettings['attendance_correction_days'] ?? config('attendance.archive_grace_days', 3)))@php($cyclePeriod = app(\App\Services\HrOperationalSettingsService::class)->periodContaining(\Illuminate\Support\Carbon::today()))
     <script>
-    (function(){
+    document.addEventListener('DOMContentLoaded',function(){
         var sIn=document.querySelector('input[name="payroll_period_start_day"]'),eIn=document.querySelector('input[name="payroll_period_end_day"]');
         if(!sIn||!eIn)return;
         var t='{{ \Illuminate\Support\Carbon::today()->toDateString() }}'.split('-').map(Number);
@@ -592,8 +592,8 @@
             if(!(s>=1&&s<=31&&e>=1&&e<=31)){return;}
             var P=current(s,e);hs.textContent=f(P.s);he.textContent=f(P.e);
         }
-        sIn.addEventListener('input',upd);eIn.addEventListener('input',upd);
-    })();
+        ['input','change'].forEach(function(ev){sIn.addEventListener(ev,upd);eIn.addEventListener(ev,upd);});
+    });
     </script>
     <form method="POST" id="operationalForm" action="{{ route('payroll.settings.operational.update') }}" data-track-dirty="true">
         @csrf @method('PUT')
