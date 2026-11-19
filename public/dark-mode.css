@@ -874,7 +874,7 @@ body.preview-dark .settings-card { background: var(--dm-surface); border-color: 
 body.preview-dark .settings-card-head h3 { color: var(--dm-text); }
 body.preview-dark .settings-card-head span { color: var(--dm-muted); }
 body.preview-dark .settings-field .form-label { color: var(--dm-text-2); }
-body.preview-dark .settings-unit .input-group-text { background: transparent; color: var(--dm-muted); border: 0; }
+body.preview-dark .settings-unit .input-group-text { background: var(--dm-surface-3); color: var(--dm-muted); border-color: var(--dm-border); }
 body.preview-dark .settings-hint { color: var(--dm-muted); }
 body.preview-dark .settings-effective { background: var(--dm-orange-soft); border-color: rgba(245, 158, 11, .35); }
 body.preview-dark .settings-effective-text strong,
