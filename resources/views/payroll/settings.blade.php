@@ -567,6 +567,34 @@
     @if(session('period_confirm'))<div class="alert alert-warning" role="alert" id="periodCloseConfirm"><strong>{{ session('period_confirm')['message'] }}</strong><ul class="mb-2 mt-2">@foreach(session('period_confirm')['periods'] as $line)<li><bdi dir="ltr">{{ $line }}</bdi></li>@endforeach</ul><label class="d-flex gap-2 align-items-center"><input type="checkbox" form="operationalForm" name="confirm_close_pending" value="1"> <span>{{ __('أؤكد قفل وحفظ هذه الفترات الآن وحفظ الإعدادات الجديدة') }}</span></label></div>@endif
     @if(session('period_notes'))<div class="alert alert-warning" role="status">@foreach(session('period_notes') as $line)<div>{{ $line }}</div>@endforeach</div>@endif
     @php($cycleStart = (int) ($operationalSettings['payroll_period_start_day'] ?? 1))@php($cycleEnd = (int) ($operationalSettings['payroll_period_end_day'] ?? 30))@php($graceDays = (int) ($operationalSettings['attendance_correction_days'] ?? config('attendance.archive_grace_days', 3)))@php($cyclePeriod = app(\App\Services\HrOperationalSettingsService::class)->periodContaining(\Illuminate\Support\Carbon::today()))
+    <script>
+    (function(){
+        var sIn=document.querySelector('input[name="payroll_period_start_day"]'),eIn=document.querySelector('input[name="payroll_period_end_day"]');
+        if(!sIn||!eIn)return;
+        var t='{{ \Illuminate\Support\Carbon::today()->toDateString() }}'.split('-').map(Number);
+        var TY=t[0],TM=t[1]-1,TD=t[2];
+        function dim(y,m){return new Date(y,m+1,0).getDate();}
+        function norm(y,m){var d=new Date(y,m,1);return [d.getFullYear(),d.getMonth()];}
+        function period(y,m,s,e){var sm=s>e?norm(y,m-1):[y,m];return {s:[sm[0],sm[1],Math.min(s,dim(sm[0],sm[1]))],e:[y,m,Math.min(e,dim(y,m))]};}
+        function key(a){return a[0]*10000+a[1]*100+a[2];}
+        function current(s,e){
+            var P=period(TY,TM,s,e),k=key([TY,TM,TD]),m;
+            if(k>=key(P.s)&&k<=key(P.e)){m=[P.e[0],P.e[1]];}
+            else if(s>e&&TD>=s){m=norm(TY,TM+1);}
+            else if(s<=e&&TD<s){m=norm(TY,TM-1);}
+            else{m=[TY,TM];}
+            return period(m[0],m[1],s,e);
+        }
+        function f(a){return String(a[2]).padStart(2,'0')+'/'+String(a[1]+1).padStart(2,'0')+'/'+a[0];}
+        function upd(){
+            var s=parseInt(sIn.value,10),e=parseInt(eIn.value,10);
+            var hs=document.querySelector('[data-cycle-date="start"] bdi'),he=document.querySelector('[data-cycle-date="end"] bdi');
+            if(!(s>=1&&s<=31&&e>=1&&e<=31)){return;}
+            var P=current(s,e);hs.textContent=f(P.s);he.textContent=f(P.e);
+        }
+        sIn.addEventListener('input',upd);eIn.addEventListener('input',upd);
+    })();
+    </script>
     <form method="POST" id="operationalForm" action="{{ route('payroll.settings.operational.update') }}" data-track-dirty="true">
         @csrf @method('PUT')
         <div class="alert alert-info" role="status">{{ __('الدورة الحالية: من') }} <bdi dir="ltr">{{ $cyclePeriod['start']->format('d/m/Y') }}</bdi> {{ __('إلى') }} <bdi dir="ltr">{{ $cyclePeriod['end']->format('d/m/Y') }}</bdi>{{ __('. مهلة تصحيح الحضور') }} {{ $graceDays }} {{ $graceDays === 1 ? __('يوم') : __('أيام') }} {{ __('بعد نهاية الفترة، وبعدها يُقفل المسير والحضور والملخص تلقائيًا. تغيير اليومين بيُنشئ مسير انتقالي بالأيام الفعلية عشان ميبقاش في فجوة ولا تداخل.') }}</div>
@@ -582,8 +610,8 @@
                 <div class="settings-field"><label class="form-label">{{ __('نهاية الفترة الليلية للإضافي') }}</label><input type="time" name="night_end" class="form-control" value="{{ old('night_end', $operationalSettings['night_end'] ?? '07:00') }}"></div>
             </div></div>
             <div class="settings-card"><div class="settings-card-head"><h3>{{ __('دورة المسير وتصحيح الحضور') }}</h3><span>{{ __('بداية ونهاية فترة حساب الشهر ومهلة التصحيح.') }}</span></div><div class="settings-card-grid">
-                <div class="settings-field"><label class="form-label">{{ __('بداية فترة المسير (يوم الشهر)') }}</label><div class="input-group settings-unit"><input type="number" name="payroll_period_start_day" class="form-control" min="1" max="31" value="{{ old('payroll_period_start_day', $operationalSettings['payroll_period_start_day'] ?? 1) }}" required><span class="input-group-text">{{ __('يوم') }}</span></div><small class="settings-hint">{{ __('مثال: 26') }}</small></div>
-                <div class="settings-field"><label class="form-label">{{ __('نهاية فترة المسير (يوم الشهر)') }}</label><div class="input-group settings-unit"><input type="number" name="payroll_period_end_day" class="form-control" min="1" max="31" value="{{ old('payroll_period_end_day', $operationalSettings['payroll_period_end_day'] ?? 30) }}" required><span class="input-group-text">{{ __('يوم') }}</span></div><small class="settings-hint">{{ __('مثال: 25') }}</small></div>
+                <div class="settings-field"><label class="form-label">{{ __('بداية فترة المسير (يوم الشهر)') }}</label><div class="input-group settings-unit"><input type="number" name="payroll_period_start_day" class="form-control" min="1" max="31" value="{{ old('payroll_period_start_day', $operationalSettings['payroll_period_start_day'] ?? 1) }}" required><span class="input-group-text">{{ __('يوم') }}</span></div><small class="settings-hint" data-cycle-date="start">{{ __('تبدأ الفترة الحالية في') }} <bdi dir="ltr" class="fw-bold">{{ $cyclePeriod['start']->format('d/m/Y') }}</bdi></small></div>
+                <div class="settings-field"><label class="form-label">{{ __('نهاية فترة المسير (يوم الشهر)') }}</label><div class="input-group settings-unit"><input type="number" name="payroll_period_end_day" class="form-control" min="1" max="31" value="{{ old('payroll_period_end_day', $operationalSettings['payroll_period_end_day'] ?? 30) }}" required><span class="input-group-text">{{ __('يوم') }}</span></div><small class="settings-hint" data-cycle-date="end">{{ __('وتنتهي في') }} <bdi dir="ltr" class="fw-bold">{{ $cyclePeriod['end']->format('d/m/Y') }}</bdi></small></div>
                 <div class="settings-field"><label class="form-label">{{ __('أيام تصحيح الحضور بعد نهاية الفترة') }}</label><div class="input-group settings-unit"><input type="number" min="0" name="attendance_correction_days" class="form-control" value="{{ old('attendance_correction_days', $operationalSettings['attendance_correction_days'] ?? config('attendance.archive_grace_days', 3)) }}"><span class="input-group-text">{{ __('يوم') }}</span></div><small class="settings-hint">{{ __('بعد آخر يوم من هذه الأيام تتقفل الفترة وتتحفظ في «الشهور السابقة».') }}</small></div>
             </div></div>
             <div class="settings-card"><div class="settings-card-head"><h3>{{ __('الإجازة بدون أجر وأيام الراحة') }}</h3><span>{{ __('خصم الإجازة بدون أجر والأيام التي لا يُحتسب فيها دوام اعتيادي.') }}</span></div><div class="settings-card-grid">
