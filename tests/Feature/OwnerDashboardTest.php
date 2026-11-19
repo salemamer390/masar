@@ -107,6 +107,22 @@ class OwnerDashboardTest extends TestCase
         $response->assertSee('بيانات الشركات');
     }
 
+    public function test_company_list_shows_each_company_managers_names_and_login_emails_and_only_their_own(): void
+    {
+        [$companyA, $managerA] = $this->companyWithManager('list-col-a');
+        [$companyB, $managerB] = $this->companyWithManager('list-col-b');
+        $second = User::create(['name' => 'Second Manager A', 'email' => 'second-a@list-col.test', 'password' => bcrypt('x'), 'role_id' => $managerA->role_id, 'company_id' => $companyA->id, 'is_active' => true]);
+
+        $html = $this->asOwner()->get('/owner')->assertOk()->getContent();
+
+        $this->assertStringContainsString('بريد دخول المدير', $html);
+        $this->assertMatchesRegularExpression('/<td class="company-manager">[^<]*' . preg_quote(e($managerA->name), '/') . '<br>\s*' . preg_quote(e($second->name), '/') . '/u', $html);
+        $this->assertStringContainsString($second->email, $html);
+        $this->assertStringContainsString($managerB->email, $html);
+        $this->assertStringContainsString('<span class="co-label">حذف</span>', $html);
+        $this->assertStringContainsString('<span class="co-label">تعيين الباسورد</span>', $html);
+    }
+
     // ── Dedicated owner login ────────────────────────────────────────────
 
     public function test_owner_login_page_is_shown_to_guests(): void
