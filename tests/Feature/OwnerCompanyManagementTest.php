@@ -173,4 +173,67 @@ class OwnerCompanyManagementTest extends TestCase
         $this->post('/login', ['email' => $users[0]->email, 'password' => 'old-password'])->assertRedirect();
         $this->assertNotNull(session('password_hash_web_' . $users[0]->id));
     }
+
+    /**
+     * Real browsers keep `web` as the default guard. The owner can be signed in
+     * as a company user (web) and as the owner (owner guard) at the same time;
+     * tests that use actingAs(..., 'owner') silently switch the default guard
+     * and hide that case, so it is rebuilt here explicitly.
+     */
+    private function ownerAlongsideCompanyUser(User $companyUser): void
+    {
+        $this->owner();
+        $this->actingAs($companyUser, 'web');
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+    }
+
+    public function test_owner_reset_works_while_also_signed_in_to_a_different_company(): void
+    {
+        [$mine, $mineUsers] = $this->company('mine');
+        [$target, $targetUsers, $targetStaff] = $this->company('target');
+        [$third, $thirdUsers] = $this->company('third');
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+
+        $this->put(route('owner.companies.manager-password', $target), ['user_id' => $targetUsers[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])
+            ->assertRedirect()->assertSessionHas('toast');
+
+        $this->assertTrue(Hash::check('Brand-New-Pass-1', $targetUsers[0]->fresh()->password));
+        // Nothing else changed: the signed-in company, another company, and staff.
+        $this->assertTrue(Hash::check('old-password', $mineUsers[0]->fresh()->password));
+        $this->assertTrue(Hash::check('old-password', $thirdUsers[0]->fresh()->password));
+        $this->assertTrue(Hash::check('old-password', $targetStaff->fresh()->password));
+        // The audit row belongs to the target company and is attributed to the owner account, not the company user.
+        $log = DB::table('activity_logs')->where('action', 'subscription_company_password_reset')->latest('id')->first();
+        $this->assertNotNull($log);
+        $this->assertSame((int) $target->id, (int) $log->company_id);
+        $this->assertSame(self::OWNER, User::withoutGlobalScopes()->whereKey($log->user_id)->value('email'));
+    }
+
+    public function test_company_isolation_still_holds_for_company_users_after_the_owner_fix(): void
+    {
+        [$mine, $mineUsers] = $this->company('m2');
+        [$target, $targetUsers] = $this->company('t2');
+        // A company manager can never reach owner actions, even with an owner session open alongside.
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+        \Illuminate\Support\Facades\Auth::guard('owner')->logout();
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+        $this->put(route('owner.companies.manager-password', $target), ['user_id' => $targetUsers[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])->assertStatus(404);
+        $this->assertTrue(Hash::check('old-password', $targetUsers[0]->fresh()->password));
+        // A company-scoped write for another company is still refused by the tenant guard.
+        $this->actingAs($mineUsers[0], 'web');
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+        \App\Models\ActivityLog::create(['company_id' => $target->id, 'action' => 'x', 'description' => 'cross-company write must fail']);
+    }
+
+    public function test_owner_delete_works_while_also_signed_in_to_a_different_company(): void
+    {
+        Storage::fake('local'); Storage::fake('public');
+        [$mine, $mineUsers] = $this->company('mine3');
+        [$target] = $this->company('target3');
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+        $this->delete(route('owner.companies.destroy', $target), ['confirm_name' => $target->name])->assertSessionHas('toast');
+        $this->assertFalse(Company::whereKey($target->id)->exists());
+        $this->assertSame(2, User::withoutGlobalScopes()->where('company_id', $mine->id)->count());
+    }
 }
