@@ -191,9 +191,15 @@ class OwnerDashboardController extends Controller
         $userId = (int) ($data['user_id'] ?? $managers[0]);
         abort_unless(in_array($userId, $managers, true), 422, __('الحساب المحدد ليس مدير هذه الشركة.'));
         $user = User::where('company_id', $company->id)->findOrFail($userId);
-        $user->forceFill(['password' => $data['password'], 'remember_token' => Str::random(60)])->save();
-        $sessions = DB::table('sessions')->where('user_id', $user->id)->delete();
-        ActivityLog::record('subscription_company_password_reset', "تمت إعادة تعيين كلمة مرور مدير الشركة {$company->name} ({$user->email}).", $user, null, null, 'subscriptions');
+        // One transaction: the new password, the ended sessions and the durable reset event either all
+        // persist or none do. Older sessions without a fingerprint are ended because of that event, so a
+        // password that saved without it would leave them open.
+        $sessions = DB::transaction(function () use ($user, $data, $company) {
+            $user->forceFill(['password' => $data['password'], 'remember_token' => Str::random(60)])->save();
+            $ended = DB::table('sessions')->where('user_id', $user->id)->delete();
+            ActivityLog::record('subscription_company_password_reset', "تمت إعادة تعيين كلمة مرور مدير الشركة {$company->name} ({$user->email}).", $user, null, null, 'subscriptions');
+            return $ended;
+        });
         return back()->with('toast', __('تم تعيين كلمة المرور الجديدة وتطبيقها فورًا. الجلسات التي تم إنهاؤها: :n.', ['n' => $sessions]));
     }
 

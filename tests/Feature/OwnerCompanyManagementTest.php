@@ -236,4 +236,25 @@ class OwnerCompanyManagementTest extends TestCase
         $this->assertFalse(Company::whereKey($target->id)->exists());
         $this->assertSame(2, User::withoutGlobalScopes()->where('company_id', $mine->id)->count());
     }
+
+    public function test_reset_is_atomic_when_the_audit_event_cannot_be_written(): void
+    {
+        [$c, $users] = $this->company('atomic');
+        DB::table('sessions')->insert(['id' => 'sess-atomic-1', 'user_id' => $users[0]->id, 'payload' => 'x', 'last_activity' => time()]);
+        $before = $users[0]->fresh()->password;
+        \App\Models\ActivityLog::creating(function () { throw new \RuntimeException('audit write failed'); });
+        $this->owner();
+        $failed = false;
+        try {
+            $this->withoutExceptionHandling()->put(route('owner.companies.manager-password', $c), ['user_id' => $users[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1']);
+        } catch (\RuntimeException $e) {
+            $failed = true;
+        }
+        $this->assertTrue($failed);
+        // Nothing half-applied: old password stays, session stays, no reset event.
+        $this->assertSame($before, $users[0]->fresh()->password);
+        $this->assertTrue(Hash::check('old-password', $users[0]->fresh()->password));
+        $this->assertSame(1, DB::table('sessions')->where('id', 'sess-atomic-1')->count());
+        $this->assertSame(0, DB::table('activity_logs')->where('action', 'subscription_company_password_reset')->count());
+    }
 }
