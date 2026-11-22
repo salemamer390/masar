@@ -299,6 +299,36 @@ class AttendancePenaltyPolicyTest extends TestCase
         $this->get(route('payroll.settings.index'))->assertOk()->assertSee('الرابعة فأكثر')->assertSee('إنذار');
     }
 
+    public function test_backdated_policy_never_changes_an_approved_payroll_but_rebuilds_the_open_draft(): void
+    {
+        $closed = $this->employee($this->company, 'PC1');
+        $this->day($closed, '2026-10-05', 45);
+        $before = $this->record($closed);
+        $run = \App\Models\PayrollRun::withoutGlobalScopes()->findOrFail($before->payroll_run_id);
+        app(PayrollRunService::class)->approve($run, true);
+        $approved = PayrollRecord::withoutGlobalScopes()->findOrFail($before->id);
+        $this->assertSame('Approved', $approved->status);
+
+        // Open November draft with a late day of its own.
+        $open = $this->employee($this->company, 'PC2');
+        $this->day($open, '2026-11-02', 45);
+        $draftRun = app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+
+        // Policy saved with an old start date (before the closed month).
+        $this->put(route('payroll.settings.attendance-penalties.update'), [
+            'is_enabled' => 1, 'effective_from' => '2026-09-01',
+            'tiers' => [['kind' => 'late', 'from_minutes' => 31, 'to_minutes' => '', 'occurrence_from' => 1, 'occurrence_to' => '', 'deduction_days' => 1]],
+        ])->assertRedirect(route('payroll.settings.index'));
+
+        $afterClosed = PayrollRecord::withoutGlobalScopes()->findOrFail($before->id);
+        $this->assertEqualsWithDelta((float) $approved->penalty_deduction, (float) $afterClosed->penalty_deduction, 0.001);
+        $this->assertEqualsWithDelta((float) $approved->net_salary, (float) $afterClosed->net_salary, 0.001);
+        $this->assertSame('Approved', $afterClosed->status);
+
+        $draftRecord = PayrollRecord::withoutGlobalScopes()->where('payroll_run_id', $draftRun->id)->where('employee_id', $open->id)->firstOrFail();
+        $this->assertGreaterThan(0.0, (float) $draftRecord->penalty_deduction);
+    }
+
     public function test_settings_save_rejects_enabling_without_tiers_and_needs_the_permission(): void
     {
         $this->put(route('payroll.settings.attendance-penalties.update'), ['is_enabled' => 1, 'effective_from' => '2026-10-01'])
