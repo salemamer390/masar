@@ -89,11 +89,20 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         ]);
         $run = app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
         $record = $run->records()->where('employee_id', $this->employee->id)->firstOrFail();
-        $record->forceFill(['official_holiday_amount' => 851.21, 'weekly_rest_amount' => 120.5])->save();
+        // Same composition as PayrollCalculator: overtime total = day + night + holiday + rest.
+        $record->forceFill(['ot_day_amount' => 40.0, 'day_overtime_amount' => 40.0, 'official_holiday_amount' => 851.21, 'weekly_rest_amount' => 120.5, 'overtime_amount' => 1011.71])->save();
 
         $content = $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']))->assertOk()->getContent();
         $this->assertStringContainsString('["عمل يوم عطلة رسمية",851.21]', $content);
         $this->assertStringContainsString('["عمل يوم راحة",120.5]', $content);
+
+        // The drawer lines add up to the drawer total (no missing line, no double count).
+        $this->assertSame(1, preg_match('/people: (\[.*\]),\n  stats:/s', $content, $m));
+        $people = json_decode($m[1], true);
+        $person = collect($people)->firstWhere('id', $record->id) ?? $people[0];
+        $sum = round(array_sum(array_map(fn ($i) => (float) $i[1], $person['items'])), 2);
+        $this->assertEqualsWithDelta((float) $person['entitlements'], $sum, 0.01);
+        $this->assertEqualsWithDelta(1011.71 + 400.0 + 173.33, $sum, 0.01);
     }
 
     private function auditRecord(): PayrollRecord

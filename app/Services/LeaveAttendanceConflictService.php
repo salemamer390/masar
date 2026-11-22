@@ -19,7 +19,6 @@ use Illuminate\Notifications\DatabaseNotification;
 class LeaveAttendanceConflictService
 {
     public const REMIND_AFTER_HOURS = 24;
-    private const LOOKBACK_DAYS = 90;
 
     public static function key(int $leaveId, string $date): string
     {
@@ -30,13 +29,18 @@ class LeaveAttendanceConflictService
     public function conflicts(?int $leaveId = null): array
     {
         $leaves = Leave::withoutGlobalScopes()->effective()->with('employee')
-            ->whereDate('end_date', '>=', today()->subDays(self::LOOKBACK_DAYS))
             ->whereDate('start_date', '<=', today())
             ->when($leaveId, fn ($q) => $q->where('id', $leaveId))->get();
         $out = [];
+        $windowStart = [];
         foreach ($leaves as $leave) {
             if (!$leave->employee) continue;
-            $from = Carbon::parse($leave->start_date)->toDateString();
+            // Only days that still matter: from the earliest open (Draft) payroll period of the
+            // company, or the current attendance period when no draft is older.
+            $cid = (int) $leave->employee->company_id;
+            $windowStart[$cid] ??= $this->windowStart($cid);
+            if (Carbon::parse($leave->end_date)->toDateString() < $windowStart[$cid]) continue;
+            $from = max(Carbon::parse($leave->start_date)->toDateString(), $windowStart[$cid]);
             $to = min(Carbon::parse($leave->end_date)->toDateString(), today()->toDateString());
             $days = Attendance::withoutGlobalScopes()->where('employee_id', $leave->employee_id)
                 ->whereBetween('attendance_date', [$from, $to])->whereNotNull('check_in')->pluck('attendance_date');
@@ -45,6 +49,13 @@ class LeaveAttendanceConflictService
             }
         }
         return $out;
+    }
+
+    private function windowStart(int $companyId): string
+    {
+        $start = \App\Support\CompanyContext::run($companyId, fn () => app(HrOperationalSettingsService::class)->periodContaining(today()->copy())['start']->toDateString());
+        $draft = \App\Models\PayrollRun::withoutGlobalScopes()->where('company_id', $companyId)->where('status', 'Draft')->whereNotNull('period_start')->min('period_start');
+        return $draft ? min($start, Carbon::parse($draft)->toDateString()) : $start;
     }
 
     /** Send new notices and reminders. Returns the number of notifications sent. */

@@ -51,7 +51,9 @@ class LeaveAttendanceConflictNoticeTest extends TestCase
         $this->assertSame(2, $this->manager->notifications()->count());
 
         $latest = $this->manager->notifications()->latest()->first();
-        $this->get(route('notifications.index'))->assertOk()->assertSee('data-conflict-confirm', false);
+        $this->get(route('notifications.index'))->assertOk()->assertSee('data-conflict-confirm', false)->assertSee('data-open-notification="'.$latest->id.'"', false);
+        // Opening the notice marks it read and redirects to the attendance row.
+        $this->post(route('notifications.read', $latest->id))->assertRedirect($latest->data['url']);
         $this->post(route('notifications.confirm', $latest->id))->assertRedirect();
         $this->get(route('notifications.index'))->assertOk()->assertSee('تم التأكيد');
 
