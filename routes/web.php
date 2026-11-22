@@ -98,7 +98,7 @@ Route::middleware('guest')->group(function () {
 });
 
 // Authenticated Routes
-Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\RunLeaveConflictReminders::class])->group(function () {
+Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\RunLeaveConflictReminders::class, \App\Http\Middleware\RunAttendanceArchiveSync::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::middleware('global_superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
