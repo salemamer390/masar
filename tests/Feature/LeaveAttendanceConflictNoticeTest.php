@@ -64,6 +64,20 @@ class LeaveAttendanceConflictNoticeTest extends TestCase
         $this->assertSame(1, Attendance::where('employee_id', $this->employee->id)->count());
     }
 
+    public function test_conflict_shows_in_the_top_bell_with_badge_row_link_and_confirm(): void
+    {
+        app(LeaveAttendanceConflictService::class)->notify();
+        $n = $this->manager->notifications()->first();
+        $html = $this->get(route('dashboard'))->assertOk()->getContent();
+        $this->assertStringContainsString('class="notification-dot">1<', $html);
+        $this->assertStringContainsString(route('notifications.read', $n->id), $html);
+        $this->assertStringContainsString(route('notifications.confirm', $n->id), $html);
+        $this->assertStringContainsString('data-bell-conflict-confirm', $html);
+        // Clicking the bell item marks it read and lands on the affected attendance row.
+        $this->post(route('notifications.read', $n->id))->assertRedirect($n->data['url']);
+        $this->assertStringContainsString('highlight=2026-11-04', $n->data['url']);
+    }
+
     public function test_attendance_page_highlights_the_linked_day(): void
     {
         $this->get(route('attendance.index', ['employee_id' => $this->employee->id, 'from_date' => '2026-11-04', 'to_date' => '2026-11-04', 'highlight' => '2026-11-04']))
