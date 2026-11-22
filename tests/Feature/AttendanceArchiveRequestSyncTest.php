@@ -13,7 +13,7 @@ class AttendanceArchiveRequestSyncTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private function makeCompany(string $slug, int $start, int $end): array
+    protected function makeCompany(string $slug, int $start, int $end): array
     {
         $status = EmployeeStatus::firstOrCreate(['name' => 'Active']);
         $plan = SubscriptionPlan::firstOrCreate(['slug' => 'sync-unlimited'], ['name' => 'T', 'employee_limit' => 1000, 'features' => []]);
@@ -55,6 +55,13 @@ class AttendanceArchiveRequestSyncTest extends TestCase
         $this->get(route('attendance.index', ['from_date' => '2026-10-20', 'to_date' => '2026-11-19']))->assertOk()
             ->assertSee('25/10/2026', false)->assertSee('10/11/2026', false)->assertSee('18/11/2026', false);
         $this->assertSame(3, Attendance::withoutGlobalScopes()->where('company_id', $company->id)->count(), 'records untouched');
+
+        // Immediately after the period ends it is listed in «الشهور السابقة», still editable until the deadline.
+        $this->get(route('attendance.archive.index'))->assertOk()
+            ->assertSee('20/10/2026 - 19/11/2026', false)->assertSee('قيد التصحيح حتى 22/11/2026', false)
+            ->assertSee('فتح وتعديل', false)->assertSee('from_date=2026-10-20', false);
+        $svc = app(\App\Services\AttendancePeriodArchiveService::class);
+        $this->assertFalse($svc->isClosed($company->id, '2026-11-10'), 'still editable during the correction days');
     }
 
     public function test_period_closes_after_its_correction_days_and_other_companies_are_not_affected(): void
@@ -74,7 +81,7 @@ class AttendanceArchiveRequestSyncTest extends TestCase
         $this->assertSame(AttendancePeriodArchive::CLOSED, $closed->status);
         $this->assertSame(3, (int) $closed->record_count);
         $this->assertSame(3, Attendance::withoutGlobalScopes()->where('company_id', $a->id)->count(), 'records untouched');
-        $this->get(route('attendance.archive.index'))->assertOk()->assertSee('20/10/2026', false);
+        $this->get(route('attendance.archive.index'))->assertOk()->assertSee('20/10/2026', false)->assertDontSee('قيد التصحيح حتى', false);
         $this->assertSame(0, AttendancePeriodArchive::withoutGlobalScopes()->where('company_id', $b->id)->count());
         $this->assertSame(0, DB::table('payroll_runs')->where('company_id', $a->id)->count(), 'payroll untouched');
     }
