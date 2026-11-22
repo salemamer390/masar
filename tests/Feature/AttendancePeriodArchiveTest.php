@@ -326,6 +326,9 @@ class AttendancePeriodArchiveTest extends TestCase
             $this->assertStringContainsString($from, $html, $today);
             $this->assertStringContainsString($to, $html, $today);
             $this->assertStringNotContainsString('من الشهر السابق', $html);
+            $this->assertMatchesRegularExpression('/data-cycle-date="start".*?'.preg_quote($from, '/').'/s', $html, $today);
+            $this->assertMatchesRegularExpression('/data-cycle-date="end".*?'.preg_quote($to, '/').'/s', $html, $today);
+            $this->assertStringContainsString('name="payroll_period_start_day"', $html);
         }
         $this->setting('payroll_period_start_day', '31');
         $this->setting('payroll_period_end_day', '30');
