@@ -15,6 +15,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionRenewalRequest;
 use App\Models\User;
 use App\Notifications\PlatformCompanyAnnouncement;
+use App\Services\CompanyErasureService;
 use App\Services\OwnerDatabaseUpdateService;
 use App\Notifications\SubscriptionRenewalProcessedNotification;
 use Illuminate\Http\Request;
@@ -64,12 +65,15 @@ class OwnerDashboardController extends Controller
             ->limit(30)
             ->get();
 
+        $companyDetails = $this->companyDetails($companies, $latestSubscriptions, $renewalRequests);
+        $pendingErasureFiles = app(CompanyErasureService::class)->pendingManifestCount();
+
         return view('owner.dashboard', compact(
             'plans', 'companies', 'renewalRequests', 'latestSubscriptions',
             'activeCompanies', 'activeSubscriptions', 'expiringSubscriptions',
             'pendingRenewals', 'approvedRevenue', 'companiesByPlan',
             'totalEmployees', 'totalUsers', 'dataStats', 'subscriptionActivity',
-            'databaseUpdateStatus'
+            'databaseUpdateStatus', 'companyDetails', 'pendingErasureFiles'
         ));
     }
 
@@ -105,6 +109,92 @@ class OwnerDashboardController extends Controller
             ];
         }
         return $stats;
+    }
+
+
+    /** Read-only details shown in the company details dialog. Never includes passwords, hashes or tokens. */
+    private function companyDetails($companies, $latestSubscriptions, $renewalRequests): array
+    {
+        $ids = $companies->pluck('id')->all();
+        if (!$ids) return [];
+        $count = fn (string $table) => DB::table($table)->whereIn('company_id', $ids)->selectRaw('company_id, COUNT(*) as n')->groupBy('company_id')->pluck('n', 'company_id');
+        $attendance = $count('attendance');
+        $devices = $count('fingerprint_devices');
+        $documents = $count('documents');
+        $admins = DB::table('users')->join('roles', 'roles.id', '=', 'users.role_id')
+            ->whereIn('users.company_id', $ids)->where('roles.name', 'company_manager')
+            ->orderBy('users.id')->get(['users.id', 'users.company_id', 'users.name', 'users.email', 'users.is_active', 'users.last_login_at', 'users.created_at'])
+            ->groupBy('company_id');
+        $details = [];
+        foreach ($companies as $company) {
+            $id = $company->id;
+            $sub = $latestSubscriptions[$id] ?? null;
+            $details[$id] = [
+                'admins' => $admins[$id] ?? collect(),
+                'subscription' => $sub,
+                'renewals' => $renewalRequests->where('company_id', $id)->count(),
+                'attendance' => (int) ($attendance[$id] ?? 0),
+                'devices' => (int) ($devices[$id] ?? 0),
+                'documents' => (int) ($documents[$id] ?? 0),
+            ];
+        }
+        return $details;
+    }
+
+    /** Read-only: what a full erase would remove right now. */
+    public function erasurePreview(Company $company, CompanyErasureService $erasure)
+    {
+        try {
+            $counts = $erasure->preview((int) $company->id);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => __('تعذر تجهيز المعاينة: ') . $e->getMessage()], 422);
+        }
+        return response()->json(['counts' => $counts]);
+    }
+
+    /** Permanently erase one company, its accounts, all its rows and uploaded files. */
+    public function destroyCompany(Request $request, Company $company, CompanyErasureService $erasure)
+    {
+        $data = $request->validate(['confirm_name' => ['required', 'string']]);
+        if (!hash_equals((string) $company->name, (string) $data['confirm_name'])) {
+            return back()->withErrors(['confirm_name' => __('اسم الشركة المكتوب غير مطابق. لم يتم حذف أي شيء.')]);
+        }
+        try {
+            $result = $erasure->erase((int) $company->id);
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->withErrors(['confirm_name' => __('تعذر حذف الشركة، ولم يتم حذف أي بيانات. ') . __('السبب: ') . class_basename($e)]);
+        }
+        if ($result['files_failed'] > 0) {
+            return back()->with('toast', __('تم حذف بيانات الشركة من قاعدة البيانات، لكن تعذر حذف :n ملف. ما زالت قيد إعادة المحاولة ولم يكتمل الحذف الفعلي بعد.', ['n' => $result['files_failed']]));
+        }
+        return back()->with('toast', __('تم حذف الشركة وكل بياناتها وملفاتها نهائيًا.'));
+    }
+
+    public function retryErasureFiles(CompanyErasureService $erasure)
+    {
+        $left = $erasure->retryPendingFiles();
+        return back()->with('toast', $left === 0 ? __('اكتمل حذف الملفات المتبقية.') : __('ما زال هناك ملفات تعذر حذفها، أعد المحاولة لاحقًا.'));
+    }
+
+    /** Set a new password for a company manager account. Nothing about the password is logged or flashed back. */
+    public function resetManagerPassword(Request $request, Company $company)
+    {
+        $managers = DB::table('users')->join('roles', 'roles.id', '=', 'users.role_id')
+            ->where('users.company_id', $company->id)->where('roles.name', 'company_manager')
+            ->orderBy('users.id')->pluck('users.id')->all();
+        abort_if($managers === [], 422, __('لا يوجد حساب مدير لهذه الشركة.'));
+        $data = $request->validate([
+            'user_id' => ['nullable', 'integer'],
+            'password' => ['required', 'string', 'min:8', 'max:128', 'confirmed'],
+        ]);
+        $userId = (int) ($data['user_id'] ?? $managers[0]);
+        abort_unless(in_array($userId, $managers, true), 422, __('الحساب المحدد ليس مدير هذه الشركة.'));
+        $user = User::where('company_id', $company->id)->findOrFail($userId);
+        $user->forceFill(['password' => $data['password'], 'remember_token' => Str::random(60)])->save();
+        $sessions = DB::table('sessions')->where('user_id', $user->id)->delete();
+        ActivityLog::record('subscription_company_password_reset', "تمت إعادة تعيين كلمة مرور مدير الشركة {$company->name} ({$user->email}).", $user, null, null, 'subscriptions');
+        return back()->with('toast', __('تم تعيين كلمة المرور الجديدة وتطبيقها فورًا. الجلسات التي تم إنهاؤها: :n.', ['n' => $sessions]));
     }
 
     public function storePlan(Request $request)

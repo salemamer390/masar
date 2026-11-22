@@ -111,3 +111,10 @@ a.owner-tab{text-decoration:none;text-align:center;display:flex;align-items:cent
 @media(max-width:850px){.owner-stats,.owner-overview-grid,.owner-notification-grid,.owner-update-grid{grid-template-columns:1fr}.owner-heading{align-items:flex-start;flex-direction:column}}
 @media(max-width:600px){.owner-stats{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.owner-tab{flex:0 0 auto}}
 </style>
+<style>
+.company-actions{white-space:nowrap}.company-actions .btn{margin-inline-start:4px}
+.company-delete-btn{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}
+.company-details{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin:0}
+.company-details dt{font-size:12px;color:#778;font-weight:400}.company-details dd{margin:0;overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:640px){.company-details{grid-template-columns:1fr}}
+</style>

@@ -652,6 +652,10 @@ Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->
     Route::post('/companies', [\App\Http\Controllers\OwnerDashboardController::class, 'storeCompany'])->name('companies.store');
     Route::put('/companies/{company}/subscription', [\App\Http\Controllers\OwnerDashboardController::class, 'updateCompanySubscription'])->name('companies.subscription.update');
     Route::put('/companies/{company}/status', [\App\Http\Controllers\OwnerDashboardController::class, 'updateCompanyStatus'])->name('companies.status.update');
+    Route::get('/companies/{company}/erasure-preview', [\App\Http\Controllers\OwnerDashboardController::class, 'erasurePreview'])->name('companies.erasure.preview');
+    Route::delete('/companies/{company}', [\App\Http\Controllers\OwnerDashboardController::class, 'destroyCompany'])->middleware('throttle:6,1')->name('companies.destroy');
+    Route::post('/erasure/retry-files', [\App\Http\Controllers\OwnerDashboardController::class, 'retryErasureFiles'])->middleware('throttle:6,1')->name('erasure.retry');
+    Route::put('/companies/{company}/manager-password', [\App\Http\Controllers\OwnerDashboardController::class, 'resetManagerPassword'])->middleware('throttle:6,1')->name('companies.manager-password');
     Route::put('/renewals/{renewal}', [\App\Http\Controllers\OwnerDashboardController::class, 'updateRenewal'])->name('renewals.update');
     Route::post('/announcements', [\App\Http\Controllers\OwnerDashboardController::class, 'sendAnnouncement'])->name('announcements.send');
 
