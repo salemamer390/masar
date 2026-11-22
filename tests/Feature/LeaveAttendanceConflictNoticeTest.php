@@ -93,6 +93,27 @@ class LeaveAttendanceConflictNoticeTest extends TestCase
         $this->assertSame(1, $this->manager->notifications()->count(), 'throttled to once per hour');
     }
 
+    public function test_open_draft_period_is_covered_and_other_companies_get_nothing(): void
+    {
+        // Old leave day inside an October payroll period that is still an open draft.
+        $type = $this->leave->leave_type_id;
+        Leave::withoutGlobalScopes()->create(['employee_id' => $this->employee->id, 'leave_type_id' => $type, 'start_date' => '2026-10-08', 'end_date' => '2026-10-10', 'days' => 3, 'status' => 'Approved', 'company_id' => $this->company->id]);
+        Attendance::create(['employee_id' => $this->employee->id, 'attendance_date' => '2026-10-09', 'check_in' => '09:00:00', 'check_out' => '17:00:00', 'status' => 'Present']);
+        $svc = app(LeaveAttendanceConflictService::class);
+        $dates = fn () => collect($svc->conflicts())->map(fn ($c) => $c['date']->toDateString())->all();
+        $this->assertNotContains('2026-10-09', $dates(), 'no open draft yet: October is closed territory');
+        \App\Models\PayrollRun::withoutGlobalScopes()->create(['company_id' => $this->company->id, 'payroll_month' => '2026-10-01', 'period_start' => '2026-10-01', 'period_end' => '2026-10-31', 'status' => 'Draft']);
+        $this->assertContains('2026-10-09', $dates(), 'open draft period must be covered');
+
+        // A manager of another company never receives this company's conflicts.
+        $other = Company::create(['name' => 'Other', 'slug' => 'other-co', 'status' => 'active']);
+        $role = Role::create(['name' => 'company_manager', 'display_name' => 'Manager', 'company_id' => $other->id]);
+        $stranger = User::create(['name' => 'X', 'email' => 'x@example.test', 'password' => bcrypt('x'), 'role_id' => $role->id, 'company_id' => $other->id, 'is_active' => true]);
+        $svc->notify();
+        $this->assertSame(0, $stranger->notifications()->count());
+        $this->assertGreaterThan(0, $this->manager->notifications()->count());
+    }
+
     public function test_no_notice_without_attendance_on_leave_days(): void
     {
         Attendance::where('employee_id', $this->employee->id)->delete();
