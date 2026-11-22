@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'iclock/*',
             'api/fingerprint-bridge/*',
         ]);
+        // A password change (including an Owner reset) ends that user's other open sessions on any session driver.
+        $middleware->appendToGroup('web', \App\Http\Middleware\EndSessionsAfterPasswordChange::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SetLocale::class);
         $middleware->alias([
@@ -31,6 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->booted(function () {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, function ($event) {
+            if ($event->guard === 'web') \App\Http\Middleware\EndSessionsAfterPasswordChange::fingerprint($event->user);
+        });
         // The interface and validation messages are Arabic; month and weekday names produced
         // by translatedFormat() keep their existing English output.
         \Illuminate\Support\Facades\Date::setLocale('en');

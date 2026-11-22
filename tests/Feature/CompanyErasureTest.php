@@ -109,11 +109,12 @@ class CompanyErasureTest extends TestCase
 
     public function test_erase_removes_only_the_selected_company_rows_and_files(): void
     {
-        $shared = ['plans' => DB::table('subscription_plans')->count(), 'perms' => DB::table('permissions')->count(), 'statuses' => DB::table('employee_statuses')->count()];
         $sharedBank = $this->row('banks', ['company_id' => null]);
         $sharedType = $this->row('leave_types', ['company_id' => null]);
         $a = $this->makeCompany('a');
         $b = $this->makeCompany('b');
+        // Snapshot shared tables after fixtures exist: the fixture itself may create the shared test plan on a fresh DB.
+        $shared = ['plans' => DB::table('subscription_plans')->count(), 'perms' => DB::table('permissions')->count(), 'statuses' => DB::table('employee_statuses')->count()];
         $before = $this->snapshot($b);
         $this->assertNotContains(false, $before);
         $companiesBefore = DB::table('companies')->count();
@@ -202,5 +203,110 @@ class CompanyErasureTest extends TestCase
         $this->assertSame(0, app(CompanyErasureService::class)->retryPendingFiles());
         Storage::disk('local')->assertMissing("employees/{$a['employee']}/profile/photo.jpg");
         $this->assertSame(0, app(CompanyErasureService::class)->pendingManifestCount());
+    }
+
+    private const HOSTED_ONLY = ['failed_jobs', 'insurance_job_codes', 'overtime_records', 'payroll_earnings', 'queue_jobs', 'system_settings'];
+
+    /** Create the six tables found only on the hosted database (structures as read from phpMyAdmin), outside the test transaction. */
+    private function createHostedOnlyTables(): void
+    {
+        DB::rollBack();
+        foreach (self::HOSTED_ONLY as $t) DB::statement("DROP TABLE IF EXISTS $t");
+        DB::statement('CREATE TABLE failed_jobs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, uuid VARCHAR(255), connection TEXT, queue TEXT, payload LONGTEXT, exception LONGTEXT, failed_at TIMESTAMP NULL)');
+        DB::statement('CREATE TABLE insurance_job_codes (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50), title VARCHAR(255), is_active TINYINT(1), created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)');
+        DB::statement('CREATE TABLE overtime_records (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, employee_id BIGINT UNSIGNED, payroll_record_id BIGINT UNSIGNED NULL, overtime_date DATE, hours DECIMAL(10,2), amount DECIMAL(12,2), created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)');
+        DB::statement('CREATE TABLE payroll_earnings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, payroll_record_id BIGINT UNSIGNED, employee_id BIGINT UNSIGNED, earning_type VARCHAR(100), amount DECIMAL(12,2), created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)');
+        DB::statement('CREATE TABLE queue_jobs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, company_id BIGINT UNSIGNED NULL, title VARCHAR(150), job_code VARCHAR(50), is_active TINYINT(1), created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL, queue VARCHAR(255) NULL, payload LONGTEXT NULL, attempts TINYINT UNSIGNED NULL, reserved_at INT UNSIGNED NULL, available_at INT UNSIGNED NULL)');
+        DB::statement('CREATE TABLE system_settings (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, setting_key VARCHAR(255), setting_value TEXT, setting_group VARCHAR(100), label VARCHAR(255), is_public TINYINT(1), created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)');
+        DB::beginTransaction();
+    }
+
+    private function dropHostedOnlyTables(): void
+    {
+        DB::rollBack();
+        foreach (self::HOSTED_ONLY as $t) DB::statement("DROP TABLE IF EXISTS $t");
+        DB::beginTransaction();
+    }
+
+    public function test_hosted_only_tables_are_owned_or_shared_and_erase_only_the_target_company(): void
+    {
+        $this->createHostedOnlyTables();
+        try {
+            $a = $this->makeCompany('ha');
+            $b = $this->makeCompany('hb');
+            foreach ([$a, $b] as $x) {
+                DB::table('overtime_records')->insert(['employee_id' => $x['employee'], 'payroll_record_id' => $x['record'], 'overtime_date' => '2026-01-01', 'hours' => 1, 'amount' => 10]);
+                DB::table('payroll_earnings')->insert(['employee_id' => $x['employee'], 'payroll_record_id' => $x['record'], 'earning_type' => 'bonus', 'amount' => 5]);
+                DB::table('queue_jobs')->insert(['company_id' => $x['company'], 'title' => 'Job ' . $x['company'], 'job_code' => 'J' . $x['company'], 'is_active' => 1]);
+            }
+            DB::table('insurance_job_codes')->insert(['code' => 'C1', 'title' => 'shared', 'is_active' => 1]);
+            DB::table('system_settings')->insert(['setting_key' => 'k', 'setting_value' => 'v', 'setting_group' => 'g', 'label' => 'l', 'is_public' => 0]);
+            $svc = app(CompanyErasureService::class);
+            $svc->assertSchemaClassified();
+            $counts = $svc->preview($a['company']);
+            $this->assertSame(1, $counts['overtime_records']);
+            $this->assertSame(1, $counts['payroll_earnings']);
+            $this->assertSame(1, $counts['queue_jobs']);
+
+            $svc->erase($a['company']);
+
+            $this->assertSame(0, DB::table('overtime_records')->where('employee_id', $a['employee'])->count());
+            $this->assertSame(0, DB::table('payroll_earnings')->where('employee_id', $a['employee'])->count());
+            $this->assertSame(0, DB::table('queue_jobs')->where('company_id', $a['company'])->count());
+            $this->assertSame(1, DB::table('overtime_records')->where('employee_id', $b['employee'])->count());
+            $this->assertSame(1, DB::table('payroll_earnings')->where('employee_id', $b['employee'])->count());
+            $this->assertSame(1, DB::table('queue_jobs')->where('company_id', $b['company'])->count());
+            $this->assertSame(1, DB::table('insurance_job_codes')->count());
+            $this->assertSame(1, DB::table('system_settings')->count());
+            $this->assertTrue(DB::table('companies')->where('id', $b['company'])->exists());
+        } finally {
+            $this->dropHostedOnlyTables();
+        }
+    }
+
+    public function test_non_empty_failed_jobs_or_unattributable_queue_rows_make_erase_refuse_and_delete_nothing(): void
+    {
+        $this->createHostedOnlyTables();
+        try {
+            $a = $this->makeCompany('hc');
+            DB::table('failed_jobs')->insert(['uuid' => 'u1', 'connection' => 'database', 'queue' => 'default', 'payload' => '{}', 'exception' => 'x']);
+            try {
+                app(CompanyErasureService::class)->erase($a['company']);
+                $this->fail('failed_jobs row must block erase');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('failed_jobs', $e->getMessage());
+            }
+            $this->assertTrue(DB::table('companies')->where('id', $a['company'])->exists());
+            $this->assertSame(1, DB::table('employees')->where('company_id', $a['company'])->count());
+            DB::table('failed_jobs')->delete();
+
+            DB::table('queue_jobs')->insert(['company_id' => null, 'title' => 'q', 'job_code' => 'q', 'is_active' => 1, 'queue' => 'default', 'payload' => '{"job":"x"}']);
+            try {
+                app(CompanyErasureService::class)->erase($a['company']);
+                $this->fail('unattributable queue payload must block erase');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('queue_jobs', $e->getMessage());
+            }
+            $this->assertTrue(DB::table('companies')->where('id', $a['company'])->exists());
+            $this->assertSame(1, DB::table('queue_jobs')->count());
+        } finally {
+            $this->dropHostedOnlyTables();
+        }
+    }
+
+    public function test_shared_table_that_gains_a_company_column_makes_erase_refuse(): void
+    {
+        $this->createHostedOnlyTables();
+        DB::rollBack();
+        DB::statement('ALTER TABLE system_settings ADD COLUMN company_id BIGINT UNSIGNED NULL');
+        DB::beginTransaction();
+        try {
+            $a = $this->makeCompany('hd');
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('system_settings has company_id');
+            app(CompanyErasureService::class)->erase($a['company']);
+        } finally {
+            $this->dropHostedOnlyTables();
+        }
     }
 }

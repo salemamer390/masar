@@ -48,7 +48,25 @@ class CompanyErasureService
     ];
 
     /** Shared or system tables: never deleted by company erasure. */
-    private const SHARED = ['companies_placeholder_never_matches', 'employee_statuses', 'migrations', 'permissions', 'subscription_plans', 'tour_steps'];
+    private const SHARED = [
+        'companies_placeholder_never_matches', 'employee_statuses', 'migrations', 'permissions', 'subscription_plans', 'tour_steps',
+        // Found on the hosted database only (no repo migration creates them): global lookup/settings tables
+        // with no company_id and no employee link. assertSchemaClassified() re-checks that on every run.
+        'insurance_job_codes', 'system_settings',
+    ];
+
+    /**
+     * Tables that exist on some databases only (hosted legacy). Owned through employees / payroll records
+     * (overtime_records, payroll_earnings) or company_id (queue_jobs). Skipped where the table does not exist.
+     */
+    private const OPTIONAL_OWNED = ['overtime_records', 'payroll_earnings', 'queue_jobs'];
+
+    /**
+     * Queue storage. Job payloads are serialized objects with no reliable company marker, so rows cannot be
+     * attributed to a company. A company erase is refused while any unattributable row exists, instead of
+     * deleting another tenant's jobs or leaving this company's payload behind.
+     */
+    private const QUEUE = ['failed_jobs', 'jobs', 'job_batches'];
 
     /** Classified tables whose rows are mapped to a company through a parent table, not company_id. */
     private const CHILD = [
@@ -61,14 +79,37 @@ class CompanyErasureService
     /** Throws when the live schema contains a table this service does not know. */
     public function assertSchemaClassified(): void
     {
-        $known = array_merge(self::OWNED, self::SHARED, ['companies']);
+        $known = array_merge(self::OWNED, self::OPTIONAL_OWNED, self::QUEUE, self::SHARED, ['companies']);
         $unknown = array_values(array_diff($this->liveTables(), $known));
         if ($unknown !== []) {
             throw new RuntimeException('Company erasure refused: unclassified tables: ' . implode(', ', $unknown));
         }
         foreach ($this->liveTables() as $table) {
-            if ($table !== 'companies' && Schema::hasColumn($table, 'company_id') && !in_array($table, self::OWNED, true)) {
+            if ($table !== 'companies' && Schema::hasColumn($table, 'company_id') && !in_array($table, array_merge(self::OWNED, self::OPTIONAL_OWNED), true)) {
                 throw new RuntimeException("Company erasure refused: table {$table} has company_id but is not mapped.");
+            }
+        }
+        // A table classified as shared must really be shared: no company column.
+        foreach (self::SHARED as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'company_id')) {
+                throw new RuntimeException("Company erasure refused: shared table {$table} has a company_id column.");
+            }
+        }
+        foreach (['overtime_records', 'payroll_earnings'] as $table) {
+            if (Schema::hasTable($table) && !Schema::hasColumn($table, 'employee_id')) {
+                throw new RuntimeException("Company erasure refused: table {$table} has no employee_id to attribute rows.");
+            }
+        }
+        // Queue rows cannot be attributed to a company: refuse while any exist.
+        foreach (self::QUEUE as $table) {
+            if (Schema::hasTable($table) && DB::table($table)->exists()) {
+                throw new RuntimeException("Company erasure refused: queue table {$table} is not empty. Clear queued and failed jobs first.");
+            }
+        }
+        if (Schema::hasTable('queue_jobs') && Schema::hasColumn('queue_jobs', 'payload')) {
+            $q = DB::table('queue_jobs')->whereNotNull('payload')->where('payload', '!=', '')->whereNull('company_id');
+            if ($q->exists()) {
+                throw new RuntimeException('Company erasure refused: queue_jobs holds queued payload rows that belong to no company. Clear them first.');
             }
         }
     }
@@ -96,7 +137,12 @@ class CompanyErasureService
         $own = fn ($q) => $q->where('company_id', $c);
         $ownOrEmp = fn ($q) => $q->where(fn ($w) => $w->where('company_id', $c)->orWhereIn('employee_id', $emp()));
 
+        $byEmpOrRec = fn ($q) => $q->where(fn ($w) => $w->whereIn('employee_id', $emp())->orWhereIn('payroll_record_id', $rec()));
+
         return [
+            ['overtime_records', $byEmpOrRec],
+            ['payroll_earnings', $byEmpOrRec],
+            ['queue_jobs', $own],
             ['attendance_punch_revisions', $own],
             ['attendance_import_days', $own],
             ['attendance_import_batches', $own],
@@ -175,6 +221,7 @@ class CompanyErasureService
         $this->assertSchemaClassified();
         $counts = [];
         foreach ($this->steps($companyId) as [$table, $scope]) {
+            if (!Schema::hasTable($table)) continue;
             $n = $scope(DB::table($table))->count();
             if ($n > 0) $counts[$table] = $n;
         }
@@ -241,6 +288,7 @@ class CompanyErasureService
         try {
             DB::transaction(function () use ($companyId, &$rows) {
                 foreach ($this->steps($companyId) as [$table, $scope]) {
+                    if (!Schema::hasTable($table)) continue;
                     $rows += $scope(DB::table($table))->delete();
                 }
                 $rows += DB::table('companies')->where('id', $companyId)->delete();

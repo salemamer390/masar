@@ -122,4 +122,139 @@ class OwnerCompanyManagementTest extends TestCase
         Storage::disk('local')->assertExists('employees/9999/profile/p.jpg');
         $this->assertSame(0, DB::table('activity_logs')->where('description', 'like', '%Mgmt Co x%')->count());
     }
+
+    public function test_open_manager_session_is_ended_after_password_change_on_any_session_driver(): void
+    {
+        [$c, $users] = $this->company('z');
+        $manager = $users[0];
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+        $this->post('/login', ['email' => $manager->email, 'password' => 'old-password'])->assertRedirect();
+        $this->assertAuthenticatedAs($manager);
+        $this->get('/dashboard')->assertSuccessful();
+
+        // Same write the Owner reset performs on the manager row.
+        $manager->forceFill(['password' => 'Brand-New-Pass-1', 'remember_token' => 'rotated'])->save();
+
+        $this->app['auth']->forgetGuards(); // a real next request starts with a fresh guard
+
+        // The open session is rejected on its next request, whatever the session driver.
+        $this->get('/dashboard')->assertRedirect();
+        $this->assertGuest();
+    }
+
+    public function test_session_without_fingerprint_from_before_deploy_is_ended_by_owner_reset(): void
+    {
+        [$c, $users] = $this->company('legacy');
+        $manager = $users[0];
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+
+        // A session opened before deploy: authenticated, no password fingerprint, and no request since.
+        $this->actingAs($manager, 'web');
+        $this->assertNull(session('password_hash_web_' . $manager->id));
+
+        // Real Owner reset through the real route, as a separate request.
+        $this->owner()->put(route('owner.companies.manager-password', $c), ['password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])->assertRedirect();
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+
+        // The old session (still no fingerprint) makes its first request after the reset.
+        $fresh = User::find($manager->id);
+        $this->actingAs($fresh, 'web')->get('/dashboard')->assertRedirect(route('login'));
+        $this->assertGuest('web');
+    }
+
+    public function test_new_login_is_fingerprinted_immediately(): void
+    {
+        [$c, $users] = $this->company('fp');
+        $plan = \App\Models\SubscriptionPlan::first() ?? \App\Models\SubscriptionPlan::create(['name' => 'T', 'slug' => 't-' . uniqid(), 'price' => 0, 'is_active' => true]);
+        \App\Models\CompanySubscription::create(['company_id' => $c->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
+        $this->post('/login', ['email' => $users[0]->email, 'password' => 'old-password'])->assertRedirect();
+        $this->assertNotNull(session('password_hash_web_' . $users[0]->id));
+    }
+
+    /**
+     * Real browsers keep `web` as the default guard. The owner can be signed in
+     * as a company user (web) and as the owner (owner guard) at the same time;
+     * tests that use actingAs(..., 'owner') silently switch the default guard
+     * and hide that case, so it is rebuilt here explicitly.
+     */
+    private function ownerAlongsideCompanyUser(User $companyUser): void
+    {
+        $this->owner();
+        $this->actingAs($companyUser, 'web');
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+    }
+
+    public function test_owner_reset_works_while_also_signed_in_to_a_different_company(): void
+    {
+        [$mine, $mineUsers] = $this->company('mine');
+        [$target, $targetUsers, $targetStaff] = $this->company('target');
+        [$third, $thirdUsers] = $this->company('third');
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+
+        $this->put(route('owner.companies.manager-password', $target), ['user_id' => $targetUsers[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])
+            ->assertRedirect()->assertSessionHas('toast');
+
+        $this->assertTrue(Hash::check('Brand-New-Pass-1', $targetUsers[0]->fresh()->password));
+        // Nothing else changed: the signed-in company, another company, and staff.
+        $this->assertTrue(Hash::check('old-password', $mineUsers[0]->fresh()->password));
+        $this->assertTrue(Hash::check('old-password', $thirdUsers[0]->fresh()->password));
+        $this->assertTrue(Hash::check('old-password', $targetStaff->fresh()->password));
+        // The audit row belongs to the target company and is attributed to the owner account, not the company user.
+        $log = DB::table('activity_logs')->where('action', 'subscription_company_password_reset')->latest('id')->first();
+        $this->assertNotNull($log);
+        $this->assertSame((int) $target->id, (int) $log->company_id);
+        $this->assertSame(self::OWNER, User::withoutGlobalScopes()->whereKey($log->user_id)->value('email'));
+    }
+
+    public function test_company_isolation_still_holds_for_company_users_after_the_owner_fix(): void
+    {
+        [$mine, $mineUsers] = $this->company('m2');
+        [$target, $targetUsers] = $this->company('t2');
+        // A company manager can never reach owner actions, even with an owner session open alongside.
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+        \Illuminate\Support\Facades\Auth::guard('owner')->logout();
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+        $this->put(route('owner.companies.manager-password', $target), ['user_id' => $targetUsers[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1'])->assertStatus(404);
+        $this->assertTrue(Hash::check('old-password', $targetUsers[0]->fresh()->password));
+        // A company-scoped write for another company is still refused by the tenant guard.
+        $this->actingAs($mineUsers[0], 'web');
+        \Illuminate\Support\Facades\Auth::shouldUse('web');
+        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+        \App\Models\ActivityLog::create(['company_id' => $target->id, 'action' => 'x', 'description' => 'cross-company write must fail']);
+    }
+
+    public function test_owner_delete_works_while_also_signed_in_to_a_different_company(): void
+    {
+        Storage::fake('local'); Storage::fake('public');
+        [$mine, $mineUsers] = $this->company('mine3');
+        [$target] = $this->company('target3');
+        $this->ownerAlongsideCompanyUser($mineUsers[0]);
+        $this->delete(route('owner.companies.destroy', $target), ['confirm_name' => $target->name])->assertSessionHas('toast');
+        $this->assertFalse(Company::whereKey($target->id)->exists());
+        $this->assertSame(2, User::withoutGlobalScopes()->where('company_id', $mine->id)->count());
+    }
+
+    public function test_reset_is_atomic_when_the_audit_event_cannot_be_written(): void
+    {
+        [$c, $users] = $this->company('atomic');
+        DB::table('sessions')->insert(['id' => 'sess-atomic-1', 'user_id' => $users[0]->id, 'payload' => 'x', 'last_activity' => time()]);
+        $before = $users[0]->fresh()->password;
+        \App\Models\ActivityLog::creating(function () { throw new \RuntimeException('audit write failed'); });
+        $this->owner();
+        $failed = false;
+        try {
+            $this->withoutExceptionHandling()->put(route('owner.companies.manager-password', $c), ['user_id' => $users[0]->id, 'password' => 'Brand-New-Pass-1', 'password_confirmation' => 'Brand-New-Pass-1']);
+        } catch (\RuntimeException $e) {
+            $failed = true;
+        }
+        $this->assertTrue($failed);
+        // Nothing half-applied: old password stays, session stays, no reset event.
+        $this->assertSame($before, $users[0]->fresh()->password);
+        $this->assertTrue(Hash::check('old-password', $users[0]->fresh()->password));
+        $this->assertSame(1, DB::table('sessions')->where('id', 'sess-atomic-1')->count());
+        $this->assertSame(0, DB::table('activity_logs')->where('action', 'subscription_company_password_reset')->count());
+    }
 }
