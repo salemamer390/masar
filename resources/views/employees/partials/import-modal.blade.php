@@ -805,7 +805,8 @@
                 + '</div></div></div>';
         });
         html += '</div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
-        const incomplete = (data.incomplete_sheets || []);
+        const incomplete = (data.incomplete_sheets || []).filter(sheet => { const k = state.sheetKinds[sheet.name] || sheet.kind; return k !== 'ignore' && k !== 'auxiliary'; });
+        if (!incomplete.length && /بيانات ناقصة في/.test((alertBox && alertBox.textContent) || '')) { showAlert(''); }
         if (incomplete.length) {
             showAlert('بيانات ناقصة في: ' + incomplete.map(sheet=>'«'+sheet.name+'» ('+sheet.missing.join('، ')+')').join('؛ ') + '. الأوراق المعلّمة بشارة «حقول ناقصة» تحتاج إلى استكمال الأعمدة قبل المتابعة.');
         }

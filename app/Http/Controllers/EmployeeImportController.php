@@ -54,7 +54,7 @@ class EmployeeImportController extends Controller
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
             'mapping_error' => $this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null),
             'incomplete_sheets' => array_values(array_filter(array_map(
-                fn (array $sheet) => empty($sheet['missing_fields']) ? null : [
+                fn (array $sheet) => (empty($sheet['missing_fields']) || in_array((string) ($sheet['kind'] ?? ''), ['ignore', 'auxiliary'], true)) ? null : [
                     'name' => (string) ($sheet['name'] ?? ''),
                     'kind' => (string) ($sheet['kind'] ?? 'unknown'),
                     'missing' => array_values((array) $sheet['missing_fields']),
