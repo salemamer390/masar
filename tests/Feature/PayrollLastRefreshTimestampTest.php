@@ -59,6 +59,8 @@ class PayrollLastRefreshTimestampTest extends TestCase
         // Backdate the refresh log: same truth, different day.
         ActivityLog::where('model_id', $this->currentRun()->id)->where('action', 'payroll_generate')
             ->update(['created_at' => Carbon::parse('2026-11-05 09:30:00', 'Africa/Cairo')]);
+        // An approved run is not refreshed on open, so the old date stays visible.
+        $this->currentRun()->update(['status' => 'Approved']);
 
         $response = $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']));
         $response->assertOk();
