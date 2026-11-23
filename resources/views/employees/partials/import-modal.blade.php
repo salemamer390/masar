@@ -943,6 +943,24 @@
         } catch (error) { showAlert(error.message); }
     }
 
+    function markSummaryStale() {
+        if (sheetsList.querySelector('[data-stale-note]')) return;
+        const note = document.createElement('div');
+        note.className = 'form-text text-warning-emphasis mt-2';
+        note.setAttribute('data-stale-note', '1');
+        note.textContent = window.masarT('ملخص «ما سيحدث» يتحدّث عند الضغط على «متابعة للمراجعة».');
+        sheetsList.appendChild(note);
+    }
+    function rerenderSheetsLocal() {
+        const open = [...sheetsList.querySelectorAll('.sheet-card-body.open')].map(el => el.id);
+        const scroller = sheetsList.closest('.modal-body') || sheetsList.parentElement;
+        const top = scroller ? scroller.scrollTop : 0;
+        renderSheetsStep(lastData);
+        open.forEach(id => { const b = document.getElementById(id); if (b && !b.closest('.sheet-card-ignored')) setSheetExpanded(b, true); });
+        if (scroller) scroller.scrollTop = top;
+        markSummaryStale();
+    }
+
     async function runPreview(button, label, stayOnPreview, mode = null, correctedSheet = null) {
         if (busy) { return; }
         showAlert('');
@@ -1057,7 +1075,8 @@
             const sheet = lastData.sheets.find(s=>s.name===ignore.dataset.ignoreSheet);
             if (ignore.checked) state.ignoredKinds[sheet.name] = state.sheetKinds[sheet.name] || sheet.kind;
             { const back = state.ignoredKinds[sheet.name] || sheet.detected_kind; state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : ((!back || back === 'auxiliary' || back === 'ignore') ? 'unknown' : back); }
-            runPreview(null, '', false, 'reload-sheets'); return;
+            if (ignore.checked || state.sheetKinds[sheet.name] === sheet.kind) { rerenderSheetsLocal(); } else { runPreview(null, '', false, 'reload-sheets'); }
+            return;
         }
         const fieldSelect = event.target.closest('select[data-domain-field]');
         if (fieldSelect) {
@@ -1072,7 +1091,7 @@
                 const chip = card.querySelector('.field-state');
                 if (chip) chip.textContent = window.masarT('حقل مطلوب');
             }
-            runPreview(null, '', false, 'reload-sheets', sheetName);
+            markSummaryStale();
             return;
         }
         if (event.target.matches('input[name="import_sheet"]')) { state.sheet=event.target.value;runPreview(null,'',false,'reload-sheets');return; }
