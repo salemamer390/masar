@@ -142,7 +142,7 @@ class WorkbookLeavePenaltyImporter
                 // A missing type must be rejected for review, never matched by wildcard.
                 if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
                 $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
-                if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر.');
+                if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر (في الملف: ' . (trim((string) ($row[$map['deduction'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) $row[$map['deduction']])) . ').');
                 $days = (float) $quantity;
                 $type = $this->resolveOrRegisterPenaltyType($typeName, $result);
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
