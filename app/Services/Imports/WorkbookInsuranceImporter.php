@@ -298,7 +298,7 @@ class WorkbookInsuranceImporter
 
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
     private function person(mixed $value): string { return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim((string) $value))); }
-    private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
+    private function date(mixed $value): ?string { return ImportDateParser::toDate($value); }
     private function money(mixed $value): ?float
     {
         $value = trim((string) $value);

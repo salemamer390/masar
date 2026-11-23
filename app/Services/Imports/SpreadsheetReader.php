@@ -280,6 +280,7 @@ class SpreadsheetReader
         $document = new DOMDocument();
         $rows = [];
         $lastRow = 0;
+        $formulaCtx = ['cells' => [], 'masters' => []];
 
         while ($reader->read()) {
             if ($reader->nodeType !== XMLReader::ELEMENT || $reader->localName !== 'row') {
@@ -298,7 +299,7 @@ class SpreadsheetReader
                 continue;
             }
 
-            $cells = $this->parseRow($node, $shared, $dateStyles, $date1904);
+            $cells = $this->parseRow($node, $shared, $dateStyles, $date1904, $lastRow, $formulaCtx);
             if ($cells === []) {
                 continue;
             }
@@ -311,7 +312,136 @@ class SpreadsheetReader
         }
         $reader->close();
 
+        if ($formulaCtx['cells'] !== []) {
+            $rows = $this->fillFormulaResults($rows, $formulaCtx, $dateStyles, $date1904);
+        }
+
         return $rows;
+    }
+
+    /**
+     * Formula cells saved without a result (the file was written by a tool
+     * that does not recalculate) would read as empty. Evaluate the simple
+     * ones here; a formula that cannot be evaluated stays empty as before.
+     *
+     * @param array<int, array<int, string>> $rows
+     * @param array{cells: array<int, array<int, array{text: string, style: int, si: string}>>, masters: array<string, array{text: string, row: int, col: int}>} $ctx
+     * @param array<int, bool> $dateStyles
+     * @return array<int, array<int, string>>
+     */
+    private function fillFormulaResults(array $rows, array $ctx, array $dateStyles, bool $date1904): array
+    {
+        $pending = [];
+        $count = 0;
+        foreach ($ctx['cells'] as $r => $line) {
+            foreach ($line as $c => $info) {
+                $text = $info['text'];
+                if ($text === '' && $info['si'] !== '' && isset($ctx['masters'][$info['si']])) {
+                    $master = $ctx['masters'][$info['si']];
+                    $text = $this->shiftFormula($master['text'], $r - $master['row'], $c - $master['col']);
+                }
+                if ($text === '' || ++$count > 20000) {
+                    continue;
+                }
+                $pending[$r][$c] = ['text' => $text, 'style' => $info['style']];
+            }
+        }
+
+        $done = [];
+        $busy = [];
+        $failed = [];
+        $evaluator = null;
+        $lookup = function (int $r, int $c) use (&$rows, &$pending, &$done, &$busy, &$failed, &$evaluator) {
+            if (array_key_exists($c, $done[$r] ?? [])) {
+                return $done[$r][$c];
+            }
+            if (isset($rows[$r][$c])) {
+                return $rows[$r][$c];
+            }
+            if (!isset($pending[$r][$c])) {
+                return null; // a genuinely blank cell
+            }
+            if (isset($busy[$r][$c]) || isset($failed[$r][$c])) {
+                throw new RuntimeException('referenced formula cannot be evaluated');
+            }
+            $busy[$r][$c] = true;
+            try {
+                $value = $evaluator->evaluate($pending[$r][$c]['text'], $r);
+            } catch (\Throwable $e) {
+                unset($busy[$r][$c]);
+                $failed[$r][$c] = true;
+                throw $e instanceof FormulaValueError ? $e : new RuntimeException('referenced formula cannot be evaluated');
+            }
+            unset($busy[$r][$c]);
+            $done[$r][$c] = $value;
+
+            return $value;
+        };
+        $evaluator = new SpreadsheetFormulaEvaluator($lookup, $date1904);
+
+        foreach ($pending as $r => $line) {
+            foreach ($line as $c => $info) {
+                try {
+                    $value = $lookup($r, $c);
+                } catch (\Throwable) {
+                    continue;
+                }
+                if ($value === null || $value === '' || isset($rows[$r][$c]) || !isset($rows[$r])) {
+                    continue;
+                }
+                if (is_bool($value)) {
+                    $rows[$r][$c] = $value ? '1' : '0';
+                } elseif (is_float($value)) {
+                    $rows[$r][$c] = ($dateStyles[$info['style']] ?? false) && $value > 0
+                        ? $this->excelDate($value, $date1904)
+                        : $this->numericString(rtrim(rtrim(number_format($value, 10, '.', ''), '0'), '.') ?: '0');
+                } else {
+                    $rows[$r][$c] = trim((string) $value);
+                }
+                if ($rows[$r][$c] === '') {
+                    unset($rows[$r][$c]);
+                }
+            }
+            if (isset($rows[$r])) {
+                ksort($rows[$r]);
+            }
+        }
+        ksort($rows);
+
+        return $rows;
+    }
+
+    /** Moves the relative references of a shared formula to a dependent cell. */
+    private function shiftFormula(string $text, int $rowOffset, int $colOffset): string
+    {
+        return (string) preg_replace_callback('/(\"[^\"]*\")|(?<![A-Za-z0-9_.])(\$?)([A-Z]{1,3})(\$?)(\d+)(?![\d(A-Za-z])/', function (array $m) use ($rowOffset, $colOffset) {
+            if (($m[1] ?? '') !== '') {
+                return $m[1];
+            }
+            $col = $m[3];
+            if ($m[2] === '') {
+                $n = 0;
+                foreach (str_split($col) as $ch) {
+                    $n = $n * 26 + (ord($ch) - 64);
+                }
+                $n += $colOffset;
+                if ($n < 1) {
+                    return $m[0];
+                }
+                $col = '';
+                while ($n > 0) {
+                    $n--;
+                    $col = chr(65 + $n % 26) . $col;
+                    $n = intdiv($n, 26);
+                }
+            }
+            $row = $m[5];
+            if ($m[4] === '') {
+                $row = (string) max(1, (int) $row + $rowOffset);
+            }
+
+            return $m[2] . $col . $m[4] . $row;
+        }, $text);
     }
 
     /**
@@ -319,7 +449,7 @@ class SpreadsheetReader
      * @param array<int, bool> $dateStyles
      * @return array<int, string>
      */
-    private function parseRow(DOMElement $row, array $shared, array $dateStyles, bool $date1904): array
+    private function parseRow(DOMElement $row, array $shared, array $dateStyles, bool $date1904, int $rowNumber = 0, array &$formulaCtx = ['cells' => [], 'masters' => []]): array
     {
         $cells = [];
         $next = 0;
@@ -337,6 +467,19 @@ class SpreadsheetReader
             }
 
             $value = $this->cellValue($cell, $shared, $dateStyles, $date1904);
+            foreach ($cell->childNodes as $child) {
+                if ($child instanceof DOMElement && $child->localName === 'f') {
+                    $text = trim($child->textContent);
+                    $si = $child->getAttribute('t') === 'shared' ? $child->getAttribute('si') : '';
+                    if ($si !== '' && $text !== '') {
+                        $formulaCtx['masters'][$si] = ['text' => $text, 'row' => $rowNumber, 'col' => $column];
+                    }
+                    if ($value === '' && ($text !== '' || $si !== '')) {
+                        $formulaCtx['cells'][$rowNumber][$column] = ['text' => $text, 'style' => (int) $cell->getAttribute('s'), 'si' => $si];
+                    }
+                    break;
+                }
+            }
             if ($value !== '') {
                 $cells[$column] = $value;
             }

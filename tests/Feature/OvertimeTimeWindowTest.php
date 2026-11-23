@@ -79,9 +79,10 @@ class OvertimeTimeWindowTest extends TestCase
         ]);
     }
 
-    private function overtimeRequest(string $date, string $period, float $hours, ?string $from, ?string $to): HrRequest
+    private function overtimeRequest(string $date, string $period, float $hours, ?string $from, ?string $to, bool $anchored = false): HrRequest
     {
         $payload = ['request_date' => $date, 'hours' => $hours, 'overtime_period' => $period];
+        if ($anchored) $payload['anchor_to_shift'] = true;
         if ($from !== null) $payload['from_time'] = $from;
         if ($to !== null) $payload['to_time'] = $to;
 
@@ -295,7 +296,7 @@ class OvertimeTimeWindowTest extends TestCase
     public function test_import_overtime_row_with_window_columns(): void
     {
         $csv = "كود الموظف,اسم الموظف,تاريخ الإضافي,عدد الساعات,نوع الإضافي,من الساعة,إلى الساعة\n"
-            . "9001,Employee Alpha A,2026-10-15,1,نهاري,08:00,09:00\n";
+            . "9001,Employee Alpha A," . now()->toDateString() . ",1,نهاري,08:00,09:00\n";
         $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
         file_put_contents($path, $csv);
 
@@ -308,26 +309,151 @@ class OvertimeTimeWindowTest extends TestCase
         unlink($path);
     }
 
-    public function test_import_overtime_row_without_window_is_skipped_with_clear_error(): void
+    public function test_import_hours_only_overtime_row_is_marked_to_anchor_to_the_shift(): void
     {
         $csv = "كود الموظف,اسم الموظف,تاريخ الإضافي,عدد الساعات,نوع الإضافي\n"
-            . "9001,Employee Alpha A,2026-10-15,1,نهاري\n";
+            . "9001,Employee Alpha A," . now()->toDateString() . ",1.5,ليلي\n"
+            . "9001,Employee Alpha A," . now()->toDateString() . ",1,نهاري\n";
+        $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
+        file_put_contents($path, $csv);
+
+        $result = app(WorkbookRequestImporter::class)->import($path, 'csv', app(PayrollPeriodGuard::class), app(PayrollRunService::class));
+
+        $this->assertSame(2, $result['imported'], json_encode($result['errors'], JSON_UNESCAPED_UNICODE));
+        $night = HrRequest::get()->first(fn ($r) => $r->payload['overtime_period'] === 'night');
+        $this->assertSame(1.5, (float) $night->payload['hours']);
+        $this->assertTrue($night->payload['anchor_to_shift']);
+        $this->assertArrayNotHasKey('from_time', (array) $night->payload);
+        $this->assertNotEmpty($result['warnings']);
+        unlink($path);
+    }
+
+    public function test_import_overtime_without_hours_or_window_is_still_rejected(): void
+    {
+        $csv = "كود الموظف,اسم الموظف,تاريخ الإضافي,نوع الإضافي\n"
+            . "9001,Employee Alpha A," . now()->toDateString() . ",نهاري\n";
         $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
         file_put_contents($path, $csv);
 
         $result = app(WorkbookRequestImporter::class)->import($path, 'csv', app(PayrollPeriodGuard::class), app(PayrollRunService::class));
 
         $this->assertSame(0, $result['imported']);
-        $this->assertSame(1, $result['skipped']);
         $this->assertStringContainsString('من الساعة', implode(' ', $result['errors']));
         $this->assertSame(0, HrRequest::count());
         unlink($path);
     }
 
+    public function test_import_written_window_wins_over_hours_column(): void
+    {
+        $csv = "كود الموظف,اسم الموظف,تاريخ الإضافي,عدد الساعات,نوع الإضافي,من الساعة,إلى الساعة\n"
+            . "9001,Employee Alpha A," . now()->toDateString() . ",5,نهاري,08:00,09:00\n";
+        $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
+        file_put_contents($path, $csv);
+
+        app(WorkbookRequestImporter::class)->import($path, 'csv', app(PayrollPeriodGuard::class), app(PayrollRunService::class));
+
+        $request = HrRequest::firstOrFail();
+        $this->assertSame(1.0, (float) $request->payload['hours']);
+        $this->assertArrayNotHasKey('anchor_to_shift', (array) $request->payload);
+        unlink($path);
+    }
+
+    public function test_import_unknown_overtime_period_is_rejected(): void
+    {
+        $csv = "كود الموظف,اسم الموظف,تاريخ الإضافي,عدد الساعات,نوع الإضافي\n"
+            . "9001,Employee Alpha A," . now()->toDateString() . ",1,صباحي\n";
+        $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
+        file_put_contents($path, $csv);
+
+        $result = app(WorkbookRequestImporter::class)->import($path, 'csv', app(PayrollPeriodGuard::class), app(PayrollRunService::class));
+
+        $this->assertSame(0, $result['imported']);
+        $this->assertStringContainsString('نوع الإضافي', implode(' ', $result['errors']));
+        unlink($path);
+    }
+
+    public function test_anchored_hour_before_shift_is_paid_only_when_present_in_that_hour(): void
+    {
+        // Shift 09:00-17:00, one day hour requested without a window: the app
+        // places it 08:00-09:00. Arrived 08:00 - earns 60, never 120.
+        $this->attendance('2026-11-01', '08:00', '17:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, null, null, true);
+
+        $this->assertSame(60, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+        $this->assertSame(60.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_hour_arriving_two_hours_early_still_earns_one_hour(): void
+    {
+        $this->attendance('2026-11-01', '07:00', '17:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, null, null, true);
+
+        $this->assertSame(60, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+        $this->assertSame(60.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_hour_after_shift_end_is_paid_for_late_stay(): void
+    {
+        $this->attendance('2026-11-01', '09:00', '18:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, null, null, true);
+
+        $this->assertSame(60, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+        $this->assertSame(60.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_hour_with_early_and_late_presence_is_not_paid_twice(): void
+    {
+        $this->attendance('2026-11-01', '08:00', '18:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, null, null, true);
+
+        $this->assertSame(60, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+        $this->assertSame(60.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_hour_without_presence_next_to_the_shift_earns_nothing(): void
+    {
+        // Worked the shift exactly: nothing outside it to prove the hour.
+        $this->attendance('2026-11-01', '09:00', '17:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, null, null, true);
+
+        $this->assertSame(0, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+        $this->assertSame(0.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_hour_is_not_covered_by_presence_far_from_the_shift(): void
+    {
+        // Presence only 19:00-21:00 would be night; a day hour anchored at
+        // 17:00-18:00 has no presence in it when the person left at 17:00.
+        $this->attendance('2026-11-01', '09:00', '17:00');
+        $this->overtimeRequest('2026-11-01', 'day', 2.0, null, null, true);
+
+        $this->assertSame(0.0, $this->payrollOvertime()['day_minutes']);
+    }
+
+    public function test_anchored_night_hours_are_capped_by_night_presence(): void
+    {
+        $this->attendance('2026-11-01', '09:00', '21:00');
+        $this->overtimeRequest('2026-11-01', 'night', 5.0, null, null, true);
+
+        $row = $this->summaryRow(Carbon::parse('2026-11-01'));
+        $this->assertSame(120, $row['night_overtime_minutes']);
+        $this->assertSame(0, $row['day_overtime_minutes']);
+        $this->assertSame(120.0, $this->payrollOvertime()['night_minutes']);
+    }
+
+    public function test_written_window_is_used_as_written_even_with_the_anchor_flag(): void
+    {
+        // Window 08:00-09:00 written; person only stayed late. Not anchored.
+        $this->attendance('2026-11-01', '09:00', '19:00');
+        $this->overtimeRequest('2026-11-01', 'day', 1.0, '08:00', '09:00', true);
+
+        $this->assertSame(0, $this->summaryRow(Carbon::parse('2026-11-01'))['day_overtime_minutes']);
+    }
+
     public function test_import_advance_rows_still_work_without_window_columns(): void
     {
         $csv = "كود الموظف,اسم الموظف,تاريخ الطلب,مبلغ السلفة\n"
-            . "9001,Employee Alpha A,2026-10-15,500\n";
+            . "9001,Employee Alpha A," . now()->toDateString() . ",500\n";
         $path = tempnam(sys_get_temp_dir(), 'imp') . '.csv';
         file_put_contents($path, $csv);
         RequestType::create(['code' => 'advance', 'display_name' => 'سلفة', 'source_key' => 'advance', 'is_active' => true, 'company_id' => $this->company->id]);

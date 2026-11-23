@@ -43,6 +43,9 @@ class PurgeUntimedOvertimeRequests extends Command
             ->get(['id', 'company_id', 'employee_id', 'request_type', 'payload', 'created_at'])
             ->filter(function (HrRequest $request): bool {
                 $payload = is_array($request->payload) ? $request->payload : [];
+                // Hours-only requests created by the sheet import are placed next
+                // to the shift on purpose and are not legacy test data.
+                if (!empty($payload['anchor_to_shift'])) return false;
                 return empty($payload['from_time']) || empty($payload['to_time']);
             });
 
