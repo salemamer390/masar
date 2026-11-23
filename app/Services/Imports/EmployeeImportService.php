@@ -761,15 +761,20 @@ class EmployeeImportService
     }
 
     /** First data rows of a sheet (strings, capped) so the user can eyeball what a sheet really is. */
-    private function sheetSample(array $rows, ?int $headerRow, int $maxRows = 3, int $maxCols = 8): array
+    private function sheetSample(array $rows, ?int $headerRow, int $maxRows = 4, int $maxCols = 14): array
     {
         $sample = [];
         $count = 0;
         foreach ($rows as $number => $cells) {
             if ($count >= $maxRows) break;
             if ($headerRow !== null && $number < $headerRow) continue;
-            $values = array_map(static fn ($v) => (string) $v, array_slice($cells, 0, $maxCols));
-            if (implode('', $values) === '') continue;
+            $values = [];
+            $top = empty($cells) ? -1 : min($maxCols - 1, (int) max(array_keys($cells)));
+            for ($c = 0; $c <= $top; $c++) {
+                $v = $cells[$c] ?? '';
+                $values[] = is_scalar($v) ? (string) $v : '';
+            }
+            if (trim(implode('', $values)) === '') continue;
             $sample[] = $values;
             $count++;
         }
