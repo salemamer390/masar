@@ -14,58 +14,90 @@
     @php($serviceDiff = $employee->contract_start_date->diff(today()))
     @php($servicePeriod = ['years' => $serviceDiff->y, 'months' => $serviceDiff->m, 'days' => $serviceDiff->d])
 @endif
-<div class="profile-head">
-    <a href="{{ route('employees.index') }}" class="back-btn profile-back-btn">
-        <i class="bi bi-arrow-right"></i> {{ __('العودة للموظفين') }}
-    </a>
-
-    <div class="profile-person">
-        <button type="button" class="profile-avatar profile-avatar-button" data-bs-toggle="modal" data-bs-target="#profilePhotoModal" title="{{ __('إدارة الصورة') }}">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else<i class="bi bi-person-fill" aria-hidden="true"></i>@endif</button>
-        <div>
-            <h1>{{ $employee->full_name }}</h1>
-            <p>{{ $employee->job?->title ?? '—' }} · {{ $employee->department?->name ?? '—' }}</p>
-            <div class="profile-tags">
-                @php($employeeStatus = $employee->status?->name ?? 'Active')
-                <button type="button" class="badge-soft border-0 {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => 'success' } }}" data-bs-toggle="modal" data-bs-target="#employeeStatusModal">{{ match($employeeStatus) { 'Active' => __('نشط'), 'Leave' => __('إجازة'), 'Suspended' => __('موقوف'), 'Terminated' => __('منتهي الخدمة'), 'Pending' => __('قيد التعيين'), default => $employeeStatus } }} <i class="bi bi-chevron-down"></i></button>
+<a href="{{ route('employees.index') }}" class="back-btn profile-back-btn">
+    <i class="bi bi-arrow-right"></i> {{ __('العودة للموظفين') }}
+</a>
+@php($employeeStatus = $employee->status?->name ?? 'Active')
+<section class="emp-header">
+    <div class="emp-cover"></div>
+    <div class="emp-main">
+        <div class="emp-avatar">
+            <button type="button" class="profile-avatar profile-avatar-button" data-bs-toggle="modal" data-bs-target="#profilePhotoModal" title="{{ __('إدارة الصورة') }}">@if($employee->profile_photo_url)<img src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}">@else<i class="bi bi-person-fill" aria-hidden="true"></i>@endif</button>
+            <span class="dot {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => '' } }}"></span>
+        </div>
+        <div class="emp-id">
+            <h1 class="emp-name">{{ $employee->full_name }}
+                <button type="button" class="emp-badge {{ match($employeeStatus) { 'Leave' => 'warning', 'Suspended', 'Terminated' => 'danger', default => '' } }}" data-bs-toggle="modal" data-bs-target="#employeeStatusModal">{{ match($employeeStatus) { 'Active' => __('نشط'), 'Leave' => __('إجازة'), 'Suspended' => __('موقوف'), 'Terminated' => __('منتهي الخدمة'), 'Pending' => __('قيد التعيين'), default => $employeeStatus } }} <i class="bi bi-chevron-down"></i></button>
                 @if($hasPreviousResignation)
-                    <span class="badge-soft warning d-block" title="{{ __('استقالة سابقة') }}" aria-label="{{ __('استقالة سابقة') }}"><i class="bi bi-file-earmark-text"></i></span>
+                    <span class="emp-badge warning" title="{{ __('استقالة سابقة') }}" aria-label="{{ __('استقالة سابقة') }}"><i class="bi bi-file-earmark-text"></i></span>
                 @endif
                 @if($hasPreviousDismissal)
-                    <span class="badge-soft danger d-block">{{ __('فصل سابق') }}{{ ($employee->termination_type === 'dismissal' && $employee->termination_date) ? ' · '.$employee->termination_date->format('d/m/Y') : ($dismissalMovement?->movement_date ? ' · '.$dismissalMovement->movement_date->format('d/m/Y') : '') }}</span>
+                    <span class="emp-badge danger">{{ __('فصل سابق') }}{{ ($employee->termination_type === 'dismissal' && $employee->termination_date) ? ' · '.$employee->termination_date->format('d/m/Y') : ($dismissalMovement?->movement_date ? ' · '.$dismissalMovement->movement_date->format('d/m/Y') : '') }}</span>
                 @endif
+            </h1>
+            <div class="emp-role">
+                <span class="dept">{{ $employee->department?->name ?? '—' }}</span><i class="sep"></i><span>{{ $employee->job?->title ?? '—' }}</span>
             </div>
         </div>
-        <div class="profile-metrics" aria-label="{{ __('ملخص بيانات الموظف') }}">
-            <div class="profile-metric"><i class="bi bi-hash"></i><span>{{ __('كود الموظف') }}</span><b>{{ $employee->employee_code ?? '—' }}</b></div>
-            <div class="profile-metric"><i class="bi bi-person"></i><span>{{ __('العمر') }}</span><b>{{ $ageYears !== null ? $ageYears.' '.__('سنة') : '—' }}</b></div>
-            <div class="profile-metric"><i class="bi bi-briefcase"></i><span>{{ __('مدة الخدمة') }}</span><b>
-                @if(!$servicePeriod) —
-                @elseif($servicePeriod['years'] > 0)
-                    {{ $servicePeriod['years'] }} {{ __('سنة') }}{{ $servicePeriod['months'] > 0 ? ' '.__('و').$servicePeriod['months'].' '.__('شهر') : '' }}
-                @elseif($servicePeriod['months'] > 0)
-                    {{ $servicePeriod['months'] }} {{ __('شهر') }}{{ $servicePeriod['days'] > 0 ? ' '.__('و').$servicePeriod['days'].' '.__('يوم') : '' }}
-                @else
-                    {{ $servicePeriod['days'] }} {{ __('يوم') }}
-                @endif
-            </b></div>
-            <div class="profile-metric"><i class="bi bi-diagram-3"></i><span>{{ __('القسم') }}</span><b>{{ $employee->department?->name ?? '—' }}</b></div>
+        <div class="emp-actions">
+            @if(auth()->user()?->hasPermission('employees.edit'))
+            <button type="button" class="emp-btn emp-btn-ghost" data-bs-toggle="modal" data-bs-target="#employeeMasterModal"><i class="bi bi-pencil"></i> {{ __('تعديل الملف') }}</button>
+            @endif
+            <a href="{{ route('employees.print', $employee) }}" target="_blank" class="emp-btn emp-btn-primary"><i class="bi bi-printer"></i> {{ __('طباعة الملف') }}</a>
         </div>
     </div>
-
-    <div class="profile-actions">
-        @if(auth()->user()?->hasPermission('employees.edit'))
-            <a href="{{ route('employees.show', [$employee, 'tab' => 'job']) }}" class="btn btn-light">
-                <i class="bi bi-pencil"></i> {{ __('البيانات الوظيفية') }}
-            </a>
-        @endif
-        @if(auth()->user()?->hasPermission('employees.edit'))
-        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeeMasterModal"><i class="bi bi-pencil-square"></i> {{ __('تعديل الملف') }}</button>
-        @endif
-        <a href="{{ route('employees.print', $employee) }}" target="_blank" class="btn btn-primary">
-            <i class="bi bi-printer"></i> {{ __('طباعة الملف') }}
-        </a>
+    <div class="emp-stats" aria-label="{{ __('ملخص بيانات الموظف') }}">
+        <div class="emp-stat"><span class="ico"><i class="bi bi-hash"></i></span><div><small>{{ __('كود الموظف') }}</small><strong>{{ $employee->employee_code ?? '—' }}</strong></div></div>
+        <div class="emp-stat"><span class="ico"><i class="bi bi-person"></i></span><div><small>{{ __('العمر') }}</small><strong>{{ $ageYears !== null ? $ageYears.' '.__('سنة') : '—' }}</strong></div></div>
+        <div class="emp-stat"><span class="ico"><i class="bi bi-briefcase"></i></span><div><small>{{ __('مدة الخدمة') }}</small><strong>
+            @if(!$servicePeriod) —
+            @elseif($servicePeriod['years'] > 0)
+                {{ $servicePeriod['years'] }} {{ __('سنة') }}{{ $servicePeriod['months'] > 0 ? ' '.__('و').$servicePeriod['months'].' '.__('شهر') : '' }}
+            @elseif($servicePeriod['months'] > 0)
+                {{ $servicePeriod['months'] }} {{ __('شهر') }}{{ $servicePeriod['days'] > 0 ? ' '.__('و').$servicePeriod['days'].' '.__('يوم') : '' }}
+            @else
+                {{ $servicePeriod['days'] }} {{ __('يوم') }}
+            @endif
+        </strong></div></div>
+        <div class="emp-stat"><span class="ico"><i class="bi bi-calendar-event"></i></span><div><small>{{ __('تاريخ التعيين') }}</small><strong>{{ $employee->contract_start_date?->format('d/m/Y') ?? '—' }}</strong></div></div>
     </div>
-</div>
+</section>
+@push('styles')
+<style>
+.emp-header{--navy:#0f1f3d;--blue:#1a73ff;--blue-soft:#eaf2ff;--green:#12a36b;--green-soft:#e3f7ee;--red:#e5484d;--red-soft:#fdecec;--amber:#b7791f;--amber-soft:#fff4de;--muted:#7a88a3;--line:#e6ecf5;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 8px 30px rgba(15,31,61,.06);margin-bottom:16px}
+.emp-cover{height:92px;background:linear-gradient(120deg,var(--navy) 0%,#1b3a7a 55%,var(--blue) 100%);position:relative}
+.emp-cover::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 15% 120%,rgba(255,255,255,.18),transparent 45%)}
+.emp-main{display:flex;align-items:flex-end;gap:20px;padding:0 28px 20px;margin-top:-48px;position:relative;flex-wrap:wrap}
+.emp-avatar{position:relative;flex:none}
+.emp-header .emp-avatar .profile-avatar{width:112px;height:112px;border-radius:26px;border:5px solid #fff;box-shadow:0 6px 18px rgba(15,31,61,.18)}
+.emp-header .emp-avatar .profile-avatar>i{font-size:44px}
+.emp-avatar .dot{position:absolute;bottom:6px;inset-inline-start:6px;width:20px;height:20px;border-radius:50%;background:var(--green);border:3px solid #fff}
+.emp-avatar .dot.warning{background:#f0a020}.emp-avatar .dot.danger{background:var(--red)}
+.emp-id{flex:1;min-width:220px}
+.emp-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:54px 0 0;font-size:26px;font-weight:800;line-height:1.2;color:var(--navy)}
+.emp-badge{font-family:inherit;font-size:12px;font-weight:700;padding:4px 12px;border-radius:99px;background:var(--green-soft);color:var(--green);border:0;display:inline-flex;align-items:center;gap:4px}
+button.emp-badge{cursor:pointer}
+.emp-badge.warning{background:var(--amber-soft);color:var(--amber)}.emp-badge.danger{background:var(--red-soft);color:var(--red)}
+.emp-role{margin-top:6px;color:var(--muted);font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.emp-role .sep{width:4px;height:4px;border-radius:50%;background:#c3cde0;display:inline-block}
+.emp-role .dept{color:var(--blue)}
+.emp-actions{display:flex;gap:10px}
+.emp-btn{font-family:inherit;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:12px;cursor:pointer;transition:.2s;text-decoration:none}
+.emp-btn-primary{background:var(--blue);color:#fff;border:1px solid var(--blue);box-shadow:0 6px 16px rgba(26,115,255,.28)}
+.emp-btn-primary:hover{color:#fff;transform:translateY(-1px);box-shadow:0 8px 20px rgba(26,115,255,.38)}
+.emp-btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.emp-btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
+.emp-stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:#fbfcff}
+.emp-stat{display:flex;align-items:center;gap:14px;padding:16px 24px}
+.emp-stat+.emp-stat{border-inline-start:1px solid var(--line)}
+.emp-stat .ico{width:42px;height:42px;border-radius:12px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;flex:none;font-size:19px}
+.emp-stat small{display:block;color:var(--muted);font-size:12px;font-weight:600}
+.emp-stat strong{display:block;font-size:16px;font-weight:800;margin-top:1px;color:var(--navy)}
+@media(max-width:991px){.emp-stats{grid-template-columns:repeat(2,1fr)}.emp-stat:nth-child(3){border-inline-start:0}.emp-stat:nth-child(n+3){border-top:1px solid var(--line)}}
+@media(max-width:640px){.emp-main{flex-direction:column;align-items:center;text-align:center}.emp-name,.emp-role{justify-content:center}.emp-name{margin-top:8px}.emp-actions{width:100%}.emp-actions .emp-btn{flex:1;justify-content:center}.emp-stats{grid-template-columns:1fr}.emp-stat{border-inline-start:0!important}.emp-stat+.emp-stat{border-top:1px solid var(--line)}}
+@media print{.emp-actions{display:none}}
+</style>
+@endpush
 
 <div class="profile-tabs">
     @foreach([
