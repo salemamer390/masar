@@ -6192,3 +6192,14 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 .profile-photo-modal .ppm-footer .ppm-delete{margin-inline-start:auto}
 .profile-photo-modal .ppm-footer .btn{border-radius:12px;font-weight:700;padding:9px 18px}
 @media(max-width:480px){.profile-photo-modal .ppm-drop-preview{flex-direction:column;text-align:center}.profile-photo-modal .ppm-file{text-align:center}}
+
+/* Photo modal: always fit the viewport */
+.profile-photo-modal{display:flex;flex-direction:column;max-height:calc(100vh - 32px)}
+.profile-photo-modal .ppm-head{flex:none}
+.profile-photo-modal .ppm-current{flex:none}
+.profile-photo-modal .ppm-current .profile-photo-full{max-height:min(200px,22vh)}
+.profile-photo-modal form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.profile-photo-modal .ppm-body{flex:1 1 auto;min-height:0;overflow-y:auto}
+.profile-photo-modal .ppm-footer{flex:none;border-top:1px solid #edf1f5;padding-top:14px}
+.profile-photo-modal .ppm-drop{min-height:min(190px,26vh)}
+@media(max-height:620px){.profile-photo-modal .ppm-current{display:none}}
