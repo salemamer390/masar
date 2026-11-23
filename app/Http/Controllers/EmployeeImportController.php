@@ -104,10 +104,12 @@ class EmployeeImportController extends Controller
             $data = $distributed[$domain] ?? [];
             $imported = (int) ($data['imported'] ?? 0);
             $skipped = (int) ($data['skipped'] ?? 0);
-            if ($imported + $skipped > 0) {
+            $deferred = (int) ($data['deferred'] ?? 0);
+            if ($imported + $skipped + $deferred > 0) {
                 $domains[$domain] = [
                     'imported' => $imported,
                     'skipped' => $skipped,
+                    'deferred' => $deferred,
                     'out_of_period_count' => (int) ($data['out_of_period_count'] ?? 0),
                     'period_start' => app(\App\Services\CurrentPayrollPeriodImportGuard::class)->currentStart()->format('d/m'),
                     'errors' => (array) ($data['errors'] ?? []),

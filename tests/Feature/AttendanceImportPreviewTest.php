@@ -732,10 +732,11 @@ class AttendanceImportPreviewTest extends TestCase
         ]]]);
         $report = \App\Support\CompanyContext::run($this->company->id, fn () => app(\App\Services\Imports\WorkbookAttendanceImporter::class)->import($file->getRealPath(), 'xlsx', app(\App\Services\PayrollPeriodGuard::class), app(\App\Services\PayrollRunService::class)));
         $this->assertSame(1, $report['imported']);
-        $this->assertSame(3, $report['skipped']);
-        $this->assertCount(1, $report['warnings']);
+        $this->assertSame(2, $report['skipped']);
+        $this->assertSame(1, $report['deferred']); // the blank-punch day is kept as a punch error, not rejected
+        $this->assertCount(2, $report['warnings']);
         $this->assertSame('Present', Attendance::firstOrFail()->status);
-        $this->assertCount(3, $report['failures']);
+        $this->assertCount(2, $report['failures']);
     }
 
     public function test_raw_punches_accept_arabic_digits_without_changing_shift_aggregation(): void

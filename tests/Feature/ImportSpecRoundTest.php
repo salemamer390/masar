@@ -109,4 +109,19 @@ class ImportSpecRoundTest extends TestCase
         ]);
         $this->get('/discipline?from_date=2026-11-01&to_date=2026-11-30')->assertOk()->assertSee('جزاءات التأخير والحضور والانصراف');
     }
+
+    public function test_wizard_attendance_missing_punch_days_are_not_rejected(): void
+    {
+        $file = $this->xlsx([['name' => 'الحضور والانصراف', 'rows' => [
+            ['كود الموظف', 'التاريخ', 'وقت الحضور', 'وقت الانصراف'],
+            ['104', '2026-11-10', '09:00', '17:00'],
+            ['104', '2026-11-11', '', ''],
+            ['104', '2026-11-12', '09:00', ''],
+        ]]]);
+        $preview = $this->postJson('/employees/import/preview', ['file' => $file])->assertOk();
+        $this->assertSame(1, $preview->json('domains.attendance.imported'));
+        $this->assertSame(0, $preview->json('domains.attendance.skipped'));
+        $this->assertSame(2, $preview->json('domains.attendance.deferred'));
+        $this->assertStringContainsString('أخطاء البصمات', implode(' ', $preview->json('domains.attendance.warnings')));
+    }
 }
