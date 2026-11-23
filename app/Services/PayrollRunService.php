@@ -334,6 +334,11 @@ class PayrollRunService
         // deduct the same day twice. Legacy rows without a contractual basic
         // breakdown keep the calculator's own basic.
         if ($salary->basic_salary === null) return null;
+        // Allowances disabled: their value is folded into the basic, so the
+        // absence base is the contractual basic plus the contractual allowances.
+        if (!$this->settings->allowancesEnabled()) {
+            return (float) $salary->basic_salary + (float) ($salary->allowances ?? 0);
+        }
 
         return (float) $salary->basic_salary;
     }
@@ -347,8 +352,10 @@ class PayrollRunService
     {
         // Only under the Basic basis: under Gross every allowance share is
         // already inside the gross absence deduction, so reducing the earnings
-        // side too would deduct the same day twice.
+        // side too would deduct the same day twice. With allowances disabled
+        // there is no allowance share at all; their value sits in the basic.
         if ($this->settings->absenceBasis() !== 'Basic') return 0.0;
+        if (!$this->settings->allowancesEnabled()) return 0.0;
         if ($absenceDays <= 0) return 0.0;
         $divisor = max(1, $this->settings->absenceDailyDivisor());
         $hasSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
@@ -388,7 +395,13 @@ class PayrollRunService
     {
         // Persist the contractual amounts actually earned in the period: the
         // engine's internal basic/allowance split drives statutory math only.
+        $allowancesEnabled = $this->settings->allowancesEnabled();
         $contractualBasicEarned = round((float) ($salary->basic_salary ?? $structure['basic_salary']) * $window['factor'], 2);
+        if (!$allowancesEnabled) {
+            // Allowances disabled: their contractual value folds into the basic
+            // (the total is unchanged) and every allowance column stays zero.
+            $contractualBasicEarned = round($contractualBasicEarned + (float) ($salary->allowances ?? ($structure['allowances'] ?? 0)) * $window['factor'], 2);
+        }
         // Itemized allowances are the contractual split when the structure has
         // one; a lump-only structure stores zeros so the drawer shows the
         // contractual lump instead of the engine's invented split.
@@ -397,13 +410,15 @@ class PayrollRunService
         // Employment-window proration is automatic for every allowance. Under
         // the Basic basis a flagged allowance additionally loses its daily share
         // for each absence day; the absence deduction covers the basic only, so
-        // no allowance day is deducted twice.
+        // no allowance day is deducted twice. With allowances disabled their
+        // value folds into the basic and every allowance column is zero.
         $absenceDaysForAllowances = max(0.0, (float) ($calculation['absence_days'] ?? 0));
         $absenceAllowanceDivisor = max(1, $this->settings->absenceDailyDivisor());
         // The flagged-allowance absence share applies only under the Basic basis;
         // under Gross it is already inside the gross absence deduction.
-        $absenceShareApplies = $this->settings->absenceBasis() === 'Basic';
-        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies) {
+        $absenceShareApplies = $allowancesEnabled && $this->settings->absenceBasis() === 'Basic';
+        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies, $allowancesEnabled) {
+            if (!$allowancesEnabled) return 0.0;
             $full = (float) ($salary->{$column} ?? 0);
             $earned = $full * $window['factor'];
             if ($absenceShareApplies && $absenceDaysForAllowances > 0 && $this->settings->allowanceIsProrated($column)) {
@@ -419,7 +434,8 @@ class PayrollRunService
         // configured percentages the calculator splits a gross with - and each
         // share follows its own proration flag. The clothing share is the
         // remainder, exactly like the calculator's residual.
-        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies) {
+        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies, $allowancesEnabled) {
+            if (!$allowancesEnabled) return 0.0;
             $lump = (float) ($salary->allowances ?? $structure['allowances']);
             $factor = $window['factor'];
             $distribution = $this->settings->allowanceDistribution();

@@ -36,17 +36,18 @@ class PayrollDefaultsService
         ['advance', 'max_percent_of_gross', 10, 'percentage', '%', 'سقف السلفة/القسط من الإجمالي', 'الحد الأقصى للسلفة وللقسط الشهري كنسبة من إجمالي الراتب'],
     ];
 
-    /** [key, name, percentage, sort] */
+    /** [key, name, percentage, sort, absence-deducted by default] */
     public const ALLOWANCES = [
-        ['transport', 'بدل انتقال', 35, 1],
-        ['housing', 'بدل سكن', 30, 2],
-        ['meal', 'بدل وجبة', 20, 3],
-        ['clothing', 'بدل ملبس', 15, 4],
+        ['transport', 'بدل انتقال', 35, 1, 1],
+        ['housing', 'بدل سكن', 30, 2, 0],
+        ['meal', 'بدل وجبة', 20, 3, 1],
+        ['clothing', 'بدل ملبس', 15, 4, 0],
     ];
 
     /** [group, key, value, label, description] */
     public const RULES = [
-        ['absence', 'calculation_basis', 'Gross', 'أساس حساب الغياب', 'أساس حساب أجر يوم الغياب: Gross إجمالي الراتب أو Basic الأساسي'],
+        ['absence', 'calculation_basis', 'Basic', 'أساس حساب الغياب', 'أساس حساب أجر يوم الغياب: Basic الأساسي أو Gross إجمالي الراتب'],
+        ['allowances', 'enabled', '1', 'تفعيل البدلات في الحساب', 'عند الإلغاء تُضم قيمة البدلات إلى الأساسي ويُحسب الراتب كله كأساسي دون تغيير الإجمالي'],
         ['absence', 'deducted_allowances', 'meal,transportation', 'البدلات المخصومة مع الغياب', 'البدلات التي تُضاف قيمتها اليومية إلى خصم يوم الغياب عند أساس «الأساسي»: housing المسكن، transportation الانتقال، meal الوجبة، clothing الملبس، other أخرى'],
         ['penalty', 'calculation_basis', 'Basic', 'أساس حساب الجزاءات', 'أساس حساب أجر يوم الجزاء: Gross إجمالي الراتب أو Basic الأساسي'],
         ['overtime', 'calculation_basis', 'Gross', 'أساس حساب الإضافي', 'أساس حساب أجر ساعة الإضافي وأجر يوم الراحة/العطلة: Gross أو Basic'],
@@ -185,12 +186,16 @@ class PayrollDefaultsService
         if (!Schema::hasTable('payroll_allowance_settings')) return;
         if (DB::table('payroll_allowance_settings')->where('company_id', $companyId)->exists()) return;
         $now = now();
-        foreach (self::ALLOWANCES as [$key, $name, $percentage, $sort]) {
-            DB::table('payroll_allowance_settings')->insertOrIgnore([
+        foreach (self::ALLOWANCES as [$key, $name, $percentage, $sort, $prorated]) {
+            $row = [
                 'company_id' => $companyId, 'allowance_key' => $key, 'allowance_name' => $name,
                 'percentage' => $percentage, 'calculation_basis' => 'allowance_pool',
                 'is_active' => 1, 'sort_order' => $sort, 'created_at' => $now, 'updated_at' => $now,
-            ]);
+            ];
+            if (Schema::hasColumn('payroll_allowance_settings', 'is_prorated')) {
+                $row['is_prorated'] = $prorated;
+            }
+            DB::table('payroll_allowance_settings')->insertOrIgnore($row);
         }
     }
 

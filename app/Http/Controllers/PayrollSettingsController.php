@@ -539,6 +539,7 @@ class PayrollSettingsController extends Controller
             'allowances.*' => ['numeric', 'min:0', 'max:100'],
             'allowance_prorated' => ['nullable', 'array'],
             'allowance_prorated.*' => ['nullable', 'boolean'],
+            'allowances_enabled' => ['nullable', 'boolean'],
         ]);
 
         abort_if(array_diff(array_keys($data['settings']), self::SETTING_KEYS) !== [], 422, 'Invalid payroll setting.');
@@ -563,7 +564,12 @@ class PayrollSettingsController extends Controller
 
         app(PayrollDefaultsService::class)->ensureForCompany($companyId);
         $proratedFlags = $data['allowance_prorated'] ?? [];
-        DB::transaction(function () use ($data, $companyId, $proratedFlags) {
+        $allowancesEnabled = !empty($data['allowances_enabled']) ? '1' : '0';
+        DB::transaction(function () use ($data, $companyId, $proratedFlags, $allowancesEnabled) {
+            DB::table('payroll_calculation_rules')->updateOrInsert(
+                ['company_id' => $companyId, 'rule_group' => 'allowances', 'rule_key' => 'enabled'],
+                ['rule_value' => $allowancesEnabled, 'updated_at' => now()]
+            );
             $snapshot = fn () => [
                 'settings' => DB::table('payroll_calculation_settings')->where('company_id', $companyId)->where('is_active', true)->get(),
                 'allowances' => DB::table('payroll_allowance_settings')->where('company_id', $companyId)->where('is_active', true)->get(),

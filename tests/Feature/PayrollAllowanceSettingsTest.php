@@ -84,7 +84,11 @@ class PayrollAllowanceSettingsTest extends TestCase
 
         $rows = $this->allowanceRows()->keyBy('allowance_key');
         $this->assertEqualsWithDelta(15.0, (float) $rows['clothing']->percentage, 0.0001);
-        $this->assertEquals(1, (int) $rows['housing']->is_prorated);
+        // Seeded defaults: meal and transport deduct the absence-day share,
+        // housing and clothing do not. This form posts no prorated flags, so
+        // the seeded values must survive the save untouched.
+        $this->assertEquals(0, (int) $rows['housing']->is_prorated);
+        $this->assertEquals(1, (int) $rows['transport']->is_prorated);
     }
 
     public function test_unknown_allowance_keys_are_rejected(): void

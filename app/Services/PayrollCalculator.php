@@ -33,7 +33,9 @@ class PayrollCalculator
     public function grossResult(float $gross, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0): array
     {
         $gross = max(0, $gross);
-        $allowanceRate = $this->settings->allowanceRate() / 100;
+        // Allowances disabled: their whole value folds into the basic, so the
+        // engine's split is basic = gross with a zero allowance pool.
+        $allowanceRate = $this->settings->allowancesEnabled() ? $this->settings->allowanceRate() / 100 : 0.0;
         $basic = $this->round2($gross / (1 + $allowanceRate));
         $allowances = $this->round2($gross - $basic);
         $shares = $this->allowanceShares();

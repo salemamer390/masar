@@ -201,6 +201,12 @@ class PayrollSettingsService
         return $this->basis('absence', 'calculation_basis', 'Gross');
     }
 
+    /** Whether allowances exist in the calculation; when off, their value folds into the basic. */
+    public function allowancesEnabled(): bool
+    {
+        return $this->rule('allowances', 'enabled', '1') !== '0';
+    }
+
     /** Allowance keys whose daily value joins the absence-day deduction under the Basic basis. */
     public function absenceDeductedAllowances(): array
     {
