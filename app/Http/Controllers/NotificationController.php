@@ -22,6 +22,14 @@ class NotificationController extends Controller
         return redirect($item->data['url'] ?? route('dashboard'));
     }
 
+    public function confirm(Request $request, string $notification, \App\Services\LeaveAttendanceConflictService $conflicts): RedirectResponse
+    {
+        abort_unless($request->user()->hasPermission('leaves.view'), 403);
+        $item = $request->user()->notifications()->findOrFail($notification);
+        $conflicts->confirm($request->user(), $item);
+        return back()->with('toast', __('تم تأكيد التعارض ولن يتكرر التنبيه.'));
+    }
+
     public function markAllRead(Request $request)
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);

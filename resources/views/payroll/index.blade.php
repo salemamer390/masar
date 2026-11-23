@@ -334,10 +334,14 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       });
       if (Number(record.day_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي النهاري'), payrollMoney(record.day_overtime_amount)));
       if (Number(record.night_overtime_amount || 0) > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي الليلي'), payrollMoney(record.night_overtime_amount)));
+      const holidayPay = Number(record.official_holiday_amount || 0);
+      const restPay = Number(record.weekly_rest_amount || 0);
+      if (holidayPay > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('عمل يوم عطلة رسمية'), payrollMoney(holidayPay)));
+      if (restPay > 0) earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('عمل يوم راحة'), payrollMoney(restPay)));
       const dayOvertime = Number(record.day_overtime_amount || 0);
       const nightOvertime = Number(record.night_overtime_amount || 0);
       const totalOvertime = Number(record.overtime_amount || 0);
-      if (dayOvertime <= 0 && nightOvertime <= 0 && totalOvertime > 0) {
+      if (dayOvertime <= 0 && nightOvertime <= 0 && holidayPay <= 0 && restPay <= 0 && totalOvertime > 0) {
         earningsSection.insertAdjacentHTML('beforeend', detailValue(window.masarT('الإضافي'), payrollMoney(totalOvertime)));
       }
       detailBody.querySelectorAll('.payroll-detail-section:nth-of-type(3) .payroll-detail-item').forEach((item) => {
@@ -512,6 +516,8 @@ document.querySelectorAll('form[action*="/payroll/"]').forEach((form) => {
       if (detail) Object.assign(detail, record, {
         day_overtime_amount: Math.max(Number(record.day_overtime_amount || 0), Number(record.ot_day_amount || 0)),
         night_overtime_amount: Math.max(Number(record.night_overtime_amount || 0), Number(record.ot_night_amount || 0)),
+        official_holiday_amount: Number(record.official_holiday_amount || 0),
+        weekly_rest_amount: Number(record.weekly_rest_amount || 0),
         bonus: Number(record.bonus || 0),
         loans: Number(record.loans || 0),
         other_earnings: Number(record.other_earnings || 0),

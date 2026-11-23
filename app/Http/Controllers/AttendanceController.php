@@ -437,7 +437,21 @@ class AttendanceController extends Controller
         $archives = AttendancePeriodArchive::where('status', AttendancePeriodArchive::CLOSED)->orderByDesc('period_end')->get();
         $current = $this->hrSettings->periodContaining(today()->copy());
 
-        return view('attendance.archive', ['archives' => $archives, 'archive' => null, 'rows' => [], 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
+        return view('attendance.archive', ['archives' => $archives, 'pendingArchives' => $this->pendingArchiveSummaries(), 'archive' => null, 'rows' => [], 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
+    }
+
+    /** Ended periods still inside their correction days: shown in the previous-periods tab with live counts and stay editable. */
+    private function pendingArchiveSummaries(): \Illuminate\Support\Collection
+    {
+        return app(\App\Services\AttendancePeriodArchiveService::class)->pendingPeriods()->map(function (AttendancePeriodArchive $item) {
+            $records = Attendance::whereBetween('attendance_date', [$item->period_start->toDateString(), $item->period_end->toDateString()]);
+
+            return (object) [
+                'item' => $item,
+                'record_count' => (clone $records)->count(),
+                'employee_count' => (clone $records)->distinct('employee_id')->count('employee_id'),
+            ];
+        });
     }
 
     public function archiveShow(AttendancePeriodArchive $archive)
@@ -446,7 +460,7 @@ class AttendanceController extends Controller
         $archives = AttendancePeriodArchive::where('status', AttendancePeriodArchive::CLOSED)->orderByDesc('period_end')->get();
         $current = $this->hrSettings->periodContaining(today()->copy());
 
-        return view('attendance.archive', ['archives' => $archives, 'archive' => $archive, 'rows' => $archive->rows, 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
+        return view('attendance.archive', ['archives' => $archives, 'pendingArchives' => $this->pendingArchiveSummaries(), 'archive' => $archive, 'rows' => $archive->rows, 'periodStart' => $current['start']->toDateString(), 'periodEnd' => $current['end']->toDateString()]);
     }
 
     public function archiveExport(AttendancePeriodArchive $archive)
