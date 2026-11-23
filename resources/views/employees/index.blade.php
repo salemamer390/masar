@@ -2,21 +2,35 @@
 
 @section('title', __('الموظفون'))
 
+@push('styles')
+<style>
+  /* Amer's approved mobile arrangement (23/11/2026): Add (blue) + Excel Import (green) side by side in one row */
+  .btn-employees-import { background:#16a34a; border-color:#16a34a; color:#fff; }
+  .btn-employees-import:hover, .btn-employees-import:focus { background:#15803d; border-color:#15803d; color:#fff; }
+  .btn-employees-import i { color:#fff !important; }
+  @media (max-width: 767.98px) {
+    .employees-actions { flex-wrap: nowrap; gap: 8px; }
+    .employees-actions .btn { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 700; padding: 8px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 46px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+  }
+</style>
+@endpush
+
 @section('content')
 <div class="page-head">
   <div>
     <h1>{{ __('الموظفون') }}</h1>
     <p>{{ __('إدارة ملف الموظف والبيانات الأساسية.') }}</p>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2 flex-wrap employees-actions">
     {{-- زر «إعدادات بيانات الموظفين» مخفي بطلب عامر (23/11/2026) حتى يطلب إظهاره؛ الصفحة والبيانات كما هي --}}
     {{-- @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات بيانات الموظفين') }}</a>@endif --}}
-    <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
+    <button type="button" class="btn btn-light btn-employees-import" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
       <i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد من Excel') }}
     </button>
-    <a class="btn btn-light" href="{{ route('employees.import-batches.index') }}" title="{{ __('صفوف الاستيراد المرفوضة وملفات الاستيراد السابقة') }}">
+    {{-- زر «سجل الاستيراد» مخفي بطلب عامر (23/11/2026) حتى يطلب إظهاره؛ السجلات والصفحة كما هي --}}
+    {{-- <a class="btn btn-light btn-employees-history" href="{{ route('employees.import-batches.index') }}" title="{{ __('صفوف الاستيراد المرفوضة وملفات الاستيراد السابقة') }}">
       <i class="bi bi-inbox text-warning"></i> {{ __('سجل الاستيراد') }}
-    </a>
+    </a> --}}
     @if(auth()->user()?->hasPermission('employees.create'))
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
       <i class="bi bi-plus-lg"></i> {{ __('إضافة موظف') }}
