@@ -678,7 +678,58 @@ document.addEventListener('DOMContentLoaded', function () { const select=documen
 @endif
 
 @push('scripts')
-<div class="modal fade" id="profilePhotoModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">@if($employee->profile_photo_url)<div class="modal-body text-center"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"></div>@endif @if(auth()->user()?->hasPermission('employees.edit'))<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data">@csrf @method('PATCH')<div class="modal-body pt-0"><label class="form-label">{{ $employee->profile_photo_url ? __('تغيير الصورة') : __('إضافة صورة شخصية') }}</label><input type="file" name="profile_photo" class="form-control" accept="image/jpeg,image/png,image/webp"><small class="text-muted">{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</small></div><div class="modal-footer justify-content-center gap-2"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger">{{ __('حذف الصورة') }}</button>@endif<button class="btn btn-primary">{{ __('حفظ الصورة') }}</button></div></form>@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif @endif</div></div></div>
+<div class="modal fade" id="profilePhotoModal" tabindex="-1" aria-labelledby="profilePhotoTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">
+<div class="ppm-head"><span class="ppm-head-icon"><i class="bi bi-camera" aria-hidden="true"></i></span><div class="ppm-head-text"><h5 id="profilePhotoTitle">{{ $employee->profile_photo_url ? __('الصورة الشخصية') : __('إضافة صورة شخصية') }}</h5><p>{{ $employee->full_name }}</p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}"></button></div>
+@if($employee->profile_photo_url)<div class="ppm-current"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"><span class="ppm-current-label">{{ __('الصورة الحالية') }}</span></div>@endif
+@if(auth()->user()?->hasPermission('employees.edit'))
+<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data" id="profilePhotoForm" data-max-bytes="5242880">@csrf @method('PATCH')
+<div class="ppm-body">
+<label class="ppm-drop" for="profilePhotoInput" id="profilePhotoDrop" tabindex="0">
+<input type="file" name="profile_photo" id="profilePhotoInput" accept="image/jpeg,image/png,image/webp" class="ppm-input">
+<span class="ppm-drop-empty"><span class="ppm-drop-icon"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i></span><strong>{{ $employee->profile_photo_url ? __('اسحب الصورة الجديدة هنا') : __('اسحب الصورة هنا') }}</strong><span class="ppm-or">{{ __('أو') }}</span><span class="ppm-browse">{{ __('اختيار صورة من الجهاز') }}</span></span>
+<span class="ppm-drop-preview" hidden><img alt="" id="profilePhotoPreview"><span class="ppm-file"><span class="ppm-file-name" id="profilePhotoName"></span><span class="ppm-file-size" id="profilePhotoSize"></span></span><button type="button" class="ppm-remove" id="profilePhotoClear" aria-label="{{ __('إزالة الصورة المختارة') }}"><i class="bi bi-x-lg" aria-hidden="true"></i></button></span>
+</label>
+<div class="ppm-hint" id="profilePhotoHint"><i class="bi bi-info-circle" aria-hidden="true"></i><span>{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</span></div>
+</div>
+<div class="ppm-footer">
+<button class="btn btn-primary ppm-save" id="profilePhotoSave" disabled><i class="bi bi-check2" aria-hidden="true"></i> {{ __('حفظ الصورة') }}</button>
+<button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>
+@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger ppm-delete" onclick="return confirm('{{ __('حذف الصورة الشخصية؟') }}')"><i class="bi bi-trash3" aria-hidden="true"></i> {{ __('حذف الصورة') }}</button>@endif
+</div></form>
+@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif
+<script>
+(function(){
+  var form=document.getElementById('profilePhotoForm'); if(!form) return;
+  var input=document.getElementById('profilePhotoInput'), drop=document.getElementById('profilePhotoDrop'),
+      empty=drop.querySelector('.ppm-drop-empty'), prev=drop.querySelector('.ppm-drop-preview'),
+      img=document.getElementById('profilePhotoPreview'), nm=document.getElementById('profilePhotoName'),
+      sz=document.getElementById('profilePhotoSize'), save=document.getElementById('profilePhotoSave'),
+      hint=document.getElementById('profilePhotoHint'), clear=document.getElementById('profilePhotoClear'),
+      max=parseInt(form.dataset.maxBytes,10), types=['image/jpeg','image/png','image/webp'], url=null;
+  var defaultHint=hint.querySelector('span').textContent;
+  function fmt(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
+  function reset(msg){
+    input.value=''; if(url){URL.revokeObjectURL(url);url=null;}
+    img.removeAttribute('src'); prev.hidden=true; empty.hidden=false; drop.classList.remove('has-file'); save.disabled=true;
+    hint.classList.toggle('is-error',!!msg); hint.querySelector('span').textContent=msg||defaultHint;
+  }
+  function show(f){
+    if(types.indexOf(f.type)<0){reset(@json(__('نوع الملف غير مدعوم. اختر JPG أو PNG أو WebP.')));return;}
+    if(f.size>max){reset(@json(__('حجم الصورة أكبر من 5 ميجابايت.')));return;}
+    if(url) URL.revokeObjectURL(url); url=URL.createObjectURL(f); img.src=url; nm.textContent=f.name; sz.textContent=fmt(f.size);
+    empty.hidden=true; prev.hidden=false; drop.classList.add('has-file'); save.disabled=false;
+    hint.classList.remove('is-error'); hint.querySelector('span').textContent=defaultHint;
+  }
+  input.addEventListener('change',function(){ if(input.files[0]) show(input.files[0]); else reset(); });
+  clear.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();reset();});
+  ['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.add('is-drag');});});
+  ['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.remove('is-drag');});});
+  drop.addEventListener('drop',function(e){var f=e.dataTransfer.files[0]; if(!f) return;
+    try{var dt=new DataTransfer(); dt.items.add(f); input.files=dt.files;}catch(x){} show(f);});
+  document.getElementById('profilePhotoModal').addEventListener('hidden.bs.modal',function(){reset();});
+})();
+</script>
+@endif</div></div></div>
 <script>
 (function(){
     const contractStart=document.getElementById('employee_contract_start_date');
