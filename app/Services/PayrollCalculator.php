@@ -44,9 +44,11 @@ class PayrollCalculator
         $insuranceBase = $this->settings->insuranceAutomaticBasis() === 'Gross' ? $gross : $basic;
         $insuranceWage = $noInsurance ? 0.0 : $this->clamp($manualInsuranceWage && $manualInsuranceWage > 0 ? $manualInsuranceWage : $insuranceBase, $this->settings->insuranceMinimum(), $this->settings->insuranceMaximum());
         $employeeInsurance = $this->round2($insuranceWage * $this->settings->employeeInsuranceRate());
-        $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption()) * 12) - $this->settings->taxDeductibleContributions());
-        $tax = $this->tax->calculate($annualBase);
         $martyrs = $this->round2($gross * $this->settings->martyrsFundRate());
+        // Unified taxable base: employee insurance, the personal exemption and the
+        // martyrs fund all reduce it before the annual brackets are applied.
+        $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption() - $martyrs) * 12) - $this->settings->taxDeductibleContributions());
+        $tax = $this->tax->calculate($annualBase);
         $statutory = $this->round2($employeeInsurance + $tax['monthly_tax'] + $martyrs);
         $extraDeductions = max(0, $extraDeductions);
         $total = $this->round2($statutory + $extraDeductions);
@@ -128,13 +130,19 @@ class PayrollCalculator
 
         $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
         $variableTaxable = $overtime + $bonus + $incentives + $commission + $otherEarnings + $profitTaxable;
-        $variableTax = $variableTaxable > 0.0
-            ? $this->round2(($this->tax->annualTax($structure['taxable_annual'] + 12 * $variableTaxable) - $structure['annual_tax']) / 12)
-            : 0.0;
-        $structureTax = (float) $structure['income_tax'];
-        $tax = $this->round2($structureTax + $variableTax);
-
         $absenceDeduction = $absenceDays * $absenceBase / max(1, $this->settings->absenceDailyDivisor());
+
+        // One unified income tax on the month's actual wage: the contractual
+        // structure plus taxable variable earnings, minus the absence deduction
+        // (wage never received is never taxed), annualised, brackets applied,
+        // divided by 12. Insurance, the personal exemption and the martyrs fund
+        // are already out of the structure base. The split below is for display
+        // only; the structure part is the same formula without this month's
+        // variables and absence.
+        $structureTax = (float) $structure['income_tax'];
+        $combinedAnnualBase = max(0.0, $structure['taxable_annual'] + 12 * ($variableTaxable - $absenceDeduction));
+        $tax = $this->round2($this->tax->annualTax($combinedAnnualBase) / 12);
+        $variableTax = $this->round2($tax - $structureTax);
         // Disciplinary split: automatic lateness/early-departure policy days are ALWAYS priced
         // from the basic salary, whatever the company's general penalty basis is; manual
         // penalties keep the configured basis. The monthly cap trims the combined days

@@ -61,7 +61,7 @@ class AllowanceProrationTest extends TestCase
         $this->assertEqualsWithDelta(240.0, $r['meal_allowance'], 0.001);
         $this->assertEqualsWithDelta(180.0, $r['clothing_allowance'], 0.001);
         $this->assertEqualsWithDelta(1200.0, $r['allowances'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(5394.38, $r['net_monthly'], 0.01);
     }
 
     public function test_full_month_is_not_changed_by_the_flag(): void
@@ -76,7 +76,7 @@ class AllowanceProrationTest extends TestCase
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->fullMonthWindow());
 
         $this->assertEqualsWithDelta(2400.0, $payload['allowances'], 0.001);
-        $this->assertEqualsWithDelta(12000.0, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(10788.77, $payload['net_salary'], 0.01);
         $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
@@ -84,7 +84,7 @@ class AllowanceProrationTest extends TestCase
     {
         $r = $this->service([])->calculate($this->salary(), ['gross' => 12000.0], [], true, 0.5);
         $this->assertEqualsWithDelta(1200.0, $r['allowances'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(5394.38, $r['net_monthly'], 0.01);
     }
 
     private function payrollRun(): PayrollRun
@@ -132,7 +132,7 @@ class AllowanceProrationTest extends TestCase
         // The gross extra over the all-prorated baseline: 6360 - 6000 = 360.
         // It is taxed through the marginal path (annualised bracket delta 72)
         // and carries the flat martyrs rate (0.18), so net = 6360 - 72 - 0.18.
-        $this->assertEqualsWithDelta(6287.82, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(5682.2, $payload['net_salary'], 0.01);
         $this->assertEqualsWithDelta(360.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
@@ -148,7 +148,7 @@ class AllowanceProrationTest extends TestCase
         $this->assertEqualsWithDelta(6600.0, $payload['basic_salary'] + $payload['allowances'], 0.001);
         // The net pays exactly the displayed pieces minus the tax the 600
         // extra carries: 6600 - 120 marginal tax - 0.30 martyrs.
-        $this->assertEqualsWithDelta(6479.70, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(5874.08, $payload['net_salary'], 0.001);
         $this->assertEqualsWithDelta(600.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
@@ -163,9 +163,9 @@ class AllowanceProrationTest extends TestCase
         // taxed with the engine's existing marginal rule (annualised bracket
         // delta on top of the fixed base: 120) and the flat martyrs rate:
         // 6 x 0.5 + 600 x 0.0005 = 3.30.
-        $this->assertEqualsWithDelta(270.0, $payload['income_tax'], 0.001);
+        $this->assertEqualsWithDelta(725.62, $payload['income_tax'], 0.001);
         $this->assertEqualsWithDelta(3.3, $payload['martyrs_fund'], 0.001);
-        $this->assertEqualsWithDelta(6600.0 - 270.0 - 3.3, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(6600.0 - 725.62 - 3.3, $payload['net_salary'], 0.001);
         $this->assertEqualsWithDelta(120.0, $payload['calculation_snapshot']['proration_adjustment_tax'], 0.001);
         $this->assertEqualsWithDelta(0.3, $payload['calculation_snapshot']['proration_adjustment_martyrs'], 0.001);
     }
@@ -184,7 +184,7 @@ class AllowanceProrationTest extends TestCase
         // Itemized columns stay zero so the drawer shows the lump.
         $this->assertEqualsWithDelta(0.0, $payload['housing_allowance'], 0.001);
         // Net = pieces minus the tax the 360 extra carries (72 + 0.18).
-        $this->assertEqualsWithDelta(4800.0 + 1560.0 - 72.0 - 0.18, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(4800.0 + 1560.0 - 677.62 - 0.18, $payload['net_salary'], 0.01);
         $this->assertEqualsWithDelta(360.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
@@ -197,7 +197,7 @@ class AllowanceProrationTest extends TestCase
 
         // Baseline behavior unchanged: no adjustment, engine net stored.
         $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(5394.38, $payload['net_salary'], 0.001);
         $this->assertEqualsWithDelta(6000.0, $payload['basic_salary'] + $payload['allowances'], 0.001);
     }
 }

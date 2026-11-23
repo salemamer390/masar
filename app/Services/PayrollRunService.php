@@ -421,8 +421,8 @@ class PayrollRunService
             $extra = round($fixedEarned - $contractualFullFixed * $window['factor'], 2);
             $extraTax = $this->calculator->extraIncomeTax($calculation, $extra);
             $extraMartyrs = round($extra * $this->settings->martyrsFundRate(), 2);
-            $incomeTax = round($structureTax * $window['factor']
-                + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2);
+            $incomeTax = max(0.0, round($structureTax * $window['factor']
+                + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2));
             $martyrsFund = round($martyrsFull * $window['factor'] + $extraMartyrs, 2);
             // Variable lines are never prorated. Deriving them by subtracting
             // separately rounded fixed components invents a +/-0.01 earning.
@@ -1448,9 +1448,13 @@ class PayrollRunService
         $insuranceWage = $insuranceDue ? (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0) : 0.0;
         // A run charges one full monthly insurance per calendar month it owns (never prorated).
         $employeeInsurance = $insuranceDue ? (float) ($salary->employee_insurance ?? 0) * $insuranceMonths : 0.0;
-        $structureTax = (float) ($salary->income_tax ?? 0);
+        // Freshly computed unified structure tax (martyrs fund and absence reduce
+        // the base); the stored snapshot predates the unified formula.
+        $structureTax = (float) ($calculation['income_tax_structure'] ?? $salary->income_tax ?? 0);
         $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
-        $incomeTax = round($structureTax + $variableTax, 2);
+        // The absence effect can outweigh the structure tax (a month of pure
+        // absence): income tax never goes negative.
+        $incomeTax = max(0.0, round($structureTax + $variableTax, 2));
         $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
         $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) * $insuranceMonths : 0.0;
         // Company cost carries the month's earned overtime and bonuses on top of the
@@ -1501,8 +1505,13 @@ class PayrollRunService
         // (basic salary plus fixed allowances), divided over 30 days.
         $fixedEntitlements = (float) ($calculation['gross'] ?? ((float) $calculation['basic_salary'] + (float) $calculation['allowances']));
         $variableEntitlements = (float) $calculation['entitlements'] - $fixedEntitlements;
-        $proratedDeductions = (float) ($calculation['income_tax_structure'] ?? 0) + (float) ($calculation['martyrs_fund'] ?? 0);
-        $fullDeductions = max(0, (float) $calculation['monthly_deductions'] - $proratedDeductions);
+        // The tax line and the deductions total must always tell the same story:
+        // rebuild the total from the non-tax/martyrs deductions (never prorated)
+        // plus the final, floored tax and the prorated martyrs fund. The absence
+        // tax effect rides with the variable tax, which is never prorated.
+        $fullIncomeTax = (float) ($calculation['income_tax'] ?? 0);
+        $fullMartyrs = (float) ($calculation['martyrs_fund'] ?? 0);
+        $otherDeductions = max(0, (float) $calculation['monthly_deductions'] - $fullIncomeTax - $fullMartyrs);
         $entitlements = round(($fixedEntitlements * $factor) + $variableEntitlements, 2);
         $monthlyTotal = round(($fixedEntitlements * $factor)
             + (float) ($calculation['overtime_amount'] ?? 0)
@@ -1512,11 +1521,12 @@ class PayrollRunService
             + (float) ($calculation['profit_share'] ?? 0)
             + (float) ($calculation['other_earnings'] ?? 0)
             + (float) ($calculation['advance_earnings'] ?? 0), 2);
-        $deductions = round(($proratedDeductions * $factor) + $fullDeductions, 2);
-        $proratedBasic = round((float) $calculation['basic_salary'] * $factor, 2);
-        $proratedAllowances = round((float) $calculation['allowances'] * $factor, 2);
         $proratedStructureTax = round((float) ($calculation['income_tax_structure'] ?? 0) * $factor, 2);
         $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
+        $proratedIncomeTax = max(0.0, round($proratedStructureTax + $variableTax, 2));
+        $deductions = round($otherDeductions + $proratedIncomeTax + $fullMartyrs * $factor, 2);
+        $proratedBasic = round((float) $calculation['basic_salary'] * $factor, 2);
+        $proratedAllowances = round((float) $calculation['allowances'] * $factor, 2);
 
         return array_merge($calculation, [
             // Persist the values actually earned during the partial period so
@@ -1527,7 +1537,7 @@ class PayrollRunService
             'transportation_allowance' => round((float) ($calculation['transportation_allowance'] ?? 0) * $factor, 2),
             'meal_allowance' => round((float) ($calculation['meal_allowance'] ?? 0) * $factor, 2),
             'clothing_allowance' => round((float) ($calculation['clothing_allowance'] ?? 0) * $factor, 2),
-            'income_tax' => round($proratedStructureTax + $variableTax, 2),
+            'income_tax' => $proratedIncomeTax,
             'martyrs_fund' => round((float) ($calculation['martyrs_fund'] ?? 0) * $factor, 2),
             'entitlements' => $entitlements,
             'to_date_entitlement' => $proratedBasic,

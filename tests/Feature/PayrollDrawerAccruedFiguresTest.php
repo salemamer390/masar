@@ -12,8 +12,8 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
 {
     use DatabaseTransactions;
 
-    private Employee $employee;
-    private Company $company;
+    public Employee $employee;
+    public Company $company;
 
     protected function setUp(): void
     {
