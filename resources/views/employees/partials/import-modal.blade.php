@@ -458,6 +458,17 @@
     // One card per data domain: headline chips with what will import, and the
     // rejected rows grouped under their sheet with a clear row badge, the row's
     // own values, its reason, and - for penalties - the correction picker.
+    // One general red notice (above the sheets) for rows outside the current payroll period.
+    function periodBannerHtml(data) {
+        const periodLabels = {attendance: 'الحضور', leaves: 'الإجازات', penalties: 'الجزاءات', requests: 'الطلبات', insurance: 'التأمينات'};
+        const domains = data.domains || {};
+        const lines = Object.keys(periodLabels).filter((key) => domains[key] && domains[key].out_of_period_count > 0).map((key) => {
+            const d = domains[key];
+            return '<div><i class="bi bi-exclamation-triangle-fill"></i> ' + esc(periodLabels[key]) + window.masarT(' قبل ') + esc(d.period_start) + window.masarT(' لن يتم حفظه لأنه خارج فترة المرتب') + ' (' + num(d.out_of_period_count) + ')</div>';
+        });
+        return lines.length ? '<div class="period-alert" role="alert">' + lines.join('') + '</div>' : '';
+    }
+
     function domainCardsHtml(data, allowCorrections) {
         const labels = {attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), requests: window.masarT('الطلبات'), insurance: window.masarT('التأمينات')};
         const icons = {attendance: 'calendar2-check', leaves: 'calendar2-x', penalties: 'exclamation-octagon', requests: 'inbox', insurance: 'shield-check'};
@@ -476,10 +487,6 @@
                 + (d.skipped > 0 ? '<span class="domain-chip bad"><i class="bi bi-x-lg"></i>' + num(d.skipped) + window.masarT(' مرفوض') + '</span>' : '')
                 + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
                 + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
-            if (d.out_of_period_count > 0) {
-                const periodLabels = {attendance:'الحضور', leaves:'الإجازات', penalties:'الجزاءات', requests:'الطلبات'};
-                card += '<div class="domain-period-notice"><i class="bi bi-info-circle"></i> ' + esc(periodLabels[key] || labels[key]) + window.masarT(' قبل ') + esc(d.period_start) + window.masarT(' لن يتم حفظه لأنه خارج فترة المرتب') + '</div>';
-            }
             if (expandable) card += '<div class="domain-collapse" inert><div class="domain-collapse-inner"><div class="domain-scroll">';
             if (failures.length) {
                 const bySheet = {};
@@ -752,7 +759,7 @@
         cancelSheetAttention();
         const sheets = data.sheets || [];
         q('[data-import-filename]').textContent = fileInput.files[0]?.name || '';
-        let html = '<div class="sheet-cards">';
+        let html = periodBannerHtml(data) + '<div class="sheet-cards">';
         sheets.forEach((sheet, index) => {
             const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
             const config = sheet.domain_config;
@@ -797,7 +804,7 @@
         Object.entries(data.new_lookups || {}).forEach(([key,values])=>{
             if (values?.length) html += note('سيتم إنشاء ' + esc(labels[key] || key) + ': ' + values.map(esc).join('، '));
         });
-        html += domainCardsHtml(data, false);
+        html += periodBannerHtml(data) + domainCardsHtml(data, false);
         if (data.review_sheets?.length) html += note('لن تُستورد الأوراق غير المعروفة: ' + data.review_sheets.map(s=>esc(s.name)).join('، '));
         return html;
     }
@@ -894,7 +901,7 @@
             const container = sheetsList.querySelector('.domain-cards');
             const expandedCards = container ? [...container.querySelectorAll('.domain-card')].map((c, i) => c.classList.contains('is-expanded') ? i : -1).filter((i) => i >= 0) : [];
             const scrollTops = container ? [...container.querySelectorAll('.domain-scroll')].map((el) => el.scrollTop) : [];
-            const html = domainCardsHtml(data, true);
+            const html = periodBannerHtml(data) + domainCardsHtml(data, true);
             if (container && html) { container.outerHTML = html; }
             else if (container) { container.remove(); }
             const fresh = sheetsList.querySelector('.domain-cards');

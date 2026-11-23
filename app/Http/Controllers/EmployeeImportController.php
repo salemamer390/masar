@@ -654,6 +654,7 @@ class EmployeeImportController extends Controller
                 'attendance' => EmployeeImportService::domainFields('attendance'),
                 'leaves' => EmployeeImportService::domainFields('leaves'),
                 'penalties' => EmployeeImportService::domainFields('penalties'),
+                'advances' => EmployeeImportService::domainFields('advances'),
                 'requests' => EmployeeImportService::domainFields('requests'),
                 'insurance' => EmployeeImportService::domainFields('insurance'),
             ],

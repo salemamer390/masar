@@ -38,7 +38,7 @@ class WorkbookLeavePenaltyImporter
 
     public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true, ?array $onlySheets = null, ?array $configs = null, array $penaltyFixes = []): array
     {
-        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []]];
+        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'warnings' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'warnings' => [], 'failures' => []]];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
             if ($onlySheets !== null && !in_array((string) ($sheet['name'] ?? ''), $onlySheets, true)) continue;
             $config = $configs[$sheet['name']] ?? null;
@@ -97,7 +97,15 @@ class WorkbookLeavePenaltyImporter
                 if ($status === 'Approved') {
                     $overlap = Leave::effective()->where('employee_id', $employee->id)->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
                     if ($overlap) throw new \RuntimeException('يوجد طلب إجازة متداخل مع هذه المدة.');
-                    app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+                    // Policy checks (service months, balance, caps) are warnings for an Excel import:
+                    // the leave is recorded as written in the file and the user is told what was off.
+                    try {
+                        app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+                    } catch (\Illuminate\Validation\ValidationException $policy) {
+                        $reasons = collect($policy->errors())->flatten()->implode(' ');
+                        if (count($result['warnings']) < 50) $result['warnings'][] = "{$sheet} / الصف {$line}: تحذير: {$reasons} سُجّلت الإجازة كما وردت في الملف، راجعها.";
+                        $result['policy_warning_count'] = ($result['policy_warning_count'] ?? 0) + 1;
+                    }
                 }
                 $leave->save();
                 $result['created_ids'][] = (int) $leave->id;
@@ -130,11 +138,10 @@ class WorkbookLeavePenaltyImporter
                 if (is_string($fixedType) && trim($fixedType) !== '') $typeName = trim($fixedType);
                 // A missing type must be rejected for review, never matched by wildcard.
                 if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
-                $type = PenaltyType::where('name', $typeName)->first() ?: PenaltyType::where('name', 'like', '%'.$typeName.'%')->first();
-                if (!$type) throw new \RuntimeException('نوع الجزاء غير موجود.');
                 $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
                 if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر.');
                 $days = (float) $quantity;
+                $type = $this->resolveOrRegisterPenaltyType($typeName, $result);
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
                 if ($exists) throw new \RuntimeException('سجل الجزاء موجود بالفعل.');
                 $status = 'Approved';
@@ -142,6 +149,22 @@ class WorkbookLeavePenaltyImporter
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $penalty->id;
             } catch (\Throwable $exception) { $result['skipped']++; if ($exception instanceof OutsidePayrollPeriodException) $result['out_of_period_count'] = ($result['out_of_period_count'] ?? 0) + 1; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()], 'reason_code' => $exception instanceof OutsidePayrollPeriodException ? 'outside_payroll_period' : null]; }
         }
+    }
+
+    /**
+     * Exact (case-insensitive) name match inside the company; a type the file introduces is
+     * registered for this company only. Existing types are never changed or removed.
+     */
+    private function resolveOrRegisterPenaltyType(string $name, array &$result): PenaltyType
+    {
+        $name = trim((string) preg_replace('/\s+/u', ' ', $name));
+        $type = PenaltyType::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->orderByRaw('company_id IS NULL')->first();
+        if ($type) return $type;
+        $type = PenaltyType::create(['name' => $name, 'company_id' => auth()->user()?->company_id, 'is_active' => true, 'default_deduction_days' => 0]);
+        \App\Models\ActivityLog::record('master_create', "تمت إضافة نوع جزاء ({$name}) تلقائيًا من ملف الاستيراد.", $type);
+        $result['created_types'][] = $name;
+        if (count($result['warnings'] ?? []) < 50) $result['warnings'][] = "تم تسجيل نوع جزاء جديد «{$name}» لشركتك من ملف الاستيراد.";
+        return $type;
     }
 
     private function splitHeader(array $rows): array

@@ -784,7 +784,8 @@ class EmployeeImportService
             'attendance' => WorkbookAttendanceImporter::MAPPABLE_FIELDS,
             'leaves' => WorkbookLeavePenaltyImporter::LEAVE_FIELDS,
             'penalties' => WorkbookLeavePenaltyImporter::PENALTY_FIELDS,
-            'requests', 'advances' => WorkbookRequestImporter::MAPPABLE_FIELDS,
+            'advances' => WorkbookRequestImporter::ADVANCE_FIELDS,
+            'requests' => WorkbookRequestImporter::MAPPABLE_FIELDS,
             'insurance' => WorkbookInsuranceImporter::MAPPABLE_FIELDS,
             default => [],
         };
@@ -831,7 +832,8 @@ class EmployeeImportService
             'attendance' => ['code', 'date', 'in', 'out'],
             'leaves' => ['leave_type', 'start', 'end'],
             'penalties' => ['code', 'penalty_type', 'date', 'deduction'],
-            'requests', 'advances' => ['date'],
+            'advances' => ['code', 'date', 'amount'],
+            'requests' => ['code', 'date'],
             'insurance' => ['insurance_number'],
             default => [],
         };
