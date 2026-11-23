@@ -1,14 +1,19 @@
 @extends('layouts.app')
 @section('title',__('الشهور السابقة'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('الحضور والانصراف') }}</h1><p>{{ __('سجلات محفوظة للفترات المنتهية. لا تتغير بعد حفظها.') }}</p></div></div>
+<div class="page-head"><div><h1>{{ __('الحضور والانصراف') }}</h1><p>{{ __('الفترات المنتهية. تظهر هنا فور انتهائها وتبقى قابلة للتعديل خلال مهلة التصحيح، وبعدها تُحفظ ولا تتغير.') }}</p></div></div>
 <nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab active" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a></nav>
-<div class="panel table-panel archive-list"><div class="panel-head"><div><h3>{{ __('الشهور السابقة') }}</h3><span>{{ __('كل سجل يحفظ الحضور من أول يوم لآخر يوم في الفترة وقت انتهائها.') }}</span></div></div>
+<div class="panel table-panel archive-list"><div class="panel-head"><div><h3>{{ __('الشهور السابقة') }}</h3><span>{{ __('الفترة التي في مهلة التصحيح تُعرض بأرقامها الحالية وتقبل التعديل، والفترة المقفولة تُعرض كما حُفظت.') }}</span></div></div>
 <div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('الفترة') }}</th><th>{{ __('عدد السجلات') }}</th><th>{{ __('عدد الموظفين') }}</th><th>{{ __('تاريخ الحفظ') }}</th><th>{{ __('الإجراء') }}</th></tr></thead><tbody>
+@foreach($pendingArchives as $pending)
+<tr><td data-label="الفترة">{{ $pending->item->period_start->format('d/m/Y') }} - {{ $pending->item->period_end->format('d/m/Y') }} <span class="badge bg-warning text-dark">{{ __('قيد التصحيح حتى') }} {{ $pending->item->closes_on->copy()->subDay()->format('d/m/Y') }}</span></td><td data-label="عدد السجلات">{{ $pending->record_count }}</td><td data-label="عدد الموظفين">{{ $pending->employee_count }}</td><td data-label="تاريخ الحفظ">—</td><td><a class="btn btn-sm btn-primary" href="{{ route('attendance.index', ['from_date' => $pending->item->period_start->toDateString(), 'to_date' => $pending->item->period_end->toDateString()]) }}"><i class="bi bi-pencil-square"></i> {{ __('فتح وتعديل') }}</a></td></tr>
+@endforeach
 @forelse($archives as $item)
 <tr @class(['table-active' => $archive && $archive->id === $item->id])><td data-label="الفترة">{{ $item->period_start->format('d/m/Y') }} - {{ $item->period_end->format('d/m/Y') }}</td><td data-label="عدد السجلات">{{ $item->record_count }}</td><td data-label="عدد الموظفين">{{ $item->employee_count }}</td><td data-label="تاريخ الحفظ">{{ $item->captured_at?->format('d/m/Y H:i') }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ route('attendance.archive.show', $item) }}"><i class="bi bi-eye"></i> {{ __('فتح') }}</a> <a class="btn btn-sm btn-outline-success" href="{{ route('attendance.archive.export', $item) }}"><i class="bi bi-download"></i> {{ __('تصدير') }}</a></td></tr>
 @empty
+@if($pendingArchives->isEmpty())
 <tr><td colspan="5" class="text-center py-4">{{ __('لا توجد فترات محفوظة بعد. تُحفظ الفترة تلقائيًا بعد انتهاء آخر يوم فيها.') }}</td></tr>
+@endif
 @endforelse
 </tbody></table></div></div>
 @if($archive)

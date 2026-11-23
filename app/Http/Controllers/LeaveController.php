@@ -198,6 +198,7 @@ class LeaveController extends Controller
         $this->leaveStatus->sync();
         ActivityLog::record('leave_create', 'Leave request created.', $leave, null, $leave->toArray(), 'leaves');
         $payrollRuns->refreshEmployeeInOpenDrafts((int) $leave->employee_id);
+        app(\App\Services\LeaveAttendanceConflictService::class)->notify($leave->id);
         return $request->wantsJson()
             ? response()->json(['success' => true, 'message' => 'Leave request created.', 'leave' => $leave->fresh()->load(['employee.department', 'leaveType'])])
             : back()->with('toast', __('تم إنشاء طلب الإجازة بنجاح.'));

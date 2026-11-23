@@ -439,10 +439,17 @@ class JobDataController extends Controller
             $from = OvertimeWindowMatcher::timeToMinutes($payload['from_time'] ?? null);
             $to = OvertimeWindowMatcher::timeToMinutes($payload['to_time'] ?? null);
             if ($from === null || $to === null) {
-                // Overtime requests without a time window no longer earn
-                // anything: only actual presence inside the requested window
-                // counts. Amer confirmed these legacy untimed requests are
-                // test data to be removed by the scoped cleanup command.
+                // Without a written window, only a request marked to be placed
+                // next to the shift earns anything (hours-only imports);
+                // other legacy untimed requests still earn nothing.
+                if (empty($payload['anchor_to_shift'])) continue;
+                $authorized += OvertimeWindowMatcher::anchoredMinutes(
+                    $segments,
+                    OvertimeWindowMatcher::timeToMinutes((string) ($employee->shift_start ?: $settings->start())) ?? 0,
+                    OvertimeWindowMatcher::timeToMinutes((string) ($employee->shift_end ?: $settings->end())) ?? 0,
+                    $requested,
+                    $period,
+                );
                 continue;
             }
             $authorized += OvertimeWindowMatcher::authorizedMinutes($segments, $from, $to, $requested);

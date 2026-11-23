@@ -73,6 +73,40 @@ final class OvertimeWindowMatcher
     }
 
     /**
+     * Minutes an overtime request WITHOUT a written from/to window earns on a
+     * day. The app places the requested hours itself, next to the shift:
+     * a day request sits either immediately before the shift start
+     * (start - hours .. start) or immediately after the shift end
+     * (end .. end + hours); the better single placement against actual
+     * presence wins, so one requested hour is never paid twice. Someone who
+     * clocked in two hours early still earns only the one requested hour,
+     * and only for the hour that touches the shift start.
+     * A night request follows the same rule (confirmed by Amer): its hours
+     * are placed at the shift edge and paid only for the presence inside.
+     * A request with a written window never comes here: authorizedMinutes
+     * uses it exactly as written.
+     *
+     * @param array<int, array{0: int, 1: int}> $segments presence outside the shift
+     */
+    public static function anchoredMinutes(array $segments, int $shiftStart, int $shiftEnd, float $requestedMinutes, string $period): int
+    {
+        $requested = (int) round($requestedMinutes);
+        if ($requested <= 0) return 0;
+
+        if ($shiftEnd <= $shiftStart) $shiftEnd += 1440;
+        $best = 0;
+        foreach ([[$shiftStart - $requested, $shiftStart], [$shiftEnd, $shiftEnd + $requested]] as [$a, $b]) {
+            $overlap = 0;
+            foreach ($segments as [$start, $end]) {
+                $overlap += max(0, min($end, $b) - max($start, $a));
+            }
+            $best = max($best, $overlap);
+        }
+
+        return min($requested, $best);
+    }
+
+    /**
      * Minutes a timed overtime request earns on a day: the requested window's
      * overlap with actual outside-shift presence, capped at the requested
      * duration. Partial overlap earns the partial duration.

@@ -78,6 +78,33 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         $this->assertEqualsWithDelta(33.33, (float) $record2->meal_allowance, 0.01);
         $this->assertEqualsWithDelta(66.67, (float) $record2->clothing_allowance, 0.01);
     }
+    public function test_drawer_lists_rest_day_and_holiday_pay_as_lines(): void
+    {
+        \App\Models\Salary::create([
+            'company_id' => $this->company->id, 'employee_id' => $this->employee->id,
+            'effective_from' => '2026-01-01', 'salary_type' => 'gross', 'salary_input' => 8600,
+            'basic_salary' => 6000, 'allowances' => 2600,
+            'housing_allowance' => 0, 'transportation_allowance' => 0, 'meal_allowance' => 0, 'clothing_allowance' => 0,
+            'gross_salary' => 8600, 'net_salary' => 8000, 'no_insurance' => true, 'status' => 'Active',
+        ]);
+        $run = app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        $record = $run->records()->where('employee_id', $this->employee->id)->firstOrFail();
+        // Same composition as PayrollCalculator: overtime total = day + night + holiday + rest.
+        $record->forceFill(['ot_day_amount' => 40.0, 'day_overtime_amount' => 40.0, 'official_holiday_amount' => 851.21, 'weekly_rest_amount' => 120.5, 'overtime_amount' => 1011.71])->save();
+
+        $content = $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']))->assertOk()->getContent();
+        $this->assertStringContainsString('["عمل يوم عطلة رسمية",851.21]', $content);
+        $this->assertStringContainsString('["عمل يوم راحة",120.5]', $content);
+
+        // The drawer lines add up to the drawer total (no missing line, no double count).
+        $this->assertSame(1, preg_match('/people: (\[.*\]),\n  stats:/s', $content, $m));
+        $people = json_decode($m[1], true);
+        $person = collect($people)->firstWhere('id', $record->id) ?? $people[0];
+        $sum = round(array_sum(array_map(fn ($i) => (float) $i[1], $person['items'])), 2);
+        $this->assertEqualsWithDelta((float) $person['entitlements'], $sum, 0.01);
+        $this->assertEqualsWithDelta(1011.71 + 400.0 + 173.33, $sum, 0.01);
+    }
+
     private function auditRecord(): PayrollRecord
     {
         // Reuse this test's existing drawer fixture, not a screen lifecycle.

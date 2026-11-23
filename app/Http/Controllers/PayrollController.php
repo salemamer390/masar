@@ -132,6 +132,8 @@ class PayrollController extends Controller
             'overtime_amount' => (float) $record->overtime_amount,
             'day_overtime_amount' => max((float) ($record->day_overtime_amount ?? 0), (float) ($record->ot_day_amount ?? 0)),
             'night_overtime_amount' => max((float) ($record->night_overtime_amount ?? 0), (float) ($record->ot_night_amount ?? 0)),
+            'official_holiday_amount' => (float) ($record->official_holiday_amount ?? 0),
+            'weekly_rest_amount' => (float) ($record->weekly_rest_amount ?? 0),
             'advance_earnings' => (float) data_get($record->calculation_snapshot, 'inputs.advance_earnings', data_get($record->calculation_snapshot, 'advance_earnings', 0)),
             'bonus' => (float) $record->bonus,
             'incentives' => (float) $record->incentives,
@@ -197,6 +199,8 @@ class PayrollController extends Controller
             foreach ([
                 'day_overtime_amount' => __('إضافي نهاري'),
                 'night_overtime_amount' => __('إضافي ليلي'),
+                'official_holiday_amount' => __('عمل يوم عطلة رسمية'),
+                'weekly_rest_amount' => __('عمل يوم راحة'),
                 'bonus' => __('المكافآت'),
                 'incentives' => __('الحوافز'),
                 'commission' => __('العمولات'),
@@ -286,6 +290,8 @@ class PayrollController extends Controller
                 'additionalItems' => array_values(array_filter([
                     [__('إضافي نهاري'), $dayOvertimeAmount],
                     [__('إضافي ليلي'), $nightOvertimeAmount],
+                    [__('عمل يوم عطلة رسمية'), (float) ($record->official_holiday_amount ?? 0)],
+                    [__('عمل يوم راحة'), (float) ($record->weekly_rest_amount ?? 0)],
                     [__('المكافآت'), (float) $record->bonus],
                     [__('الحوافز'), (float) $record->incentives],
                     [__('العمولات'), (float) $record->commission],
@@ -383,6 +389,8 @@ class PayrollController extends Controller
         $overtime = array_values(array_filter([
             [__('الإضافي النهاري'), (float) ($payrollRecord->day_overtime_amount ?: $payrollRecord->ot_day_amount)],
             [__('الإضافي الليلي'), (float) ($payrollRecord->night_overtime_amount ?: $payrollRecord->ot_night_amount)],
+            [__('عمل يوم عطلة رسمية'), (float) $payrollRecord->official_holiday_amount],
+            [__('عمل يوم راحة'), (float) $payrollRecord->weekly_rest_amount],
             [__('الإضافي'), (float) $payrollRecord->overtime_amount],
         ], fn ($item) => $positive($item[1])));
         if (count($overtime) > 1) {

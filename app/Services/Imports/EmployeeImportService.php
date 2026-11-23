@@ -472,6 +472,9 @@ class EmployeeImportService
      * domain, and an attendance sheet needs a real date column - anything
      * uncertain stays 'unknown' for the user to decide.
      */
+    /** Sheet-name fragments of summary/report/settings sheets that are ignored automatically. */
+    private const AUXILIARY_SHEET_NAMES = ['ملخص', 'الإعدادات', 'إعدادات', 'الاعدادات', 'settings', 'summary', 'ورقة التعليمات', 'تعليمات', 'instructions', 'readme'];
+
     private function detectWorkbookSheetKind(array $rows, array $used, string $name = '', bool $multipleSheets = false): string
     {
         // Dashboard/summary/account sheets are auxiliary, and the file's own
@@ -480,6 +483,11 @@ class EmployeeImportService
         $nameKey = $this->key($name);
         if ($nameKey !== '') {
             foreach ($auxiliaryNeedles as $needle) {
+                if (str_contains($nameKey, $this->key($needle))) return 'auxiliary';
+            }
+            // Summary, report and settings sheets are never data to import,
+            // whatever columns they carry; matched on the sheet's own name only.
+            foreach (self::AUXILIARY_SHEET_NAMES as $needle) {
                 if (str_contains($nameKey, $this->key($needle))) return 'auxiliary';
             }
         }
@@ -519,8 +527,8 @@ class EmployeeImportService
         // blaming employee fields on a penalties sheet.
         if ($has(['نوع الجزاء', 'أيام الخصم', 'penalty type', 'deduction days'])
             || ($has(['تاريخ القرار', 'decision date', 'penalty date']) && $has(['كود الموظف', 'اسم الموظف', 'employee code', 'employee name']))) return 'penalties';
-        if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة'])) return 'advances';
-        if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'نوع الطلب', 'overtime', 'bonus', 'commission', 'incentive', 'profit', 'permission', 'mission', 'request type', 'إذن', 'مأمورية'])) return 'requests';
+        if ($has(['مبلغ السلفة', 'تاريخ طلب السلفة', 'advance amount', 'advance date', 'سلفة', 'قيمة السلفة'])) return 'advances';
+        if ($has(['الإضافي النهاري', 'الإضافي الليلي', 'عدد الساعات', 'نوع الطلب', 'overtime', 'bonus', 'commission', 'incentive', 'profit', 'permission', 'mission', 'request type', 'إذن', 'مأمورية', 'نوع الإضافي', 'قيمة العمولة', 'نسبة العمولة', 'مبلغ العمولة', 'قيمة الحافز', 'قيمة المكافأة', 'مبلغ المكافأة'])) return 'requests';
         // Insurance-record sheets need markers beyond الرقم التأميني, which is a
         // normal employee column too; a sheet that also carries strong employee
         // identity columns stays an employees sheet, and ambiguous sheets stay
@@ -536,6 +544,10 @@ class EmployeeImportService
 
             return $hint === 'employees' ? 'unknown' : ($hint ?? 'unknown');
         }
+        // A sheet whose own name says it is a commissions/bonus/overtime/... table is not an
+        // employee table just because it carries a code or name column.
+        $nameHint = $multipleSheets ? $this->kindFromSheetName($name) : null;
+        if ($nameHint !== null && $nameHint !== 'employees') return $nameHint;
         if ($this->hasNameField($used) || $has(['كود الموظف', 'اسم الموظف', 'employee code', 'full name'])) return 'employees';
 
         // Last resort: common sheet names are only a hint for a sheet the columns could not
@@ -718,7 +730,7 @@ class EmployeeImportService
         'leaves' => ['الإجازات', 'الاجازات', 'إجازات', 'اجازات', 'leaves', 'leave', 'vacations', 'الأجازات', 'طلبات الإجازة'],
         'penalties' => ['الجزاءات', 'جزاءات', 'المخالفات', 'penalties', 'disciplinary', 'الإنذارات', 'التحقيقات', 'warnings'],
         'advances' => ['السلف', 'سلف', 'advances', 'advance'],
-        'requests' => ['الطلبات', 'طلبات', 'requests'],
+        'requests' => ['الطلبات', 'طلبات', 'requests', 'العمولات', 'عمولات', 'العمولة', 'الحوافز', 'حوافز', 'المكافآت', 'المكافات', 'مكافآت', 'مكافات', 'الإضافي', 'الاضافي', 'إضافي', 'اضافي', 'الساعات الإضافية', 'ساعات إضافية', 'overtime', 'commissions', 'bonuses', 'incentives', 'الأذونات', 'الاذونات', 'المأموريات', 'المأمورية'],
         'insurance' => ['التأمينات', 'التأمين', 'التامينات', 'insurance', 'social insurance', 'التأمين الاجتماعي', 'بيانات التأمين'],
     ];
 
