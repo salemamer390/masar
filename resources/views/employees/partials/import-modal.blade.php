@@ -97,7 +97,7 @@
 .mapping-field-card.is-required.is-ready { border-color: #198754; background: #f6fffa; box-shadow: 0 0 0 3px rgba(25,135,84,.08); animation: none; }
 .mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .mapping-field-card.is-missing .field-state { color: #dc3545; background: transparent; padding: 0; }
-.mapping-field-card.is-ready .field-state { color: #0f5132; background: #d1e7dd; }
+.mapping-field-card.is-ready .field-state { color: #dc3545; background: transparent; padding: 0; }
 .required-field-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
 .required-field-chip.is-missing { color: #842029; border-color: #dc3545; background: #fff8f8;  }
 .required-field-chip.is-ready { color: #0f5132; border-color: #198754; background: #f6fffa; animation: none; }
@@ -641,7 +641,7 @@
             const selected = chosenMap[field] !== undefined ? chosenMap[field] : (detectedMap[field] !== undefined ? detectedMap[field] : '');
             const isRequired = required.includes(field);
             const stateClass = isRequired ? (String(selected) === '' ? ' is-required is-missing' : ' is-required is-ready') : '';
-            const stateChip = isRequired ? '<span class="field-state">' + (String(selected) === '' ? window.masarT('حقل مطلوب') : window.masarT('تم')) + '</span>' : '';
+            const stateChip = isRequired ? '<span class="field-state">' + window.masarT('حقل مطلوب') + '</span>' : '';
             html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1 d-block">' + esc(fields[field]) + (isRequired ? '<span class="text-danger fw-bold ms-1 me-1">*</span>' : '') + '</label>' + (isRequired ? '<div class="mb-1">' + stateChip + '</div>' : '')
                 + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
                 + window.masarStaticHtml('<option value="">— بدون —</option>')
@@ -1069,7 +1069,7 @@
                 card.classList.toggle('is-missing', fieldSelect.value === '');
                 card.classList.toggle('is-ready', fieldSelect.value !== '');
                 const chip = card.querySelector('.field-state');
-                if (chip) chip.textContent = fieldSelect.value === '' ? window.masarT('مطلوب') : window.masarT('تم');
+                if (chip) chip.textContent = window.masarT('حقل مطلوب');
             }
             runPreview(null, '', false, 'reload-sheets', sheetName);
             return;
