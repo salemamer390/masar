@@ -121,12 +121,13 @@ class ImmediateHrIntegrationTest extends TestCase
         $this->assertSame(0.0, $this->daily('2026-10-30')['absence_days']); // default Friday rest
     }
 
-    public function test_absence_deduction_follows_configured_basis_and_allowance_selection(): void
+    public function test_absence_deduction_is_priced_on_the_basic_only(): void
     {
         // Contractual row: basic 6000, meal 500, transport 500, housing 600,
         // clothing 1000 (gross 8600). Confirmed rule: an absence day deducts
-        // basic/30 + meal/30 + transport/30; housing and clothing are not
-        // reduced by absence.
+        // the contractual basic/30 only. Each allowance's own absence share is
+        // governed by its per-allowance flag on the earnings side, so no share
+        // is ever deducted twice.
         $salary = new \App\Models\Salary([
             'company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'effective_from' => '2026-11-01',
             'basic_salary' => 6000, 'meal_allowance' => 500, 'transportation_allowance' => 500,
@@ -141,26 +142,21 @@ class ImmediateHrIntegrationTest extends TestCase
         };
         $calculate = fn () => app(PayrollRunService::class)->calculate($salary, ['gross' => 8600], ['absence_days' => 1], false, 1.0);
 
-        // Confirmed rule: basis Basic + meal,transportation marked absence-deducted
-        // deducts (contractual basic + meal + transport)/30 per absent day.
+        // The legacy basis and allowance-selection rules no longer change the
+        // absence base: every combination prices absence on the basic alone.
         $rule('calculation_basis', 'Basic');
         $rule('deducted_allowances', 'meal,transportation');
-        $this->assertEqualsWithDelta(233.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500)/30
+        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01); // 6000/30
 
-        // Only the configured allowances join the base; adding housing adds its daily share.
         $rule('deducted_allowances', 'meal,transportation,housing');
-        $this->assertEqualsWithDelta(253.33, $calculate()['absence_deduction'], 0.01); // (6000+500+500+600)/30
+        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01);
 
-        // Gross is unchanged and never double-deducts: every allowance is already
-        // inside the gross, so the allowance selection adds nothing there.
         $rule('calculation_basis', 'Gross');
-        $this->assertEqualsWithDelta(286.67, $calculate()['absence_deduction'], 0.01); // 8600/30
+        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01);
 
-        // Basic with no allowance selected is the contractual basic alone - never
-        // the engine's internal split (gross / 1.25 = 6880 here).
         $rule('calculation_basis', 'Basic');
         $rule('deducted_allowances', '');
-        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01); // 6000/30
+        $this->assertEqualsWithDelta(200.00, $calculate()['absence_deduction'], 0.01);
     }
 
     public function test_rules_settings_save_accepts_the_allowance_basis_and_its_allowance_selection(): void

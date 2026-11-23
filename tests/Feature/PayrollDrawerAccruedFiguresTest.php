@@ -50,7 +50,9 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
 
         // The record persists the contractual prorated amounts.
         $this->assertEqualsWithDelta(400.00, (float) $record->basic_salary, 0.01); // 6000 x 2/30
-        $this->assertEqualsWithDelta(173.33, (float) $record->allowances, 0.01);   // 2600 x 2/30
+        // Lump with no itemized split is treated as flagged: it earns 2600 x 2/30 = 173.33
+        // and loses the same 173.33 as its absence share for the 2 absent days.
+        $this->assertEqualsWithDelta(0.00, (float) $record->allowances, 0.01);
 
         // «المستحق حتى اليوم» is the same contractual prorated basic, not the engine split.
         $this->assertEqualsWithDelta((float) $record->basic_salary, (float) data_get($record->calculation_snapshot, 'to_date_entitlement'), 0.01);
@@ -59,7 +61,7 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         $response = $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']));
         $response->assertOk();
         // The people JSON is HTML-hex-escaped (JSON_HEX_QUOT): match the value, not the quote.
-        $this->assertMatchesRegularExpression('/entitlements.{0,8}:573\\.33/', $response->getContent()); // 400.00 + 173.33
+        $this->assertMatchesRegularExpression('/entitlements.{0,8}:400(\\.0+)?/', $response->getContent()); // 400.00 + 0.00
 
         // A structure with a contractual itemized split keeps its own amounts,
         // prorated - the engine's split never replaces them on the record.
@@ -73,10 +75,12 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         ]);
         app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
         $record2 = PayrollRecord::withoutGlobalScopes()->where('employee_id', $employee2->id)->latest('id')->firstOrFail();
-        $this->assertEqualsWithDelta(40.00, (float) $record2->housing_allowance, 0.01);        // 600 x 2/30
-        $this->assertEqualsWithDelta(33.33, (float) $record2->transportation_allowance, 0.01); // 500 x 2/30
-        $this->assertEqualsWithDelta(33.33, (float) $record2->meal_allowance, 0.01);
-        $this->assertEqualsWithDelta(66.67, (float) $record2->clothing_allowance, 0.01);
+        // Every column is flagged by default: each earns its 2/30 window share and
+        // loses the same share again for the 2 absent days, landing on zero.
+        $this->assertEqualsWithDelta(0.00, (float) $record2->housing_allowance, 0.01);
+        $this->assertEqualsWithDelta(0.00, (float) $record2->transportation_allowance, 0.01);
+        $this->assertEqualsWithDelta(0.00, (float) $record2->meal_allowance, 0.01);
+        $this->assertEqualsWithDelta(0.00, (float) $record2->clothing_allowance, 0.01);
     }
     public function test_drawer_lists_rest_day_and_holiday_pay_as_lines(): void
     {
@@ -102,7 +106,7 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
         $person = collect($people)->firstWhere('id', $record->id) ?? $people[0];
         $sum = round(array_sum(array_map(fn ($i) => (float) $i[1], $person['items'])), 2);
         $this->assertEqualsWithDelta((float) $person['entitlements'], $sum, 0.01);
-        $this->assertEqualsWithDelta(1011.71 + 400.0 + 173.33, $sum, 0.01);
+        $this->assertEqualsWithDelta(1011.71 + 400.0 + 0.0, $sum, 0.01);
     }
 
     private function auditRecord(): PayrollRecord
@@ -122,9 +126,9 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
     public function test_partial_period_money_reconciles_without_a_phantom_piastre(): void
     {
         $record = $this->auditRecord();
-        $this->assertSame('573.33', number_format((float) $record->monthly_total, 2, '.', ''));
+        $this->assertSame('400.00', number_format((float) $record->monthly_total, 2, '.', ''));
         $this->assertSame('0.00', number_format((float) $record->net_salary, 2, '.', ''));
-        $this->assertSame('573.33', number_format((float) $record->employee_cost, 2, '.', ''));
+        $this->assertSame('400.00', number_format((float) $record->employee_cost, 2, '.', ''));
         $this->assertEquals(round((float) $record->basic_salary + (float) $record->allowances - (float) $record->deductions, 2), (float) $record->net_salary);
     }
 
@@ -180,7 +184,8 @@ class PayrollDrawerAccruedFiguresTest extends TestCase
             $this->assertEquals(17, $earnings[$locale === 'ar' ? 'بدل الوجبة' : 'Meal allowance']);
             $this->assertEquals(23, $earnings[$locale === 'ar' ? 'الإضافي الليلي' : 'Night overtime']);
             $this->assertEquals(29, $earnings[$locale === 'ar' ? 'العمولات' : 'Commissions']);
-            $this->assertEquals(573.33, $deductions[$locale === 'ar' ? 'خصم الغياب' : 'Absence deduction']);
+            // Absence is priced on the contractual basic only: 2 x 6000/30.
+            $this->assertEquals(400.0, $deductions[$locale === 'ar' ? 'خصم الغياب' : 'Absence deduction']);
             $this->assertArrayNotHasKey($locale === 'ar' ? 'تأمين الموظف' : 'Employee insurance', $deductions);
         }
     }

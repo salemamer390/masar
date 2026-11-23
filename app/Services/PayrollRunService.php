@@ -300,6 +300,9 @@ class PayrollRunService
     /** Run the full calculation for one salary: monthly inputs, statutory values, then proration. */
     public function calculate(Salary $salary, array $structure, array $inputs, bool $insuranceDue, float $factor, int $insuranceMonths = 1, bool $allowOverFullMonth = false): array
     {
+        $inputs['absence_allowance_reduction'] = $this->allowanceAbsenceReduction(
+            $salary, $structure, (float) ($inputs['absence_days'] ?? 0)
+        );
         $calculation = $this->calculator->monthly(
             (float) $structure['gross'],
             $inputs,
@@ -322,21 +325,54 @@ class PayrollRunService
      */
     private function absenceBaseOverride(Salary $salary): ?float
     {
-        if ($this->settings->absenceBasis() !== 'Basic') return null;
-        $allowances = $this->settings->absenceDeductedAllowances();
-        // Legacy rows without a contractual basic breakdown keep the calculator's own base.
+        // Absence is priced from the contractual basic only. A flagged allowance
+        // loses its own daily share on the earnings side (allowanceAbsenceReduction),
+        // so including any allowance here would deduct the same day twice.
+        // Legacy rows without a contractual basic breakdown keep the calculator's own basic.
         if ($salary->basic_salary === null) return null;
 
-        $columns = [
-            'housing' => 'housing_allowance', 'transportation' => 'transportation_allowance',
-            'meal' => 'meal_allowance', 'clothing' => 'clothing_allowance', 'other' => 'other_allowances',
-        ];
-        $base = (float) $salary->basic_salary;
-        foreach ($allowances as $key) {
-            $base += (float) ($salary->{$columns[$key]} ?? 0);
-        }
+        return (float) $salary->basic_salary;
+    }
 
-        return $base;
+    /**
+     * Daily-share loss on flagged allowances for absence days. Applied as an
+     * earnings reduction in the calculator and in the record columns, never as
+     * a deduction line: the absence deduction itself covers the basic only.
+     */
+    private function allowanceAbsenceReduction(Salary $salary, array $structure, float $absenceDays): float
+    {
+        if ($absenceDays <= 0) return 0.0;
+        $divisor = max(1, $this->settings->absenceDailyDivisor());
+        $hasSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
+            + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
+        if ($hasSplit) {
+            $flaggedTotal = 0.0;
+            foreach (['housing_allowance', 'transportation_allowance', 'meal_allowance', 'clothing_allowance'] as $column) {
+                if ($this->settings->allowanceIsProrated($column)) $flaggedTotal += (float) ($salary->{$column} ?? 0);
+            }
+
+            return round($flaggedTotal * $absenceDays / $divisor, 2);
+        }
+        // Lump-only legacy structure: reduce the flagged configured shares of the pool.
+        $lump = (float) ($salary->allowances ?? ($structure['allowances'] ?? 0));
+        $distribution = $this->settings->allowanceDistribution();
+        if (!$distribution) return round($lump * $absenceDays / $divisor, 2);
+        $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
+        $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
+        $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
+        $housing = $distribution['housing'] ?? null;
+        $meal = $distribution['meal'] ?? null;
+        $clothing = $distribution['clothing'] ?? null;
+        $transportShare = $share($transport, 0.35);
+        $housingShare = $share($housing, 0.30);
+        $mealShare = $share($meal, 0.20);
+        $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
+        $flaggedShare = ($flag($transport) ? $transportShare : 0)
+            + ($flag($housing) ? $housingShare : 0)
+            + ($flag($meal) ? $mealShare : 0)
+            + ($flag($clothing) ? $clothingShare : 0);
+
+        return round($lump * $flaggedShare * $absenceDays / $divisor, 2);
     }
 
     /** Map a finished calculation to the payroll_records columns and its audit snapshot. */
@@ -350,11 +386,19 @@ class PayrollRunService
         // contractual lump instead of the engine's invented split.
         $hasContractualSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
             + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
-        // Each allowance follows its own proration setting: a prorated one is
-        // scaled by the worked factor, a full one is paid whole.
-        $allowanceEarned = function (string $column) use ($salary, $window) {
+        // Employment-window proration is automatic for every allowance. A
+        // flagged allowance additionally loses its daily share for each absence
+        // day; the absence deduction covers the basic only, so no allowance day
+        // is deducted twice.
+        $absenceDaysForAllowances = max(0.0, (float) ($calculation['absence_days'] ?? 0));
+        $absenceAllowanceDivisor = max(1, $this->settings->absenceDailyDivisor());
+        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor) {
             $full = (float) ($salary->{$column} ?? 0);
-            return $this->settings->allowanceIsProrated($column) ? round($full * $window['factor'], 2) : round($full, 2);
+            $earned = $full * $window['factor'];
+            if ($absenceDaysForAllowances > 0 && $this->settings->allowanceIsProrated($column)) {
+                $earned -= $full * $absenceDaysForAllowances / $absenceAllowanceDivisor;
+            }
+            return round(max(0.0, $earned), 2);
         };
         $itemized = static fn (string $column): float => $hasContractualSplit
             ? $allowanceEarned($column)
@@ -364,11 +408,12 @@ class PayrollRunService
         // configured percentages the calculator splits a gross with - and each
         // share follows its own proration flag. The clothing share is the
         // remainder, exactly like the calculator's residual.
-        $lumpEarned = function () use ($salary, $structure, $window) {
+        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor) {
             $lump = (float) ($salary->allowances ?? $structure['allowances']);
             $factor = $window['factor'];
             $distribution = $this->settings->allowanceDistribution();
-            if (!$distribution) return round($lump * $factor, 2);
+            // No configured distribution: the whole lump behaves as flagged.
+            if (!$distribution) return round(max(0.0, $lump * $factor - $lump * $absenceDaysForAllowances / $absenceAllowanceDivisor), 2);
             $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
             $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
             $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
@@ -379,10 +424,12 @@ class PayrollRunService
             $housingShare = $share($housing, 0.30);
             $mealShare = $share($meal, 0.20);
             $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
-            $earned = $lump * $transportShare * ($flag($transport) ? $factor : 1)
-                + $lump * $housingShare * ($flag($housing) ? $factor : 1)
-                + $lump * $mealShare * ($flag($meal) ? $factor : 1)
-                + $lump * $clothingShare * ($flag($clothing) ? $factor : 1);
+            $lumpShareEarned = static fn (float $share, bool $flagged): float => $share <= 0 ? 0.0
+                : max(0.0, $share * $factor - ($flagged ? $share * $absenceDaysForAllowances / $absenceAllowanceDivisor : 0));
+            $earned = $lump * $lumpShareEarned($transportShare, $flag($transport))
+                + $lump * $lumpShareEarned($housingShare, $flag($housing))
+                + $lump * $lumpShareEarned($mealShare, $flag($meal))
+                + $lump * $lumpShareEarned($clothingShare, $flag($clothing));
 
             return round($earned, 2);
         };
@@ -418,7 +465,11 @@ class PayrollRunService
             $fixedEarned = round($contractualBasicEarned + $allowancesEarned, 2);
             $structureTax = (float) ($calculation['income_tax_structure'] ?? 0);
             $martyrsFull = (float) ($salary->martyrs_fund ?? 0);
-            $extra = round($fixedEarned - $contractualFullFixed * $window['factor'], 2);
+            // Every allowance now prorates with the window, so fixed earnings
+            // never exceed the all-prorated baseline; a flagged allowance's
+            // absence-day loss is already relieved once through the unified tax
+            // base (it rides with the variable tax), so no extra tax applies.
+            $extra = max(0.0, round($fixedEarned - $contractualFullFixed * $window['factor'], 2));
             $extraTax = $this->calculator->extraIncomeTax($calculation, $extra);
             $extraMartyrs = round($extra * $this->settings->martyrsFundRate(), 2);
             $incomeTax = max(0.0, round($structureTax * $window['factor']

@@ -95,7 +95,10 @@ class PayrollCalculator
         $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
         $basic = (float) $structure['basic_salary'];
         $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
-        $absenceBase = $absenceBaseOverride ?? ($this->settings->absenceBasis() === 'Basic' ? $basic : $gross);
+        // Absence is priced from the basic salary only: a flagged allowance loses
+        // its own daily share on the earnings side (absence_allowance_reduction),
+        // so including allowances here would deduct the same day twice.
+        $absenceBase = $absenceBaseOverride ?? $basic;
         $penaltyBase = $this->settings->penaltyBasis() === 'Gross' ? $gross : $basic;
 
         $dayHours = max(0, (float)($monthly['ot_day_hours'] ?? 0));
@@ -131,6 +134,10 @@ class PayrollCalculator
         $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
         $variableTaxable = $overtime + $bonus + $incentives + $commission + $otherEarnings + $profitTaxable;
         $absenceDeduction = $absenceDays * $absenceBase / max(1, $this->settings->absenceDailyDivisor());
+        // Daily shares of flagged allowances lost to absence, computed by the run
+        // service from the contractual allowance split and applied as an earnings
+        // reduction below (never as a second deduction line).
+        $absenceAllowanceReduction = max(0, (float)($monthly['absence_allowance_reduction'] ?? 0));
 
         // One unified income tax on the month's actual wage: the contractual
         // structure plus taxable variable earnings, minus the absence deduction
@@ -140,7 +147,7 @@ class PayrollCalculator
         // only; the structure part is the same formula without this month's
         // variables and absence.
         $structureTax = (float) $structure['income_tax'];
-        $combinedAnnualBase = max(0.0, $structure['taxable_annual'] + 12 * ($variableTaxable - $absenceDeduction));
+        $combinedAnnualBase = max(0.0, $structure['taxable_annual'] + 12 * ($variableTaxable - $absenceDeduction - $absenceAllowanceReduction));
         $tax = $this->round2($this->tax->annualTax($combinedAnnualBase) / 12);
         $variableTax = $this->round2($tax - $structureTax);
         // Disciplinary split: automatic lateness/early-departure policy days are ALWAYS priced
@@ -158,8 +165,8 @@ class PayrollCalculator
         $policyPenaltyDeduction = $policyDaysRequested * $capScale * $basic / $penaltyDivisor;
         $manualPenaltyDeduction = ($penaltyDays - $policyDaysRequested * $capScale) * $penaltyBase / $penaltyDivisor;
         $penaltyDeduction = $policyPenaltyDeduction + $manualPenaltyDeduction;
-        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
-        $monthlyTotal = $structure['gross'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $entitlements = $structure['basic_salary'] + $structure['allowances'] - $absenceAllowanceReduction + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $monthlyTotal = $structure['gross'] - $absenceAllowanceReduction + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
         $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $timeDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
@@ -169,6 +176,7 @@ class PayrollCalculator
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'penalty_days_requested'=>$penaltyDaysRequested, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
             'income_tax'=>$tax, 'absence_base'=>$this->round2($absenceBase), 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
+            'absence_allowance_reduction'=>$this->round2($absenceAllowanceReduction),
             'attendance_time_deduction'=>$timeDeduction, 'attendance_penalty_deduction'=>$policyPenaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
