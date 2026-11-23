@@ -226,16 +226,20 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertSame(0, Attendance::where('employee_id', $this->day->id)->count());
     }
 
-    public function test_blank_rows_are_skipped_not_fabricated_as_absent(): void
+    public function test_blank_or_absent_rows_become_punch_errors_not_rejections_and_no_attendance_is_fabricated(): void
     {
         [$token, $units, , $key] = $this->preview($this->workbook($this->dailyRows([
             ['I1', '2026-11-02', '', '', ''],
             ['I1', '2026-11-03', '', '', 'غائب'],
         ])));
         $response = $this->import($token, $units[0], $key);
-        $response->assertSessionHas('attendance_import_errors', fn ($errors) => str_contains(implode(' ', $errors), 'وقت الحضور مطلوب'));
-        $rows = Attendance::where('employee_id', $this->day->id)->get();
-        $this->assertCount(0, $rows, 'status-only rows cannot fabricate absence; both times are required');
+        $response->assertSessionHas('toast', fn ($m) => str_contains($m, 'أخطاء البصمات'));
+        $response->assertSessionHas('attendance_import_errors', fn ($errors) => !str_contains(implode(' ', $errors), 'وقت الحضور مطلوب'));
+        $this->assertCount(0, Attendance::where('employee_id', $this->day->id)->get(), 'absence is never fabricated as attendance');
+        $days = \App\Models\AttendanceImportDay::where('employee_id', $this->day->id)->get();
+        $this->assertCount(2, $days);
+        $this->assertSame(['missing', 'missing'], $days->pluck('issue')->all());
+        $this->assertSame(['pending', 'pending'], $days->pluck('resolution')->all());
     }
 
     public function test_changing_mapping_requires_fresh_preview_before_commit(): void
@@ -660,15 +664,17 @@ class AttendanceImportPreviewTest extends TestCase
         $this->assertSame('عامر سالم جمعه', $this->day->fresh()->full_name);
     }
 
-    public function test_unknown_status_input_is_ignored_and_missing_times_are_rejected(): void
+    public function test_unknown_status_input_is_ignored_and_missing_times_go_to_punch_errors(): void
     {
         [$token, $units, $html, $key] = $this->preview($this->workbook($this->dailyRows([
             ['I1', '2026-11-20', '', '', 'حالة غريبة'],
         ])));
         $this->assertStringNotContainsString('name="map_sheet-0[status]"', $html);
-        $this->assertStringContainsString('وقت الحضور مطلوب', $html);
+        $this->assertStringNotContainsString('وقت الحضور مطلوب', $html);
+        $this->assertStringContainsString('أخطاء البصمات', $html);
         $this->import($token, $units[0], $key)->assertRedirect();
         $this->assertSame(0, Attendance::count());
+        $this->assertSame(1, \App\Models\AttendanceImportDay::where('resolution', 'pending')->count());
     }
 
     public function test_status_only_aliases_do_not_override_required_times(): void

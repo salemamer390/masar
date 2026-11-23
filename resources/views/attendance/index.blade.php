@@ -12,7 +12,7 @@
 @endforeach</div>
 <p class="summary-swipe-hint" aria-hidden="true">{{ __('اسحب لعرض باقي الإحصائيات') }} <span dir="ltr">↔</span></p>
 <div class="attendance-toolbar">
-<nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">{{ __('استثناءات البصمات') }} <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
+<nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab active" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a><a class="attendance-tab" href="{{ route('attendance.exceptions.index') }}">{{ __('أخطاء البصمات') }} <span class="badge bg-warning text-dark">{{ \App\Models\AttendanceImportDay::where('resolution','pending')->count() }}</span></a></nav>
 
 </div>
 @if(\App\Models\AttendanceImportDay::where('resolution','pending')->exists())

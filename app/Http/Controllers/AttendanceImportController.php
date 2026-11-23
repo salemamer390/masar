@@ -194,7 +194,7 @@ class AttendanceImportController extends Controller
                             'original_punches' => $punches, 'current_punches' => $punches,
                             'issue' => $issue, 'resolution' => $issue ? 'pending' : 'resolved',
                         ]);
-                        if ($issue === 'extra') return; // saved for explicit review; never silently reduce 3+ punches
+                        if ($issue === 'extra' || !empty($row['incomplete'])) return; // saved for explicit review; never silently reduce 3+ punches
                         $metrics = app(AttendanceMetricsService::class)->metrics($row['employee'], $row['check_in'], $row['check_out'], $row['status']);
                         $attendance = Attendance::updateOrCreate(
                             ['employee_id' => $row['employee']->id, 'attendance_date' => $row['date']],
@@ -203,7 +203,7 @@ class AttendanceImportController extends Controller
                         $lineage->update(['attendance_id' => $attendance->id]);
                         $affectedEmployeeIds[] = (int) $row['employee']->id;
                     });
-                    if (($row['issue'] ?? null) !== 'extra') $imported++; else $deferred++;
+                    if (($row['issue'] ?? null) !== 'extra' && empty($row['incomplete'])) $imported++; else $deferred++;
                 } catch (\Throwable $exception) {
                     $skippedRows++;
                     $errors[] = "{$row['ref']}: {$exception->getMessage()}";
@@ -225,7 +225,7 @@ class AttendanceImportController extends Controller
             $this->deleteTempImport($token);
             ActivityLog::record('attendance_import', 'Attendance records imported.', null, null, ['imported' => $imported, 'skipped' => $skippedRows, 'refresh_warnings' => $refreshWarnings, 'errors' => $errors], 'attendance');
             $message = "تم استيراد {$imported} سجل حضور"
-                . ($deferred ? " وحفظ {$deferred} يومًا باستثناءات للمراجعة" : '')
+                . ($deferred ? " ونقل {$deferred} يومًا ببصمات ناقصة إلى صفحة الحضور والانصراف ضمن «أخطاء البصمات»" : '')
                 . ($skippedRows ? " وتخطي {$skippedRows} سجل بأخطاء" : '')
                 . ($refreshWarnings ? " مع تنبيه في تحديث مسودات الرواتب" : '') . '.';
             $reportToken = (string) Str::uuid();
@@ -522,6 +522,13 @@ class AttendanceImportController extends Controller
         return array_filter($rows, fn ($r, $n) => $n > $sheet['header_row'] && count(array_filter($r, fn ($v) => trim((string) $v) !== '')) >= 1, ARRAY_FILTER_USE_BOTH);
     }
 
+    /** Tell the user how many days have a missing punch and where they will be found. */
+    private function noteIncompleteDays(array $rows): void
+    {
+        $n = count(array_filter($rows, fn ($r) => !empty($r['incomplete'])));
+        if ($n > 0) $this->normalizationWarnings[] = "يوجد {$n} يومًا ببصمات ناقصة (حضور أو انصراف غير مسجّل). لم تُرفض، وستُنقل إلى صفحة الحضور والانصراف ضمن «أخطاء البصمات» لمراجعتها.";
+    }
+
     private function parseDaily(array $unit, array $map, array $sheets, array $options): array
     {
         $rows = [];
@@ -539,11 +546,17 @@ class AttendanceImportController extends Controller
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {
                     $errors[] = "$ref: توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف."; continue;
                 }
-                if (!$checkIn || !$checkOut) { $errors[] = "$ref: " . (!$checkIn ? 'وقت الحضور مطلوب.' : 'وقت الانصراف مطلوب.'); continue; }
                 $status = 'Present';
+                if (!$checkIn || !$checkOut) {
+                    // Missing punch or absence: never rejected; kept as a punch error for review.
+                    $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref, 'incomplete' => true, 'issue' => 'missing',
+                        'punches' => array_values(array_filter([$checkIn ? ['slot' => 'in', 'time' => $checkIn, 'ref' => $ref] : null, $checkOut ? ['slot' => 'out', 'time' => $checkOut, 'ref' => $ref] : null]))];
+                    continue;
+                }
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
+        $this->noteIncompleteDays($rows);
         return [$rows, $errors];
     }
 
@@ -583,7 +596,7 @@ class AttendanceImportController extends Controller
             $ref = "«بصمات» {$day['date']}";
             try { app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($day['date'], 'الحضور'); } catch (\RuntimeException $e) { $errors[] = "$ref: {$e->getMessage()}"; continue; }
             if (($day['punch_count'] ?? 0) > 2) {
-                $errors[] = "$ref: اليوم يحتوي " . $day['punch_count'] . " بصمات؛ سيُحفظ اليوم للمراجعة في الاستثناءات بكل بصماته، دون إنشاء سجل حضور تلقائيًا.";
+                $errors[] = "$ref: اليوم يحتوي " . $day['punch_count'] . " بصمات؛ سيُحفظ اليوم للمراجعة في أخطاء البصمات بكل بصماته، دون إنشاء سجل حضور تلقائيًا.";
             }
             $rows[] = ['employee' => $employees[(int) $day['key']], 'date' => $day['date'], 'check_in' => $day['check_in'], 'check_out' => $day['check_out'], 'status' => 'Present', 'ref' => $ref, 'punches' => $day['punches'], 'issue' => count($day['punches']) > 2 ? 'extra' : (count($day['punches']) === 1 ? 'missing' : null)];
         }
@@ -613,11 +626,17 @@ class AttendanceImportController extends Controller
                 if ((filled($row[$map['check_in'] ?? -1] ?? null) && !$checkIn) || (filled($row[$map['check_out'] ?? -1] ?? null) && !$checkOut)) {
                     $errors[] = "$ref: توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف."; continue;
                 }
-                if (!$checkIn || !$checkOut) { $errors[] = "$ref: " . (!$checkIn ? 'وقت الحضور مطلوب.' : 'وقت الانصراف مطلوب.'); continue; }
                 $status = 'Present';
+                if (!$checkIn || !$checkOut) {
+                    // Missing punch or absence: never rejected; kept as a punch error for review.
+                    $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref, 'incomplete' => true, 'issue' => 'missing',
+                        'punches' => array_values(array_filter([$checkIn ? ['slot' => 'in', 'time' => $checkIn, 'ref' => $ref] : null, $checkOut ? ['slot' => 'out', 'time' => $checkOut, 'ref' => $ref] : null]))];
+                    continue;
+                }
                 $rows[] = ['employee' => $employee, 'date' => $date, 'check_in' => $checkIn, 'check_out' => $checkOut, 'status' => $status, 'ref' => $ref];
             }
         }
+        $this->noteIncompleteDays($rows);
         return [$rows, $errors];
     }
 
@@ -676,7 +695,7 @@ class AttendanceImportController extends Controller
         $existing = Attendance::whereIn('employee_id', $employeeIds)->whereIn('attendance_date', $dates)->get(['employee_id', 'attendance_date', 'source']);
         $wanted = [];
         foreach ($rows as $row) {
-            if (($row['issue'] ?? null) === 'extra') continue;
+            if (($row['issue'] ?? null) === 'extra' || !empty($row['incomplete'])) continue;
             $wanted[$row['employee']->id . '|' . $row['date']] = true;
         }
         $total = 0; $manual = 0;

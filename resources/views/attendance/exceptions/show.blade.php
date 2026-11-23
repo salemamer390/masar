@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title',__('مراجعة بصمات اليوم'))
 @section('content')
-<a href="{{ route('attendance.exceptions.index') }}">{{ __('استثناءات البصمات') }}</a>
+<a href="{{ route('attendance.exceptions.index') }}">{{ __('أخطاء البصمات') }}</a>
 <h3 class="my-3">{{ $day->employee->employee_code }} · {{ $day->employee->full_name }} · {{ $day->work_date->format('d/m/Y') }}</h3>
 <p>{{ __('الحالة:') }} {{ ['pending'=>__('تحتاج مراجعة'),'resolved'=>__('تمت المراجعة'),'deleted'=>__('مستبعد مع الاحتفاظ بالأصل')][$day->resolution] }}</p>
 @if(auth()->user()->hasPermission('attendance.edit'))<a href="{{ route('attendance.exceptions.batch',$day->batch) }}">{{ __('فتح أعمدة الحضور الأصلية:') }} {{ $day->batch->file_name }}</a>@endif
