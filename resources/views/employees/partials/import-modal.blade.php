@@ -494,7 +494,7 @@
                 + '<span class="domain-chips">'
                 + '<span class="domain-chip ok"><i class="bi bi-check-lg"></i>' + num(d.imported) + window.masarT(' سيُستورد') + '</span>'
                 + (d.skipped > 0 ? '<span class="domain-chip bad"><i class="bi bi-x-lg"></i>' + num(d.skipped) + window.masarT(' مرفوض') + '</span>' : '')
-                + ((d.warnings || []).length > 0 ? '<span class="domain-chip warn"><i class="bi bi-exclamation-triangle"></i>' + num((d.warnings || []).length) + window.masarT(' تحذيرات') + '</span>' : '')
+                + ((d.warnings || []).length > 0 ? '<span class="domain-chip warn"><i class="bi bi-exclamation-triangle"></i>' + (function(n){ return n === 1 ? 'تحذير واحد' : (n === 2 ? 'تحذيران' : num(n) + (n <= 10 ? ' تحذيرات' : ' تحذيرًا')); })((d.warnings || []).length) + '</span>' : '')
                 + ((d.deferred || 0) > 0 ? '<span class="domain-chip mute">' + num(d.deferred) + window.masarT(' بصمات ناقصة للمراجعة') + '</span>' : '')
                 + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
                 + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
