@@ -785,7 +785,7 @@
             const config = sheet.domain_config;
             const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
             const id = 'sheetBody' + index;
-            const ignored = chosen === 'ignore';
+            const ignored = chosen === 'ignore' || chosen === 'auxiliary';
             const missingFields = (!ignored && (sheet.missing_fields || []).length) ? sheet.missing_fields : [];
             html += '<div class="sheet-card'+(missingFields.length?' sheet-card-missing':'')+(ignored?' sheet-card-ignored':'')+'">'
                 + '<div class="sheet-card-head" data-sheet-row-toggle="'+id+'" tabindex="0" role="button" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' aria-disabled="true"':'')+'>'
@@ -1056,7 +1056,7 @@
         if (ignore) {
             const sheet = lastData.sheets.find(s=>s.name===ignore.dataset.ignoreSheet);
             if (ignore.checked) state.ignoredKinds[sheet.name] = state.sheetKinds[sheet.name] || sheet.kind;
-            state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : (state.ignoredKinds[sheet.name] || sheet.detected_kind);
+            { const back = state.ignoredKinds[sheet.name] || sheet.detected_kind; state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : ((!back || back === 'auxiliary' || back === 'ignore') ? 'unknown' : back); }
             runPreview(null, '', false, 'reload-sheets'); return;
         }
         const fieldSelect = event.target.closest('select[data-domain-field]');
