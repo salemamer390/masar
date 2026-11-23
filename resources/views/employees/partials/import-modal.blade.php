@@ -1101,6 +1101,8 @@
         if (select.value === 'ignore') state.ignoredKinds[name] = state.sheetKinds[name] || lastData.sheets.find(s=>s.name===name)?.kind;
         state.sheetKinds[name] = select.value;
         // Reload the detected column mapping for the newly chosen type, staying here.
+        const sheetInfo = lastData.sheets.find(s => s.name === name);
+        if (select.value === 'ignore' || (sheetInfo && select.value === sheetInfo.kind && select.value !== 'auxiliary' && select.value !== 'unknown')) { rerenderSheetsLocal(); return; }
         runPreview(null, '', false, 'reload-sheets');
 
     });
