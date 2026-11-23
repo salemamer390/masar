@@ -80,6 +80,7 @@ class WorkbookLeavePenaltyImporter
     {
         foreach ($rows as $line => $row) {
             try {
+                if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
                 if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                 $start = $this->date($row[$map['start']] ?? null); $end = $this->date($row[$map['end']] ?? null);
@@ -90,7 +91,9 @@ class WorkbookLeavePenaltyImporter
                 $type = LeaveType::where('is_active', true)->where('name', $typeName)->first() ?: LeaveType::where('is_active', true)->where('name', 'like', '%'.$typeName.'%')->first();
                 if (!$type) throw new \RuntimeException('نوع الإجازة غير موجود.');
                 $status = $this->status($row[$map['status'] ?? -1] ?? '');
-                $days = is_numeric($row[$map['days'] ?? -1] ?? null) ? (float) $row[$map['days']] : $this->workingDays($start, $end);
+                $daysCell = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['days'] ?? -1] ?? '')));
+                if (!is_numeric($daysCell) || (float) $daysCell <= 0) throw new \RuntimeException('عدد الأيام مطلوب ويجب أن يكون رقمًا أكبر من صفر.');
+                $days = (float) $daysCell;
                 $exists = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->whereDate('start_date', $start)->whereDate('end_date', $end)->exists();
                 if ($exists) throw new \RuntimeException('سجل الإجازة موجود بالفعل.');
                 $leave = new Leave(['employee_id' => $employee->id, 'leave_type_id' => $type->id, 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'reason' => $row[$map['reason'] ?? -1] ?? null, 'status' => $status, 'approved_by' => $status === 'Approved' ? auth()->id() : null, 'approved_at' => $status === 'Approved' ? now() : null]);

@@ -124,4 +124,31 @@ class ImportSpecRoundTest extends TestCase
         $this->assertSame(2, $preview->json('domains.attendance.deferred'));
         $this->assertStringContainsString('أخطاء البصمات', implode(' ', $preview->json('domains.attendance.warnings')));
     }
+
+    public function test_required_fields_per_sheet_kind(): void
+    {
+        $svc = \App\Services\Imports\EmployeeImportService::class;
+        foreach (['attendance', 'leaves', 'penalties', 'advances', 'requests', 'insurance'] as $kind) {
+            $this->assertContains('code', $svc::requiredDomainFields($kind), $kind);
+        }
+        $this->assertContains('days', $svc::requiredDomainFields('leaves'));
+        $this->assertSame(['code', 'date'], $svc::requiredDomainFields('requests', 'العمولات', ['التاريخ', 'قيمة العمولة']));
+        $this->assertSame(['code', 'date', 'hours', 'period'], $svc::requiredDomainFields('requests', 'الإضافي', ['التاريخ']));
+        $this->assertNotContains('amount', $svc::requiredDomainFields('requests', 'الإضافي', []));
+    }
+
+    public function test_overtime_row_without_hours_type_is_rejected_with_reason(): void
+    {
+        \App\Models\RequestType::create(['code' => 'overtime', 'display_name' => 'إضافي', 'source_key' => 'overtime', 'is_active' => true, 'company_id' => $this->company->id]);
+        $file = $this->xlsx([['name' => 'الإضافي', 'rows' => [
+            ['كود الموظف', 'التاريخ', 'عدد الساعات', 'نوع الإضافي'],
+            ['104', '2026-11-10', '2', 'نهاري'],
+            ['104', '2026-11-11', '2', ''],
+        ]]]);
+        $preview = $this->postJson('/employees/import/preview', ['file' => $file])->assertOk();
+        $this->assertSame(1, $preview->json('domains.requests.imported'));
+        $this->assertSame(1, $preview->json('domains.requests.skipped'));
+        $this->assertStringContainsString('نوع الساعات مطلوب', implode(' ', $preview->json('domains.requests.errors')));
+        $this->assertStringContainsString('ملاحظة', implode(' ', $preview->json('domains.requests.warnings')));
+    }
 }

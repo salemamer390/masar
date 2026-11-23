@@ -81,6 +81,7 @@ class WorkbookInsuranceImporter
     {
         $cell = static fn (string $key): string => trim((string) ($row[$map[$key] ?? -1] ?? ''));
 
+        if ($cell('code') === '') throw new \RuntimeException('كود الموظف مطلوب.');
         $employee = $this->employee($cell('code'), $cell('name'), $cell('insurance_number'));
         if (!$employee) {
             throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');

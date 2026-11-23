@@ -96,7 +96,7 @@
 .mapping-field-card.is-required.is-missing { border-color: #dc3545; background: #fff8f8; box-shadow: 0 0 0 3px rgba(220,53,69,.08);  }
 .mapping-field-card.is-required.is-ready { border-color: #198754; background: #f6fffa; box-shadow: 0 0 0 3px rgba(25,135,84,.08); animation: none; }
 .mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
-.mapping-field-card.is-missing .field-state { color: #842029; background: #f8d7da; }
+.mapping-field-card.is-missing .field-state { color: #dc3545; background: transparent; padding: 0; }
 .mapping-field-card.is-ready .field-state { color: #0f5132; background: #d1e7dd; }
 .required-field-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
 .required-field-chip.is-missing { color: #842029; border-color: #dc3545; background: #fff8f8;  }
@@ -615,6 +615,15 @@
         return html;
     }
 
+    function requiredFieldsFor(data, sheet, kind) {
+        const base = ((data.required_domain_fields || {})[kind] || []).slice();
+        if (kind === 'requests') {
+            const label = (String(sheet.name || '') + ' ' + ((sheet.domain_config && sheet.domain_config.headers) || []).join(' ')).toLowerCase();
+            if (/إضاف|اضاف|overtime/.test(label)) { ['hours', 'period'].forEach((f) => { if (!base.includes(f)) base.push(f); }); }
+        }
+        return base;
+    }
+
     function domainMappingEditor(data, sheet, chosen) {
         const fields = (data.domain_fields || {})[chosen];
         if (!fields) { return ''; }
@@ -625,15 +634,15 @@
         if (!headers.length) {
             return window.masarStaticHtml('<div class="alert alert-warning small py-1 px-2 mt-2 mb-0">لم يتعرف التطبيق على صف العناوين في هذه الورقة؛ اختر نوعًا آخر أو راجع الملف.</div>');
         }
-        const required = (data.required_domain_fields || {})[chosen] || [];
+        const required = requiredFieldsFor(data, sheet, chosen);
         let html = window.masarStaticHtml('<div class="mt-2 border-top pt-2"><div class="small fw-semibold mb-1"><i class="bi bi-layout-three-columns"></i> ربط الأعمدة بحقول النظام <span class="text-muted fw-normal">(راجعه وعدّله لو التطبيق قراه غلط)</span></div>');
         html += '<div class="row g-1">';
         Object.keys(fields).forEach((field) => {
             const selected = chosenMap[field] !== undefined ? chosenMap[field] : (detectedMap[field] !== undefined ? detectedMap[field] : '');
             const isRequired = required.includes(field);
             const stateClass = isRequired ? (String(selected) === '' ? ' is-required is-missing' : ' is-required is-ready') : '';
-            const stateChip = isRequired ? '<span class="field-state">' + (String(selected) === '' ? window.masarT('مطلوب') : window.masarT('تم')) + '</span>' : '';
-            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1">' + esc(fields[field]) + (isRequired ? ' <span class="text-danger">*</span>' : '') + stateChip + '</label>'
+            const stateChip = isRequired ? '<span class="field-state">' + (String(selected) === '' ? window.masarT('حقل مطلوب') : window.masarT('تم')) + '</span>' : '';
+            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1 d-block">' + esc(fields[field]) + (isRequired ? '<span class="text-danger fw-bold ms-1 me-1">*</span>' : '') + '</label>' + (isRequired ? '<div class="mb-1">' + stateChip + '</div>' : '')
                 + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
                 + window.masarStaticHtml('<option value="">— بدون —</option>')
                 + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || (window.masarT('عمود ') + (index + 1))) + '</option>').join('')
@@ -659,7 +668,7 @@
             const fields = (data.domain_fields || {})[kind];
             if (!fields) continue;
             const map = Object.assign({}, sheet.domain_config?.map || {}, state.domainMappings[sheet.name] || {});
-            const missing = ((data.required_domain_fields || {})[kind] || []).filter(field => (map[field] === undefined || map[field] === '' || map[field] === null));
+            const missing = requiredFieldsFor(data, sheet, kind).filter(field => (map[field] === undefined || map[field] === '' || map[field] === null));
             if (['leaves','requests','advances'].includes(kind) && (map.code === undefined || map.code === '') && (map.name === undefined || map.name === '')) missing.push('كود أو اسم الموظف');
             if (missing.length) return 'الشيت «'+sheet.name+'»: أكمل ربط الحقول المطلوبة ('+missing.map(f => fields[f] || f).join('، ')+').';
         }

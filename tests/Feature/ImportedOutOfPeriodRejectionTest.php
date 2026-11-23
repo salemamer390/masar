@@ -85,8 +85,8 @@ class ImportedOutOfPeriodRejectionTest extends TestCase
     public function test_leave_crossing_period_start_is_rejected_whole(): void
     {
         $domains = $this->preview($this->xlsx([['name' => 'الإجازات', 'rows' => [
-            ['كود الموظف', 'اسم الموظف', 'نوع الإجازة', 'من تاريخ', 'إلى تاريخ'],
-            ['104', 'عامر سالم جمعه', 'Annual', '2026-10-31', '2026-11-02'],
+            ['كود الموظف', 'اسم الموظف', 'نوع الإجازة', 'من تاريخ', 'إلى تاريخ', 'عدد الأيام'],
+            ['104', 'عامر سالم جمعه', 'Annual', '2026-10-31', '2026-11-02', '3'],
         ]]]));
         $this->assertSame(0, $domains['leaves']['imported']);
         $this->assertSame(1, $domains['leaves']['skipped']);

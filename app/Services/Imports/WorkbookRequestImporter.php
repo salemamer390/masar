@@ -51,10 +51,11 @@ class WorkbookRequestImporter
                 [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
                 $map = $this->mapHeaders($headers);
             }
-            if (!isset($map['date']) || (!isset($map['code']) && !isset($map['name']))) continue;
+            if (!isset($map['date']) || !isset($map['code'])) continue;
             foreach ($rows as $line => $row) {
                 $untimedOvertime = false;
                 try {
+                    if (blank($row[$map['code']] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                     $employee = $this->employee($row[$map['code']] ?? null, $row[$map['name'] ?? -1] ?? null);
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                     $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح.');
@@ -73,7 +74,8 @@ class WorkbookRequestImporter
                     } elseif ($source === 'overtime') {
                         $periodCell = $row[$map['period'] ?? -1] ?? '';
                         $period = $this->period($periodCell);
-                        if (filled($periodCell) && !$period) throw new \RuntimeException('نوع الإضافي غير معروف؛ استخدم «نهاري» أو «ليلي».');
+                        if (!filled($periodCell)) throw new \RuntimeException('نوع الساعات مطلوب؛ استخدم «نهاري» أو «ليلي».');
+                        if (!$period) throw new \RuntimeException('نوع الإضافي غير معروف؛ استخدم «نهاري» أو «ليلي».');
                         $hasWindow = filled($row[$map['from'] ?? -1] ?? null) || filled($row[$map['to'] ?? -1] ?? null);
                         if ($hasWindow || !isset($map['hours'])) {
                             // Hours come from the from/to window itself, matching the
