@@ -29,11 +29,6 @@ class PayrollSettingsController extends Controller
         $holidays = DB::table('hr_holidays')->where('company_id',$companyId)->orderBy('holiday_date')->get();
         $settings = DB::table('payroll_calculation_settings')->where('company_id',$companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->setting_group.$item->setting_key");
-        // Insurance and tax numbers are platform-wide and owner-controlled: show them read-only.
-        $globalRules = app(\App\Services\GlobalPayrollRulesService::class);
-        foreach ($globalRules->values() as $name => $value) {
-            $settings[$name] = (object) ['setting_value' => $value];
-        }
         $allowances = DB::table('payroll_allowance_settings')->where('company_id',$companyId)->where('is_active', true)->orderBy('sort_order')->get();
         $history = DB::table('payroll_setting_changes')->leftJoin('users', 'users.id', '=', 'payroll_setting_changes.changed_by')
             ->where('payroll_setting_changes.company_id', $companyId)
@@ -79,7 +74,6 @@ class PayrollSettingsController extends Controller
         });
         $rules = DB::table('payroll_calculation_rules')->where('company_id', $companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->rule_group.$item->rule_key");
-        $taxCategories = $globalRules->taxCategories();
         $penaltyService = app(\App\Services\AttendancePenaltyPolicyService::class);
         if ($companyId) $penaltyService->ensureSuggested((int) $companyId);
         $attendancePenaltyPolicy = $penaltyService->forCompany($companyId ? (int) $companyId : null);
@@ -90,7 +84,7 @@ class PayrollSettingsController extends Controller
         // silently skips the flags; surface that instead of showing a dead toggle.
         $allowanceProrationReady = Schema::hasColumn('payroll_allowance_settings', 'is_prorated');
 
-        return view('payroll.settings', compact('attendancePenaltyPolicy', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'taxCategories', 'suggestedPenaltyTiers', 'allowanceProrationReady'));
+        return view('payroll.settings', compact('attendancePenaltyPolicy', 'settings', 'allowances', 'history', 'salarySummary', 'operationalSettings', 'holidays', 'leavePolicies', 'leavePolicyLabels', 'leaveTypes', 'rules', 'suggestedPenaltyTiers', 'allowanceProrationReady'));
     }
 
     /** Lateness / early-departure penalty tiers of this company. Saving rebuilds open payroll drafts so the policy reaches the salary. */

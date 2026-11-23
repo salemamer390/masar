@@ -109,7 +109,7 @@ class GlobalInsuranceAndTaxRulesTest extends TestCase
     public function test_owner_saves_global_values_and_company_page_shows_them_read_only(): void
     {
         $owner = $this->owner();
-        $this->actingAs($owner, 'owner')->get(route('owner.index'))->assertOk()->assertSee('owner-tax-category', false)->assertSee('name="settings[insurance.insurance_maximum]"', false);
+        $this->actingAs($owner, 'owner')->get(route('owner.index'))->assertOk()->assertSee('owner-tax-category', false)->assertSee('name="settings[insurance.insurance_maximum]"', false)->assertSee('ownerTaxPane', false);
         $this->actingAs($owner, 'owner')->put(route('owner.payroll-rules.settings'), [
             'effective_from' => '2026-11-01',
             'settings' => ['insurance.insurance_maximum' => 20000, 'tax.personal_exemption' => 1800],
@@ -122,7 +122,7 @@ class GlobalInsuranceAndTaxRulesTest extends TestCase
         CompanySubscription::create(['company_id' => $company->id, 'subscription_plan_id' => $plan->id, 'status' => 'active', 'starts_at' => today()]);
         $manager = User::create(['name' => 'M', 'email' => 'gl-page@example.test', 'password' => bcrypt('x'), 'role_id' => Role::create(['name' => 'company_manager', 'display_name' => 'Manager', 'company_id' => $company->id])->id, 'company_id' => $company->id, 'is_active' => true]);
         $page = $this->actingAs($manager)->get(route('payroll.settings.index'));
-        $page->assertOk()->assertSee('value="20000"', false)->assertDontSee('name="settings[insurance.insurance_maximum]"', false)->assertDontSee('name="settings[tax.personal_exemption]"', false);
+        $page->assertOk()->assertDontSee('value="20000"', false)->assertDontSee('taxBrackets', false)->assertDontSee('tax.personal_exemption', false)->assertDontSee('insurance.employee_insurance_rate', false)->assertDontSee('name="settings[insurance.insurance_maximum]"', false)->assertDontSee('name="settings[tax.personal_exemption]"', false);
         $this->actingAs($manager)->put(route('payroll.settings.update'), ['effective_from' => '2026-11-01', 'settings' => ['insurance.insurance_maximum' => 1], 'allowances' => ['transport' => 100]])->assertStatus(422);
     }
 

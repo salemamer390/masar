@@ -6237,3 +6237,5 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 @media(max-width:900px){.pc-card .pc-groups{grid-template-columns:1fr}.pc-card .pc-head{flex-wrap:wrap}}
 @media(max-width:640px){.pc-card .pc-head{flex-wrap:wrap;padding:16px}.pc-card .pc-title{flex:1 1 0}.pc-card .pc-action{width:100%;justify-content:center;order:3}.pc-card .pc-progress,.pc-card .pc-groups{padding-left:16px;padding-right:16px}.pc-card .pc-done{margin-left:16px;margin-right:16px}}
 .settings-global-note{display:block;margin-top:6px;font-size:12px;font-weight:700;color:#885300}
+.owner-rules-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 22px}
+.owner-rules-panel .settings-card .table input{min-width:90px}
