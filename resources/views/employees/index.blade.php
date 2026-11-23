@@ -9,7 +9,8 @@
     <p>{{ __('إدارة ملف الموظف والبيانات الأساسية.') }}</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات بيانات الموظفين') }}</a>@endif
+    {{-- زر «إعدادات بيانات الموظفين» مخفي بطلب عامر (23/11/2026) حتى يطلب إظهاره؛ الصفحة والبيانات كما هي --}}
+    {{-- @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات بيانات الموظفين') }}</a>@endif --}}
     <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#employeesImportModal">
       <i class="bi bi-file-earmark-excel text-success"></i> {{ __('استيراد من Excel') }}
     </button>
