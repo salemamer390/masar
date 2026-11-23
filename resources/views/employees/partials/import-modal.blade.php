@@ -509,7 +509,7 @@
                             + '<div class="reject-body">'
                             + (who ? '<div class="reject-who">' + who + '</div>' : '')
                             + '<div class="reject-reason">' + (f.errors || []).map(esc).join(window.masarT('؛ ')) + '</div>';
-                        if (key === 'penalties' && allowCorrections && (f.errors || []).some((e) => String(e).indexOf('نوع الجزاء') !== -1)) {
+                        if (false) {
                             const chosenFix = ((state.penaltyFixes || {})[f.sheet] || {})[f.line] || '';
                             row += '<div class="reject-fix"><span>' + window.masarT('صحّح نوع الجزاء أو استبعد الصف:') + '</span>'
                                 + '<select class="form-select form-select-sm" data-penalty-fix="1" data-penalty-sheet="' + esc(f.sheet) + '" data-penalty-line="' + esc(f.line) + '">'
