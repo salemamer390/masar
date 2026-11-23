@@ -23,7 +23,41 @@ class PayrollController extends Controller
     public function employeeSalaries(Request $request)
     {
         $request->attributes->set('payroll_view', 'payroll.employee-salaries');
+        $this->refreshDraftOnOpen($request, app(PayrollRunService::class));
         return $this->index($request, app(PayrollRunService::class));
+    }
+
+    /**
+     * Opening the employee-salaries page does what «تحديث المسير» does, so the figures
+     * are never old. Only the user's own company, only a Draft run (or no run yet for the
+     * current month), never an approved, locked, paid or in-progress run. Skipped when the
+     * last refresh is recent, and a cache lock stops two people opening it at once from
+     * running it twice. A failure never blocks the page.
+     */
+    private function refreshDraftOnOpen(Request $request, PayrollRunService $service): void
+    {
+        $user = auth()->user();
+        $companyId = $user?->company_id;
+        if (! $companyId || ! $request->isMethod('GET') || ! $user->hasPermission('payroll.create')) return;
+        $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
+        $run = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->first();
+        if ($run ? $run->status !== 'Draft' : ! $month->isSameMonth(now())) return;
+        if ($run) {
+            $last = ActivityLog::where('company_id', $companyId)->where('model_type', PayrollRun::class)->where('model_id', $run->id)
+                ->where('action', 'payroll_generate')->latest('created_at')->value('created_at');
+            if ($last && Carbon::parse($last)->gt(now()->subMinutes(5))) return;
+        }
+        try {
+            $lock = \Illuminate\Support\Facades\Cache::lock('payroll-open-refresh:'.$companyId.':'.$month->format('Y-m'), 120);
+            if (! $lock->get()) return;
+            try {
+                $service->generate($month, null, (int) $companyId);
+            } finally {
+                $lock->release();
+            }
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function index(Request $request, PayrollRunService $service)
