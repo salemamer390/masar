@@ -118,7 +118,7 @@ class WorkbookRequestImporter
                     }
                     $warning = $this->duplicatePolicy($employee, $type, $source, $date, $payload['overtime_period'] ?? null, $result['created_ids'] ?? []);
                     if (!empty($untimedOvertime)) {
-                        $warning = trim(($warning ? $warning . ' ' : '') . 'طلب إضافي بعدد ساعات فقط بدون «من الساعة» و«إلى الساعة»: سيُلزق تلقائيًا بجانب الشفت (قبل البداية أو بعد النهاية) ولا يُصرف إلا بحسب الحضور الفعلي.');
+                        $warning = trim(($warning ? $warning . ' ' : '') . 'ملاحظة: ساعات بدون «من/إلى»، تُحسب بجوار الشفت وبحسب الحضور الفعلي.');
                         $untimedOvertime = false;
                     }
                     $hrRequest = HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);

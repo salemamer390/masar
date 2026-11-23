@@ -477,8 +477,13 @@
         if (!kinds.length) return '';
         return '<div class="domain-cards">' + kinds.map((key) => {
             const d = domains[key];
-            const failures = (d.row_failures || d.failures || []).filter(f => f.reason_code !== 'outside_payroll_period');
-            const errors = (d.errors || []).filter(e => !String(e).includes('فترة المرتب الحالية'));
+            const failures = (d.failures || d.row_failures || []).slice().sort((a, b) => (a.reason_code === 'outside_payroll_period') - (b.reason_code === 'outside_payroll_period'));
+            const errors = (d.errors || []);
+            const warnRows = {}; const warnGeneral = [];
+            (d.warnings || []).forEach((w) => {
+                const m = String(w).match(/^(.*?) \/ الصف (\d+): ([\s\S]*)$/);
+                if (m) { (warnRows[m[1]] = warnRows[m[1]] || []).push({line: m[2], text: m[3]}); } else { warnGeneral.push(w); }
+            });
             const expandable = failures.length || errors.length || (d.warnings || []).length;
             let card = '<div class="domain-card">' + (expandable ? '<button type="button" class="domain-card-head" data-domain-toggle aria-expanded="false">' : '<div class="domain-card-head">')
                 + '<span class="domain-card-title"><i class="bi bi-' + icons[key] + '"></i> ' + esc((data.kind_labels || {})[key] || labels[key]) + '</span>'
@@ -489,10 +494,13 @@
                 + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
                 + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
             if (expandable) card += '<div class="domain-collapse" inert><div class="domain-collapse-inner"><div class="domain-scroll">';
-            if (failures.length) {
+            const sheetNames = [];
+            failures.forEach((f) => { if (!sheetNames.includes(f.sheet)) sheetNames.push(f.sheet); });
+            Object.keys(warnRows).forEach((n) => { if (!sheetNames.includes(n)) sheetNames.push(n); });
+            if (sheetNames.length) {
                 const bySheet = {};
                 failures.forEach((f) => { (bySheet[f.sheet] = bySheet[f.sheet] || []).push(f); });
-                card += Object.entries(bySheet).map(([sheet, rows]) => {
+                card += sheetNames.map((sheet) => { const rows = bySheet[sheet] || [];
                     let group = '<div class="domain-sheet"><div class="domain-sheet-name"><i class="bi bi-file-earmark-spreadsheet"></i> «' + esc(sheet) + '»</div>';
                     group += rows.map((f) => {
                         const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
@@ -512,16 +520,17 @@
                         }
                         return row + '</div></div>';
                     }).join('');
+                    group += (warnRows[sheet] || []).sort((a, b) => a.line - b.line).map((w) => '<div class="reject-row warn-row"><span class="reject-line">' + window.masarT('صف') + ' ' + num(w.line) + '</span><div class="reject-body"><div class="reject-reason"><i class="bi bi-exclamation-triangle"></i> ' + esc(w.text) + '</div></div></div>').join('');
                     return group + '</div>';
                 }).join('');
             } else if (errors.length) {
                 card += '<div class="domain-errors">' + errors.map((message) => '<div class="reject-reason">' + esc(message) + '</div>').join('') + '</div>';
             }
-            if (failures.length && (d.skipped - (d.out_of_period_count || 0)) > failures.length) {
-                card += '<div class="domain-warnings">' + window.masarT('المعروض أول ') + num(failures.length) + window.masarT(' من ') + num(d.skipped - (d.out_of_period_count || 0)) + window.masarT(' صف مرفوض.') + '</div>';
+            if (failures.length && d.skipped > failures.length) {
+                card += '<div class="domain-warnings">' + window.masarT('المعروض أول ') + num(failures.length) + window.masarT(' من ') + num(d.skipped) + window.masarT(' صف مرفوض.') + '</div>';
             }
-            if ((d.warnings || []).length) {
-                card += '<div class="domain-warnings">' + d.warnings.map((message) => '<div><i class="bi bi-exclamation-triangle"></i> ' + esc(message) + '</div>').join('') + '</div>';
+            if (warnGeneral.length) {
+                card += '<div class="domain-warnings">' + warnGeneral.map((message) => '<div><i class="bi bi-exclamation-triangle"></i> ' + esc(message) + '</div>').join('') + '</div>';
             }
             return card + (expandable ? '</div></div></div>' : '') + '</div>';
         }).join('') + '</div>';

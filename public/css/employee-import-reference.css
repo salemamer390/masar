@@ -255,3 +255,7 @@ body.preview-dark #employeesImportModal :is(.import-modal,.modal-header,.modal-f
 /* General out-of-period warning above the sheets */
 #employeesImportModal .period-alert{margin:0 0 10px;padding:8px 14px;font-size:13px;line-height:1.7;font-weight:600;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:10px}
 #employeesImportModal .period-alert i{margin-inline-end:6px}
+
+#employeesImportModal .reject-row.warn-row{background:#fffbeb;border-color:#fde68a}
+#employeesImportModal .reject-row.warn-row .reject-reason{color:#92400e}
+#employeesImportModal .reject-row.warn-row .reject-line{background:#fef3c7;color:#92400e}
