@@ -1823,3 +1823,38 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
     border-color: var(--dm-border, #334155) !important;
   }
 }
+
+/* Employee photo modal */
+.profile-photo-modal{border:0;border-radius:20px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.22)}
+.profile-photo-modal .ppm-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid #edf1f5}
+.profile-photo-modal .ppm-head-icon{width:42px;height:42px;border-radius:12px;background:var(--odir-gold-soft,#fff6e7);color:var(--odir-gold-ink,#885300);display:inline-flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.profile-photo-modal .ppm-head-text{flex:1;min-width:0}
+.profile-photo-modal .ppm-head-text h5{margin:0;font-size:17px;font-weight:800;color:#0f172a}
+.profile-photo-modal .ppm-head-text p{margin:2px 0 0;font-size:13px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-photo-modal .ppm-current{position:relative;padding:18px 22px 0;text-align:center}
+.profile-photo-modal .ppm-current .profile-photo-full{max-height:200px;border-radius:16px;box-shadow:0 4px 14px rgba(15,23,42,.12)}
+.profile-photo-modal .ppm-current-label{display:inline-block;margin-top:8px;font-size:12px;color:#64748b}
+.profile-photo-modal .ppm-body{padding:18px 22px 6px}
+.profile-photo-modal .ppm-drop{position:relative;display:flex;align-items:center;justify-content:center;min-height:190px;padding:20px;margin:0;border:2px dashed #cbd5e1;border-radius:16px;background:#f8fafc;cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.profile-photo-modal .ppm-drop:hover,.profile-photo-modal .ppm-drop:focus-visible{border-color:var(--odir-gold,#fea41a);background:#fffaf0;outline:0}
+.profile-photo-modal .ppm-drop.is-drag{border-color:var(--odir-gold,#fea41a);background:#fff3d9;border-style:solid}
+.profile-photo-modal .ppm-drop.has-file{border-style:solid;border-color:#bbf7d0;background:#f0fdf4;cursor:default}
+.profile-photo-modal .ppm-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.profile-photo-modal .ppm-drop.has-file .ppm-input{display:none}
+.profile-photo-modal .ppm-drop-empty{display:flex;flex-direction:column;align-items:center;gap:6px;color:#334155}
+.profile-photo-modal .ppm-drop-empty[hidden],.profile-photo-modal .ppm-drop-preview[hidden]{display:none}
+.profile-photo-modal .ppm-drop-icon{width:56px;height:56px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.1);display:inline-flex;align-items:center;justify-content:center;font-size:26px;color:var(--odir-gold-ink,#885300);margin-bottom:4px}
+.profile-photo-modal .ppm-or{font-size:12px;color:#94a3b8}
+.profile-photo-modal .ppm-browse{padding:7px 16px;border-radius:999px;background:#0f172a;color:#fff;font-size:13px;font-weight:700}
+.profile-photo-modal .ppm-drop-preview{display:flex;align-items:center;gap:14px;width:100%}
+.profile-photo-modal .ppm-drop-preview img{width:110px;height:110px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 14px rgba(15,23,42,.18);flex:none}
+.profile-photo-modal .ppm-file{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:start}
+.profile-photo-modal .ppm-file-name{font-weight:700;color:#0f172a;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;align-self:flex-start;max-width:100%}
+.profile-photo-modal .ppm-file-size{font-size:12px;color:#64748b;direction:ltr;align-self:flex-start}
+.profile-photo-modal .ppm-remove{flex:none;width:34px;height:34px;border:0;border-radius:50%;background:#fff;color:#b91c1c;box-shadow:0 1px 4px rgba(15,23,42,.15);cursor:pointer}
+.profile-photo-modal .ppm-hint{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12.5px;color:#64748b}
+.profile-photo-modal .ppm-hint.is-error{color:#b91c1c;font-weight:700}
+.profile-photo-modal .ppm-footer{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:14px 22px 20px}
+.profile-photo-modal .ppm-footer .ppm-delete{margin-inline-start:auto}
+.profile-photo-modal .ppm-footer .btn{border-radius:12px;font-weight:700;padding:9px 18px}
+@media(max-width:480px){.profile-photo-modal .ppm-drop-preview{flex-direction:column;text-align:center}.profile-photo-modal .ppm-file{text-align:center}}
