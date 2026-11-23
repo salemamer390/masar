@@ -69,15 +69,15 @@ class WorkbookAttendanceImporter
                         if (blank($row[$map[$field] ?? -1] ?? null)) throw new \RuntimeException($label . ' مطلوب.');
                     }
                     $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                    if (!$employee) throw new \RuntimeException('الموظف غير موجود أو بياناته غير مكتملة.');
+                    if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة.');
                     if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $row[$map['name'] ?? -1] ?? null)) { $warnings[] = "{$sheet['name']} / الصف {$line}: $warning"; }
                     $date = $this->date($row[$map['date'] ?? -1] ?? ($config['default_date'] ?? null));
-                    if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
+                    if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                     app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور');
                     $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
-                    if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف.');
+                    if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت غير صالح: الحضور «' . (trim((string) ($row[$map['in'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['in'] ?? -1] ?? ''))) . '»، الانصراف «' . (trim((string) ($row[$map['out'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['out'] ?? -1] ?? ''))) . '»؛ لم يُستورد الصف.');
                     $status = 'Present';
                     if (!$in || !$out) {
                         // Missing punch or absence: never rejected. Kept as a punch error (أخطاء البصمات) for review; no attendance record is written.

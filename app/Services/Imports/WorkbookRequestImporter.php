@@ -57,8 +57,8 @@ class WorkbookRequestImporter
                 try {
                     if (blank($row[$map['code']] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                     $employee = $this->employee($row[$map['code']] ?? null, $row[$map['name'] ?? -1] ?? null);
-                    if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
-                    $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح.');
+                    if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة، أو الاسم لا يطابق الكود.');
+                    $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                     app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الطلب');
                     $guard->ensureOpen($date);
                     $source = $this->source($row, $map, $headers, (string) ($sheet['name'] ?? ''));

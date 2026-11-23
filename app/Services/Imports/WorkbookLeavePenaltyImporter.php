@@ -82,14 +82,14 @@ class WorkbookLeavePenaltyImporter
             try {
                 if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
+                if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة، أو الاسم لا يطابق الكود.');
                 $start = $this->date($row[$map['start']] ?? null); $end = $this->date($row[$map['end']] ?? null);
-                if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة.');
+                if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة: من «' . (trim((string) ($row[$map['start'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['start'] ?? -1] ?? ''))) . '» إلى «' . (trim((string) ($row[$map['end'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['end'] ?? -1] ?? ''))) . '»؛ تأكد أن التاريخين صحيحان وأن النهاية ليست قبل البداية.');
                 app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureRangeWithinCurrentPeriod($start, $end, 'الإجازة');
                 $guard->ensureRangeOpen($start, $end);
                 $typeName = trim((string) ($row[$map['leave_type']] ?? ''));
                 $type = LeaveType::where('is_active', true)->where('name', $typeName)->first() ?: LeaveType::where('is_active', true)->where('name', 'like', '%'.$typeName.'%')->first();
-                if (!$type) throw new \RuntimeException('نوع الإجازة غير موجود.');
+                if (!$type) throw new \RuntimeException('نوع الإجازة «' . (trim((string) ($row[$map['leave_type'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['leave_type'] ?? -1] ?? ''))) . '» غير موجود في إعدادات الشركة.');
                 $status = $this->status($row[$map['status'] ?? -1] ?? '');
                 $daysCell = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['days'] ?? -1] ?? '')));
                 if (!is_numeric($daysCell) || (float) $daysCell <= 0) throw new \RuntimeException('عدد الأيام مطلوب ويجب أن يكون رقمًا أكبر من صفر.');
@@ -132,15 +132,15 @@ class WorkbookLeavePenaltyImporter
                 }
                 if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                if (!$employee) throw new \RuntimeException('كود الموظف غير موجود.');
-                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود.');
+                if (!$employee) throw new \RuntimeException('كود الموظف «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» غير موجود في هذه الشركة.');
+                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                 app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الجزاء');
                 $guard->ensureOpen($date);
                 $typeName = trim((string) ($row[$map['penalty_type']] ?? ''));
                 $fixedType = $penaltyFixes[$sheet][$line] ?? null;
                 if (is_string($fixedType) && trim($fixedType) !== '') $typeName = trim($fixedType);
                 // A missing type must be rejected for review, never matched by wildcard.
-                if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
+                if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب ولم يُكتب في هذا الصف.');
                 $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
                 if (!is_numeric($quantity) || (float) $quantity <= 0) {
                     $daysRaw = trim((string) ($row[$map['deduction'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) $row[$map['deduction']]);
