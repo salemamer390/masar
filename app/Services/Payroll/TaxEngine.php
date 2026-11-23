@@ -23,7 +23,7 @@ class TaxEngine
     public function settings(): array
     {
         $rows = DB::getSchemaBuilder()->hasTable('tax_categories')
-            ? DB::table('tax_categories')->orderBy('sort_order')->get()
+            ? DB::table('tax_categories')->whereNull('company_id')->orderBy('sort_order')->get()
             : collect();
         if ($rows->isEmpty()) return config('payroll.tax.categories', []);
         return $rows->mapWithKeys(fn($r) => [$r->category_key => ['label' => $r->label, 'max' => $r->max_income === null ? null : (float)$r->max_income]])->all();
@@ -49,12 +49,7 @@ class TaxEngine
             $rows = DB::table('tax_brackets as b')
                 ->join('tax_categories as c', 'c.id', '=', 'b.tax_category_id')
                 ->where('c.category_key', $category)
-                ->where(function ($query) {
-                    $companyId = CompanyContext::id();
-                    $companyId === null
-                        ? $query->whereNull('c.company_id')
-                        : $query->where('c.company_id', $companyId);
-                })
+                ->whereNull('c.company_id')
                 ->orderBy('b.from_amount')
                 ->get(['b.from_amount as from', 'b.to_amount as to', 'b.rate']);
             if ($rows->isNotEmpty()) {

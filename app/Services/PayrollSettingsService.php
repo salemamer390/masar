@@ -38,13 +38,15 @@ class PayrollSettingsService
 
     public function number(string $group, string $key, float $default = 0.0): float
     {
-        $cacheKey = $this->cacheKey($group . '.' . $key);
+        $cacheKey = (in_array($group, GlobalPayrollRulesService::GROUPS, true) ? 'global' : ($this->companyId() ?? 'global')) . '|' . $group . '.' . $key;
         if (array_key_exists($cacheKey, $this->numberCache)) {
             return $this->numberCache[$cacheKey];
         }
 
+        // Insurance and tax numbers are platform-wide (company_id NULL), owner-controlled.
+        $isGlobal = in_array($group, GlobalPayrollRulesService::GROUPS, true);
         $value = DB::table('payroll_calculation_settings')
-            ->where('company_id', $this->companyId())
+            ->when($isGlobal, fn ($q) => $q->whereNull('company_id'), fn ($q) => $q->where('company_id', $this->companyId()))
             ->where('setting_group', $group)
             ->where('setting_key', $key)
             ->where('is_active', 1)

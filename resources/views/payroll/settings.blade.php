@@ -35,7 +35,7 @@
 ['key'=>'general.allowance_rate','label'=>__('نسبة البدلات من الأساسي'),'unit'=>__('٪')],
 ['key'=>'general.proration_days','label'=>__('أيام الشهر لتسوية الراتب الجزئي'),'unit'=>__('يوم')]]]])
 <div class="settings-cards">
-@foreach($settingsCards as $settingsCard)<div class="settings-card"><div class="settings-card-head"><h3>{{ $settingsCard['title'] }}</h3><span>{{ $settingsCard['subtitle'] }}</span></div><div class="settings-card-grid">@foreach($settingsCard['fields'] as $field)<div class="settings-field"><label class="form-label">{{ $field['label'] }}</label><div class="input-group settings-unit"><input type="number" step="0.000001" min="0" name="settings[{{ $field['key'] }}]" value="{{ format_number(old('settings.'.$field['key'],$settings[$field['key']]->setting_value ?? '')) }}" class="form-control" required><span class="input-group-text">{{ $field['unit'] }}</span></div>@if(!empty($field['hint']))<small class="settings-hint">{{ $field['hint'] }}</small>@endif</div>@endforeach</div></div>@endforeach
+@foreach($settingsCards as $settingsCard)<div class="settings-card"><div class="settings-card-head"><h3>{{ $settingsCard['title'] }}</h3><span>{{ $settingsCard['subtitle'] }}@if(\App\Services\GlobalPayrollRulesService::isGlobalSetting($settingsCard['fields'][0]['key'])) <b class="settings-global-note"><i class="bi bi-lock-fill"></i> {{ __('قيم عامة تحددها إدارة المنصة لكل الشركات، للعرض فقط') }}</b>@endif</span></div><div class="settings-card-grid">@foreach($settingsCard['fields'] as $field)<div class="settings-field"><label class="form-label">{{ $field['label'] }}</label><div class="input-group settings-unit">@if(\App\Services\GlobalPayrollRulesService::isGlobalSetting($field['key']))<input type="text" value="{{ format_number($settings[$field['key']]->setting_value ?? '') }}" class="form-control" readonly disabled>@else<input type="number" step="0.000001" min="0" name="settings[{{ $field['key'] }}]" value="{{ format_number(old('settings.'.$field['key'],$settings[$field['key']]->setting_value ?? '')) }}" class="form-control" required>@endif<span class="input-group-text">{{ $field['unit'] }}</span></div>@if(!empty($field['hint']))<small class="settings-hint">{{ $field['hint'] }}</small>@endif</div>@endforeach</div></div>@endforeach
 <div class="settings-card wide"><div class="settings-card-head"><h3>{{ __('توزيع البدلات') }}</h3><span>{{ __('البدل الأخير يأخذ الباقي تلقائيًا ليكتمل المجموع 100%. فعّل «حساب جزئي» ليُحتسب البدل بنسبة أيام العمل عند التعيين أو ترك الخدمة خلال الشهر، أو أوقفه ليُصرف كاملًا.') }}</span></div>
 @if(!($allowanceProrationReady ?? true))<div class="alert alert-warning py-2 mb-3" role="alert"><i class="bi bi-exclamation-triangle ms-1"></i> {{ __('اختيار «الحساب الجزئي» للبدلات يحتاج تحديث قاعدة البيانات أولًا: شغّل') }} <code dir="ltr">php artisan migrate</code> {{ __('ثم أعد تحميل الصفحة. النسب تحفظ كالمعتاد.') }}</div>@endif
 <div class="allowance-row">@foreach($allowances as $allowance)<div class="allowance-item"><label class="form-label">{{ __($allowance->allowance_name) }}</label><div class="input-group settings-unit"><input type="number" step="0.0001" min="0" max="100" name="allowances[{{ $allowance->allowance_key }}]" value="{{ format_number(old('allowances.'.$allowance->allowance_key,$allowance->percentage)) }}" class="form-control allowance-input {{ $loop->last ? 'allowance-auto' : '' }}" @if($loop->last) readonly tabindex="-1" @endif required><span class="input-group-text">{{ __('٪') }}</span></div>@if($allowanceProrationReady ?? true)<label class="allowance-prorate"><input type="hidden" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="0"><input type="checkbox" name="allowance_prorated[{{ $allowance->allowance_key }}]" value="1" @checked(old('allowance_prorated.'.$allowance->allowance_key, $allowance->is_prorated ?? 1))> {{ __('حساب جزئي مع أيام العمل') }}</label>@endif @if($loop->last)<small class="settings-hint">{{ __('يأخذ الباقي تلقائيًا من إجمالي البدلات.') }}</small>@endif</div>@endforeach</div>
@@ -59,60 +59,17 @@
 <div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">{{ __('تعديلات غير محفوظة:') }} <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>{{ __('تراجع') }}</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> {{ __('حفظ التعديلات') }}</button></span></div>
 </form>
 
-<form id="taxBrackets" class="settings-tab-pane" method="POST" action="{{ route('payroll.settings.tax') }}" data-track-dirty="true" hidden>@csrf @method('PUT')
-@error('tax')<div class="alert alert-danger">{{ $message }}</div>@enderror
-<div class="settings-effective"><div class="settings-effective-text"><strong><i class="bi bi-calendar2-check ms-1"></i> {{ __('التعديلات الجديدة تسري من التاريخ المحدد') }}</strong><span>{{ __('عدّل الفئات والشرائح عند تغيّر القانون. كل شريحة تبدأ من حيث انتهت السابقة، وآخر شريحة بدون حد أعلى. التغيير يخص شركتك فقط.') }}</span></div><div class="settings-effective-field"><label class="form-label">{{ __('تاريخ السريان') }}</label><input type="date" name="effective_from" value="{{ now()->toDateString() }}" class="form-control" required></div></div>
-<div id="taxCategories" class="settings-cards">
-@foreach($taxCategories as $ci=>$category)
-<div class="settings-card tax-category">
-<div class="settings-card-grid category-head-grid"><div class="settings-field"><label class="form-label">{{ __('اسم الفئة') }}</label><input data-field="label" name="categories[{{ $ci }}][label]" value="{{ $category->label }}" class="form-control" required></div>
-<div class="settings-field"><label class="form-label">{{ __('الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)') }}</label><div class="input-group settings-unit"><input type="number" step="0.01" min="0" data-field="max_income" name="categories[{{ $ci }}][max_income]" value="{{ $category->max_income !== null ? format_number($category->max_income) : '' }}" class="form-control"><span class="input-group-text">{{ __('ج.م') }}</span></div></div>
-<div class="settings-field d-flex align-items-end"><button type="button" class="btn btn-outline-danger w-100 remove-category">{{ __('حذف الفئة') }}</button></div></div>
-<div class="table-responsive"><table class="table table-sm align-middle mb-2"><thead><tr><th>{{ __('من') }}</th><th>{{ __('إلى (فارغ = بلا حد)') }}</th><th>{{ __('النسبة %') }}</th><th></th></tr></thead><tbody>
-@foreach($category->brackets as $bi=>$bracket)
-<tr><td><input type="number" step="0.01" min="0" data-field="from" name="categories[{{ $ci }}][brackets][{{ $bi }}][from]" value="{{ format_number($bracket->from_amount) }}" class="form-control form-control-sm" required></td><td><input type="number" step="0.01" min="0" data-field="to" name="categories[{{ $ci }}][brackets][{{ $bi }}][to]" value="{{ $bracket->to_amount !== null ? format_number($bracket->to_amount) : '' }}" class="form-control form-control-sm"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" name="categories[{{ $ci }}][brackets][{{ $bi }}][rate]" value="{{ round((float) $bracket->rate * 100, 4) }}" class="form-control form-control-sm" required></td><td><button type="button" class="btn btn-sm btn-outline-danger remove-bracket">{{ __('حذف') }}</button></td></tr>
-@endforeach
-</tbody></table></div>
-<button type="button" class="btn btn-sm btn-outline-primary add-bracket"><i class="bi bi-plus"></i> {{ __('إضافة شريحة') }}</button>
-</div>
+<div id="taxBrackets" class="settings-tab-pane" hidden>
+<div class="settings-effective"><div class="settings-effective-text"><strong><i class="bi bi-lock-fill ms-1"></i> {{ __('شرائح الضرائب عامة لكل الشركات') }}</strong><span>{{ __('تحددها إدارة المنصة وتسري على كل الشركات، ولا يمكن تعديلها من هنا.') }}</span></div></div>
+<div class="settings-cards">
+@foreach($taxCategories as $category)
+<div class="settings-card"><div class="settings-card-head"><h3>{{ $category->label }}</h3><span>{{ $category->max_income !== null ? __('حتى') . ' ' . format_number($category->max_income) . ' ' . __('ج.م سنويًا') : __('أعلى فئة') }}</span></div>
+<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>{{ __('من') }}</th><th>{{ __('إلى') }}</th><th>{{ __('النسبة') }}</th></tr></thead><tbody>
+@foreach($category->brackets as $bracket)<tr><td>{{ format_number($bracket->from_amount) }}</td><td>{{ $bracket->to_amount !== null ? format_number($bracket->to_amount) : __('بلا حد') }}</td><td>{{ round((float) $bracket->rate * 100, 4) }}%</td></tr>@endforeach
+</tbody></table></div></div>
 @endforeach
 </div>
-<button type="button" class="btn btn-outline-primary" id="addTaxCategory"><i class="bi bi-plus-circle"></i> {{ __('إضافة فئة') }}</button>
-<div class="settings-save-bar" data-save-bar hidden><span class="settings-save-text">{{ __('تعديلات غير محفوظة:') }} <b data-dirty-count>0</b></span><span class="settings-save-actions"><button type="button" class="btn btn-outline-light" data-revert>{{ __('تراجع') }}</button><button type="button" class="btn btn-primary" data-save><i class="bi bi-save"></i> {{ __('حفظ التعديلات') }}</button></span></div>
-</form>
-<script>
-(function () {
-    const wrap = document.getElementById('taxCategories');
-    const form = document.getElementById('taxBrackets');
-    if (!wrap || !form) return;
-    const rowHtml = window.masarStaticHtml('<tr><td><input type="number" step="0.01" min="0" data-field="from" class="form-control form-control-sm" required></td><td><input type="number" step="0.01" min="0" data-field="to" class="form-control form-control-sm"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" class="form-control form-control-sm" required></td><td><button type="button" class="btn btn-sm btn-outline-danger remove-bracket">حذف</button></td></tr>');
-    const categoryHtml = window.masarStaticHtml('<div class="settings-card tax-category"><div class="settings-card-grid category-head-grid"><div class="settings-field"><label class="form-label">اسم الفئة</label><input data-field="label" class="form-control" required></div><div class="settings-field"><label class="form-label">الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)</label><div class="input-group settings-unit"><input type="number" step="0.01" min="0" data-field="max_income" class="form-control"><span class="input-group-text">ج.م</span></div></div><div class="settings-field d-flex align-items-end"><button type="button" class="btn btn-outline-danger w-100 remove-category">حذف الفئة</button></div></div><div class="table-responsive"><table class="table table-sm align-middle mb-2"><thead><tr><th>من</th><th>إلى (فارغ = بلا حد)</th><th>النسبة %</th><th></th></tr></thead><tbody>') + rowHtml + window.masarStaticHtml('</tbody></table></div><button type="button" class="btn btn-sm btn-outline-primary add-bracket"><i class="bi bi-plus"></i> إضافة شريحة</button></div>');
-    function reindex() {
-        wrap.querySelectorAll('.tax-category').forEach(function (category, ci) {
-            category.querySelectorAll('[data-field]').forEach(function (input) {
-                const field = input.dataset.field;
-                if (field === 'label' || field === 'max_income') {
-                    input.name = 'categories[' + ci + '][' + field + ']';
-                } else {
-                    const row = input.closest('tr');
-                    const bi = Array.prototype.indexOf.call(row.parentNode.children, row);
-                    input.name = 'categories[' + ci + '][brackets][' + bi + '][' + field + ']';
-                }
-            });
-        });
-    }
-    window.masarReindexTax = reindex;
-    wrap.addEventListener('click', function (event) {
-        const button = event.target.closest('button');
-        if (!button) return;
-        if (button.classList.contains('add-bracket')) { button.closest('.tax-category').querySelector('tbody').insertAdjacentHTML('beforeend', rowHtml); reindex(); form.dispatchEvent(new Event('input', {bubbles: true})); }
-        if (button.classList.contains('remove-bracket')) { button.closest('tr').remove(); reindex(); form.dispatchEvent(new Event('input', {bubbles: true})); }
-        if (button.classList.contains('remove-category')) { button.closest('.tax-category').remove(); reindex(); form.dispatchEvent(new Event('input', {bubbles: true})); }
-    });
-    document.getElementById('addTaxCategory').addEventListener('click', function () { wrap.insertAdjacentHTML('beforeend', categoryHtml); reindex(); form.dispatchEvent(new Event('input', {bubbles: true})); });
-    form.addEventListener('submit', reindex);
-})();
-</script>
+</div>
 
 <div id="leavePolicy" class="settings-tab-pane" hidden>
 <form method="POST" action="{{ route('payroll.settings.leaves.update') }}" data-ajax="true" data-track-dirty="true">

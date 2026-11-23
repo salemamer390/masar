@@ -412,8 +412,6 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
             ->name('settings.update');
         Route::put('/settings/rules', [PayrollSettingsController::class, 'updateRules'])
             ->middleware('permission:payroll.settings')->name('settings.rules');
-        Route::put('/settings/tax', [PayrollSettingsController::class, 'updateTax'])
-            ->middleware('permission:payroll.settings')->name('settings.tax');
         Route::put('/settings/operational', [PayrollSettingsController::class, 'updateOperational'])
             ->middleware('permission:payroll.settings')->name('settings.operational.update');
         Route::put('/settings/attendance-penalties', [PayrollSettingsController::class, 'updateAttendancePenalties'])
@@ -648,6 +646,9 @@ Route::middleware(['no_auth_cache', 'owner'])->prefix('owner')->name('owner.')->
     Route::post('/database-updates/run', [\App\Http\Controllers\OwnerDatabaseUpdateController::class, 'run'])
         ->middleware('throttle:6,1')
         ->name('database-updates.run');
+    // Platform-wide social insurance and income tax rules (apply to every company).
+    Route::put('/payroll-rules/settings', [\App\Http\Controllers\OwnerPayrollRulesController::class, 'updateSettings'])->name('payroll-rules.settings');
+    Route::put('/payroll-rules/tax', [\App\Http\Controllers\OwnerPayrollRulesController::class, 'updateTax'])->name('payroll-rules.tax');
     Route::post('/plans', [\App\Http\Controllers\OwnerDashboardController::class, 'storePlan'])->name('plans.store');
     Route::put('/plans/{plan}', [\App\Http\Controllers\OwnerDashboardController::class, 'updatePlan'])->name('plans.update');
     Route::post('/companies', [\App\Http\Controllers\OwnerDashboardController::class, 'storeCompany'])->name('companies.store');

@@ -68,7 +68,12 @@ class OwnerDashboardController extends Controller
         $companyDetails = $this->companyDetails($companies, $latestSubscriptions, $renewalRequests);
         $pendingErasureFiles = app(CompanyErasureService::class)->pendingManifestCount();
 
+        $globalRules = app(\App\Services\GlobalPayrollRulesService::class);
+        $globalPayrollValues = $globalRules->values();
+        $globalTaxCategories = $globalRules->taxCategories();
+
         return view('owner.dashboard', compact(
+            'globalPayrollValues', 'globalTaxCategories',
             'plans', 'companies', 'renewalRequests', 'latestSubscriptions',
             'activeCompanies', 'activeSubscriptions', 'expiringSubscriptions',
             'pendingRenewals', 'approvedRevenue', 'companiesByPlan',

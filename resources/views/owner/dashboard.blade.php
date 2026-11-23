@@ -21,6 +21,7 @@
   <button class="owner-tab" data-tab="requests"><i class="bi bi-arrow-repeat"></i> {{ __('طلبات التجديد') }} <b>{{$pendingRenewals}}</b></button>
   <button class="owner-tab" data-tab="data"><i class="bi bi-database"></i> {{ __('البيانات') }}</button>
   <button class="owner-tab" data-tab="database-updates"><i class="bi bi-database-gear"></i> {{ __('تحديثات قاعدة البيانات') }} @if(count($databaseUpdateStatus['pending'] ?? []))<b>{{count($databaseUpdateStatus['pending'])}}</b>@endif</button>
+  <button class="owner-tab" data-tab="payroll-rules"><i class="bi bi-shield-check"></i> {{ __('التأمينات والضرائب') }}</button>
   <button class="owner-tab" data-tab="notifications"><i class="bi bi-megaphone"></i> {{ __('الإشعارات') }}</button>
   <button class="owner-tab" data-tab="audit"><i class="bi bi-clock-history"></i> {{ __('سجل العمليات') }}</button>
   <a class="owner-tab" href="{{ route('owner.tour.index') }}"><i class="bi bi-signpost-2"></i> {{ __('الجولة التعريفية') }}</a>
@@ -141,6 +142,48 @@
   </div>
  </section>
 
+ <section class="owner-panel" data-panel="payroll-rules" hidden>
+  <div class="section-toolbar"><div><h2>{{ __('التأمينات الاجتماعية والضرائب') }}</h2><p>{{ __('قيم عامة تسري على كل الشركات. أي تعديل هنا يعيد حساب هياكل الرواتب في كل الشركات، والمسيرات المعتمدة أو المصروفة لا تتغير. الشركات تراها للعرض فقط.') }}</p></div></div>
+  @error('payroll_rules')<div class="alert alert-danger">{{ $message }}</div>@enderror
+  <article class="owner-card"><header><h2><i class="bi bi-shield-check"></i> {{ __('التأمينات الاجتماعية والضرائب') }}</h2></header>
+  <form method="POST" action="{{ route('owner.payroll-rules.settings') }}" class="form-grid" style="padding:16px" onsubmit="return confirm('{{ __('سيتم تطبيق القيم على كل الشركات وإعادة حساب الرواتب. متابعة؟') }}')">@csrf @method('PUT')
+   <label class="full">{{ __('تاريخ السريان') }}<input type="date" name="effective_from" value="{{ now()->toDateString() }}" required></label>
+   @foreach([
+    'insurance.employee_insurance_rate'=>[__('تأمين الموظف'),__('٪')],
+    'insurance.employer_insurance_rate'=>[__('تأمين صاحب العمل'),__('٪')],
+    'insurance.martyrs_fund_rate'=>[__('صندوق أسر الشهداء'),__('٪')],
+    'insurance.insurance_minimum'=>[__('الحد الأدنى للأجر التأميني'),__('ج.م')],
+    'insurance.insurance_maximum'=>[__('الحد الأقصى للأجر التأميني'),__('ج.م')],
+    'tax.personal_exemption'=>[__('الإعفاء الشخصي الشهري'),__('ج.م')],
+    'tax.tax_deductible_contributions'=>[__('اشتراكات قابلة للخصم ضريبيًا (سنويًا)'),__('ج.م')],
+    'tax.profit_share_exempt_percent'=>[__('نسبة نصيب الأرباح المعفاة من الضريبة'),__('٪')]] as $key=>[$label,$unit])
+   <label>{{ $label }} ({{ $unit }})<input type="number" step="0.000001" min="0" name="settings[{{ $key }}]" value="{{ format_number(old('settings.'.$key, $globalPayrollValues[$key] ?? '')) }}" required></label>
+   @endforeach
+   <div class="full"><button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> {{ __('حفظ وتطبيق على كل الشركات') }}</button></div>
+  </form></article>
+
+  <div class="section-toolbar"><div><h2>{{ __('شرائح ضريبة كسب العمل') }}</h2><p>{{ __('كل شريحة تبدأ من حيث انتهت السابقة، وآخر شريحة وآخر فئة بدون حد أعلى.') }}</p></div></div>
+  @error('payroll_tax')<div class="alert alert-danger">{{ $message }}</div>@enderror
+  <form method="POST" action="{{ route('owner.payroll-rules.tax') }}" id="ownerTaxForm" onsubmit="ownerTaxReindex();return confirm('{{ __('سيتم تطبيق الشرائح على كل الشركات وإعادة حساب الرواتب. متابعة؟') }}')">@csrf @method('PUT')
+   <article class="owner-card"><div class="form-grid" style="padding:16px"><label>{{ __('تاريخ السريان') }}<input type="date" name="effective_from" value="{{ now()->toDateString() }}" required></label></div></article>
+   <div id="ownerTaxCategories">
+   @foreach($globalTaxCategories as $ci=>$category)
+   <article class="owner-card owner-tax-category" style="padding:16px">
+    <div class="form-grid"><label>{{ __('اسم الفئة') }}<input data-field="label" name="categories[{{ $ci }}][label]" value="{{ $category->label }}" required></label>
+    <label>{{ __('الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)') }}<input type="number" step="0.01" min="0" data-field="max_income" name="categories[{{ $ci }}][max_income]" value="{{ $category->max_income !== null ? format_number($category->max_income) : '' }}"></label></div>
+    <div class="table-scroll" style="margin-top:10px"><table><thead><tr><th>{{ __('من') }}</th><th>{{ __('إلى (فارغ = بلا حد)') }}</th><th>{{ __('النسبة %') }}</th><th></th></tr></thead><tbody>
+    @foreach($category->brackets as $bi=>$bracket)
+    <tr><td><input type="number" step="0.01" min="0" data-field="from" name="categories[{{ $ci }}][brackets][{{ $bi }}][from]" value="{{ format_number($bracket->from_amount) }}" required></td><td><input type="number" step="0.01" min="0" data-field="to" name="categories[{{ $ci }}][brackets][{{ $bi }}][to]" value="{{ $bracket->to_amount !== null ? format_number($bracket->to_amount) : '' }}"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" name="categories[{{ $ci }}][brackets][{{ $bi }}][rate]" value="{{ round((float) $bracket->rate * 100, 4) }}" required></td><td><button type="button" class="btn btn-sm btn-outline-danger" data-owner-tax="remove-bracket">{{ __('حذف') }}</button></td></tr>
+    @endforeach
+    </tbody></table></div>
+    <div style="margin-top:10px;display:flex;gap:8px"><button type="button" class="btn btn-sm btn-outline-primary" data-owner-tax="add-bracket"><i class="bi bi-plus"></i> {{ __('إضافة شريحة') }}</button><button type="button" class="btn btn-sm btn-outline-danger" data-owner-tax="remove-category">{{ __('حذف الفئة') }}</button></div>
+   </article>
+   @endforeach
+   </div>
+   <div style="display:flex;gap:8px;margin-bottom:20px"><button type="button" class="btn btn-outline-primary" id="ownerAddTaxCategory"><i class="bi bi-plus-circle"></i> {{ __('إضافة فئة') }}</button><button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> {{ __('حفظ وتطبيق على كل الشركات') }}</button></div>
+  </form>
+ </section>
+
  <section class="owner-panel" data-panel="notifications" hidden>
   <div class="owner-notification-grid"><article class="owner-card"><header><h2><i class="bi bi-megaphone"></i> {{ __('إرسال إشعار') }}</h2></header><form method="POST" action="{{route('owner.announcements.send')}}" class="form-grid">@csrf<label class="full">{{ __('نطاق الإرسال') }}<select name="audience" id="announcementAudience"><option value="all">{{ __('جميع الشركات') }}</option><option value="company">{{ __('شركة محددة') }}</option></select></label><label class="full" id="announcementCompanyField">{{ __('الشركة') }}<select name="company_id"><option value="">{{ __('اختر الشركة') }}</option>@foreach($companies as $company)<option value="{{$company->id}}">{{$company->name}}</option>@endforeach</select></label><label class="full">{{ __('نص الإشعار') }}<textarea name="message" rows="8" maxlength="2000" required></textarea></label><button class="btn btn-primary full"><i class="bi bi-send"></i> {{ __('إرسال الإشعار') }}</button></form></article>
   <aside class="owner-card help-card"><header><h2><i class="bi bi-lightbulb"></i> {{ __('إرشادات') }}</h2></header><ul><li>{{ __('اكتب رسالة واضحة ومباشرة.') }}</li><li>{{ __('راجع الشركة المستهدفة قبل الإرسال.') }}</li><li>{{ __('سيتم حفظ العملية في سجل العمليات.') }}</li></ul></aside></div>
@@ -234,5 +277,31 @@ const aud=document.getElementById('announcementAudience'),compField=document.get
 function syncAudience(){if(compField)compField.style.display=aud&&aud.value==='company'?'':'none';}
 aud?.addEventListener('change',syncAudience);syncAudience();
 </script>
+<script>
+(function(){
+  const wrap=document.getElementById('ownerTaxCategories'); if(!wrap) return;
+  const rowHtml='<tr><td><input type="number" step="0.01" min="0" data-field="from" required></td><td><input type="number" step="0.01" min="0" data-field="to"></td><td><input type="number" step="0.01" min="0" max="100" data-field="rate" required></td><td><button type="button" class="btn btn-sm btn-outline-danger" data-owner-tax="remove-bracket">حذف</button></td></tr>';
+  const catHtml='<article class="owner-card owner-tax-category" style="padding:16px"><div class="form-grid"><label>اسم الفئة<input data-field="label" required></label><label>الحد الأعلى للدخل السنوي (فارغ للفئة الأخيرة)<input type="number" step="0.01" min="0" data-field="max_income"></label></div><div class="table-scroll" style="margin-top:10px"><table><thead><tr><th>من</th><th>إلى (فارغ = بلا حد)</th><th>النسبة %</th><th></th></tr></thead><tbody>'+rowHtml+'</tbody></table></div><div style="margin-top:10px;display:flex;gap:8px"><button type="button" class="btn btn-sm btn-outline-primary" data-owner-tax="add-bracket"><i class="bi bi-plus"></i> إضافة شريحة</button><button type="button" class="btn btn-sm btn-outline-danger" data-owner-tax="remove-category">حذف الفئة</button></div></article>';
+  window.ownerTaxReindex=function(){
+    wrap.querySelectorAll('.owner-tax-category').forEach(function(cat,ci){
+      cat.querySelectorAll('[data-field]').forEach(function(input){
+        const f=input.dataset.field;
+        if(f==='label'||f==='max_income'){input.name='categories['+ci+']['+f+']';}
+        else{const row=input.closest('tr');const bi=Array.prototype.indexOf.call(row.parentNode.children,row);input.name='categories['+ci+'][brackets]['+bi+']['+f+']';}
+      });
+    });
+  };
+  wrap.addEventListener('click',function(e){
+    const b=e.target.closest('[data-owner-tax]'); if(!b) return;
+    const a=b.dataset.ownerTax;
+    if(a==='add-bracket') b.closest('.owner-tax-category').querySelector('tbody').insertAdjacentHTML('beforeend',rowHtml);
+    if(a==='remove-bracket') b.closest('tr').remove();
+    if(a==='remove-category') b.closest('.owner-tax-category').remove();
+    ownerTaxReindex();
+  });
+  document.getElementById('ownerAddTaxCategory').addEventListener('click',function(){wrap.insertAdjacentHTML('beforeend',catHtml);ownerTaxReindex();});
+})();
+</script>
+
 @include('owner._styles')
 @endpush

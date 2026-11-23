@@ -1902,3 +1902,4 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 .pc-card .pc-ok{display:inline-flex;align-items:center;gap:6px;color:#13885b;font-size:13px;font-weight:700}
 @media(max-width:900px){.pc-card .pc-groups{grid-template-columns:1fr}.pc-card .pc-head{flex-wrap:wrap}}
 @media(max-width:640px){.pc-card .pc-head{flex-wrap:wrap;padding:16px}.pc-card .pc-title{flex:1 1 0}.pc-card .pc-action{width:100%;justify-content:center;order:3}.pc-card .pc-progress,.pc-card .pc-groups{padding-left:16px;padding-right:16px}.pc-card .pc-done{margin-left:16px;margin-right:16px}}
+.settings-global-note{display:block;margin-top:6px;font-size:12px;font-weight:700;color:#885300}

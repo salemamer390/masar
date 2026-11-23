@@ -14,6 +14,7 @@ class OwnerReviewedMigrationsManifestTest extends TestCase
         '2026_11_17_000002_owner_updater_trial',
         '2026_11_17_000003_repair_innodb_and_fingerprint_command_relations',
         '2026_11_23_000001_remove_global_penalty_types',
+        '2026_11_23_000002_make_insurance_and_tax_rules_global',
     ];
 
     public function test_reviewed_manifest_matches_current_migration_files(): void

@@ -29,6 +29,11 @@ class PayrollSettingsController extends Controller
         $holidays = DB::table('hr_holidays')->where('company_id',$companyId)->orderBy('holiday_date')->get();
         $settings = DB::table('payroll_calculation_settings')->where('company_id',$companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->setting_group.$item->setting_key");
+        // Insurance and tax numbers are platform-wide and owner-controlled: show them read-only.
+        $globalRules = app(\App\Services\GlobalPayrollRulesService::class);
+        foreach ($globalRules->values() as $name => $value) {
+            $settings[$name] = (object) ['setting_value' => $value];
+        }
         $allowances = DB::table('payroll_allowance_settings')->where('company_id',$companyId)->where('is_active', true)->orderBy('sort_order')->get();
         $history = DB::table('payroll_setting_changes')->leftJoin('users', 'users.id', '=', 'payroll_setting_changes.changed_by')
             ->where('payroll_setting_changes.company_id', $companyId)
@@ -74,12 +79,7 @@ class PayrollSettingsController extends Controller
         });
         $rules = DB::table('payroll_calculation_rules')->where('company_id', $companyId)->where('is_active', true)->get()
             ->keyBy(fn ($item) => "$item->rule_group.$item->rule_key");
-        $taxCategories = DB::table('tax_categories')->where('company_id', $companyId)->orderBy('sort_order')->get()
-            ->map(function ($category) {
-                $category->brackets = DB::table('tax_brackets')->where('tax_category_id', $category->id)->orderBy('from_amount')->get();
-                return $category;
-            });
-
+        $taxCategories = $globalRules->taxCategories();
         $penaltyService = app(\App\Services\AttendancePenaltyPolicyService::class);
         if ($companyId) $penaltyService->ensureSuggested((int) $companyId);
         $attendancePenaltyPolicy = $penaltyService->forCompany($companyId ? (int) $companyId : null);
@@ -498,11 +498,8 @@ class PayrollSettingsController extends Controller
 
     private const SETTING_KEYS = [
         'general.allowance_rate', 'general.proration_days',
-        'insurance.employee_insurance_rate', 'insurance.employer_insurance_rate', 'insurance.martyrs_fund_rate',
-        'insurance.insurance_minimum', 'insurance.insurance_maximum',
         'overtime.hours_divisor', 'overtime.days_divisor', 'overtime.day_multiplier', 'overtime.night_multiplier',
         'overtime.official_holiday_multiplier', 'overtime.weekly_rest_multiplier',
-        'tax.personal_exemption', 'tax.tax_deductible_contributions', 'tax.profit_share_exempt_percent',
         'absence.daily_divisor', 'penalty.daily_divisor', 'penalty.max_days_per_month', 'advance.max_percent_of_gross',
     ];
 
@@ -638,87 +635,4 @@ class PayrollSettingsController extends Controller
     }
 
     /** Income-tax categories and brackets of this company, editable when the law changes. */
-    public function updateTax(Request $request)
-    {
-        $companyId = $this->companyIdOrFail();
-        $data = $request->validate([
-            'effective_from' => ['required', 'date'],
-            'categories' => ['required', 'array', 'min:1'],
-            'categories.*.label' => ['required', 'string', 'max:150'],
-            'categories.*.max_income' => ['nullable', 'numeric', 'min:0'],
-            'categories.*.brackets' => ['required', 'array', 'min:1'],
-            'categories.*.brackets.*.from' => ['required', 'numeric', 'min:0'],
-            'categories.*.brackets.*.to' => ['nullable', 'numeric', 'min:0'],
-            'categories.*.brackets.*.rate' => ['required', 'numeric', 'min:0', 'max:100'],
-        ]);
-
-        $categories = array_values($data['categories']);
-        $previousMax = null;
-        foreach ($categories as $index => $category) {
-            $isLastCategory = $index === count($categories) - 1;
-            $max = ($category['max_income'] ?? null) === null || $category['max_income'] === '' ? null : (float) $category['max_income'];
-            if ($isLastCategory !== ($max === null)) {
-                return back()->withErrors(['tax' => __('آخر فئة فقط تُترك بدون حد أعلى، وباقي الفئات لازم لها حد أعلى.')])->withInput();
-            }
-            if ($max !== null && $previousMax !== null && $max <= $previousMax) {
-                return back()->withErrors(['tax' => __('حدود الفئات لازم تكون تصاعدية.')])->withInput();
-            }
-            $previousMax = $max;
-
-            $brackets = array_values($category['brackets']);
-            $expectedFrom = 0.0;
-            foreach ($brackets as $bracketIndex => $bracket) {
-                $isLastBracket = $bracketIndex === count($brackets) - 1;
-                $from = (float) $bracket['from'];
-                $to = ($bracket['to'] ?? null) === null || $bracket['to'] === '' ? null : (float) $bracket['to'];
-                if (abs($from - $expectedFrom) > 0.005) {
-                    return back()->withErrors(['tax' => "شرائح «{$category['label']}» لازم تكون متصلة: الشريحة رقم " . ($bracketIndex + 1) . ' يجب أن تبدأ من ' . number_format($expectedFrom, 2) . '.'])->withInput();
-                }
-                if ($isLastBracket !== ($to === null)) {
-                    return back()->withErrors(['tax' => "آخر شريحة فقط في «{$category['label']}» تُترك بدون حد أعلى."])->withInput();
-                }
-                if ($to !== null && $to <= $from) {
-                    return back()->withErrors(['tax' => "حد أعلى الشريحة لازم يكون أكبر من بدايتها في «{$category['label']}»."])->withInput();
-                }
-                $expectedFrom = $to ?? 0.0;
-            }
-        }
-
-        DB::transaction(function () use ($categories, $data, $companyId) {
-            $snapshot = function () use ($companyId) {
-                $rows = DB::table('tax_categories')->where('company_id', $companyId)->orderBy('sort_order')->get();
-                return ['categories' => $rows->map(fn ($row) => (array) $row)->all(),
-                    'brackets' => DB::table('tax_brackets')->whereIn('tax_category_id', $rows->pluck('id')->all())->get()->map(fn ($row) => (array) $row)->all()];
-            };
-            $before = $snapshot();
-            $oldIds = DB::table('tax_categories')->where('company_id', $companyId)->pluck('id')->all();
-            if ($oldIds) {
-                DB::table('tax_brackets')->whereIn('tax_category_id', $oldIds)->delete();
-                DB::table('tax_categories')->whereIn('id', $oldIds)->delete();
-            }
-            $minIncome = 0.0;
-            foreach ($categories as $index => $category) {
-                $max = ($category['max_income'] ?? null) === null || $category['max_income'] === '' ? null : (float) $category['max_income'];
-                $categoryId = DB::table('tax_categories')->insertGetId([
-                    'company_id' => $companyId, 'category_key' => 'category_' . ($index + 1), 'label' => $category['label'],
-                    'min_income' => $minIncome, 'max_income' => $max, 'sort_order' => $index + 1,
-                    'created_at' => now(), 'updated_at' => now(),
-                ]);
-                foreach (array_values($category['brackets']) as $bracketIndex => $bracket) {
-                    DB::table('tax_brackets')->insert([
-                        'tax_category_id' => $categoryId, 'from_amount' => (float) $bracket['from'],
-                        'to_amount' => ($bracket['to'] ?? null) === null || $bracket['to'] === '' ? null : (float) $bracket['to'],
-                        'rate' => round(((float) $bracket['rate']) / 100, 4), 'sort_order' => $bracketIndex + 1,
-                        'created_at' => now(), 'updated_at' => now(),
-                    ]);
-                }
-                $minIncome = $max === null ? 0.0 : round($max + 0.01, 2);
-            }
-            $this->recordChange($companyId, $data['effective_from'], $before, $snapshot());
-        });
-
-        $count = $this->recalculateSalaries($companyId);
-        ActivityLog::record('payroll_tax_update', 'تم تحديث شرائح ضريبة كسب العمل.');
-        return redirect()->route('payroll.settings.index')->with('toast', "تم حفظ شرائح الضرائب لشركتك فقط وإعادة حساب {$count} هيكل راتب.");
-    }
 }
