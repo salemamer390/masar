@@ -156,12 +156,37 @@ button.emp-badge{cursor:pointer}
         </div>
     </div>
 
-    <section class="panel profile-panel mt-3 profile-completion {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
-        <div class="panel-head"><div><h3><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-x-fill' }}"></i> {{ __('اكتمال ملف الموظف') }}</h3><span>{{ $profileCompletion['complete'] ? __('البيانات الأساسية والمستندات المطلوبة مكتملة.') : __('لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.') }}</span></div>@if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeMasterModal">{{ __('استكمال البيانات') }}</button>@endif</div>
+    <?php
+        $pcMissingFields = $profileCompletion['missing_fields'];
+        $pcMissingDocs = $profileCompletion['missing_documents'];
+        $pcTotal = ($profileCompletion['total_fields'] ?? 12) + $profileCompletion['required_documents'];
+        $pcDone = max(0, $pcTotal - count($pcMissingFields) - count($pcMissingDocs));
+        $pcPercent = $pcTotal > 0 ? (int) floor($pcDone / $pcTotal * 100) : 100;
+    ?>
+    <section class="panel profile-panel mt-3 profile-completion pc-card {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
+        <div class="pc-head">
+            <span class="pc-icon"><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-pulse' }}" aria-hidden="true"></i></span>
+            <div class="pc-title"><h3>{{ __('اكتمال ملف الموظف') }}</h3><p>{{ $profileCompletion['complete'] ? __('البيانات الأساسية والمستندات المطلوبة مكتملة.') : __('لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.') }}</p></div>
+            @if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-primary pc-action" data-bs-toggle="modal" data-bs-target="#employeeMasterModal"><i class="bi bi-pencil-square" aria-hidden="true"></i> {{ __('استكمال البيانات') }}</button>@endif
+        </div>
+        <div class="pc-progress">
+            <div class="pc-progress-top"><span>{{ __('نسبة الاكتمال') }}</span><b>{{ format_number($pcPercent) }}%</b></div>
+            <div class="pc-bar" role="progressbar" aria-valuenow="{{ $pcPercent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ $pcPercent }}%"></span></div>
+            <small>{{ format_number($pcDone) }} {{ __('من') }} {{ format_number($pcTotal) }} {{ __('عنصر مكتمل') }}</small>
+        </div>
         @if($profileCompletion['complete'])
-            <div class="p-3 text-success small"><i class="bi bi-check-circle-fill"></i> {{ __('الملف جاهز للتشغيل والمتابعة.') }}</div>
+            <div class="pc-done"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('الملف جاهز للتشغيل والمتابعة.') }}</div>
         @else
-            <div class="p-3 row g-3"><div class="col-md-6"><b class="d-block mb-2">{{ __('بيانات ناقصة') }}</b><div class="completion-list">@forelse($profileCompletion['missing_fields'] as $field)<span><i class="bi bi-dot"></i>{{ $field }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> {{ __('البيانات الأساسية مكتملة') }}</span>@endforelse</div></div><div class="col-md-6"><b class="d-block mb-2">{{ __('مستندات مطلوبة ناقصة أو غير صالحة') }}</b><div class="completion-list">@forelse($profileCompletion['missing_documents'] as $document)<span><i class="bi bi-dot"></i>{{ $document }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> {{ __('المستندات المطلوبة مكتملة') }}</span>@endforelse</div></div></div>
+            <div class="pc-groups">
+                <div class="pc-group">
+                    <div class="pc-group-head"><span class="pc-group-title"><i class="bi bi-person-lines-fill" aria-hidden="true"></i> {{ __('بيانات ناقصة') }}</span><span class="pc-count {{ count($pcMissingFields) ? 'is-warn' : 'is-ok' }}">{{ format_number(count($pcMissingFields)) }}</span></div>
+                    <div class="pc-chips">@forelse($pcMissingFields as $field)<span class="pc-chip"><i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ $field }}</span>@empty<span class="pc-ok"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('البيانات الأساسية مكتملة') }}</span>@endforelse</div>
+                </div>
+                <div class="pc-group">
+                    <div class="pc-group-head"><span class="pc-group-title"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> {{ __('مستندات مطلوبة ناقصة أو غير صالحة') }}</span><span class="pc-count {{ count($pcMissingDocs) ? 'is-warn' : 'is-ok' }}">{{ format_number(count($pcMissingDocs)) }}</span></div>
+                    <div class="pc-chips">@forelse($pcMissingDocs as $document)<span class="pc-chip"><i class="bi bi-file-earmark-x" aria-hidden="true"></i>{{ $document }}</span>@empty<span class="pc-ok"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('المستندات المطلوبة مكتملة') }}</span>@endforelse</div>
+                </div>
+            </div>
         @endif
     </section>
 

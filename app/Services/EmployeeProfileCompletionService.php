@@ -64,6 +64,7 @@ class EmployeeProfileCompletionService
             'missing_fields' => $missingFields,
             'missing_documents' => $missingDocuments,
             'required_documents' => $requiredDocumentTypes->count(),
+            'total_fields' => count($values),
         ];
     }
 }
