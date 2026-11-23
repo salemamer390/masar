@@ -165,6 +165,8 @@ button.emp-badge{cursor:pointer}
         @endif
     </section>
 
+{{-- HIDDEN_PROFILE_BOTTOM: emergency contacts and bank accounts are hidden for now (Amer, 23/11/2026). To bring them back, delete the @if(false) line below and the matching @endif marked /HIDDEN_PROFILE_BOTTOM. --}}
+@if(false)
     <div class="profile-grid mt-3">
         <div class="panel profile-panel">
             <div class="panel-head"><h3>{{ __('جهات اتصال الطوارئ') }}</h3></div>
@@ -193,6 +195,7 @@ button.emp-badge{cursor:pointer}
             @endif
         </div>
     </div>
+@endif {{-- /HIDDEN_PROFILE_BOTTOM --}}
 
 @elseif($activeTab === 'job')
     <div class="profile-grid">
