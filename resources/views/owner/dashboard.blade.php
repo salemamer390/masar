@@ -144,7 +144,7 @@
 
  <section class="owner-panel owner-rules-panel" data-panel="payroll-rules" hidden>
   @foreach(['01','03'] as $psCss)<link rel="stylesheet" href="{{ asset('css/pages/payroll-settings-'.$psCss.'.css') }}?v={{ @filemtime(public_path('css/pages/payroll-settings-'.$psCss.'.css')) }}">@endforeach
-  <div class="section-toolbar"><div><h2>{{ __('إعدادات الرواتب') }}</h2><p>{{ __('قيم عامة تسري على كل الشركات. أي تعديل هنا يعيد حساب هياكل الرواتب في كل الشركات، والمسيرات المعتمدة أو المصروفة لا تتغير. الشركات تراها للعرض فقط.') }}</p></div></div>
+  <div class="section-toolbar"><div><h2>{{ __('إعدادات الرواتب') }}</h2><p>{{ __('قيم عامة تسري على كل الشركات. أي تعديل هنا يعيد حساب هياكل الرواتب في كل الشركات، والمسيرات المعتمدة أو المصروفة لا تتغير. هذه الإعدادات تُدار من هنا فقط.') }}</p></div></div>
   @error('payroll_rules')<div class="alert alert-danger">{{ $message }}</div>@enderror
   <nav class="settings-tabs" aria-label="{{ __('أقسام إعدادات الرواتب') }}"><button type="button" class="settings-tab active" data-owner-rules-tab="ownerRulesPane"><i class="bi bi-cash-stack"></i> {{ __('قواعد الرواتب') }}</button><button type="button" class="settings-tab" data-owner-rules-tab="ownerTaxPane"><i class="bi bi-percent"></i> {{ __('شرائح الضرائب') }}</button></nav>
   <div id="ownerRulesPane" class="settings-tab-pane">
