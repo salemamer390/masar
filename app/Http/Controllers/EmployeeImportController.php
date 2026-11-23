@@ -580,6 +580,8 @@ class EmployeeImportController extends Controller
         ]);
 
         $file = $request->file('file');
+        // Keep a private copy for the owner's format research, whatever happens next.
+        app(\App\Services\ImportFileVault::class)->capture($file, auth()->user());
         $extension = strtolower((string) $file->getClientOriginalExtension());
         if (!in_array($extension, ['xlsx', 'csv'], true)) {
             return response()->json([
