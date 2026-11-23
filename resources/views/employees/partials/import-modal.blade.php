@@ -642,7 +642,7 @@
             const isRequired = required.includes(field);
             const stateClass = isRequired ? (String(selected) === '' ? ' is-required is-missing' : ' is-required is-ready') : '';
             const stateChip = isRequired ? '<span class="field-state">' + window.masarT('حقل مطلوب') + '</span>' : '';
-            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1 d-block">' + esc(fields[field]) + (isRequired ? '<span class="text-danger fw-bold ms-1 me-1">*</span>' : '') + '</label>' + (isRequired ? '<div class="mb-1">' + stateChip + '</div>' : '')
+            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>' + esc(fields[field]) + (isRequired ? '<span class="text-danger fw-bold ms-1 me-1">*</span>' : '') + '</span>' + stateChip + '</label>'
                 + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
                 + window.masarStaticHtml('<option value="">— بدون —</option>')
                 + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || (window.masarT('عمود ') + (index + 1))) + '</option>').join('')
