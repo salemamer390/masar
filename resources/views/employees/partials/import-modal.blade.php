@@ -956,8 +956,14 @@
         const open = [...sheetsList.querySelectorAll('.sheet-card-body.open')].map(el => el.id);
         const scroller = sheetsList.closest('.modal-body') || sheetsList.parentElement;
         const top = scroller ? scroller.scrollTop : 0;
+        const openDomains = [...sheetsList.querySelectorAll('[data-domain-toggle]')].map((el, i) => el.getAttribute('aria-expanded') === 'true' ? i : -1).filter(i => i >= 0);
+        const openDetails = [...sheetsList.querySelectorAll('details')].map((el, i) => el.open ? i : -1).filter(i => i >= 0);
         renderSheetsStep(lastData);
         open.forEach(id => { const b = document.getElementById(id); if (b && !b.closest('.sheet-card-ignored')) setSheetExpanded(b, true); });
+        const newDomains = [...sheetsList.querySelectorAll('[data-domain-toggle]')];
+        openDomains.forEach(i => { if (newDomains[i]) newDomains[i].click(); });
+        const newDetails = [...sheetsList.querySelectorAll('details')];
+        openDetails.forEach(i => { if (newDetails[i]) newDetails[i].open = true; });
         if (scroller) scroller.scrollTop = top;
         markSummaryStale();
     }
