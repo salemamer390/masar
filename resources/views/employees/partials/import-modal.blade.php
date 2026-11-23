@@ -95,6 +95,7 @@
 .mapping-field-card label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mapping-field-card.is-required.is-missing { border-color: #dc3545; background: #fff8f8; box-shadow: 0 0 0 3px rgba(220,53,69,.08);  }
 .mapping-field-card.is-required.is-ready { border-color: #198754; background: #f6fffa; box-shadow: 0 0 0 3px rgba(25,135,84,.08); animation: none; }
+#employeesImportModal .domain-chip.warn { background: #fff4d6; color: #8a5a00; border-color: #f1d28a; }
 .mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .mapping-field-card.is-missing .field-state { color: #dc3545; background: transparent; padding: 0; }
 .mapping-field-card.is-ready .field-state { color: #dc3545; background: transparent; padding: 0; }
@@ -464,7 +465,10 @@
         const domains = data.domains || {};
         const lines = Object.keys(periodLabels).filter((key) => domains[key] && domains[key].out_of_period_count > 0).map((key) => {
             const d = domains[key];
-            return '<div><i class="bi bi-exclamation-triangle-fill"></i> ' + esc(periodLabels[key]) + window.masarT(' قبل ') + esc(d.period_start) + window.masarT(' لن يتم حفظه لأنه خارج فترة المرتب') + ' (' + num(d.out_of_period_count) + ')</div>';
+            const c = Number(d.out_of_period_count) || 0;
+            const rowsText = c === 1 ? 'صف واحد' : c === 2 ? 'صفّين' : c <= 10 ? num(c) + ' صفوف' : num(c) + ' صفًا';
+            const because = c === 1 ? 'لأنه' : c === 2 ? 'لأنهما' : 'لأنها';
+            return '<div><i class="bi bi-exclamation-triangle-fill"></i> ' + window.masarT('لن يتم حفظ ') + rowsText + window.masarT(' من ') + esc(periodLabels[key]) + window.masarT(' قبل ') + esc(d.period_start) + ' ' + because + window.masarT(' خارج فترة المرتب') + '</div>';
         });
         return lines.length ? '<div class="period-alert" role="alert">' + lines.join('') + '</div>' : '';
     }
@@ -490,6 +494,7 @@
                 + '<span class="domain-chips">'
                 + '<span class="domain-chip ok"><i class="bi bi-check-lg"></i>' + num(d.imported) + window.masarT(' سيُستورد') + '</span>'
                 + (d.skipped > 0 ? '<span class="domain-chip bad"><i class="bi bi-x-lg"></i>' + num(d.skipped) + window.masarT(' مرفوض') + '</span>' : '')
+                + ((d.warnings || []).length > 0 ? '<span class="domain-chip warn"><i class="bi bi-exclamation-triangle"></i>' + num((d.warnings || []).length) + window.masarT(' تحذيرات') + '</span>' : '')
                 + ((d.deferred || 0) > 0 ? '<span class="domain-chip mute">' + num(d.deferred) + window.masarT(' بصمات ناقصة للمراجعة') + '</span>' : '')
                 + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
                 + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
