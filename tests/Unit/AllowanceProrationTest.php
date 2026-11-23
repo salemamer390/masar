@@ -12,17 +12,17 @@ use App\Services\PayrollSettingsService;
 use App\Services\TaxCalculator;
 use PHPUnit\Framework\TestCase;
 
-/** Per-allowance proration: window proration is automatic; the flag gates only the absence share. */
+/** Per-allowance proration: window proration is automatic; under the Basic absence basis the flag gates the allowance's absence-day share. */
 class AllowanceProrationTest extends TestCase
 {
-    private function service(array $distribution): PayrollRunService
+    private function service(array $distribution, array $rules = []): PayrollRunService
     {
-        $settings = new class($distribution) extends PayrollSettingsService {
-            public function __construct(private array $distribution) {}
+        $settings = new class($distribution, $rules) extends PayrollSettingsService {
+            public function __construct(private array $distribution, private array $rules) {}
 
             public function number(string $group, string $key, float $default = 0.0): float { return $default; }
 
-            public function rule(string $group, string $key, string $default = ''): string { return $default; }
+            public function rule(string $group, string $key, string $default = ''): string { return $this->rules["$group.$key"] ?? $default; }
 
             public function allowanceDistribution(): array { return $this->distribution; }
         };
@@ -167,7 +167,7 @@ class AllowanceProrationTest extends TestCase
 
     public function test_flagged_allowances_lose_their_daily_share_on_absence(): void
     {
-        $service = $this->service($this->distribution(false));
+        $service = $this->service($this->distribution(false), ['absence.calculation_basis' => 'Basic']);
         // Engine-matching split: basic 9600 + 840/720/480/360; housing unflagged.
         $salary = $this->contractualSalary([
             'basic_salary' => 9600.0, 'transportation_allowance' => 840.0, 'housing_allowance' => 720.0,
@@ -186,6 +186,26 @@ class AllowanceProrationTest extends TestCase
         $this->assertEqualsWithDelta(448.0, $payload['meal_allowance'], 0.001);
         $this->assertEqualsWithDelta(336.0, $payload['clothing_allowance'], 0.001);
         $this->assertEqualsWithDelta(2288.0, $payload['allowances'], 0.001);
+    }
+
+    public function test_gross_basis_prices_absence_on_the_gross_without_touching_allowances(): void
+    {
+        // The stub's default absence basis is Gross.
+        $service = $this->service($this->distribution(false));
+        $salary = $this->contractualSalary([
+            'basic_salary' => 9600.0, 'transportation_allowance' => 840.0, 'housing_allowance' => 720.0,
+            'meal_allowance' => 480.0, 'clothing_allowance' => 360.0, 'allowances' => 2400.0,
+        ]);
+        $calculation = $service->calculate($salary, ['gross' => 12000.0], ['absence_days' => 2], true, 1.0);
+        $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->fullMonthWindow());
+
+        // Absence on the gross already contains every allowance's share, so the
+        // earnings side is left alone: no share is deducted twice.
+        $this->assertEqualsWithDelta(800.0, $calculation['absence_deduction'], 0.001); // 2 x 12000/30
+        $this->assertEqualsWithDelta(0.0, $calculation['absence_allowance_reduction'], 0.001);
+        $this->assertEqualsWithDelta(840.0, $payload['transportation_allowance'], 0.001);
+        $this->assertEqualsWithDelta(720.0, $payload['housing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(2400.0, $payload['allowances'], 0.001);
     }
 
     public function test_lump_only_prorates_the_lump_with_the_window(): void

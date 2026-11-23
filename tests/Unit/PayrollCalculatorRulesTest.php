@@ -48,28 +48,25 @@ class PayrollCalculatorRulesTest extends TestCase
         $r = $this->calculator()->monthly(25536.0, ['ot_day_hours' => 10, 'ot_night_hours' => 5, 'bonus' => 1000, 'absence_days' => 1, 'penalty_days' => 2, 'loans' => 300]);
         $this->assertEqualsWithDelta(2340.80, $r['overtime_amount'], 0.01);
         // Overtime and bonus are taxable: tax is higher than the structure tax.
-        $this->assertEqualsWithDelta(598.47, $r['income_tax_variable'], 0.01);
-        $this->assertEqualsWithDelta(4281.96, $r['income_tax'], 0.01);
-        // Absence is priced on the basic only (25,536 / 1.25 / 30).
-        $this->assertEqualsWithDelta(680.96, $r['absence_deduction'], 0.01);
+        $this->assertEqualsWithDelta(560.16, $r['income_tax_variable'], 0.01);
+        $this->assertEqualsWithDelta(4243.65, $r['income_tax'], 0.01);
+        $this->assertEqualsWithDelta(851.20, $r['absence_deduction'], 0.01);
         $this->assertEqualsWithDelta(1361.92, $r['penalty_deduction'], 0.01);
-        $this->assertEqualsWithDelta(20402.19, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(20270.26, $r['net_monthly'], 0.01);
     }
 
     public function test_absence_base_override_drives_the_deduction_and_is_recorded(): void
     {
-        // A base override supplies the contractual basic from the salary row;
-        // the calculator only applies days/30.
+        // A base override supplies the contractual base from the salary row
+        // (basic + selected allowances); the calculator only applies days/30.
         $r = $this->calculator([], ['absence.calculation_basis' => 'Basic'])
             ->monthly(8600.0, ['absence_days' => 2], null, true, 7000.0);
         $this->assertEqualsWithDelta(466.67, $r['absence_deduction'], 0.01);
         $this->assertEqualsWithDelta(7000.0, $r['absence_base'], 0.01);
 
-        // Without an override the basis setting no longer changes the absence
-        // base: absence is priced on the basic only, and each flagged
-        // allowance loses its daily share on the earnings side instead.
+        // Without an override the existing bases behave as before.
         $gross = $this->calculator([], ['absence.calculation_basis' => 'Gross'])->monthly(8600.0, ['absence_days' => 1], null, true);
-        $this->assertEqualsWithDelta(229.33, $gross['absence_deduction'], 0.01); // 8600/1.25/30
+        $this->assertEqualsWithDelta(286.67, $gross['absence_deduction'], 0.01);
         $basic = $this->calculator([], ['absence.calculation_basis' => 'Basic'])->monthly(8600.0, ['absence_days' => 1], null, true);
         $this->assertEqualsWithDelta(229.33, $basic['absence_deduction'], 0.01); // 8600/1.25/30
     }

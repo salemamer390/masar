@@ -56,10 +56,9 @@ class PayrollRunProrationTest extends TestCase
     public function test_absence_and_penalty_are_deducted_in_full_in_a_partial_month(): void
     {
         $r = $this->net(['absence_days' => 2, 'penalty_days' => 5], 22 / 30);
-        // Absence is priced on the basic only: 2 x 20,428.80 / 30.
-        $this->assertEqualsWithDelta(1361.92, $r['absence_deduction'], 0.01);
+        $this->assertEqualsWithDelta(1702.40, $r['absence_deduction'], 0.01);
         $this->assertEqualsWithDelta(3404.80, $r['penalty_deduction'], 0.01);
-        $this->assertEqualsWithDelta(9718.52, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(9454.65, $r['net_monthly'], 0.01);
     }
 
     public function test_variable_earnings_are_not_prorated(): void

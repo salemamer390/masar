@@ -325,10 +325,14 @@ class PayrollRunService
      */
     private function absenceBaseOverride(Salary $salary): ?float
     {
-        // Absence is priced from the contractual basic only. A flagged allowance
-        // loses its own daily share on the earnings side (allowanceAbsenceReduction),
-        // so including any allowance here would deduct the same day twice.
-        // Legacy rows without a contractual basic breakdown keep the calculator's own basic.
+        // Gross basis: the calculator prices absence on the gross, which already
+        // contains every allowance, so no allowance share may be deducted again.
+        if ($this->settings->absenceBasis() !== 'Basic') return null;
+        // Basic basis: absence is priced from the contractual basic only. A flagged
+        // allowance loses its own daily share on the earnings side
+        // (allowanceAbsenceReduction), so including any allowance here would
+        // deduct the same day twice. Legacy rows without a contractual basic
+        // breakdown keep the calculator's own basic.
         if ($salary->basic_salary === null) return null;
 
         return (float) $salary->basic_salary;
@@ -341,6 +345,10 @@ class PayrollRunService
      */
     private function allowanceAbsenceReduction(Salary $salary, array $structure, float $absenceDays): float
     {
+        // Only under the Basic basis: under Gross every allowance share is
+        // already inside the gross absence deduction, so reducing the earnings
+        // side too would deduct the same day twice.
+        if ($this->settings->absenceBasis() !== 'Basic') return 0.0;
         if ($absenceDays <= 0) return 0.0;
         $divisor = max(1, $this->settings->absenceDailyDivisor());
         $hasSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
@@ -386,16 +394,19 @@ class PayrollRunService
         // contractual lump instead of the engine's invented split.
         $hasContractualSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
             + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
-        // Employment-window proration is automatic for every allowance. A
-        // flagged allowance additionally loses its daily share for each absence
-        // day; the absence deduction covers the basic only, so no allowance day
-        // is deducted twice.
+        // Employment-window proration is automatic for every allowance. Under
+        // the Basic basis a flagged allowance additionally loses its daily share
+        // for each absence day; the absence deduction covers the basic only, so
+        // no allowance day is deducted twice.
         $absenceDaysForAllowances = max(0.0, (float) ($calculation['absence_days'] ?? 0));
         $absenceAllowanceDivisor = max(1, $this->settings->absenceDailyDivisor());
-        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor) {
+        // The flagged-allowance absence share applies only under the Basic basis;
+        // under Gross it is already inside the gross absence deduction.
+        $absenceShareApplies = $this->settings->absenceBasis() === 'Basic';
+        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies) {
             $full = (float) ($salary->{$column} ?? 0);
             $earned = $full * $window['factor'];
-            if ($absenceDaysForAllowances > 0 && $this->settings->allowanceIsProrated($column)) {
+            if ($absenceShareApplies && $absenceDaysForAllowances > 0 && $this->settings->allowanceIsProrated($column)) {
                 $earned -= $full * $absenceDaysForAllowances / $absenceAllowanceDivisor;
             }
             return round(max(0.0, $earned), 2);
@@ -408,12 +419,13 @@ class PayrollRunService
         // configured percentages the calculator splits a gross with - and each
         // share follows its own proration flag. The clothing share is the
         // remainder, exactly like the calculator's residual.
-        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor) {
+        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies) {
             $lump = (float) ($salary->allowances ?? $structure['allowances']);
             $factor = $window['factor'];
             $distribution = $this->settings->allowanceDistribution();
+            $lumpAbsenceDays = $absenceShareApplies ? $absenceDaysForAllowances : 0.0;
             // No configured distribution: the whole lump behaves as flagged.
-            if (!$distribution) return round(max(0.0, $lump * $factor - $lump * $absenceDaysForAllowances / $absenceAllowanceDivisor), 2);
+            if (!$distribution) return round(max(0.0, $lump * $factor - $lump * $lumpAbsenceDays / $absenceAllowanceDivisor), 2);
             $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
             $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
             $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
@@ -425,7 +437,7 @@ class PayrollRunService
             $mealShare = $share($meal, 0.20);
             $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
             $lumpShareEarned = static fn (float $share, bool $flagged): float => $share <= 0 ? 0.0
-                : max(0.0, $share * $factor - ($flagged ? $share * $absenceDaysForAllowances / $absenceAllowanceDivisor : 0));
+                : max(0.0, $share * $factor - ($flagged ? $share * $lumpAbsenceDays / $absenceAllowanceDivisor : 0));
             $earned = $lump * $lumpShareEarned($transportShare, $flag($transport))
                 + $lump * $lumpShareEarned($housingShare, $flag($housing))
                 + $lump * $lumpShareEarned($mealShare, $flag($meal))

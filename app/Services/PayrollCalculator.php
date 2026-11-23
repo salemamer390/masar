@@ -95,10 +95,12 @@ class PayrollCalculator
         $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
         $basic = (float) $structure['basic_salary'];
         $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
-        // Absence is priced from the basic salary only: a flagged allowance loses
-        // its own daily share on the earnings side (absence_allowance_reduction),
-        // so including allowances here would deduct the same day twice.
-        $absenceBase = $absenceBaseOverride ?? $basic;
+        // Absence follows the configured basis: Basic prices it on the basic
+        // salary (a flagged allowance then loses its own daily share on the
+        // earnings side via absence_allowance_reduction, so no day is deducted
+        // twice); Gross prices it on the gross, which already contains every
+        // allowance, so the run service passes no allowance reduction there.
+        $absenceBase = $absenceBaseOverride ?? ($this->settings->absenceBasis() === 'Basic' ? $basic : $gross);
         $penaltyBase = $this->settings->penaltyBasis() === 'Gross' ? $gross : $basic;
 
         $dayHours = max(0, (float)($monthly['ot_day_hours'] ?? 0));

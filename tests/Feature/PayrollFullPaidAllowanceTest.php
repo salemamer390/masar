@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
-/** End-to-end: window proration is automatic for every allowance; a flagged allowance also loses the absence day share. */
+/** End-to-end: window proration is automatic for every allowance; under the Basic absence basis a flagged allowance also loses the absence day share. */
 class PayrollFullPaidAllowanceTest extends TestCase
 {
     use DatabaseTransactions;
@@ -148,28 +148,29 @@ class PayrollFullPaidAllowanceTest extends TestCase
         }
         $record = $this->generate($employee);
 
-        // Window pieces: basic halved 4500; housing (unflagged) 600; the flagged
-        // allowances earn their half and lose one day's share each for the
-        // absence day: 466.67 + 233.33 + 140.00 -> allowances 1440.00.
+        // Window pieces: basic halved 4500; every allowance halved (housing 600).
+        // The seeded absence basis is Gross, so the gross absence deduction
+        // already contains the allowance shares and the allowance side is
+        // untouched: 600 + 500 + 250 + 150 -> allowances 1500.00.
         $this->assertEqualsWithDelta(600.0, (float) $record->housing_allowance, 0.01);
-        $this->assertEqualsWithDelta(1440.0, (float) $record->allowances, 0.01);
-        $this->assertEqualsWithDelta(5940.0, (float) $record->monthly_total, 0.01);
-        // Absence is priced on the contractual basic only: 9000/30.
+        $this->assertEqualsWithDelta(1500.0, (float) $record->allowances, 0.01);
+        $this->assertEqualsWithDelta(6000.0, (float) $record->monthly_total, 0.01);
+        // Absence on the gross: 12000/30.
         $absence = (float) $record->absence_deduction;
-        $this->assertEqualsWithDelta(300.0, $absence, 0.01);
+        $this->assertEqualsWithDelta(400.0, $absence, 0.01);
         // 1111.23 x 0.5 structure tax with the variable relief on the unpaid
-        // absence wage and allowance share (360 x 0.2 = 72): 483.62.
-        $this->assertEqualsWithDelta(483.62, (float) $record->income_tax, 0.01);
+        // absence wage (400 x 0.2 = 80).
+        $this->assertEqualsWithDelta(475.62, (float) $record->income_tax, 0.01);
         // Martyrs keeps the day factor: 6 x 0.5.
         $this->assertEqualsWithDelta(3.0, (float) $record->martyrs_fund, 0.01);
         $this->assertEqualsWithDelta(500.0, (float) $record->employee_insurance, 0.01);
         $this->assertEqualsWithDelta(852.27, (float) $record->employer_insurance, 0.01);
         // Exact reconciliation of the persisted record:
         // net = basic + allowances - (insurance + tax + martyrs + absence).
-        $expectedNet = 5940.0 - (500.0 + 483.62 + 3.0 + $absence);
+        $expectedNet = 6000.0 - (500.0 + 475.62 + 3.0 + $absence);
         $this->assertEqualsWithDelta($expectedNet, (float) $record->net_salary, 0.01);
-        $this->assertEqualsWithDelta(500.0 + 483.62 + 3.0 + $absence, (float) $record->deductions, 0.01);
+        $this->assertEqualsWithDelta(500.0 + 475.62 + 3.0 + $absence, (float) $record->deductions, 0.01);
         // Cost = what the company pays: entitlements + full employer insurance.
-        $this->assertEqualsWithDelta(5940.0 + 852.27, (float) $record->employee_cost, 0.01);
+        $this->assertEqualsWithDelta(6000.0 + 852.27, (float) $record->employee_cost, 0.01);
     }
 }
