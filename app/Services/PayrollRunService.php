@@ -1106,14 +1106,22 @@ class PayrollRunService
                 $period = data_get($payload, 'overtime_period', 'day');
                 $from = OvertimeWindowMatcher::timeToMinutes($payload['from_time'] ?? null);
                 $to = OvertimeWindowMatcher::timeToMinutes($payload['to_time'] ?? null);
-                if ($from === null || $to === null) continue;
+                $untimed = $from === null || $to === null;
+                // Untimed requests are only valid when the import (or the app)
+                // marked them to be placed next to the shift; anything else
+                // still earns nothing, as before.
+                if ($untimed && empty($payload['anchor_to_shift'])) continue;
+                $shiftStart = $this->minutesOf((string) ($employee->shift_start ?: $this->hrSettings->start()));
+                $shiftEnd = $this->minutesOf((string) ($employee->shift_end ?: $this->hrSettings->end()));
                 $segments ??= OvertimeWindowMatcher::outsideShiftSegments(
                     $this->minutesOf((string) $record->check_in),
                     $this->minutesOf((string) $record->check_out),
-                    $this->minutesOf((string) ($employee->shift_start ?: $this->hrSettings->start())),
-                    $this->minutesOf((string) ($employee->shift_end ?: $this->hrSettings->end())),
+                    $shiftStart,
+                    $shiftEnd,
                 );
-                $minutes = OvertimeWindowMatcher::authorizedMinutes($segments, $from, $to, $minutes);
+                $minutes = $untimed
+                    ? OvertimeWindowMatcher::anchoredMinutes($segments, $shiftStart, $shiftEnd, $minutes, (string) $period)
+                    : OvertimeWindowMatcher::authorizedMinutes($segments, $from, $to, $minutes);
                 if ($minutes <= 0) continue;
                 if ($period === 'night') {
                     $authorizedNight += $minutes;

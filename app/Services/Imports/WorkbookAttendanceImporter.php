@@ -151,7 +151,7 @@ class WorkbookAttendanceImporter
 
     private function normalise(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
     private function person(mixed $value): string { return app(ImportValueNormalizer::class)->key((string) $value); }
-    private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse(app(ImportValueNormalizer::class)->digits((string) $value))->toDateString() : null; } catch (\Throwable) { return null; } }
+    private function date(mixed $value): ?string { return ImportDateParser::toDate($value); }
     private function time(mixed $value): ?string { return app(ImportValueNormalizer::class)->time($value); }
     private function late(?string $value, string $start): int { if (!$value) return 0; return max(0, Carbon::parse($value)->diffInMinutes(Carbon::parse($start), false) * -1); }
     private function early(?string $value, string $end): int { if (!$value) return 0; return max(0, Carbon::parse($end)->diffInMinutes(Carbon::parse($value), false)); }

@@ -192,7 +192,7 @@ class WorkbookLeavePenaltyImporter
     private function employee(mixed $code, mixed $name): ?Employee { if (filled($code)) { $code = trim((string) $code); $employee = Employee::where('employee_code', $code)->first(); if (!$employee) { throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.'); } if (filled($name) && $this->person($employee->full_name) !== $this->person($name)) { throw new \RuntimeException('كود الموظف لا يطابق الاسم.'); } return $employee; } if (!filled($name)) { return null; } $matches = Employee::where('full_name', trim((string) $name))->get(); if ($matches->count() > 1) { throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.'); } return $matches->first(); }
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u', '', mb_strtolower(trim((string) $value))); }
     private function person(mixed $value): string { return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim((string) $value))); }
-    private function date(mixed $value): ?string { try { return filled($value) ? Carbon::parse($value)->toDateString() : null; } catch (\Throwable) { return null; } }
+    private function date(mixed $value): ?string { return ImportDateParser::toDate($value); }
     private function status(mixed $value): string { $key = $this->normalise($value); return str_contains($key, 'رفض') || $key === 'rejected' ? 'Rejected' : 'Approved'; }
     private function workingDays(string $start, string $end): float { return (float) (Carbon::parse($start)->diffInDays(Carbon::parse($end)) + 1); }
 }

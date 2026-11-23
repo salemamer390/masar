@@ -50,32 +50,47 @@ class WorkbookRequestImporter
             }
             if (!isset($map['date']) || (!isset($map['code']) && !isset($map['name']))) continue;
             foreach ($rows as $line => $row) {
+                $untimedOvertime = false;
                 try {
                     $employee = $this->employee($row[$map['code']] ?? null, $row[$map['name'] ?? -1] ?? null);
                     if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
                     $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح.');
                     app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الطلب');
                     $guard->ensureOpen($date);
-                    $source = $this->source($row, $map, $headers);
+                    $source = $this->source($row, $map, $headers, (string) ($sheet['name'] ?? ''));
                     if (!$source) throw new \RuntimeException('نوع الطلب غير معروف.');
                     $type = RequestType::active()->where('source_key', $source)->first();
                     if (!$type) throw new \RuntimeException('نوع الطلب غير موجود في إعدادات الشركة.');
                     $payload = ['request_date' => $date];
                     if ($source === 'advance' || in_array($source, ['bonus', 'incentive', 'commission', 'profit_share'], true)) {
                         if (!isset($map['amount'])) throw new \RuntimeException('عمود «المبلغ» غير موجود في الورقة.');
-                        $payload['amount'] = (float) ($row[$map['amount']] ?? 0);
+                        $payload['amount'] = $this->amount($row[$map['amount']] ?? null);
                         if ($payload['amount'] <= 0) throw new \RuntimeException('قيمة الطلب يجب أن يكون أكبر من صفر.');
                         if ($source !== 'advance') { $payload['affects_payroll'] = true; $payload['impact_type'] = 'earning'; }
                     } elseif ($source === 'overtime') {
-                        [$from, $to] = $this->window($row, $map, 'طلب الإضافي');
-                        $period = $this->period($row[$map['period'] ?? -1] ?? '');
-                        // Hours always come from the from/to window itself,
-                        // matching the request form; any hours column in the
-                        // sheet is ignored. Payroll still pays the window's
-                        // overlap with actual attendance.
-                        $payload['hours'] = $this->windowHours($from, $to);
+                        $periodCell = $row[$map['period'] ?? -1] ?? '';
+                        $period = $this->period($periodCell);
+                        if (filled($periodCell) && !$period) throw new \RuntimeException('نوع الإضافي غير معروف؛ استخدم «نهاري» أو «ليلي».');
+                        $hasWindow = filled($row[$map['from'] ?? -1] ?? null) || filled($row[$map['to'] ?? -1] ?? null);
+                        if ($hasWindow || !isset($map['hours'])) {
+                            // Hours come from the from/to window itself, matching the
+                            // request form. Payroll pays the window's overlap with
+                            // actual attendance.
+                            [$from, $to] = $this->window($row, $map, 'طلب الإضافي');
+                            $payload['hours'] = $this->windowHours($from, $to);
+                            $payload['from_time'] = $from; $payload['to_time'] = $to;
+                        } else {
+                            // Hours-only sheet: the request is created with its hours and
+                            // period and no time window.
+                            $hours = $this->amount($row[$map['hours']] ?? null);
+                            if ($hours <= 0 || $hours > 24) throw new \RuntimeException('عدد ساعات الإضافي يجب أن يكون بين 0 و24.');
+                            $payload['hours'] = $hours;
+                            // The app places these hours next to the shift when it
+                            // pays them, and only against actual attendance.
+                            $payload['anchor_to_shift'] = true;
+                            $untimedOvertime = true;
+                        }
                         $payload['overtime_period'] = $period ?: 'day';
-                        $payload['from_time'] = $from; $payload['to_time'] = $to;
                     } elseif ($source === 'permission') {
                         // A permission is one dated interval, exactly like the form.
                         [$from, $to] = $this->window($row, $map, 'طلب الإذن');
@@ -99,6 +114,10 @@ class WorkbookRequestImporter
                         }
                     }
                     $warning = $this->duplicatePolicy($employee, $type, $source, $date, $payload['overtime_period'] ?? null);
+                    if (!empty($untimedOvertime)) {
+                        $warning = trim(($warning ? $warning . ' ' : '') . 'طلب إضافي بعدد ساعات فقط بدون «من الساعة» و«إلى الساعة»: سيُلزق تلقائيًا بجانب الشفت (قبل البداية أو بعد النهاية) ولا يُصرف إلا بحسب الحضور الفعلي.');
+                        $untimedOvertime = false;
+                    }
                     $hrRequest = HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);
                     $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $hrRequest->id;
                     if ($warning && count($result['warnings']) < 50) $result['warnings'][] = "{$sheet['name']} / الصف {$line}: {$warning}";
@@ -182,11 +201,11 @@ class WorkbookRequestImporter
         return $hasCode && (str_contains($key, 'تاريخ') || str_contains($key, 'date'));
     }
 
-    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','الكود','كود','employee code','code','emp code','employee id'], 'name' => ['الموظفين','الموظفون','الاسماء','الاسم','اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ طلب السلفة','تاريخ الإضافي','التاريخ','date','request date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value','قيمة السلفة','cash advance','advance value','employee advance'], 'hours' => ['عدد الساعات','الساعات','hours','total hours','ساعات إضافية','overtime hours','over time'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type','تصنيف الطلب'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
-    private function source(array $row, array $map, array $headers): ?string
+    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','الكود','كود','employee code','code','emp code','employee id'], 'name' => ['الموظفين','الموظفون','الاسماء','الاسم','اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ طلب السلفة','تاريخ الإضافي','التاريخ','date','request date','تاريخ الصرف','تاريخ صرف السلفة','تاريخ الاستحقاق','تاريخ العملية','تاريخ العمولة','تاريخ الحافز','تاريخ المكافأة','تاريخ الاستلام','تاريخ المنح','تاريخ الخصم','issue date','payment date','disbursement date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value','قيمة السلفة','cash advance','advance value','employee advance','قيمة العمولة','مبلغ العمولة','العمولة','قيمة الحافز','مبلغ الحافز','الحافز','قيمة المكافأة','مبلغ المكافأة','المكافأة','المبلغ المستحق','قيمة الطلب','المبلغ (جنيه)','commission amount','incentive amount'], 'hours' => ['عدد الساعات','الساعات','hours','total hours','ساعات إضافية','overtime hours','over time'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type','تصنيف الطلب'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
+    private function source(array $row, array $map, array $headers, string $sheetName = ''): ?string
     {
         $value = $map['type'] ?? null;
-        $label = $value !== null ? $this->normalise($row[$value] ?? '') : $this->normalise(implode(' ', $headers));
+        $label = $value !== null ? $this->normalise($row[$value] ?? '') : $this->normalise(implode(' ', $headers) . ' ' . $sheetName);
         // "permission" and "commission" both contain "mission", so they must
         // be tested before it.
         if (str_contains($label, 'إذن') || str_contains($label, 'permission')) return 'permission';
@@ -199,10 +218,30 @@ class WorkbookRequestImporter
         if (str_contains($label, 'مكاف') || str_contains($label, 'bonus')) return 'bonus';
         return null;
     }
+    /**
+     * Money cell as a number: thousands separators, Arabic digits and a
+     * trailing currency word are read correctly ("1,500" is 1500, not 1).
+     */
+    private function amount(mixed $value): float
+    {
+        $text = trim((string) $value);
+        if ($text === '') return 0.0;
+        $text = strtr($text, ['٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9', '٫' => '.', '٬' => ',']);
+        $clean = trim((string) preg_replace('/[^\d.,\-]/u', '', $text), '.,');
+        if ($clean === '' || $clean === '-') throw new \RuntimeException('قيمة غير رقمية «' . trim((string) $value) . '».');
+        if (str_contains($clean, ',') && str_contains($clean, '.')) {
+            $clean = str_replace(',', '', $clean);
+        } elseif (str_contains($clean, ',')) {
+            $clean = preg_match('/^\d{1,3}(,\d{3})+$/', $clean) ? str_replace(',', '', $clean) : str_replace(',', '.', $clean);
+        }
+        if (!is_numeric($clean)) throw new \RuntimeException('قيمة غير رقمية «' . trim((string) $value) . '».');
+
+        return round((float) $clean, 2);
+    }
     private function period(mixed $value): ?string { $key=$this->normalise($value); return str_contains($key,'ليل') || str_contains($key,'night') ? 'night' : (str_contains($key,'نهار') || str_contains($key,'day') ? 'day' : null); }
     private function employee(mixed $code,mixed $name): ?Employee { if(filled($code)){ $code=trim((string)$code); $employee=Employee::where('employee_code',$code)->first(); if(!$employee){throw new \RuntimeException('كود الموظف «' . $code . '» غير موجود في الشركة.');} if(filled($name)&&$this->person($employee->full_name)!==$this->person($name)){throw new \RuntimeException('كود الموظف لا يطابق الاسم.');} return $employee;} if(!filled($name)){return null;} $matches=Employee::where('full_name',trim((string)$name))->get(); if($matches->count()>1){throw new \RuntimeException('الاسم يطابق أكثر من موظف؛ حدّد كود الموظف بدلًا من التخمين.');} return $matches->first(); }
     private function normalise(mixed $value): string { return preg_replace('/[^\p{L}\p{N}]+/u','',mb_strtolower(trim((string)$value))); }
     private function person(mixed $value): string { return mb_strtolower((string)preg_replace('/\s+/u',' ',trim((string)$value))); }
-    private function date(mixed $value): ?string { try{return filled($value)?Carbon::parse($value)->toDateString():null;}catch(\Throwable){return null;} }
+    private function date(mixed $value): ?string { return ImportDateParser::toDate($value); }
     private function time(mixed $value): ?string { if(!filled($value))return null; $value=trim((string)$value); if(preg_match('/^(\d{1,2}):(\d{2})(?::\d{2})?$/',$value,$m)){ $h=(int)$m[1]; $min=(int)$m[2]; return $h<24&&$min<60?sprintf('%02d:%02d',$h,$min):null; } try{return Carbon::parse($value)->format('H:i');}catch(\Throwable){return null;} }
 }
