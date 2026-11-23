@@ -98,7 +98,7 @@
 .mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .mapping-field-card.is-missing .field-state { color: #dc3545; background: transparent; padding: 0; }
 .mapping-field-card.is-ready .field-state { color: #dc3545; background: transparent; padding: 0; }
-.required-field-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
+.required-field-chip { display: inline-flex; justify-content: space-between; gap: 10px; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
 .required-field-chip.is-missing { color: #842029; border-color: #dc3545; background: #fff8f8;  }
 .required-field-chip.is-ready { color: #0f5132; border-color: #198754; background: #f6fffa; animation: none; }
 @keyframes mappingNeedsAttention { 0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,.2); } 50% { box-shadow: 0 0 0 6px rgba(220,53,69,.04); } }
@@ -691,18 +691,19 @@
         let html = '<div class="d-flex flex-wrap gap-2 mb-3" data-required-field-states>'
             + [...required, 'gross_salary'].map(field => {
                 const ok = field === 'gross_salary' ? selected.some(v => ['gross_salary','net_salary'].includes(v)) : ready(field);
-                return '<span class="required-field-chip '+(ok?'is-ready':'is-missing')+'"><i class="bi bi-'+(ok?'check-circle-fill':'exclamation-circle-fill')+'"></i>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'</span>';
+                return '<span class="required-field-chip '+(ok?'is-ready':'is-missing')+'"><i class="bi bi-'+(ok?'check-circle-fill':'exclamation-circle-fill')+'"></i>'+'<span>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'<span class="text-danger fw-bold ms-1 me-1">*</span></span><span class="field-state text-danger">حقل مطلوب</span></span>';
             }).join('') + '</div><div class="employee-mapping-grid">';
         // Missing system fields get a real source-column control, even when
         // the file has no matching header. Both directions use employeeMappings.
         missing.forEach(field => {
-            html += '<div class="mapping-field-card is-required is-missing" data-missing-mapping="'+esc(field)+'"><label class="form-label small mb-1">'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+' <span class="field-state">مطلوب</span></label>'
+            html += '<div class="mapping-field-card is-required is-missing" data-missing-mapping="'+esc(field)+'"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'<span class="text-danger fw-bold ms-1 me-1">*</span></span><span class="field-state">حقل مطلوب</span></label>'
                 + '<select class="form-select form-select-sm" aria-label="'+esc('اختر عمود '+label(field))+'" data-employee-missing-field="'+esc(field)+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">اختر العمود في ملفك</option>'
                 + columns.map(c => '<option value="'+c.index+'">'+esc(c.header)+'</option>').join('')+'</select><small class="text-muted">اربط عمودًا موجودًا، أو أضف الحقل للملف وأعد رفعه.</small></div>';
         });
         columns.forEach(col => {
             const value = chosen[col.index] ?? col.field ?? '';
-            html += '<div class="mapping-field-card"><label class="form-label small mb-1">'+esc(col.header)+'</label><select class="form-select form-select-sm" aria-label="'+esc('الحقل في النظام للعمود '+col.header)+'" data-employee-field="'+col.index+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">تجاهل هذا العمود</option>'
+            const reqCol = required.includes(value) || ['gross_salary','net_salary'].includes(value) || (value === 'hire_date' && required.includes('contract_start_date')) || (['first_name','last_name'].includes(value) && required.includes('full_name'));
+            html += '<div class="mapping-field-card'+(reqCol?' is-required is-ready':'')+'"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>'+esc(col.header)+(reqCol?'<span class="text-danger fw-bold ms-1 me-1">*</span>':'')+'</span>'+(reqCol?'<span class="field-state">حقل مطلوب</span>':'')+'</label><select class="form-select form-select-sm" aria-label="'+esc('الحقل في النظام للعمود '+col.header)+'" data-employee-field="'+col.index+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">تجاهل هذا العمود</option>'
                 + fields.map(field => '<option value="'+esc(field.key)+'"'+(value === field.key?' selected':'')+'>'+esc(field.label)+(required.includes(field.key)?' *':['gross_salary','net_salary'].includes(field.key)?' * (أحدهما)':'')+'</option>').join('')
                 + '</select><small class="mapping-samples">'+(col.samples || []).map(esc).join(' • ')+'</small></div>';
         });
