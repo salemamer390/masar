@@ -142,7 +142,19 @@ class WorkbookLeavePenaltyImporter
                 // A missing type must be rejected for review, never matched by wildcard.
                 if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
                 $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
-                if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر (في الملف: ' . (trim((string) ($row[$map['deduction'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) $row[$map['deduction']])) . ').');
+                if (!is_numeric($quantity) || (float) $quantity <= 0) {
+                    $daysRaw = trim((string) ($row[$map['deduction'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) $row[$map['deduction']]);
+                    $money = null; $moneyHeader = null;
+                    foreach ($headers as $hIndex => $h) {
+                        $hk = $this->normalise($h);
+                        if (str_contains($hk, 'قيمة') || str_contains($hk, 'مبلغ')) { $moneyHeader = trim((string) $h); $money = trim((string) ($row[$hIndex] ?? '')); break; }
+                    }
+                    $moneyNum = $money !== null ? app(ImportValueNormalizer::class)->digits($money) : null;
+                    if (is_numeric($moneyNum) && (float) $moneyNum > 0) {
+                        throw new \RuntimeException('الجزاء بمبلغ مالي غير مدعوم في الاستيراد حاليًا؛ يُستورد الجزاء بأيام الخصم فقط (' . $moneyHeader . ' = ' . $money . '، أيام الخصم = ' . $daysRaw . '). أضِفه يدويًا من صفحة الجزاءات.');
+                    }
+                    throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر (في الملف: ' . $daysRaw . ').');
+                }
                 $days = (float) $quantity;
                 $type = $this->resolveOrRegisterPenaltyType($typeName, $result);
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
