@@ -51,7 +51,7 @@ td.doc-meta { font-size: {{ $fs(12) }}; color: #71809a; text-align: left; paddin
       <table>
         <tr><td class="co-name">{{ $record->employee?->company?->name ?? config('app.name') }}</td></tr>
         <tr class="stackgap"><td></td></tr>
-        <tr><td class="co-sub">{{ __('إدارة الموارد البشرية — قسم الرواتب') }}</td></tr>
+        <tr><td class="co-sub">{{ __('إدارة الموارد البشرية') }}</td></tr>
       </table>
     </td>
     <td width="40%">
@@ -107,9 +107,6 @@ td.doc-meta { font-size: {{ $fs(12) }}; color: #71809a; text-align: left; paddin
 <div class="gap"></div>
 
 <table class="net"><tr><td width="55%">{{ __('صافي الراتب المستحق') }}</td><td width="45%" class="amt">{{ number_format($net, 2) }} {{ __('ج.م') }}</td></tr></table>
-
-<div class="gap"></div>
-<div class="foot">{{ __('أُصدرت هذه القسيمة إلكترونيًا بواسطة نظام ODIR HR في') }} {{ now()->format('d/m/Y') }}</div>
 
 </body>
 </html>
