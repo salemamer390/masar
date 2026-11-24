@@ -50,7 +50,7 @@ td { vertical-align: top; }
     </td>
     <td width="40%">
       <div class="doc-title">{{ __('قسيمة راتب') }}</div>
-      <div class="doc-meta">{{ $record->payroll_month?->translatedFormat('F Y') }} &nbsp;·&nbsp; {{ __('قسيمة رقم') }} {{ $record->id }}</div>
+      <div class="doc-meta">{{ $record->payroll_month?->translatedFormat('F Y') }}</div>
     </td>
   </tr>
 </table>
@@ -58,7 +58,7 @@ td { vertical-align: top; }
 <table class="emp">
   <tr>
     <td width="40%"><div class="label">{{ __('اسم الموظف') }}</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td>
-    <td width="22%"><div class="label">{{ __('الكود الوظيفي') }}</div><div class="value">{{ $record->employee?->employee_code ?? '—' }}</div></td>
+    <td width="22%"><div class="label">{{ __('الكود الوظيفي') }}</div><div class="value">{{ ltrim((string) ($record->employee?->employee_code ?? ''), '#') ?: '—' }}</div></td>
     <td width="38%"><div class="label">{{ __('القسم / الوظيفة') }}</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td>
   </tr>
 </table>
