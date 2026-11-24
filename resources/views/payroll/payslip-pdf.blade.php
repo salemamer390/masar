@@ -12,32 +12,35 @@
 {{-- mPDF-safe CSS on purpose: tables with explicit column widths, no flex/grid, no
      page-break-inside, no white-space:nowrap, no direction overrides, no @page. --}}
 <style>
-body { font-family: dejavusans; color: #24344d; font-size: {{ $fs(11) }}; }
+body { font-family: xbriyaz; color: #24344d; font-size: {{ $fs(12.5) }}; }
 table { border-collapse: collapse; width: 100%; }
 td { vertical-align: top; }
-.co-name { font-size: {{ $fs(19) }}; font-weight: bold; color: #10213d; }
-.co-sub { font-size: {{ $fs(9) }}; color: #71809a; padding-top: {{ $pad(1.5) }}; }
-.doc-title { font-size: {{ $fs(15) }}; font-weight: bold; color: #1260d8; text-align: left; }
-.doc-meta { font-size: {{ $fs(9) }}; color: #71809a; text-align: left; padding-top: {{ $pad(1.5) }}; }
+td.co-name { font-size: {{ $fs(22) }}; font-weight: bold; color: #10213d; padding: 0; }
+td.co-sub { font-size: {{ $fs(12) }}; color: #71809a; padding: 0; }
+.stackgap td { height: {{ $pad(1.4) }}; }
+.hdr table td { border-bottom: none; padding: 0; }
+.emp table td { border: none; background-color: transparent; padding: 0; }
+td.doc-title { font-size: {{ $fs(17) }}; font-weight: bold; color: #1260d8; text-align: left; padding: 0; }
+td.doc-meta { font-size: {{ $fs(12) }}; color: #71809a; text-align: left; padding: 0; }
 .hdr td { padding-bottom: {{ $pad(3) }}; border-bottom: 0.9mm solid #10213d; }
 .emp { margin-top: {{ $pad(4) }}; }
 .emp td { padding: {{ $pad(3) }} {{ $pad(2.5) }}; border: 0.2mm solid #dfe7f1; background-color: #f7fafd; }
-.label { font-size: {{ $fs(8) }}; color: #71809a; }
-.value { font-weight: bold; font-size: {{ $fs(10.5) }}; }
+.label { font-size: {{ $fs(9.5) }}; color: #71809a; padding: 0; }
+.value { font-weight: bold; font-size: {{ $fs(12) }}; }
 .gap { height: {{ $pad(4) }}; }
-.sec { padding: {{ $pad(2.6) }} {{ $pad(2.5) }}; font-size: {{ $fs(11.5) }}; font-weight: bold; }
+.sec { padding: {{ $pad(2.6) }} {{ $pad(2.5) }}; font-size: {{ $fs(13.5) }}; font-weight: bold; }
 .sec-earn { color: #087f5b; background-color: #e9f8f1; border: 0.2mm solid #c9ecdd; }
 .sec-ded { color: #c92a3f; background-color: #fff0f2; border: 0.2mm solid #f3d2d8; }
 .cols td.col { width: 50%; vertical-align: top; }
-.line td { padding: {{ $pad(2.7) }} {{ $pad(2.5) }}; border-bottom: 0.2mm solid #edf1f7; font-size: {{ $fs(10) }}; }
+.line td { padding: {{ $pad(3) }} {{ $pad(2.5) }}; border-bottom: 0.2mm solid #edf1f7; font-size: {{ $fs(11.5) }}; }
 .amt { text-align: left; font-weight: bold; }
-.tot td { padding: {{ $pad(2.8) }} {{ $pad(2.5) }}; font-weight: bold; font-size: {{ $fs(10.5) }}; }
+.tot td { padding: {{ $pad(2.8) }} {{ $pad(2.5) }}; font-weight: bold; font-size: {{ $fs(12) }}; }
 .tot-earn td { color: #087f5b; background-color: #e9f8f1; border-top: 0.3mm solid #c9ecdd; }
 .tot-ded td { color: #c92a3f; background-color: #fff0f2; border-top: 0.3mm solid #f3d2d8; }
 .colgap { width: 4mm; }
-.net td { padding: {{ $pad(4.5) }} {{ $pad(3) }}; background-color: #10213d; color: #ffffff; font-weight: bold; font-size: {{ $fs(13) }}; }
-.net .amt { color: #ffffff; font-size: {{ $fs(16) }}; }
-.foot { font-size: {{ $fs(7.5) }}; color: #8290a4; text-align: center; padding-top: {{ $pad(3) }}; border-top: 0.2mm solid #dfe7f1; }
+.net td { padding: {{ $pad(4.5) }} {{ $pad(3) }}; background-color: #10213d; color: #ffffff; font-weight: bold; font-size: {{ $fs(15) }}; }
+.net .amt { color: #ffffff; font-size: {{ $fs(18) }}; }
+.foot { font-size: {{ $fs(9) }}; color: #8290a4; text-align: center; padding-top: {{ $pad(3) }}; border-top: 0.2mm solid #dfe7f1; }
 </style>
 </head>
 <body>
@@ -45,21 +48,27 @@ td { vertical-align: top; }
 <table class="hdr">
   <tr>
     <td width="60%">
-      <div class="co-name">{{ $record->employee?->company?->name ?? config('app.name') }}</div>
-      <div class="co-sub">{{ __('إدارة الموارد البشرية — قسم الرواتب') }}</div>
+      <table>
+        <tr><td class="co-name">{{ $record->employee?->company?->name ?? config('app.name') }}</td></tr>
+        <tr class="stackgap"><td></td></tr>
+        <tr><td class="co-sub">{{ __('إدارة الموارد البشرية — قسم الرواتب') }}</td></tr>
+      </table>
     </td>
     <td width="40%">
-      <div class="doc-title">{{ __('قسيمة راتب') }}</div>
-      <div class="doc-meta">{{ $record->payroll_month?->translatedFormat('F Y') }}</div>
+      <table>
+        <tr><td class="doc-title">{{ __('قسيمة راتب') }}</td></tr>
+        <tr class="stackgap"><td></td></tr>
+        <tr><td class="doc-meta">{{ $record->payroll_month?->translatedFormat('F Y') }}</td></tr>
+      </table>
     </td>
   </tr>
 </table>
 
 <table class="emp">
   <tr>
-    <td width="40%"><div class="label">{{ __('اسم الموظف') }}</div><div class="value">{{ $record->employee?->full_name ?? '—' }}</div></td>
-    <td width="22%"><div class="label">{{ __('الكود الوظيفي') }}</div><div class="value">{{ ltrim((string) ($record->employee?->employee_code ?? ''), '#') ?: '—' }}</div></td>
-    <td width="38%"><div class="label">{{ __('القسم / الوظيفة') }}</div><div class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</div></td>
+    <td width="40%"><table><tr><td class="label">{{ __('اسم الموظف') }}</td></tr><tr class="stackgap"><td></td></tr><tr><td class="value">{{ $record->employee?->full_name ?? '—' }}</td></tr></table></td>
+    <td width="22%"><table><tr><td class="label">{{ __('الكود الوظيفي') }}</td></tr><tr class="stackgap"><td></td></tr><tr><td class="value">{{ ltrim((string) ($record->employee?->employee_code ?? ''), '#') ?: '—' }}</td></tr></table></td>
+    <td width="38%"><table><tr><td class="label">{{ __('القسم / الوظيفة') }}</td></tr><tr class="stackgap"><td></td></tr><tr><td class="value">{{ collect([$record->employee?->department?->name, $record->employee?->job?->title])->filter()->implode(' — ') ?: '—' }}</td></tr></table></td>
   </tr>
 </table>
 
