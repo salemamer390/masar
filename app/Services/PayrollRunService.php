@@ -25,7 +25,7 @@ class PayrollRunService
 
     private const FINAL_RECORD_STATUSES = ['Approved', 'معتمدة', 'معتمد', 'Locked', 'مغلق', 'مقفلة', 'Paid', 'تم الصرف'];
 
-    private const EXCLUDED_STATUSES = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة'];
+    private const EXCLUDED_STATUSES = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة', 'Inactive', 'غير نشط', 'غير نشطة'];
 
     private const TERMINATED_STATUSES = ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'];
 
