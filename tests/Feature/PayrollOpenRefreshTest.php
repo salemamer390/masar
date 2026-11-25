@@ -43,7 +43,7 @@ class PayrollOpenRefreshTest extends TestCase
         return \App\Models\PayrollRecord::whereHas('employee', fn ($q) => $q->where('employee_code', $code))->count();
     }
 
-    public function test_opening_the_page_refreshes_a_stale_draft_once_and_not_again_within_minutes(): void
+    public function test_opening_the_page_refreshes_the_draft_every_time(): void
     {
         $this->employee('OR1');
         app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
@@ -57,7 +57,7 @@ class PayrollOpenRefreshTest extends TestCase
         $this->employee('OR3');
         Carbon::setTestNow(now()->addMinute());
         $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']))->assertOk();
-        $this->assertSame(0, $this->recordCount('OR3'), 'a fresh draft is not refreshed again within 5 minutes');
+        $this->assertSame(1, $this->recordCount('OR3'), 'every open refreshes the draft, with no waiting period');
     }
 
     public function test_an_approved_run_is_never_refreshed_on_open(): void
@@ -70,5 +70,15 @@ class PayrollOpenRefreshTest extends TestCase
         $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']))->assertOk();
         $this->assertSame(0, $this->recordCount('OA2'));
         $this->assertSame('Approved', PayrollRun::find($run->id)->status);
+    }
+
+    public function test_a_closed_current_month_run_shows_a_notice_instead_of_staying_silent(): void
+    {
+        $this->employee('ON1');
+        $run = app(PayrollRunService::class)->generate(Carbon::parse('2026-11-01'), null, $this->company->id);
+        $run->update(['status' => 'Approved']);
+        Carbon::setTestNow(Carbon::parse('2026-11-20'));
+        $this->get(route('payroll.employee-salaries', ['month' => '2026-11-01']))->assertOk()
+            ->assertSee('لا يتحدث تلقائيًا');
     }
 }

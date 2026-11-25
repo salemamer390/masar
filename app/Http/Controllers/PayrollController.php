@@ -29,27 +29,35 @@ class PayrollController extends Controller
 
     /**
      * Opening the employee-salaries page does what «تحديث المسير» does, so the figures
-     * are never old. Only the user's own company, only a Draft run (or no run yet for the
-     * current month), never an approved, locked, paid or in-progress run. Skipped when the
-     * last refresh is recent, and a cache lock stops two people opening it at once from
-     * running it twice. A failure never blocks the page.
+     * are never old: every open refreshes the draft. Only the user's own company, only a Draft
+     * run (or no run yet for the current month), never an approved, locked, paid or in-progress
+     * run. A cache lock stops two people opening it at once from running it twice. A failure
+     * never blocks the page, and a skipped or failed refresh is shown as a notice, not hidden.
      */
     private function refreshDraftOnOpen(Request $request, PayrollRunService $service): void
     {
+        [$type, $message] = $this->draftRefreshOutcome($request, $service);
+        if ($message) session()->now($type, $message);
+    }
+
+    /** @return array{0: ?string, 1: ?string} notice type (warning|error) and message, or nulls when nothing needs saying. */
+    private function draftRefreshOutcome(Request $request, PayrollRunService $service): array
+    {
         $user = auth()->user();
         $companyId = $user?->company_id;
-        if (! $companyId || ! $request->isMethod('GET') || ! $user->hasPermission('payroll.create')) return;
+        if (! $companyId || ! $request->isMethod('GET') || ! $user->hasPermission('payroll.create')) return [null, null];
         $month = Carbon::parse($request->input('month', now()->format('Y-m-01')))->startOfMonth();
         $run = PayrollRun::where('company_id', $companyId)->whereDate('payroll_month', $month->toDateString())->first();
-        if ($run ? $run->status !== 'Draft' : ! $month->isSameMonth(now())) return;
-        if ($run) {
-            $last = ActivityLog::where('company_id', $companyId)->where('model_type', PayrollRun::class)->where('model_id', $run->id)
-                ->where('action', 'payroll_generate')->latest('created_at')->value('created_at');
-            if ($last && Carbon::parse($last)->gt(now()->subMinutes(5))) return;
+        if (! $run && ! $month->isSameMonth(now())) return [null, null];
+        if ($run && $run->status !== 'Draft') {
+            // Only the current month's closed run is worth a notice; browsing history is expected.
+            return $month->isSameMonth(now())
+                ? ['warning', __('مسير هذا الشهر غير مسودة (معتمد أو مقفول)، لذلك لا يتحدث تلقائيًا.')]
+                : [null, null];
         }
         try {
             $lock = \Illuminate\Support\Facades\Cache::lock('payroll-open-refresh:'.$companyId.':'.$month->format('Y-m'), 120);
-            if (! $lock->get()) return;
+            if (! $lock->get()) return ['warning', __('يجري تحديث المسير الآن من مستخدم آخر. أعد فتح الصفحة بعد لحظات لترى آخر الأرقام.')];
             try {
                 $service->generate($month, null, (int) $companyId);
             } finally {
@@ -57,7 +65,11 @@ class PayrollController extends Controller
             }
         } catch (\Throwable $exception) {
             report($exception);
+
+            return ['error', __('تعذر تحديث المسير تلقائيًا، والأرقام المعروضة من آخر تحديث ناجح. حاول تحديث المسير يدويًا.')];
         }
+
+        return [null, null];
     }
 
     public function index(Request $request, PayrollRunService $service)
