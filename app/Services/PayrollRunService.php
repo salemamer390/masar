@@ -25,9 +25,9 @@ class PayrollRunService
 
     private const FINAL_RECORD_STATUSES = ['Approved', 'معتمدة', 'معتمد', 'Locked', 'مغلق', 'مقفلة', 'Paid', 'تم الصرف'];
 
-    private const EXCLUDED_STATUSES = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة', 'Inactive', 'غير نشط', 'غير نشطة'];
+    private const EXCLUDED_STATUSES = ['Pending', 'Suspended', 'Terminated', 'قيد التعيين', 'موقوف', 'منتهي الخدمة', 'Inactive', 'غير نشط', 'غير نشطة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'];
 
-    private const TERMINATED_STATUSES = ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة'];
+    private const TERMINATED_STATUSES = ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة'];
 
     public function __construct(
         private readonly PayrollCalculator $calculator,
@@ -1653,7 +1653,7 @@ class PayrollRunService
             ? $today
             : $periodEnd->copy();
         $status = strtolower(trim((string) $employee->status?->name));
-        $terminal = in_array($status, ['terminated', 'منتهي الخدمة', 'منتهى الخدمة'], true);
+        $terminal = in_array($status, ['terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'resigned', 'resignation', 'مستقيل', 'استقالة'], true);
         $eligibleWhileActive = in_array($status, ['', 'active', 'leave', 'إجازة'], true);
 
         // Suspended/pending employees are not payable. A terminated employee is

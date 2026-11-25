@@ -22,14 +22,14 @@ class InsuranceController extends Controller
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
         $eligible = fn (Builder $query) => $query
             ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', Employee::INACTIVE_STATUS_NAMES))
-            ->where(function (Builder $employee) use ($monthStart, $monthEnd): void {
+            ->where(function (Builder $employee) use ($monthStart): void {
                 $employee->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
-                    ->orWhere(function (Builder $termination) use ($monthStart, $monthEnd): void {
-                        $termination->whereBetween('termination_date', [$monthStart, $monthEnd])
-                            ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereIn('status', ['registered', 'مسجل'])
-                                ->where(function (Builder $recordDate) use ($monthStart): void {
-                                    $recordDate->whereNull('insurance_end_date')->orWhereDate('insurance_end_date', '>=', $monthStart);
-                                }));
+                    ->orWhere(function (Builder $termination) use ($monthStart): void {
+                        // Stays listed through the month of departure; after that month it
+                        // disappears, unless the insurance record itself ends later.
+                        $termination->whereDate('termination_date', '>=', $monthStart)
+                            ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereNotNull('insurance_end_date')
+                                ->whereDate('insurance_end_date', '>=', $monthStart));
                     });
             });
         $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
