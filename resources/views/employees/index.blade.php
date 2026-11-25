@@ -17,10 +17,6 @@
 
 @section('content')
 <div class="page-head">
-  <div>
-    <h1>{{ __('الموظفون') }}</h1>
-    <p>{{ __('إدارة ملف الموظف والبيانات الأساسية.') }}</p>
-  </div>
   <div class="d-flex gap-2 flex-wrap employees-actions">
     {{-- زر «إعدادات بيانات الموظفين» مخفي بطلب عامر (23/11/2026) حتى يطلب إظهاره؛ الصفحة والبيانات كما هي --}}
     {{-- @if(auth()->user()?->hasPermission('roles.view'))<a class="btn btn-light" href="{{ route('master.index',['type'=>'departments']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات بيانات الموظفين') }}</a>@endif --}}

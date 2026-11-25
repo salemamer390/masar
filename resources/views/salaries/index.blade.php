@@ -2,7 +2,6 @@
 @section('title',__('هيكل الرواتب'))
 @section('content')
 <div class="page-head salary-page-head">
-  <div><h1>{{ __('هيكل الرواتب') }}</h1><p>{{ __('هيكل الراتب هو المصدر الثابت للراتب؛ المسير الشهري يأخذ منه القيم الثابتة ثم يضيف المدخلات الشهرية المعتمدة. المدخل الأساسي هو الراتب الإجمالي. النظام يوزع البدلات ويحسِب التأمين والضريبة والصافي وفق المواصفة المعتمدة.') }}</p></div>
   <div class="d-flex gap-2 flex-wrap">
     @if(auth()->user()?->hasPermission('roles.view'))
     <a class="btn btn-light" href="{{ route('master.index',['type'=>'payment']) }}"><i class="bi bi-gear"></i> {{ __('إعدادات طرق الصرف') }}</a>

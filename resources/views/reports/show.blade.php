@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title',$title)
 @section('content')
-<div class="page-head"><div><h1>{{$title}}</h1><p>{{$subtitle}}</p></div><div class="d-flex gap-2">@if(auth()->user()?->hasPermission('reports.print'))<button class="btn btn-light" type="button" onclick="window.print()"><i class="bi bi-printer"></i>{{ __('طباعة') }}</button>@endif
+<div class="page-head"><div class="d-flex gap-2">@if(auth()->user()?->hasPermission('reports.print'))<button class="btn btn-light" type="button" onclick="window.print()"><i class="bi bi-printer"></i>{{ __('طباعة') }}</button>@endif
 @if(auth()->user()?->hasPermission('reports.export_excel'))<a class="btn btn-primary" href="{{route('reports.export', array_merge(['type' => $type], request()->query()))}}"><i class="bi bi-file-earmark-excel"></i> Excel</a>@endif</div></div>
 <form class="filter-bar d-flex flex-wrap gap-2 mb-3" method="GET">@if($type!=='summary')<div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="{{ __('بحث بالاسم أو الكود') }}"></div>@endif
 @if(in_array($type,['employees','salaries','attendance','leaves','payroll']))<select name="department_id" class="form-select"><option value="">{{ __('كل الأقسام') }}</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select>@endif

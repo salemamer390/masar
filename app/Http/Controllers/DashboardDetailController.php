@@ -30,7 +30,7 @@ class DashboardDetailController extends Controller
         $sectionUrl = match ($type) {
             'employees', 'new-employees' => route('employees.index'),
             'attendance', 'present', 'absent', 'late' => route('attendance.index', ['date' => today()->toDateString()]),
-            'payroll-cost', 'payroll-net', 'payroll-summary' => route('payroll.index', ['month' => (string) $request->query('payroll_month', today()->startOfMonth()->format('Y-m-01'))]),
+            'payroll-cost', 'payroll-net', 'payroll-summary' => route('payroll.employee-salaries', ['month' => (string) $request->query('payroll_month', today()->startOfMonth()->format('Y-m-01'))]),
             'documents-expiring' => route('documents.index'),
             'documents-incomplete' => route('employees.index'),
             'leaves' => route('leaves.index'),

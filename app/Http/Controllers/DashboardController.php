@@ -63,7 +63,7 @@ class DashboardController extends Controller
             $heroMetrics[] = ['key' => 'late', 'label' => __('المتأخرون اليوم'), 'value' => format_number($attendance['counts']['late']), 'hint' => __('جزء من الحاضرين'), 'icon' => 'clock-history', 'tone' => 'orange', 'url' => route('attendance.index', ['date' => $today->toDateString()])];
         }
         if ($payroll) {
-            $heroMetrics[] = ['key' => 'payroll-cost', 'label' => __('إجمالي تكلفة الموظفين'), 'value' => $payroll['run'] ? format_money($payroll['cost']).' '.__('ج.م') : '—', 'hint' => $payroll['run'] ? __('دورة :m', ['m' => $month->format('m/Y')]) : __('لا توجد دورة لهذا الشهر'), 'icon' => 'cash-stack', 'tone' => 'money', 'url' => route('payroll.index', ['month' => $month->format('Y-m-01')])];
+            $heroMetrics[] = ['key' => 'payroll-cost', 'label' => __('إجمالي تكلفة الموظفين'), 'value' => $payroll['run'] ? format_money($payroll['cost']).' '.__('ج.م') : '—', 'hint' => $payroll['run'] ? __('دورة :m', ['m' => $month->format('m/Y')]) : __('لا توجد دورة لهذا الشهر'), 'icon' => 'cash-stack', 'tone' => 'money', 'url' => route('payroll.employee-salaries', ['month' => $month->format('Y-m-01')])];
         }
 
         $attentionItems = [];

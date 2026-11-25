@@ -1,7 +1,6 @@
 @extends('layouts.app')
 @section('title',__('القوائم الأساسية'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('القوائم الأساسية') }}</h1><p>{{ __('إدارة البيانات المرجعية المستخدمة في نماذج النظام.') }}</p></div></div>
 <div class="master-layout">
     <aside class="master-sidebar">
         <div class="master-menu-title">{{ __('القوائم') }}</div>

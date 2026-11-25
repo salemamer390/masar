@@ -1,7 +1,6 @@
 @extends('layouts.app')
 @section('title', __('الأرصدة الافتتاحية للإجازات'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('الأرصدة الافتتاحية وترحيل الإجازات') }}</h1><p>{{ __('تحديد نقطة بدء تتبع الترحيل وإدخال الأرصدة القديمة المؤكدة لكل موظف. لا يفترض النظام أي رصيد قديم بدون إدخال صريح هنا.') }}</p></div></div>
 
 <div class="panel table-panel mb-4"><div class="panel-head"><div><h3>{{ __('تاريخ بدء تتبع الترحيل') }}</h3><span>{{ __('الدورات التي تبدأ في هذا التاريخ أو بعده تُحسب من سجلات النظام كاملة. ما قبلها لا يترحّل إلا بإدخال افتتاحي صريح.') }} @if($baseline){{ __('الحالي:') }} <strong>{{ $baseline->format('d/m/Y') }}</strong>@else<span class="badge-soft warning">{{ __('غير مفعّل بعد') }}</span> {{ __('— لن يُحفظ أي تاريخ إلا بضغطك «تفعيل» هنا؛ حتى ذلك الحين يُعامل اليوم كحدّ أقصى للتتبع دون حفظ.') }}@endif</span></div></div>
 <div class="p-3"><form method="POST" action="{{ route('leaves.opening.baseline') }}" class="d-flex gap-2 align-items-end flex-wrap">@csrf @method('PUT')

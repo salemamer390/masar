@@ -1,7 +1,6 @@
 @extends('layouts.app')
 @section('title',__('الشهور السابقة'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('الحضور والانصراف') }}</h1><p>{{ __('الفترات المنتهية. تظهر هنا فور انتهائها وتبقى قابلة للتعديل خلال مهلة التصحيح، وبعدها تُحفظ ولا تتغير.') }}</p></div></div>
 <nav class="attendance-tabs" aria-label="{{ __('أقسام الحضور') }}"><a class="attendance-tab" href="{{ route('attendance.index') }}"><i class="bi bi-calendar-check"></i> {{ __('الفترة الحالية') }}</a><a class="attendance-tab active" href="{{ route('attendance.archive.index') }}"><i class="bi bi-archive"></i> {{ __('الشهور السابقة') }}</a></nav>
 <div class="panel table-panel archive-list"><div class="panel-head"><div><h3>{{ __('الشهور السابقة') }}</h3><span>{{ __('الفترة التي في مهلة التصحيح تُعرض بأرقامها الحالية وتقبل التعديل، والفترة المقفولة تُعرض كما حُفظت.') }}</span></div></div>
 <div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('الفترة') }}</th><th>{{ __('عدد السجلات') }}</th><th>{{ __('عدد الموظفين') }}</th><th>{{ __('تاريخ الحفظ') }}</th><th>{{ __('الإجراء') }}</th></tr></thead><tbody>
