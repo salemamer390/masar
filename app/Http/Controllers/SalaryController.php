@@ -128,6 +128,8 @@ class SalaryController extends Controller
 
     public function update(Request $request, Salary $salary, PayrollCalculator $calculator, PayrollRunService $payrollRuns)
     {
+        // The edit form never posts employee_id: a structure always belongs to its own employee.
+        $request->merge(['employee_id' => $salary->employee_id]);
         $validated = $this->validateSalary($request);
         $employee = $salary->employee;
         $this->ensureEmployeeIsEligibleForSalary($employee);
