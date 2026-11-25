@@ -35,12 +35,6 @@
   </div>
 </div>
 
-<form method="GET" action="{{ route('salaries.index') }}" class="filter-bar salary-filter-bar">
-  <div class="search-table"><i class="bi bi-search"></i><input name="search" value="{{ request('search') }}" placeholder="{{ __('بحث بالاسم أو كود الموظف') }}"></div>
-  <select name="department_id" class="form-select"><option value="">{{ __('كل الأقسام') }}</option>@foreach($departments as $department)<option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>@endforeach</select>
-  <button class="btn btn-primary"><i class="bi bi-funnel"></i> {{ __('تصفية') }}</button><a href="{{ route('salaries.index') }}" class="btn btn-light">{{ __('مسح') }}</a>
-</form>
-
 @if($selectedEmployee)
   <div class="alert alert-info py-2 mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
     <span>{{ __('عرض هيكل الراتب الخاص بالموظف:') }} <strong>{{ $selectedEmployee->full_name }}</strong></span>

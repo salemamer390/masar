@@ -6477,3 +6477,15 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
   main table:not(.modal table) > thead > tr > th { font-size: 11px !important; padding: 12px 14px !important; }
   main table:not(.modal table) > tbody > tr > td:not([colspan]) { font-size: 12px !important; padding: 12px 14px !important; }
 }
+
+/* Mobile: salary structures header. The flex-basis of 520/420px was read as a height in the column layout. */
+@media (max-width:767.98px) {
+  .salary-page-head > div:first-child,
+  .salary-page-head > div:last-child { flex: 0 0 auto !important; width: 100%; }
+  .salary-page-head > div { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .salary-page-head > div > .btn,
+  .salary-page-head > div > form { margin: 0; min-width: 0; }
+  .salary-page-head > div > .btn,
+  .salary-page-head > div > form > .btn { width: 100%; min-height: 46px; height: auto; justify-content: center; }
+  .salary-page-head > div > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
