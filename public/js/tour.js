@@ -261,6 +261,9 @@
     if (phase === 'nav') nextLabel = labels.goTo || 'Go to the page';
     const nextBtn = button(nextLabel, 'tour-btn-primary', onNext);
 
+    if (!preview && config.skipUrl) {
+      actions.append(button(labels.skip || 'Skip', 'tour-btn-skip', onSkip));
+    }
     actions.append(backBtn, nextBtn);
     footer.append(progress, actions);
     popoverEl.append(title, body, footer);
@@ -356,7 +359,17 @@
       teardown();
       return;
     }
-    post(config.completeUrl).then(() => teardown());
+    post(config.completeUrl).then(() => {
+      teardown();
+      if (config.skipUrl) window.location.href = config.skipUrl;
+    });
+  }
+
+  function onSkip() {
+    navigating = true;
+    post(config.completeUrl).then(() => {
+      window.location.href = config.skipUrl;
+    });
   }
 
   function teardown() {

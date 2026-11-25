@@ -130,3 +130,51 @@
     flex-wrap: wrap;
   }
 }
+
+.masar-tour-popover .tour-btn-skip {
+  background: transparent;
+  border: 0;
+  color: #b42318;
+  font-weight: 700;
+  text-decoration: underline;
+  margin-inline-end: auto;
+}
+
+.setup-required-banner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 2px solid #d92d20;
+  border-radius: 14px;
+  background: #fef3f2;
+  color: #7a271a;
+}
+.setup-required-banner > i {
+  font-size: 28px;
+  color: #d92d20;
+}
+.setup-required-banner strong {
+  display: block;
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.setup-required-banner p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.settings-card.setup-required-card {
+  border: 2px solid #d92d20;
+  box-shadow: 0 0 0 4px rgba(217, 45, 32, 0.15);
+}
+.settings-card.setup-required-card .settings-card-head h3::after {
+  content: "مطلوب";
+  margin-inline-start: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d92d20;
+  color: #fff;
+  font-size: 11px;
+}

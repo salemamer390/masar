@@ -141,6 +141,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
         Route::get('/import/template', [EmployeeImportController::class, 'template'])
             ->middleware('permission:employees.import')
             ->name('import.template');
+        Route::post('/import/setup-ack', [EmployeeImportController::class, 'acknowledgeSetup'])
+            ->middleware('permission:employees.import')
+            ->name('import.setup-ack');
         Route::post('/import/preview', [EmployeeImportController::class, 'preview'])
             ->middleware('permission:employees.import')
             ->name('import.preview');

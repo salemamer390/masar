@@ -562,8 +562,46 @@ class EmployeeImportController extends Controller
         return hash_hmac('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE), (string) config('app.key'));
     }
 
+    /**
+     * A company with no employees must acknowledge the "set working hours
+     * first" notice once before any import is accepted.
+     */
+    public static function importGateBlocks(Request $request): bool
+    {
+        if (! config('tour.import_gate', true) || Employee::query()->exists()) {
+            return false;
+        }
+
+        return ! DB::table('hr_operational_settings')
+            ->where('company_id', $request->user()->company_id)
+            ->where('setting_key', 'import_setup_ack')
+            ->exists();
+    }
+
+    public function acknowledgeSetup(Request $request): JsonResponse
+    {
+        $companyId = $request->user()->company_id;
+        $exists = DB::table('hr_operational_settings')->where('company_id', $companyId)->where('setting_key', 'import_setup_ack')->exists();
+        if (! $exists) {
+            DB::table('hr_operational_settings')->insert([
+                'company_id' => $companyId,
+                'setting_key' => 'import_setup_ack',
+                'setting_value' => '1',
+                'label' => 'تأكيد ضبط أوقات الدوام قبل الاستيراد',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     private function prepare(Request $request): array|JsonResponse
     {
+        if (self::importGateBlocks($request)) {
+            return response()->json(['success' => false, 'message' => 'اضبط أوقات الدوام أولًا واضغط «موافق» على التنبيه قبل استيراد أي بيانات.', 'setup_required' => true], 423);
+        }
+
         $request->validate([
             'file' => ['required', 'file', 'max:5120'],
             'duplicates' => ['nullable', 'in:update,skip'],
