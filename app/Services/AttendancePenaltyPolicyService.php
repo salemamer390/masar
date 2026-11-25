@@ -193,6 +193,15 @@ class AttendancePenaltyPolicyService
     {
         $result = ['days' => 0.0, 'penalty_minutes' => 0.0, 'details' => [], 'time_minutes' => 0];
         $policy = $this->forCompany($employee->company_id ? (int) $employee->company_id : null);
+        // The wage of the lost time does not depend on the company's penalty policy: every
+        // effective late / early-leave minute is counted even when the policy is off, has no
+        // tiers, or starts later.
+        $spellStart = $this->spellStart($employee)?->toDateString();
+        foreach ($days as $day) {
+            if (!empty($day['state']) && in_array($day['state'], ['future', 'before_hire', 'after_termination'], true)) continue;
+            if ($spellStart && (string) $day['date'] < $spellStart) continue;
+            $result['time_minutes'] += max(0, (int) ($day['late_minutes'] ?? 0)) + max(0, (int) ($day['early_leave_minutes'] ?? 0));
+        }
         if (!$policy['enabled'] || !$policy['tiers']) return $result;
         // Repetition is counted per violation band (kind + minute range), so each row of the
         // schedule escalates on its own; an occurrence beyond the defined rows keeps the last one.
@@ -210,9 +219,6 @@ class AttendancePenaltyPolicyService
                 foreach (['late' => 'late_minutes', 'early_leave' => 'early_leave_minutes'] as $kind => $field) {
                     $minutes = (int) ($day[$field] ?? 0);
                     if ($minutes <= 0) continue;
-                    // The lost-time wage covers every effective minute, even when the minutes
-                    // fall outside the defined tiers.
-                    if ($charge) $result['time_minutes'] += $minutes;
                     $band = $this->bandOf($policy['tiers'], $kind, $minutes);
                     if ($band === null) continue;
                     $count[$band] = ($count[$band] ?? 0) + 1;
