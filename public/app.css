@@ -6337,3 +6337,65 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
 @media (max-width:767.98px) {
   .unified-filter .search-table > input { flex: 1 1 auto !important; width: 100% !important; height: 100% !important; min-height: 0 !important; background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
 }
+/* Mobile batch 2: tab rows, header action buttons, dashboard quick actions */
+@media (max-width:767.98px) {
+  nav.attendance-tabs,
+  .insurance-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px !important;
+    width: 100%;
+    margin: 12px 0 10px;
+  }
+  nav.attendance-tabs > .attendance-tab,
+  .insurance-tabs > .btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100% !important;
+    min-width: 0;
+    min-height: 46px;
+    margin: 0 !important;
+    padding: 0 8px;
+    box-sizing: border-box;
+    text-align: center;
+    white-space: nowrap;
+  }
+  nav.attendance-tabs > .attendance-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .page-head > .d-flex,
+  .page-head > div:last-child:not(:first-child) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px !important;
+    width: 100%;
+    max-width: 100%;
+  }
+  .page-head > .d-flex > .btn,
+  .page-head > .d-flex > a,
+  .page-head > .d-flex > button,
+  .page-head > .d-flex > form {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    margin: 0;
+    padding: 0 8px;
+    box-sizing: border-box;
+    text-align: center;
+    line-height: 1.25;
+  }
+  .page-head > .d-flex > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .dashboard-command-bar.dashboard-command-bar--reference {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+  .dashboard-command-bar.dashboard-command-bar--reference > * { grid-column: span 2; }
+  .dashboard-command-bar.dashboard-command-bar--reference:has(> :nth-child(4):last-child) > *,
+  .dashboard-command-bar.dashboard-command-bar--reference:has(> :nth-child(5):last-child) > :nth-child(n+4) { grid-column: span 3; }
+  .dashboard-command-bar.dashboard-command-bar--reference:has(> :nth-child(4):last-child) > * { grid-column: span 3; }
+}
