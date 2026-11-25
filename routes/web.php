@@ -401,7 +401,8 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
 
     // Monthly Payroll
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        Route::get('/', [PayrollController::class, 'index'])
+        // The old monthly-payroll page was removed; keep the URL working for bookmarks.
+        Route::get('/', fn (\Illuminate\Http\Request $request) => redirect()->route('payroll.employee-salaries', $request->only('month')))
             ->middleware('permission:payroll.view')
             ->name('index');
         Route::get('/settings', [PayrollSettingsController::class, 'index'])

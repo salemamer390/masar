@@ -17,7 +17,7 @@ class StyleAssetsTest extends TestCase
 
     public function test_all_page_kpi_strips_opt_into_the_shared_boundary_policy(): void
     {
-        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests'] as $page) {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'leaves', 'requests'] as $page) {
             $view = file_get_contents(resource_path('views/'.$page.'/index.blade.php'));
             $this->assertSame(1, substr_count($view, 'kpi-summary-strip'), $page);
         }
@@ -33,7 +33,7 @@ class StyleAssetsTest extends TestCase
 
     public function test_approved_cards_use_one_lead_and_a_group_without_concept_palette(): void
     {
-        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests'] as $page) {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'leaves', 'requests'] as $page) {
             $view = file_get_contents(resource_path('views/'.$page.'/index.blade.php'));
             $this->assertSame(1, substr_count($view, 'approved-summary-cards'), $page);
             $this->assertSame(1, substr_count($view, 'class="summary-card-group"'), $page);
@@ -77,7 +77,7 @@ class StyleAssetsTest extends TestCase
 
     public function test_mobile_summaries_keep_native_swipe_and_all_metric_markup(): void
     {
-        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'payroll', 'leaves', 'requests', 'payroll/partials/employee-salaries-body'] as $page) {
+        foreach (['employees', 'insurance', 'attendance', 'dashboard', 'leaves', 'requests', 'payroll/partials/employee-salaries-body'] as $page) {
             $path = str_contains($page, 'partials') ? $page : $page.'/index';
             $view = file_get_contents(resource_path('views/'.$path.'.blade.php'));
             $this->assertSame(1, substr_count($view, 'class="summary-swipe-hint"'), $page);

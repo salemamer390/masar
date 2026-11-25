@@ -3,14 +3,10 @@ namespace Tests\Feature;
 use Tests\TestCase;
 class SharedDialogSourceTest extends TestCase
 {
-    public function test_salary_modal_has_one_rendered_component_and_payroll_does_not_rebuild_financial_fields(): void
+    public function test_salary_modal_has_one_rendered_component(): void
     {
         $salary = file_get_contents(resource_path('views/salaries/index.blade.php'));
-        $payroll = file_get_contents(resource_path('views/payroll/index.blade.php'));
         $this->assertStringContainsString("@include('salaries.partials.details-modal'", $salary);
-        $this->assertStringContainsString('data-salary-details-url', $payroll);
-        $this->assertStringNotContainsString('payrollSalaryDetails', $payroll);
-        $this->assertStringContainsString('document.importNode(modal, true)', $payroll);
     }
     public function test_hr_creation_uses_shared_markup_and_runtime_on_both_entry_points(): void
     {

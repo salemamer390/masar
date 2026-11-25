@@ -398,7 +398,7 @@ class PayrollController extends Controller
             })
             ->values();
 
-        $view = $request->attributes->get('payroll_view', 'payroll.index');
+        $view = $request->attributes->get('payroll_view', 'payroll.employee-salaries');
         return view($view, compact('payrollHistory', 'records','runs','totalEmployees','reviewedCount','pendingReview','totalNet','totalCost','totalEmployeeInsurance','totalTax','totalEmployerInsurance','totalMartyrs','month','cardDetails','payrollDetails','prototypePeople','prototypeStats','runReports','runMeta', 'lastPayrollRefreshAt'));
     }
 

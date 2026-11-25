@@ -32,7 +32,7 @@ class PayrollPeriodClosedNotification extends Notification
             'payroll_month' => $this->run->payroll_month?->toDateString(),
             'is_transition' => (bool) $this->run->is_transition,
             'message' => "تم قفل مسير شهر {$month} تلقائيًا بعد انتهاء مهلة التصحيح. أصبح الحضور والسجلات والمسير لهذه الفترة مجمدة.",
-            'url' => route('payroll.index'),
+            'url' => route('payroll.employee-salaries'),
         ];
     }
 }
