@@ -80,6 +80,9 @@
     #payrollPrototype .panelhead > .employee-payroll-actions .btn, .employee-payroll-actions .btn { flex:none; width:100%; min-height:46px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; font-weight:700; }
     .employee-payroll-actions form { display:block !important; grid-column:1 / -1; margin:0; }
     .employee-payroll-actions > span { grid-column:1 / -1; text-align:center; }
+    #payrollPrototype .toolbar { display:grid !important; grid-template-columns:1fr 1fr; gap:10px !important; align-items:stretch; }
+    #payrollPrototype .toolbar .search { grid-column:1 / -1; width:100% !important; min-width:0; height:46px; box-sizing:border-box; }
+    #payrollPrototype .toolbar select.btn { width:100% !important; min-width:0; height:46px; box-sizing:border-box; flex:none; text-align:start; }
   }
 </style>
 
