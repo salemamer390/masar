@@ -24,15 +24,19 @@ class PayrollCalculator
         $this->settings ??= new PayrollSettingsService();
     }
 
-    public function calculate(string $salaryType, float $salaryInput, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0): array
+    public function calculate(string $salaryType, float $salaryInput, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0, array $skip = []): array
     {
-        if ($salaryType === 'net') return $this->grossFromNet($salaryInput, $manualInsuranceWage, $noInsurance, $extraDeductions);
-        return $this->grossResult($salaryInput, $manualInsuranceWage, $noInsurance, $ignoredAllowancePct, $ignoredExemption, $taxTreatment, $extraDeductions);
+        if ($salaryType === 'net') return $this->grossFromNet($salaryInput, $manualInsuranceWage, $noInsurance, $extraDeductions, $skip);
+        return $this->grossResult($salaryInput, $manualInsuranceWage, $noInsurance, $ignoredAllowancePct, $ignoredExemption, $taxTreatment, $extraDeductions, $skip);
     }
 
-    public function grossResult(float $gross, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0): array
+    public function grossResult(float $gross, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0, array $skip = []): array
     {
         $gross = max(0, $gross);
+        // Calculation switches: the company-wide setting OR the per-employee flag turns an item off.
+        $noInsurance = $noInsurance || !$this->settings->statutoryEnabled('insurance');
+        $noTax = !empty($skip['tax']) || !$this->settings->statutoryEnabled('tax');
+        $noMartyrs = !empty($skip['martyrs']) || !$this->settings->statutoryEnabled('martyrs');
         // Allowances disabled: their whole value folds into the basic, so the
         // engine's split is basic = gross with a zero allowance pool.
         $allowanceRate = $this->settings->allowancesEnabled() ? $this->settings->allowanceRate() / 100 : 0.0;
@@ -46,11 +50,13 @@ class PayrollCalculator
         $insuranceBase = $this->settings->insuranceAutomaticBasis() === 'Gross' ? $gross : $basic;
         $insuranceWage = $noInsurance ? 0.0 : $this->clamp($manualInsuranceWage && $manualInsuranceWage > 0 ? $manualInsuranceWage : $insuranceBase, $this->settings->insuranceMinimum(), $this->settings->insuranceMaximum());
         $employeeInsurance = $this->round2($insuranceWage * $this->settings->employeeInsuranceRate());
-        $martyrs = $this->round2($gross * $this->settings->martyrsFundRate());
+        $martyrs = $noMartyrs ? 0.0 : $this->round2($gross * $this->settings->martyrsFundRate());
         // Unified taxable base: employee insurance, the personal exemption and the
         // martyrs fund all reduce it before the annual brackets are applied.
         $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption() - $martyrs) * 12) - $this->settings->taxDeductibleContributions());
-        $tax = $this->tax->calculate($annualBase);
+        $tax = $noTax
+            ? ['category'=>null, 'category_up_to'=>null, 'annual_tax'=>0.0, 'monthly_tax'=>0.0]
+            : $this->tax->calculate($annualBase);
         $statutory = $this->round2($employeeInsurance + $tax['monthly_tax'] + $martyrs);
         $extraDeductions = max(0, $extraDeductions);
         $total = $this->round2($statutory + $extraDeductions);
@@ -61,7 +67,7 @@ class PayrollCalculator
             'transportation_allowance'=>$transport, 'housing_allowance'=>$housing, 'meal_allowance'=>$meal, 'clothing_allowance'=>$clothing,
             'insurance_wage'=>$this->round2($insuranceWage), 'employee_insurance'=>$employeeInsurance,
             'taxable_annual'=>$annualBase, 'tax_category'=>$tax['category'], 'tax_category_up_to'=>$tax['category_up_to'],
-            'annual_tax'=>$tax['annual_tax'], 'income_tax'=>$tax['monthly_tax'], 'martyrs_fund'=>$martyrs,
+            'annual_tax'=>$tax['annual_tax'], 'income_tax'=>$tax['monthly_tax'], 'martyrs_fund'=>$martyrs, 'tax_disabled'=>$noTax,
             'extra_deductions'=>$extraDeductions, 'statutory_deductions'=>$statutory, 'total_deductions'=>$total,
             'net'=>$this->round2($gross - $total), 'employer_insurance'=>$employerInsurance, 'employee_cost'=>$this->round2($gross + $employerInsurance),
         ];
@@ -71,7 +77,7 @@ class PayrollCalculator
     {
         $salaryType = ($in['salary_type'] ?? 'gross') === 'net' ? 'net' : 'gross';
         $fixed = max(0, (float)($in['fixed_deductions'] ?? 0));
-        $calc = $this->calculate($salaryType, (float)($in['salary_input'] ?? 0), ($in['insurance_wage'] ?? '') === '' ? null : (float)$in['insurance_wage'], (bool)($in['no_insurance'] ?? false), 0, 0, 'egyptian', $fixed);
+        $calc = $this->calculate($salaryType, (float)($in['salary_input'] ?? 0), ($in['insurance_wage'] ?? '') === '' ? null : (float)$in['insurance_wage'], (bool)($in['no_insurance'] ?? false), 0, 0, 'egyptian', $fixed, ['tax'=>(bool)($in['no_tax'] ?? false), 'martyrs'=>(bool)($in['no_martyrs_fund'] ?? false)]);
         return array_merge($calc, [
             'allowance_limit_pct'=>$this->settings->allowanceRate(), 'allowance_limit'=>$calc['allowances'], 'allowance_remaining'=>0.0,
             'fixed_deductions'=>$fixed, 'net_after_fixed'=>$calc['net'], 'personal_exemption'=>$this->settings->personalExemption(),
@@ -80,7 +86,7 @@ class PayrollCalculator
 
     public function structureForSalary(Salary $salary): array
     {
-        return $this->structure(['salary_type'=>$salary->salary_type ?: 'gross','salary_input'=>$salary->salary_input,'insurance_wage'=>$salary->insurance_wage,'no_insurance'=>$salary->no_insurance,'fixed_deductions'=>$salary->fixed_deductions]);
+        return $this->structure(['salary_type'=>$salary->salary_type ?: 'gross','salary_input'=>$salary->salary_input,'insurance_wage'=>$salary->insurance_wage,'no_insurance'=>$salary->no_insurance,'no_tax'=>$salary->no_tax,'no_martyrs_fund'=>$salary->no_martyrs_fund,'fixed_deductions'=>$salary->fixed_deductions]);
     }
 
     /**
@@ -92,9 +98,9 @@ class PayrollCalculator
      * the variable amount on top of the fixed taxable base. Advances are a loan
      * payout and are never taxed.
      */
-    public function monthly(float $gross, array $monthly = [], ?float $manualInsuranceWage = null, bool $noInsurance = false, ?float $absenceBaseOverride = null): array
+    public function monthly(float $gross, array $monthly = [], ?float $manualInsuranceWage = null, bool $noInsurance = false, ?float $absenceBaseOverride = null, array $skip = []): array
     {
-        $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
+        $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance, self::DEFAULT_EXCLUDED_PCT, self::PERSONAL_EXEMPTION, 'egyptian', 0.0, $skip);
         $basic = (float) $structure['basic_salary'];
         $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
         // Absence follows the configured basis: Basic prices it on the basic
@@ -152,7 +158,7 @@ class PayrollCalculator
         // variables and absence.
         $structureTax = (float) $structure['income_tax'];
         $combinedAnnualBase = max(0.0, $structure['taxable_annual'] + 12 * ($variableTaxable - $absenceDeduction - $absenceAllowanceReduction));
-        $tax = $this->round2($this->tax->annualTax($combinedAnnualBase) / 12);
+        $tax = !empty($structure['tax_disabled']) ? 0.0 : $this->round2($this->tax->annualTax($combinedAnnualBase) / 12);
         $variableTax = $this->round2($tax - $structureTax);
         // Disciplinary split: automatic lateness/early-departure policy days are ALWAYS priced
         // from the basic salary, whatever the company's general penalty basis is; manual
@@ -194,7 +200,7 @@ class PayrollCalculator
      */
     public function extraIncomeTax(array $calculation, float $extraTaxable): float
     {
-        if (abs($extraTaxable) < 0.000001) return 0.0;
+        if (abs($extraTaxable) < 0.000001 || !empty($calculation['tax_disabled'])) return 0.0;
         $base = (float) ($calculation['taxable_annual'] ?? 0);
         $annualTax = (float) ($calculation['annual_tax'] ?? 0);
 
@@ -212,13 +218,13 @@ class PayrollCalculator
         ];
     }
 
-    private function grossFromNet(float $target, ?float $manual, bool $noInsurance, float $fixed): array
+    private function grossFromNet(float $target, ?float $manual, bool $noInsurance, float $fixed, array $skip = []): array
     {
         $lo = max(.01, $target); $hi = max($target * 2, $target + 50000);
-        while ($this->grossResult($hi, $manual, $noInsurance, 0, 0, 'egyptian', $fixed)['net'] < $target) $hi *= 1.5;
-        for ($i=0; $i<100; $i++) { $mid=($lo+$hi)/2; if ($this->grossResult($mid,$manual,$noInsurance,0,0,'egyptian',$fixed)['net'] < $target) $lo=$mid; else $hi=$mid; }
+        while ($this->grossResult($hi, $manual, $noInsurance, 0, 0, 'egyptian', $fixed, $skip)['net'] < $target) $hi *= 1.5;
+        for ($i=0; $i<100; $i++) { $mid=($lo+$hi)/2; if ($this->grossResult($mid,$manual,$noInsurance,0,0,'egyptian',$fixed,$skip)['net'] < $target) $lo=$mid; else $hi=$mid; }
         $best = null; $difference = INF;
-        for ($i=-3;$i<=3;$i++) { $candidate=$this->round2(($lo+$hi)/2)+$i/100; if ($candidate<=0) continue; $result=$this->grossResult($candidate,$manual,$noInsurance,0,0,'egyptian',$fixed); $d=abs($result['net']-$target); if ($d < $difference) { $best=$result; $difference=$d; } }
+        for ($i=-3;$i<=3;$i++) { $candidate=$this->round2(($lo+$hi)/2)+$i/100; if ($candidate<=0) continue; $result=$this->grossResult($candidate,$manual,$noInsurance,0,0,'egyptian',$fixed,$skip); $d=abs($result['net']-$target); if ($d < $difference) { $best=$result; $difference=$d; } }
         return $best;
     }
 

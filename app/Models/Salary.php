@@ -15,7 +15,7 @@ class Salary extends Model
         'housing_allowance','transportation_allowance','meal_allowance','clothing_allowance','other_allowances',
         'deductions','fixed_deductions','net_salary','gross_salary','insurance_wage','applied_insurance_wage',
         'employee_insurance','income_tax','taxable_annual','martyrs_fund','total_deductions',
-        'employer_insurance','employee_cost','no_insurance','excluded_allowance_pct',
+        'employer_insurance','employee_cost','no_insurance','no_tax','no_martyrs_fund','excluded_allowance_pct',
         'incentives','commission','profit_share','profit_share_tax_exempt','other_earnings',
         'personal_exemption','tax_treatment','status','payment_method_id','notes',
     ];
@@ -28,7 +28,7 @@ class Salary extends Model
         'deductions' => 'decimal:2','fixed_deductions' => 'decimal:2','net_salary' => 'decimal:2','gross_salary' => 'decimal:2',
         'insurance_wage' => 'decimal:2','applied_insurance_wage' => 'decimal:2','employee_insurance' => 'decimal:2','income_tax' => 'decimal:2','taxable_annual' => 'decimal:2',
         'martyrs_fund' => 'decimal:2','total_deductions' => 'decimal:2','employer_insurance' => 'decimal:2','employee_cost' => 'decimal:2',
-        'no_insurance' => 'boolean','excluded_allowance_pct' => 'decimal:2','personal_exemption' => 'decimal:2',
+        'no_insurance' => 'boolean','no_tax' => 'boolean','no_martyrs_fund' => 'boolean','excluded_allowance_pct' => 'decimal:2','personal_exemption' => 'decimal:2',
         'incentives' => 'decimal:2','commission' => 'decimal:2','profit_share' => 'decimal:2','profit_share_tax_exempt' => 'boolean','other_earnings' => 'decimal:2',
     ];
 
