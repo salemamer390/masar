@@ -76,6 +76,12 @@
   #period { cursor:pointer; }
   @media (max-width: 767.98px) {
     #payrollPrototype .panelhead { flex-wrap:wrap; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; flex:0 0 100%; width:100%; margin:0; padding:0; border:0; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs > li { display:block; min-width:0; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link { width:100%; min-height:46px; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 8px; font-size:13px; white-space:nowrap; border:1px solid #e1e8f2; background:#fff; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link.active { background:#edf5ff; border-color:#cfe1ff; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link { overflow:hidden; box-sizing:border-box; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link .badge { padding:3px 6px; font-size:11px; }
     #payrollPrototype .panelhead > .employee-payroll-actions, .employee-payroll-actions { display:grid !important; grid-template-columns:1fr 1fr; gap:10px !important; align-items:stretch; flex:0 0 100%; width:100%; margin-top:10px !important; }
     #payrollPrototype .panelhead > .employee-payroll-actions .btn, .employee-payroll-actions .btn { flex:none; width:100%; min-height:46px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; font-weight:700; }
     .employee-payroll-actions form { display:block !important; grid-column:1 / -1; margin:0; }
@@ -83,6 +89,13 @@
     #payrollPrototype .toolbar { display:grid !important; grid-template-columns:1fr 1fr; gap:10px !important; align-items:stretch; }
     #payrollPrototype .toolbar .search { grid-column:1 / -1; width:100% !important; min-width:0; height:46px; box-sizing:border-box; }
     #payrollPrototype .toolbar select.btn { width:100% !important; min-width:0; height:46px; box-sizing:border-box; flex:none; text-align:start; }
+  }
+  @media (max-width: 400px) {
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link { font-size:12px; gap:4px; padding:0 6px; }
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link > i { display:none; }
+  }
+  @media (max-width: 340px) {
+    #payrollPrototype .leftpanel .panelhead .payroll-inline-tabs .nav-link { font-size:11px; padding:0 4px; gap:3px; }
   }
 </style>
 
