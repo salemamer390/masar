@@ -2620,7 +2620,7 @@ button,
 .salary-page-head>div:last-child {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: flex-end;
   flex: 1 1 420px;
   max-width: 100%;
   min-width: 0;
@@ -2868,6 +2868,7 @@ button,
   overflow-x: hidden;
 }
 .page-head {
+  justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
 }

@@ -1,4 +1,4 @@
-<div class="heading"><div><button class="period" id="period">{{ __('▦ أكتوبر 2026 ⌄') }}</button>　<span class="status">{{ __('● قيد المراجعة') }}</span></div></div>
+<div class="heading" style="justify-content:flex-end"><div><button class="period" id="period">{{ __('▦ أكتوبر 2026 ⌄') }}</button>　<span class="status">{{ __('● قيد المراجعة') }}</span></div></div>
 <section class="stats kpi-summary-strip approved-summary-cards" aria-label="{{ __('ملخص رواتب الموظفين') }}" tabindex="0">
 @foreach([
     [__('إجمالي تكلفة الرواتب'), 'cost', 'blue', 'wallet2'],

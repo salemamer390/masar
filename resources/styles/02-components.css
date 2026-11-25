@@ -47,6 +47,7 @@
   overflow-x: hidden;
 }
 .page-head {
+  justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
 }
