@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=2">
   <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=2">
+  @include('components.pwa-head')
   <title>ODIR Platform Admin — @yield('title', __('إدارة الشركات'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" integrity="sha384-tViUnnbYAV00FLIhhi3v/dWt3Jxw4gZQcNoSCxCIFNJVCx7/D55/wXsrNIRANwdD" crossorigin="anonymous">
@@ -25,5 +26,6 @@
   </script>
   @stack('scripts')
 <script src="{{ asset('password-visibility.js') }}" defer></script>
+  @include('components.pwa-register')
 </body>
 </html>

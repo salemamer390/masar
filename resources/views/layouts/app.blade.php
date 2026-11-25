@@ -11,6 +11,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=2">
   <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=2">
   <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=2">
+  @include('components.pwa-head')
   <title>{{ config('app.brand', 'ODIR HR') }} — @yield('title', __('إدارة الموارد البشرية'))</title>
   
   <!-- Fonts & Icons -->
@@ -603,5 +604,6 @@
 <script src="{{ asset('penalty-entry.js') }}?v={{ @filemtime(public_path('penalty-entry.js')) }}"></script>
 @stack('scripts')
 <script src="{{ asset('password-visibility.js') }}" defer></script>
+  @include('components.pwa-register')
 </body>
 </html>
