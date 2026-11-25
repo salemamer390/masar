@@ -226,10 +226,13 @@ class PayrollController extends Controller
             $penaltyLines = $policyShare > 0
                 ? [[__('جزاءات التأخير والخروج المبكر (:count مخالفة)', ['count' => count($policyDetails)]), $policyShare], [__('خصم الجزاءات'), round($penaltyTotal - $policyShare, 2)]]
                 : [[__('خصم الجزاءات'), $penaltyTotal]];
+            // A statutory line is left out entirely when its calculation is switched off (company or employee).
+            $settingsService = app(\App\Services\PayrollSettingsService::class);
+            $statOn = fn (string $item, ?bool $employeeOff) => $settingsService->statutoryEnabled($item) && !$employeeOff;
             $deductions = [
-                [__('تأمين الموظف'), (float) $record->employee_insurance],
-                [__('الضريبة'), (float) $record->income_tax],
-                [__('صندوق الشهداء'), (float) $record->martyrs_fund],
+                ...($statOn('insurance', $record->salary?->no_insurance) ? [[__('تأمين الموظف'), (float) $record->employee_insurance]] : []),
+                ...($statOn('tax', $record->salary?->no_tax) ? [[__('الضريبة'), (float) $record->income_tax]] : []),
+                ...($statOn('martyrs', $record->salary?->no_martyrs_fund) ? [[__('صندوق الشهداء'), (float) $record->martyrs_fund]] : []),
                 [__('خصم الغياب'), (float) $record->absence_deduction],
                 ...$penaltyLines,
                 [__('خصم وقت التأخير والخروج المبكر'), (float) ($record->attendance_time_deduction ?? 0)],

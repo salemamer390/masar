@@ -115,6 +115,15 @@ class PayrollSettingsService
         return max(1, (int) round($this->number('general', 'proration_days', 30)));
     }
 
+    /**
+     * Company-wide calculation switch for a statutory item: insurance, tax or martyrs.
+     * Defaults to on, so a company without the rule behaves exactly as before.
+     */
+    public function statutoryEnabled(string $item): bool
+    {
+        return strtolower(trim($this->rule('statutory', $item . '_enabled', 'Yes'))) !== 'no';
+    }
+
     public function employeeInsuranceRate(): float
     {
         return $this->number('insurance', 'employee_insurance_rate', 11) / 100;
