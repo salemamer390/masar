@@ -128,6 +128,8 @@ class SalaryController extends Controller
 
     public function update(Request $request, Salary $salary, PayrollCalculator $calculator, PayrollRunService $payrollRuns)
     {
+        // The edit form never posts employee_id: a structure always belongs to its own employee.
+        $request->merge(['employee_id' => $salary->employee_id]);
         $validated = $this->validateSalary($request);
         $employee = $salary->employee;
         $this->ensureEmployeeIsEligibleForSalary($employee);
@@ -205,6 +207,8 @@ class SalaryController extends Controller
             'fixed_deductions' => ['nullable', 'numeric', 'min:0'],
             'insurance_wage' => ['nullable', 'numeric', 'min:0'],
             'no_insurance' => ['nullable', 'boolean'],
+            'no_tax' => ['nullable', 'boolean'],
+            'no_martyrs_fund' => ['nullable', 'boolean'],
             'excluded_allowance_pct' => ['nullable', 'numeric'],
             'personal_exemption' => ['nullable', 'numeric'],
             'tax_treatment' => ['nullable', 'in:egyptian,other'],
@@ -235,6 +239,8 @@ class SalaryController extends Controller
             'fixed_deductions' => ['nullable', 'numeric', 'min:0'],
             'insurance_wage' => ['nullable', 'numeric', 'min:0'],
             'no_insurance' => ['nullable', 'boolean'],
+            'no_tax' => ['nullable', 'boolean'],
+            'no_martyrs_fund' => ['nullable', 'boolean'],
             'excluded_allowance_pct' => ['nullable', 'numeric'],
             'personal_exemption' => ['nullable', 'numeric'],
             'tax_treatment' => ['nullable', 'in:egyptian,other'],
@@ -267,6 +273,8 @@ class SalaryController extends Controller
             'fixed_deductions' => $data['fixed_deductions'] ?? ($existing?->fixed_deductions ?? 0),
             'insurance_wage' => array_key_exists('insurance_wage', $data) ? (($data['insurance_wage'] ?? '') === '' ? null : $data['insurance_wage']) : $existing?->insurance_wage,
             'no_insurance' => array_key_exists('no_insurance', $data) ? (bool)$data['no_insurance'] : (bool)($existing?->no_insurance ?? false),
+            'no_tax' => array_key_exists('no_tax', $data) ? (bool)$data['no_tax'] : (bool)($existing?->no_tax ?? false),
+            'no_martyrs_fund' => array_key_exists('no_martyrs_fund', $data) ? (bool)$data['no_martyrs_fund'] : (bool)($existing?->no_martyrs_fund ?? false),
             'excluded_allowance_pct' => $this->settings->allowanceRate(),
             'personal_exemption' => $this->settings->personalExemption(),
             'tax_treatment' => $data['tax_treatment'] ?? ($existing?->tax_treatment ?? 'egyptian'),
@@ -282,6 +290,8 @@ class SalaryController extends Controller
             'salary_input' => $data['salary_input'],
             'insurance_wage' => $data['insurance_wage'],
             'no_insurance' => $data['no_insurance'],
+            'no_tax' => $data['no_tax'],
+            'no_martyrs_fund' => $data['no_martyrs_fund'],
             'excluded_allowance_pct' => $data['excluded_allowance_pct'],
             'personal_exemption' => $data['personal_exemption'],
             'tax_treatment' => $data['tax_treatment'],

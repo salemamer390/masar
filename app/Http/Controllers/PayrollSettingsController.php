@@ -540,6 +540,8 @@ class PayrollSettingsController extends Controller
             'allowance_prorated' => ['nullable', 'array'],
             'allowance_prorated.*' => ['nullable', 'boolean'],
             'allowances_enabled' => ['nullable', 'boolean'],
+            'statutory' => ['nullable', 'array'],
+            'statutory.*' => ['in:0,1'],
         ]);
 
         abort_if(array_diff(array_keys($data['settings']), self::SETTING_KEYS) !== [], 422, 'Invalid payroll setting.');
@@ -580,6 +582,15 @@ class PayrollSettingsController extends Controller
                 [$group, $key] = explode('.', $name, 2);
                 DB::table('payroll_calculation_settings')->where('company_id', $companyId)->where('setting_group', $group)->where('setting_key', $key)
                     ->update(['setting_value' => $value, 'is_active' => 1, 'effective_from' => $data['effective_from'], 'updated_at' => now()]);
+            }
+            // Company-wide calculation switches: insurance, income tax, martyrs fund (Yes/No, default Yes).
+            $statutoryLabels = ['insurance' => 'حساب التأمينات الاجتماعية', 'tax' => 'حساب ضريبة الدخل', 'martyrs' => 'حساب صندوق أسر الشهداء'];
+            foreach (array_intersect_key($data['statutory'] ?? [], $statutoryLabels) as $item => $on) {
+                DB::table('payroll_calculation_rules')->updateOrInsert(
+                    ['company_id' => $companyId, 'rule_group' => 'statutory', 'rule_key' => $item . '_enabled'],
+                    ['rule_value' => $on === '1' ? 'Yes' : 'No', 'is_active' => 1, 'is_editable' => 1, 'effective_from' => $data['effective_from'],
+                     'label' => $statutoryLabels[$item], 'description' => 'Yes أو No: تشغيل أو إيقاف الحساب لكل موظفي الشركة', 'updated_at' => now(), 'created_at' => now()]
+                );
             }
             foreach ($data['allowances'] as $key => $percentage) {
                 $row = ['percentage' => $percentage, 'updated_at' => now()];

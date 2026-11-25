@@ -309,6 +309,7 @@ class PayrollRunService
             $salary->insurance_wage ? (float) $salary->insurance_wage : null,
             (bool) $salary->no_insurance || !$insuranceDue,
             $this->absenceBaseOverride($salary),
+            ['tax' => (bool) $salary->no_tax, 'martyrs' => (bool) $salary->no_martyrs_fund],
         );
         $calculation = $this->applyStructureStatutoryValues($calculation, $salary, $insuranceDue, $insuranceMonths);
 
