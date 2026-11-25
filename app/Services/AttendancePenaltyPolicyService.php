@@ -191,7 +191,7 @@ class AttendancePenaltyPolicyService
      */
     public function evaluate(Employee $employee, array $days, array $priorDays = []): array
     {
-        $result = ['days' => 0.0, 'penalty_minutes' => 0.0, 'details' => [], 'time_minutes' => 0];
+        $result = ['days' => 0.0, 'penalty_minutes' => 0.0, 'details' => [], 'time_minutes' => 0, 'late_time_minutes' => 0, 'early_time_minutes' => 0];
         $policy = $this->forCompany($employee->company_id ? (int) $employee->company_id : null);
         // The wage of the lost time does not depend on the company's penalty policy: every
         // effective late / early-leave minute is counted even when the policy is off, has no
@@ -200,7 +200,11 @@ class AttendancePenaltyPolicyService
         foreach ($days as $day) {
             if (!empty($day['state']) && in_array($day['state'], ['future', 'before_hire', 'after_termination'], true)) continue;
             if ($spellStart && (string) $day['date'] < $spellStart) continue;
-            $result['time_minutes'] += max(0, (int) ($day['late_minutes'] ?? 0)) + max(0, (int) ($day['early_leave_minutes'] ?? 0));
+            $late = max(0, (int) ($day['late_minutes'] ?? 0));
+            $early = max(0, (int) ($day['early_leave_minutes'] ?? 0));
+            $result['late_time_minutes'] += $late;
+            $result['early_time_minutes'] += $early;
+            $result['time_minutes'] += $late + $early;
         }
         if (!$policy['enabled'] || !$policy['tiers']) return $result;
         // Repetition is counted per violation band (kind + minute range), so each row of the

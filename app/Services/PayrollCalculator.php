@@ -139,6 +139,8 @@ class PayrollCalculator
         $otherDeductions = max(0, (float)($monthly['other_deductions'] ?? 0));
         // Lost-time wage for late/early minutes: priced upstream from the gross, kept apart from
         // the capped disciplinary days above; it joins the deductions here, outside the cap.
+        $lateDeduction = max(0, (float)($monthly['attendance_late_deduction'] ?? 0));
+        $earlyDeduction = max(0, (float)($monthly['attendance_early_deduction'] ?? 0));
         $timeDeduction = max(0, (float)($monthly['attendance_time_deduction'] ?? 0));
 
         $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
@@ -187,7 +189,7 @@ class PayrollCalculator
             'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
             'income_tax'=>$tax, 'absence_base'=>$this->round2($absenceBase), 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
             'absence_allowance_reduction'=>$this->round2($absenceAllowanceReduction),
-            'attendance_time_deduction'=>$timeDeduction, 'attendance_penalty_deduction'=>$policyPenaltyDeduction,
+            'attendance_time_deduction'=>$timeDeduction, 'attendance_late_deduction'=>$lateDeduction, 'attendance_early_deduction'=>$earlyDeduction, 'attendance_penalty_deduction'=>$policyPenaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);
     }

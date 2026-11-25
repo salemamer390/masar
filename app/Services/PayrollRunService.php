@@ -839,9 +839,12 @@ class PayrollRunService
         // hour). Separate from the disciplinary days (priced from the penalty basis), not limited
         // by the monthly penalty cap, and always deducted once the policy is enabled.
         $timeMinutes = (int) ($attendancePenalty['time_minutes'] ?? 0);
-        $timeDeduction = $timeMinutes > 0
-            ? round($timeMinutes * (float) $structure['gross'] / 14400, 2)
-            : 0.0;
+        // Lateness and early departure are priced and shown as two separate lines.
+        $lateTimeMinutes = (int) ($attendancePenalty['late_time_minutes'] ?? 0);
+        $earlyTimeMinutes = (int) ($attendancePenalty['early_time_minutes'] ?? 0);
+        $lateDeduction = $lateTimeMinutes > 0 ? round($lateTimeMinutes * (float) $structure['gross'] / 14400, 2) : 0.0;
+        $earlyDeduction = $earlyTimeMinutes > 0 ? round($earlyTimeMinutes * (float) $structure['gross'] / 14400, 2) : 0.0;
+        $timeDeduction = round($lateDeduction + $earlyDeduction, 2);
         $advancePlan = $this->advanceDeduction($employee, $month, (float) $structure['gross'], $forRun);
 
         return [
@@ -849,6 +852,8 @@ class PayrollRunService
             'official_holiday_days' => $overtime['holiday_days'], 'weekly_rest_days' => $overtime['rest_days'],
             'absence_days' => $absenceDays, 'penalty_days' => (float) $penaltyDays,
             'attendance_time_minutes' => $timeMinutes, 'attendance_time_deduction' => $timeDeduction,
+            'attendance_late_minutes' => $lateTimeMinutes, 'attendance_early_minutes' => $earlyTimeMinutes,
+            'attendance_late_deduction' => $lateDeduction, 'attendance_early_deduction' => $earlyDeduction,
             'manual_penalty_days' => (float) $manualPenaltyDays,
             'attendance_penalty_days' => (float) $attendancePenalty['days'],
             'attendance_penalty_minutes' => (float) ($attendancePenalty['penalty_minutes'] ?? 0),
