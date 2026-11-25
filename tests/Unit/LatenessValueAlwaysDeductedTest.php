@@ -20,6 +20,8 @@ class LatenessValueAlwaysDeductedTest extends TestCase
         $result = (new AttendancePenaltyPolicyService())->evaluate($employee, $days);
 
         $this->assertSame(35, $result['time_minutes']);
+        $this->assertSame(20, $result['late_time_minutes']);
+        $this->assertSame(15, $result['early_time_minutes']);
         $this->assertSame(0.0, $result['days']);
         $this->assertSame([], $result['details']);
     }
