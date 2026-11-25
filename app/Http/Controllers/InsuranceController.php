@@ -8,6 +8,7 @@ use App\Models\InsuranceRecord;
 use App\Models\Salary;
 use App\Models\MovementRecord;
 use App\Models\MovementType;
+use App\Services\InsuranceDeregistrationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,21 +21,19 @@ class InsuranceController extends Controller
         $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
         $monthStart = $month->copy()->startOfMonth()->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
-        $eligible = fn (Builder $query) => $query->where(function (Builder $employee) use ($monthStart, $monthEnd): void {
-            $employee->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Active', 'نشط']))
-                ->orWhere(function (Builder $ended) use ($monthStart, $monthEnd): void {
-                    $ended->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
-                        ->where(function (Builder $termination) use ($monthStart, $monthEnd): void {
-                            $termination->whereBetween('termination_date', [$monthStart, $monthEnd])
-                                ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereIn('status', ['registered', 'مسجل'])
-                                    ->where(function (Builder $recordDate) use ($monthStart): void {
-                                        $recordDate->whereNull('insurance_end_date')->orWhereDate('insurance_end_date', '>=', $monthStart);
-                                    }));
-                        });
-                });
-        });
-        $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
-            ->whereHas('employee')
+        $eligible = fn (Builder $query) => $query
+            ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', Employee::INACTIVE_STATUS_NAMES))
+            ->where(function (Builder $employee) use ($monthStart): void {
+                $employee->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
+                    ->orWhere(function (Builder $termination) use ($monthStart): void {
+                        // A leaver stays listed through the month he left, and afterwards for as
+                        // long as his insurance record has not been marked unregistered (form 6).
+                        $termination->whereDate('termination_date', '>=', $monthStart)
+                            ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereNotIn('status', InsuranceDeregistrationService::UNREGISTERED_STATUSES));
+                    });
+            });
+        $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary', 'employee.status'])
+            ->whereHas('employee', $eligible)
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $this->normalizeInsuranceStatus($request->status)))
@@ -51,7 +50,7 @@ class InsuranceController extends Controller
         // screen as well as in the registration modal. This is important for
         // a newly added employee: absence of an InsuranceRecord must not hide
         // the employee from the insurance workflow.
-        $employees = Employee::query()->whereDoesntHave('insuranceRecord')
+        $employees = Employee::query()->tap($eligible)->whereDoesntHave('insuranceRecord')
             ->when($request->filled('search'), fn ($q) => $q->where(function ($employee) use ($request) {
                 $employee->where('full_name', 'like', '%'.$request->search.'%')
                     ->orWhere('employee_code', 'like', '%'.$request->search.'%');
@@ -61,7 +60,7 @@ class InsuranceController extends Controller
             ->orderBy('full_name')->get();
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
         $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
-        $totalEmployees = Employee::count();
+        $totalEmployees = Employee::query()->tap($eligible)->count();
         $registered = InsuranceRecord::where('status', 'مسجل')->count();
         $unregistered = Employee::whereDoesntHave('insuranceRecord', fn ($q) => $q->where('status', 'مسجل'))->count();
         $pending = InsuranceRecord::whereIn('status', ['قيد التسجيل', 'Pending'])->count();
@@ -76,7 +75,15 @@ class InsuranceController extends Controller
         $overdue = $employees->filter(fn (Employee $employee): bool => $employee->hire_date
             && $employee->hire_date->lt(today()->subDays((int) ($organization->grace_days ?? 30))))->count();
         $activeTab = $request->input('tab', 'registered');
-        return view('insurance.index', compact('insuranceRecords', 'registeredRecords', 'unregisteredRecords', 'activeTab', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue', 'month'));
+        $deregistration = [];
+        foreach ($insuranceRecords as $record) {
+            $employee = $record->employee;
+            if ($employee && $employee->termination_date && $record->status !== 'unregistered'
+                && in_array($employee->status?->name, InsuranceDeregistrationService::TERMINAL_STATUSES, true)) {
+                $deregistration[$record->id] = InsuranceDeregistrationService::info($employee->termination_date);
+            }
+        }
+        return view('insurance.index', compact('deregistration', 'insuranceRecords', 'registeredRecords', 'unregisteredRecords', 'activeTab', 'employees', 'departments', 'organization', 'totalEmployees', 'registered', 'unregistered', 'pending', 'overdue', 'month'));
     }
 
     public function store(Request $request)
@@ -179,6 +186,28 @@ class InsuranceController extends Controller
 
         $unregistered = json_decode('"\\u063a\\u064a\\u0631 \\u0645\\u0633\\u062c\\u0644"', true);
         return $unregistered && $status === $unregistered ? 'unregistered' : 'registered';
+    }
+
+    /** «تم فصله»: the S6 form was filed, so the employee becomes unregistered and the reminders stop. */
+    public function deregister(Request $request, InsuranceRecord $insuranceRecord, InsuranceDeregistrationService $deregistration)
+    {
+        $employee = $insuranceRecord->employee()->first();
+        abort_unless($employee && (int) $employee->company_id === (int) auth()->user()->company_id, 404);
+        if (in_array($insuranceRecord->status, InsuranceDeregistrationService::UNREGISTERED_STATUSES, true)) {
+            $deregistration->clear($employee);
+            return back()->with('toast', __('تم فصله بالفعل.'));
+        }
+        $old = $insuranceRecord->toArray();
+        DB::transaction(function () use ($insuranceRecord, $old) {
+            $insuranceRecord->update(['status' => 'unregistered', 'insurance_end_date' => today()->toDateString()]);
+            $this->recordHistory($insuranceRecord, $old);
+        });
+        Salary::syncInsuredSalary((int) $insuranceRecord->employee_id);
+        $this->recordInsuranceMovement($insuranceRecord->fresh(), $old);
+        ActivityLog::record('insurance_deregister', 'Employee deregistered from insurance (form 6).', $insuranceRecord, $old, $insuranceRecord->fresh()->toArray(), 'insurance');
+        $deregistration->clear($employee);
+
+        return back()->with('toast', __('تم فصل الموظف من التأمينات وإيقاف التنبيهات.'));
     }
 
     public function updateOrganization(Request $request)

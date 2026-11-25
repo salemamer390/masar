@@ -98,7 +98,7 @@ Route::middleware('guest')->group(function () {
 });
 
 // Authenticated Routes
-Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\RunLeaveConflictReminders::class, \App\Http\Middleware\RunAttendanceArchiveSync::class])->group(function () {
+Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\RunLeaveConflictReminders::class, \App\Http\Middleware\RunInsuranceDeregistrationReminders::class, \App\Http\Middleware\RunAttendanceArchiveSync::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::middleware('global_superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
@@ -525,6 +525,9 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
         Route::put('/{insuranceRecord}', [InsuranceController::class, 'update'])
             ->middleware('permission:insurance.edit')
             ->name('update');
+        Route::post('/{insuranceRecord}/deregister', [InsuranceController::class, 'deregister'])
+            ->middleware('permission:insurance.edit')
+            ->name('deregister');
         Route::get('/{insuranceRecord}/form', [InsuranceController::class, 'form'])
             ->middleware('permission:insurance.view')
             ->name('form');

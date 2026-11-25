@@ -93,7 +93,7 @@ class PayrollController extends Controller
         $summaryQuery = PayrollRecord::when($companyId, fn ($query) => $query->where('company_id', $companyId))
             ->whereDate('payroll_month', $month->toDateString());
 
-        $totalEmployees = Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->count();
+        $totalEmployees = Employee::when($companyId, fn ($query) => $query->where('company_id', $companyId))->whereDoesntHave('status', fn ($status) => $status->whereIn('name', Employee::INACTIVE_STATUS_NAMES))->count();
         $reviewedCount = (clone $summaryQuery)->whereIn('status', ['معتمدة', 'تم الصرف', 'Approved', 'Paid'])->count();
         $pendingReview = (clone $summaryQuery)->whereIn('status', ['قيد الإعداد', 'Draft'])->count();
         $totalNet = (clone $summaryQuery)->sum('net_salary');

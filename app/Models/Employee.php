@@ -11,6 +11,9 @@ use App\Models\Concerns\BelongsToCompany;
 
 class Employee extends Model
 {
+    /** Statuses that mean the employee is not active (terminal statuses have their own period rules). */
+    public const INACTIVE_STATUS_NAMES = ['Inactive', 'غير نشط', 'غير نشطة', 'Suspended', 'موقوف', 'Pending', 'قيد التعيين'];
+
     // Company isolation is enforced by the shared trait: the global scope
     // restricts every read to the actor's company (a company-less platform
     // account keeps platform-wide visibility), and the saving guard blocks
