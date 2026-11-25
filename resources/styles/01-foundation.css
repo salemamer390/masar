@@ -2618,7 +2618,7 @@ button,
 .salary-page-head>div:last-child {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex: 1 1 420px;
   max-width: 100%;
   min-width: 0;

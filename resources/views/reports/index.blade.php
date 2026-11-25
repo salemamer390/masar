@@ -1,7 +1,6 @@
 @extends('layouts.app')
 @section('title', __('التقارير'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('التقارير') }}</h1><p>{{ __('كل تقرير يعتمد على سجلات قاعدة البيانات ويمكن تصديره من صفحة التقرير.') }}</p></div></div>
 <div class="report-grid">@foreach([
 ['employees',__('تقرير الموظفين'),__('بيانات الموظفين والأقسام والحالات'),'people-fill'],
 ['attendance',__('تقرير الحضور'),__('الحضور والانصراف والتأخير'),'clock-history'],

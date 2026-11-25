@@ -13,7 +13,7 @@
     $remaining = max($limit - $employeeCount, 0);
 @endphp
 <div class="company-account-page">
-    <div class="company-account-hero page-head"><div><h1>{{ __('حساب الشركة') }}</h1><p>{{ __('ملخص الاشتراك والاستخدام وحسابات فريق الموارد البشرية.') }}</p></div><a class="btn btn-primary" href="{{ route('users.index') }}"><i class="bi bi-people ms-1"></i> {{ __('إدارة حسابات HR') }}</a></div>
+    <div class="company-account-hero page-head"><a class="btn btn-primary" href="{{ route('users.index') }}"><i class="bi bi-people ms-1"></i> {{ __('إدارة حسابات HR') }}</a></div>
     @if($subscription?->plan)
     <div class="company-account-grid">
         <section class="company-account-card"><div class="company-account-card__heading"><i class="bi bi-bar-chart-line"></i><div><h2>{{ __('استخدام الباقة') }}</h2><small>{{ __('عدد الموظفين الحالي مقارنة بالحد المسموح') }}</small></div></div><div class="account-usage"><strong>{{ format_number($employeeCount) }}</strong><span>{{ __('من') }} {{ format_number($limit) }} {{ __('موظف') }}</span></div><div class="account-progress" role="progressbar" aria-valuenow="{{ $usagePercent }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ $usagePercent }}%"></span></div><div class="account-mini-stats"><div class="account-mini-stat">{{ __('المستخدمون') }}<b>{{ $usagePercent }}%</b></div><div class="account-mini-stat">{{ __('المتاح') }}<b>{{ format_number($remaining) }}</b></div></div></section>

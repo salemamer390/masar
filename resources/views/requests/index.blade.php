@@ -88,10 +88,6 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 @endpush
 <div class="page-head">
-    <div>
-        <h1>{{ __('طلبات الموارد البشرية') }}</h1>
-        <p>{{ __('طلبات السلف والأذونات والمأموريات وطلبات المستندات والطلبات الأخرى، مرتبطة مباشرة بقاعدة البيانات.') }}</p>
-    </div>
     @if(auth()->user()?->hasPermission('requests.create'))
         <a href="{{ route('requests.index', ['create' => 1]) }}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> {{ __('طلب جديد') }}</a>
     @endif

@@ -1,7 +1,6 @@
 @extends('layouts.app')
 @section('title',__('بدء تسوية ترك خدمة'))
 @section('content')
-<div class="page-head"><div><h1>{{ __('بدء تسوية ترك خدمة') }}</h1><p>{{ __('تُنشئ مسودة تسوية وتلتقط الفترة ورصيد الإجازات والسلف القائمة كما هي الآن. لا يتغير راتب ولا حالة الموظف قبل اعتماد التسوية.') }}</p></div></div>
 <div class="panel p-4" style="max-width:640px">
 <form method="POST" action="{{ route('settlements.store') }}">@csrf
   <label class="form-label">{{ __('الموظف') }}</label>

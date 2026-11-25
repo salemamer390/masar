@@ -6,8 +6,6 @@
 <div class="roles-page">
   <div class="roles-breadcrumb">{{ __('الإعدادات') }} <span>‹</span> {{ __('الأدوار والصلاحيات') }}</div>
   <div class="roles-page-title">
-    <span class="roles-title-icon"><i class="bi bi-people-fill"></i></span>
-    <div><h1>{{ __('الأدوار والصلاحيات') }}</h1><p>{{ __('اختر دورًا لإدارة بياناته والصلاحيات الممنوحة له.') }}</p></div>
     @if($canCreate = auth()->user()?->hasPermission('roles.create'))
       <button class="btn btn-primary roles-add-btn" data-bs-toggle="modal" data-bs-target="#createRoleModal"><i class="bi bi-plus-lg"></i> {{ __('إضافة دور جديد') }}</button>
     @endif
