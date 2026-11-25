@@ -6437,3 +6437,16 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
   .modal .modal-footer > form > .btn { width: 100%; min-height: 46px; }
   .owner-stats > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* Desktop batch D1: one button scale (40px standard, 32px compact). */
+@media (min-width:768px) {
+  .btn:not(.btn-sm):not(.btn-close):not(.btn-link):not(.dashboard-existing-action):not(.dashboard-import-action):not(.table-action):not(.roles-tab):not(.period) {
+    min-height: 40px !important; height: 40px !important; padding: 0 16px !important; font-size: 13px !important; border-radius: 10px !important;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1.2;
+  }
+  .btn.btn-sm:not(.btn-link):not(.table-action) {
+    min-height: 32px !important; height: 32px !important; padding: 0 12px !important; font-size: 12px !important; border-radius: 9px !important;
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px; line-height: 1.2;
+  }
+  .attendance-more-filters { min-height: 40px !important; font-size: 13px !important; }
+}
