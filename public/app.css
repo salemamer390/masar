@@ -6422,3 +6422,18 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
   .d-flex.flex-wrap.mb-3:has(> [data-summary-tab]) > .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-width: 0; min-height: 46px; margin: 0; padding: 0 8px; box-sizing: border-box; white-space: nowrap; }
   .d-flex.flex-wrap.mb-3:has(> [data-summary-tab]) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+/* Mobile batch 4: modal forms and owner panel */
+@media (max-width:767.98px) {
+  .modal .modal-body .form-control:not(textarea):not([type=file]):not([type=checkbox]):not([type=radio]),
+  .modal .modal-body .form-select { min-height: 46px; }
+  .modal .modal-footer { display: flex; flex-wrap: nowrap; gap: 10px; }
+  .modal .modal-footer > .btn,
+  .modal .modal-footer > button,
+  .modal .modal-footer > a { flex: 1 1 0; min-width: 0; min-height: 46px; margin: 0; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+  .modal .modal-footer > .btn,
+  .modal .modal-footer > button,
+  .modal .modal-footer > a { flex: 1 1 0 !important; width: auto !important; max-width: none !important; min-height: 46px !important; font-size: 13px !important; padding: 0 10px !important; }
+  .modal .modal-footer > form { flex: 1 1 0; margin: 0; }
+  .modal .modal-footer > form > .btn { width: 100%; min-height: 46px; }
+  .owner-stats > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
