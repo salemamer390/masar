@@ -95,10 +95,11 @@
 .mapping-field-card label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mapping-field-card.is-required.is-missing { border-color: #dc3545; background: #fff8f8; box-shadow: 0 0 0 3px rgba(220,53,69,.08);  }
 .mapping-field-card.is-required.is-ready { border-color: #198754; background: #f6fffa; box-shadow: 0 0 0 3px rgba(25,135,84,.08); animation: none; }
+#employeesImportModal .domain-chip.warn { background: #fff4d6; color: #8a5a00; border-color: #f1d28a; }
 .mapping-field-card .field-state { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
-.mapping-field-card.is-missing .field-state { color: #842029; background: #f8d7da; }
-.mapping-field-card.is-ready .field-state { color: #0f5132; background: #d1e7dd; }
-.required-field-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
+.mapping-field-card.is-missing .field-state { color: #dc3545; background: transparent; padding: 0; }
+.mapping-field-card.is-ready .field-state { color: #dc3545; background: transparent; padding: 0; }
+.required-field-chip { display: inline-flex; justify-content: space-between; gap: 10px; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 11px; font-size: .8rem; font-weight: 700; border: 1px solid; transition: background .18s ease, border-color .18s ease, color .18s ease; }
 .required-field-chip.is-missing { color: #842029; border-color: #dc3545; background: #fff8f8;  }
 .required-field-chip.is-ready { color: #0f5132; border-color: #198754; background: #f6fffa; animation: none; }
 @keyframes mappingNeedsAttention { 0%,100% { box-shadow: 0 0 0 0 rgba(220,53,69,.2); } 50% { box-shadow: 0 0 0 6px rgba(220,53,69,.04); } }
@@ -458,6 +459,20 @@
     // One card per data domain: headline chips with what will import, and the
     // rejected rows grouped under their sheet with a clear row badge, the row's
     // own values, its reason, and - for penalties - the correction picker.
+    // One general red notice (above the sheets) for rows outside the current payroll period.
+    function periodBannerHtml(data) {
+        const periodLabels = {attendance: 'الحضور', leaves: 'الإجازات', penalties: 'الجزاءات', requests: 'الطلبات', insurance: 'التأمينات'};
+        const domains = data.domains || {};
+        const lines = Object.keys(periodLabels).filter((key) => domains[key] && domains[key].out_of_period_count > 0).map((key) => {
+            const d = domains[key];
+            const c = Number(d.out_of_period_count) || 0;
+            const rowsText = c === 1 ? 'صف واحد' : c === 2 ? 'صفّين' : c <= 10 ? num(c) + ' صفوف' : num(c) + ' صفًا';
+            const because = c === 1 ? 'لأنه' : c === 2 ? 'لأنهما' : 'لأنها';
+            return '<div><i class="bi bi-exclamation-triangle-fill"></i> ' + window.masarT('لن يتم حفظ ') + rowsText + window.masarT(' من ') + esc(periodLabels[key]) + window.masarT(' قبل ') + esc(d.period_start) + ' ' + because + window.masarT(' خارج فترة المرتب') + '</div>';
+        });
+        return lines.length ? '<div class="period-alert" role="alert">' + lines.join('') + '</div>' : '';
+    }
+
     function domainCardsHtml(data, allowCorrections) {
         const labels = {attendance: window.masarT('الحضور والانصراف'), leaves: window.masarT('الإجازات'), penalties: window.masarT('الجزاءات'), requests: window.masarT('الطلبات'), insurance: window.masarT('التأمينات')};
         const icons = {attendance: 'calendar2-check', leaves: 'calendar2-x', penalties: 'exclamation-octagon', requests: 'inbox', insurance: 'shield-check'};
@@ -466,25 +481,31 @@
         if (!kinds.length) return '';
         return '<div class="domain-cards">' + kinds.map((key) => {
             const d = domains[key];
-            const failures = (d.row_failures || d.failures || []).filter(f => f.reason_code !== 'outside_payroll_period');
-            const errors = (d.errors || []).filter(e => !String(e).includes('فترة المرتب الحالية'));
+            const failures = (d.failures || d.row_failures || []).slice().sort((a, b) => (a.reason_code === 'outside_payroll_period') - (b.reason_code === 'outside_payroll_period'));
+            const errors = (d.errors || []);
+            const warnRows = {}; const warnGeneral = [];
+            (d.warnings || []).forEach((w) => {
+                const m = String(w).match(/^(.*?) \/ الصف (\d+): ([\s\S]*)$/);
+                if (m) { (warnRows[m[1]] = warnRows[m[1]] || []).push({line: m[2], text: m[3]}); } else { warnGeneral.push(w); }
+            });
             const expandable = failures.length || errors.length || (d.warnings || []).length;
             let card = '<div class="domain-card">' + (expandable ? '<button type="button" class="domain-card-head" data-domain-toggle aria-expanded="false">' : '<div class="domain-card-head">')
                 + '<span class="domain-card-title"><i class="bi bi-' + icons[key] + '"></i> ' + esc((data.kind_labels || {})[key] || labels[key]) + '</span>'
                 + '<span class="domain-chips">'
                 + '<span class="domain-chip ok"><i class="bi bi-check-lg"></i>' + num(d.imported) + window.masarT(' سيُستورد') + '</span>'
                 + (d.skipped > 0 ? '<span class="domain-chip bad"><i class="bi bi-x-lg"></i>' + num(d.skipped) + window.masarT(' مرفوض') + '</span>' : '')
+                + ((d.warnings || []).length > 0 ? '<span class="domain-chip warn"><i class="bi bi-exclamation-triangle"></i>' + (function(n){ return n === 1 ? 'تحذير واحد' : (n === 2 ? 'تحذيران' : num(n) + (n <= 10 ? ' تحذيرات' : ' تحذيرًا')); })((d.warnings || []).length) + '</span>' : '')
+                + ((d.deferred || 0) > 0 ? '<span class="domain-chip mute">' + num(d.deferred) + window.masarT(' بصمات ناقصة للمراجعة') + '</span>' : '')
                 + ((d.excluded || 0) > 0 ? '<span class="domain-chip mute">' + num(d.excluded) + window.masarT(' مستبعد') + '</span>' : '')
                 + '</span>' + (expandable ? '<span class="domain-toggle-label">' + window.masarT('عرض التفاصيل') + ' <i class="bi bi-chevron-down"></i></span></button>' : '</div>');
-            if (d.out_of_period_count > 0) {
-                const periodLabels = {attendance:'الحضور', leaves:'الإجازات', penalties:'الجزاءات', requests:'الطلبات'};
-                card += '<div class="domain-period-notice"><i class="bi bi-info-circle"></i> ' + esc(periodLabels[key] || labels[key]) + window.masarT(' قبل ') + esc(d.period_start) + window.masarT(' لن يتم حفظه لأنه خارج فترة المرتب') + '</div>';
-            }
             if (expandable) card += '<div class="domain-collapse" inert><div class="domain-collapse-inner"><div class="domain-scroll">';
-            if (failures.length) {
+            const sheetNames = [];
+            failures.forEach((f) => { if (!sheetNames.includes(f.sheet)) sheetNames.push(f.sheet); });
+            Object.keys(warnRows).forEach((n) => { if (!sheetNames.includes(n)) sheetNames.push(n); });
+            if (sheetNames.length) {
                 const bySheet = {};
                 failures.forEach((f) => { (bySheet[f.sheet] = bySheet[f.sheet] || []).push(f); });
-                card += Object.entries(bySheet).map(([sheet, rows]) => {
+                card += sheetNames.map((sheet) => { const rows = bySheet[sheet] || [];
                     let group = '<div class="domain-sheet"><div class="domain-sheet-name"><i class="bi bi-file-earmark-spreadsheet"></i> «' + esc(sheet) + '»</div>';
                     group += rows.map((f) => {
                         const vals = Array.isArray(f.values) ? f.values : Object.values(f.values || {});
@@ -493,7 +514,7 @@
                             + '<div class="reject-body">'
                             + (who ? '<div class="reject-who">' + who + '</div>' : '')
                             + '<div class="reject-reason">' + (f.errors || []).map(esc).join(window.masarT('؛ ')) + '</div>';
-                        if (key === 'penalties' && allowCorrections) {
+                        if (false) {
                             const chosenFix = ((state.penaltyFixes || {})[f.sheet] || {})[f.line] || '';
                             row += '<div class="reject-fix"><span>' + window.masarT('صحّح نوع الجزاء أو استبعد الصف:') + '</span>'
                                 + '<select class="form-select form-select-sm" data-penalty-fix="1" data-penalty-sheet="' + esc(f.sheet) + '" data-penalty-line="' + esc(f.line) + '">'
@@ -504,16 +525,17 @@
                         }
                         return row + '</div></div>';
                     }).join('');
+                    group += (warnRows[sheet] || []).sort((a, b) => a.line - b.line).map((w) => '<div class="reject-row warn-row"><span class="reject-line">' + window.masarT('صف') + ' ' + num(w.line) + '</span><div class="reject-body"><div class="reject-reason"><i class="bi bi-exclamation-triangle"></i> ' + esc(w.text) + '</div></div></div>').join('');
                     return group + '</div>';
                 }).join('');
             } else if (errors.length) {
                 card += '<div class="domain-errors">' + errors.map((message) => '<div class="reject-reason">' + esc(message) + '</div>').join('') + '</div>';
             }
-            if (failures.length && (d.skipped - (d.out_of_period_count || 0)) > failures.length) {
-                card += '<div class="domain-warnings">' + window.masarT('المعروض أول ') + num(failures.length) + window.masarT(' من ') + num(d.skipped - (d.out_of_period_count || 0)) + window.masarT(' صف مرفوض.') + '</div>';
+            if (failures.length && d.skipped > failures.length) {
+                card += '<div class="domain-warnings">' + window.masarT('المعروض أول ') + num(failures.length) + window.masarT(' من ') + num(d.skipped) + window.masarT(' صف مرفوض.') + '</div>';
             }
-            if ((d.warnings || []).length) {
-                card += '<div class="domain-warnings">' + d.warnings.map((message) => '<div><i class="bi bi-exclamation-triangle"></i> ' + esc(message) + '</div>').join('') + '</div>';
+            if (warnGeneral.length) {
+                card += '<div class="domain-warnings">' + warnGeneral.map((message) => '<div><i class="bi bi-exclamation-triangle"></i> ' + esc(message) + '</div>').join('') + '</div>';
             }
             return card + (expandable ? '</div></div></div>' : '') + '</div>';
         }).join('') + '</div>';
@@ -598,6 +620,15 @@
         return html;
     }
 
+    function requiredFieldsFor(data, sheet, kind) {
+        const base = ((data.required_domain_fields || {})[kind] || []).slice();
+        if (kind === 'requests') {
+            const label = (String(sheet.name || '') + ' ' + ((sheet.domain_config && sheet.domain_config.headers) || []).join(' ')).toLowerCase();
+            if (/إضاف|اضاف|overtime/.test(label)) { ['hours', 'period'].forEach((f) => { if (!base.includes(f)) base.push(f); }); }
+        }
+        return base;
+    }
+
     function domainMappingEditor(data, sheet, chosen) {
         const fields = (data.domain_fields || {})[chosen];
         if (!fields) { return ''; }
@@ -608,15 +639,15 @@
         if (!headers.length) {
             return window.masarStaticHtml('<div class="alert alert-warning small py-1 px-2 mt-2 mb-0">لم يتعرف التطبيق على صف العناوين في هذه الورقة؛ اختر نوعًا آخر أو راجع الملف.</div>');
         }
-        const required = (data.required_domain_fields || {})[chosen] || [];
+        const required = requiredFieldsFor(data, sheet, chosen);
         let html = window.masarStaticHtml('<div class="mt-2 border-top pt-2"><div class="small fw-semibold mb-1"><i class="bi bi-layout-three-columns"></i> ربط الأعمدة بحقول النظام <span class="text-muted fw-normal">(راجعه وعدّله لو التطبيق قراه غلط)</span></div>');
         html += '<div class="row g-1">';
         Object.keys(fields).forEach((field) => {
             const selected = chosenMap[field] !== undefined ? chosenMap[field] : (detectedMap[field] !== undefined ? detectedMap[field] : '');
             const isRequired = required.includes(field);
             const stateClass = isRequired ? (String(selected) === '' ? ' is-required is-missing' : ' is-required is-ready') : '';
-            const stateChip = isRequired ? '<span class="field-state">' + (String(selected) === '' ? window.masarT('مطلوب') : window.masarT('تم')) + '</span>' : '';
-            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1">' + esc(fields[field]) + (isRequired ? ' <span class="text-danger">*</span>' : '') + stateChip + '</label>'
+            const stateChip = isRequired ? '<span class="field-state">' + window.masarT('حقل مطلوب') + '</span>' : '';
+            html += '<div class="col-6 col-md-4"><div class="mapping-field-card' + stateClass + '" data-mapping-card="' + esc(field) + '"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>' + esc(fields[field]) + (isRequired ? '<span class="text-danger fw-bold ms-1 me-1">*</span>' : '') + '</span>' + stateChip + '</label>'
                 + '<select class="form-select form-select-sm" data-domain-field="' + esc(field) + '" data-domain-sheet="' + esc(sheet.name) + '">'
                 + window.masarStaticHtml('<option value="">— بدون —</option>')
                 + headers.map((header, index) => '<option value="' + index + '"' + (String(selected) === String(index) ? ' selected' : '') + '>' + esc(header || (window.masarT('عمود ') + (index + 1))) + '</option>').join('')
@@ -642,7 +673,7 @@
             const fields = (data.domain_fields || {})[kind];
             if (!fields) continue;
             const map = Object.assign({}, sheet.domain_config?.map || {}, state.domainMappings[sheet.name] || {});
-            const missing = ((data.required_domain_fields || {})[kind] || []).filter(field => (map[field] === undefined || map[field] === '' || map[field] === null));
+            const missing = requiredFieldsFor(data, sheet, kind).filter(field => (map[field] === undefined || map[field] === '' || map[field] === null));
             if (['leaves','requests','advances'].includes(kind) && (map.code === undefined || map.code === '') && (map.name === undefined || map.name === '')) missing.push('كود أو اسم الموظف');
             if (missing.length) return 'الشيت «'+sheet.name+'»: أكمل ربط الحقول المطلوبة ('+missing.map(f => fields[f] || f).join('، ')+').';
         }
@@ -665,18 +696,19 @@
         let html = '<div class="d-flex flex-wrap gap-2 mb-3" data-required-field-states>'
             + [...required, 'gross_salary'].map(field => {
                 const ok = field === 'gross_salary' ? selected.some(v => ['gross_salary','net_salary'].includes(v)) : ready(field);
-                return '<span class="required-field-chip '+(ok?'is-ready':'is-missing')+'"><i class="bi bi-'+(ok?'check-circle-fill':'exclamation-circle-fill')+'"></i>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'</span>';
+                return '<span class="required-field-chip '+(ok?'is-ready':'is-missing')+'"><i class="bi bi-'+(ok?'check-circle-fill':'exclamation-circle-fill')+'"></i>'+'<span>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'<span class="text-danger fw-bold ms-1 me-1">*</span></span><span class="field-state text-danger">حقل مطلوب</span></span>';
             }).join('') + '</div><div class="employee-mapping-grid">';
         // Missing system fields get a real source-column control, even when
         // the file has no matching header. Both directions use employeeMappings.
         missing.forEach(field => {
-            html += '<div class="mapping-field-card is-required is-missing" data-missing-mapping="'+esc(field)+'"><label class="form-label small mb-1">'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+' <span class="field-state">مطلوب</span></label>'
+            html += '<div class="mapping-field-card is-required is-missing" data-missing-mapping="'+esc(field)+'"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>'+esc(field === 'gross_salary' ? 'الراتب الإجمالي أو الصافي' : label(field))+'<span class="text-danger fw-bold ms-1 me-1">*</span></span><span class="field-state">حقل مطلوب</span></label>'
                 + '<select class="form-select form-select-sm" aria-label="'+esc('اختر عمود '+label(field))+'" data-employee-missing-field="'+esc(field)+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">اختر العمود في ملفك</option>'
                 + columns.map(c => '<option value="'+c.index+'">'+esc(c.header)+'</option>').join('')+'</select><small class="text-muted">اربط عمودًا موجودًا، أو أضف الحقل للملف وأعد رفعه.</small></div>';
         });
         columns.forEach(col => {
             const value = chosen[col.index] ?? col.field ?? '';
-            html += '<div class="mapping-field-card"><label class="form-label small mb-1">'+esc(col.header)+'</label><select class="form-select form-select-sm" aria-label="'+esc('الحقل في النظام للعمود '+col.header)+'" data-employee-field="'+col.index+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">تجاهل هذا العمود</option>'
+            const reqCol = required.includes(value) || ['gross_salary','net_salary'].includes(value) || (value === 'hire_date' && required.includes('contract_start_date')) || (['first_name','last_name'].includes(value) && required.includes('full_name'));
+            html += '<div class="mapping-field-card'+(reqCol?' is-required is-ready':'')+'"><label class="form-label small mb-1 d-flex justify-content-between align-items-center gap-2"><span>'+esc(col.header)+(reqCol?'<span class="text-danger fw-bold ms-1 me-1">*</span>':'')+'</span>'+(reqCol?'<span class="field-state">حقل مطلوب</span>':'')+'</label><select class="form-select form-select-sm" aria-label="'+esc('الحقل في النظام للعمود '+col.header)+'" data-employee-field="'+col.index+'" data-employee-sheet="'+esc(sheet.name)+'"><option value="">تجاهل هذا العمود</option>'
                 + fields.map(field => '<option value="'+esc(field.key)+'"'+(value === field.key?' selected':'')+'>'+esc(field.label)+(required.includes(field.key)?' *':['gross_salary','net_salary'].includes(field.key)?' * (أحدهما)':'')+'</option>').join('')
                 + '</select><small class="mapping-samples">'+(col.samples || []).map(esc).join(' • ')+'</small></div>';
         });
@@ -752,13 +784,13 @@
         cancelSheetAttention();
         const sheets = data.sheets || [];
         q('[data-import-filename]').textContent = fileInput.files[0]?.name || '';
-        let html = '<div class="sheet-cards">';
+        let html = periodBannerHtml(data) + '<div class="sheet-cards">';
         sheets.forEach((sheet, index) => {
             const chosen = state.sheetKinds[sheet.name] || sheet.kind || 'unknown';
             const config = sheet.domain_config;
             const mapped = chosen === 'employees' ? (sheet.employee_config?.columns || []).filter(c=>c.field).length : Object.keys(config?.map || {}).length;
             const id = 'sheetBody' + index;
-            const ignored = chosen === 'ignore';
+            const ignored = chosen === 'ignore' || chosen === 'auxiliary';
             const missingFields = (!ignored && (sheet.missing_fields || []).length) ? sheet.missing_fields : [];
             html += '<div class="sheet-card'+(missingFields.length?' sheet-card-missing':'')+(ignored?' sheet-card-ignored':'')+'">'
                 + '<div class="sheet-card-head" data-sheet-row-toggle="'+id+'" tabindex="0" role="button" aria-expanded="false" aria-controls="'+id+'"'+(ignored?' aria-disabled="true"':'')+'>'
@@ -778,7 +810,8 @@
                 + '</div></div></div>';
         });
         html += '</div>' + sheetsCard(data) + '<div class="form-text">راجع نوع كل ورقة والربط قبل المتابعة. الأوراق المتجاهلة أو غير المعروفة لا تُستورد.</div>';
-        const incomplete = (data.incomplete_sheets || []);
+        const incomplete = (data.incomplete_sheets || []).filter(sheet => { const k = state.sheetKinds[sheet.name] || sheet.kind; return k !== 'ignore' && k !== 'auxiliary'; });
+        if (!incomplete.length && /بيانات ناقصة في/.test((alertBox && alertBox.textContent) || '')) { showAlert(''); }
         if (incomplete.length) {
             showAlert('بيانات ناقصة في: ' + incomplete.map(sheet=>'«'+sheet.name+'» ('+sheet.missing.join('، ')+')').join('؛ ') + '. الأوراق المعلّمة بشارة «حقول ناقصة» تحتاج إلى استكمال الأعمدة قبل المتابعة.');
         }
@@ -797,7 +830,7 @@
         Object.entries(data.new_lookups || {}).forEach(([key,values])=>{
             if (values?.length) html += note('سيتم إنشاء ' + esc(labels[key] || key) + ': ' + values.map(esc).join('، '));
         });
-        html += domainCardsHtml(data, false);
+        html += periodBannerHtml(data) + domainCardsHtml(data, false);
         if (data.review_sheets?.length) html += note('لن تُستورد الأوراق غير المعروفة: ' + data.review_sheets.map(s=>esc(s.name)).join('، '));
         return html;
     }
@@ -894,7 +927,7 @@
             const container = sheetsList.querySelector('.domain-cards');
             const expandedCards = container ? [...container.querySelectorAll('.domain-card')].map((c, i) => c.classList.contains('is-expanded') ? i : -1).filter((i) => i >= 0) : [];
             const scrollTops = container ? [...container.querySelectorAll('.domain-scroll')].map((el) => el.scrollTop) : [];
-            const html = domainCardsHtml(data, true);
+            const html = periodBannerHtml(data) + domainCardsHtml(data, true);
             if (container && html) { container.outerHTML = html; }
             else if (container) { container.remove(); }
             const fresh = sheetsList.querySelector('.domain-cards');
@@ -914,6 +947,30 @@
                 });
             }
         } catch (error) { showAlert(error.message); }
+    }
+
+    function markSummaryStale() {
+        if (sheetsList.querySelector('[data-stale-note]')) return;
+        const note = document.createElement('div');
+        note.className = 'form-text text-warning-emphasis mt-2';
+        note.setAttribute('data-stale-note', '1');
+        note.textContent = window.masarT('ملخص «ما سيحدث» يتحدّث عند الضغط على «متابعة للمراجعة».');
+        sheetsList.appendChild(note);
+    }
+    function rerenderSheetsLocal() {
+        const open = [...sheetsList.querySelectorAll('.sheet-card-body.open')].map(el => el.id);
+        const scroller = sheetsList.closest('.modal-body') || sheetsList.parentElement;
+        const top = scroller ? scroller.scrollTop : 0;
+        const openDomains = [...sheetsList.querySelectorAll('[data-domain-toggle]')].map((el, i) => el.getAttribute('aria-expanded') === 'true' ? i : -1).filter(i => i >= 0);
+        const openDetails = [...sheetsList.querySelectorAll('details')].map((el, i) => el.open ? i : -1).filter(i => i >= 0);
+        renderSheetsStep(lastData);
+        open.forEach(id => { const b = document.getElementById(id); if (b && !b.closest('.sheet-card-ignored')) setSheetExpanded(b, true); });
+        const newDomains = [...sheetsList.querySelectorAll('[data-domain-toggle]')];
+        openDomains.forEach(i => { if (newDomains[i]) newDomains[i].click(); });
+        const newDetails = [...sheetsList.querySelectorAll('details')];
+        openDetails.forEach(i => { if (newDetails[i]) newDetails[i].open = true; });
+        if (scroller) scroller.scrollTop = top;
+        markSummaryStale();
     }
 
     async function runPreview(button, label, stayOnPreview, mode = null, correctedSheet = null) {
@@ -1029,8 +1086,9 @@
         if (ignore) {
             const sheet = lastData.sheets.find(s=>s.name===ignore.dataset.ignoreSheet);
             if (ignore.checked) state.ignoredKinds[sheet.name] = state.sheetKinds[sheet.name] || sheet.kind;
-            state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : (state.ignoredKinds[sheet.name] || sheet.detected_kind);
-            runPreview(null, '', false, 'reload-sheets'); return;
+            { const back = state.ignoredKinds[sheet.name] || sheet.detected_kind; state.sheetKinds[sheet.name] = ignore.checked ? 'ignore' : ((!back || back === 'auxiliary' || back === 'ignore') ? 'unknown' : back); }
+            if (ignore.checked || state.sheetKinds[sheet.name] === sheet.kind) { rerenderSheetsLocal(); } else { runPreview(null, '', false, 'reload-sheets'); }
+            return;
         }
         const fieldSelect = event.target.closest('select[data-domain-field]');
         if (fieldSelect) {
@@ -1043,9 +1101,9 @@
                 card.classList.toggle('is-missing', fieldSelect.value === '');
                 card.classList.toggle('is-ready', fieldSelect.value !== '');
                 const chip = card.querySelector('.field-state');
-                if (chip) chip.textContent = fieldSelect.value === '' ? window.masarT('مطلوب') : window.masarT('تم');
+                if (chip) chip.textContent = window.masarT('حقل مطلوب');
             }
-            runPreview(null, '', false, 'reload-sheets', sheetName);
+            markSummaryStale();
             return;
         }
         if (event.target.matches('input[name="import_sheet"]')) { state.sheet=event.target.value;runPreview(null,'',false,'reload-sheets');return; }
@@ -1055,6 +1113,8 @@
         if (select.value === 'ignore') state.ignoredKinds[name] = state.sheetKinds[name] || lastData.sheets.find(s=>s.name===name)?.kind;
         state.sheetKinds[name] = select.value;
         // Reload the detected column mapping for the newly chosen type, staying here.
+        const sheetInfo = lastData.sheets.find(s => s.name === name);
+        if (select.value === 'ignore' || (sheetInfo && select.value === sheetInfo.kind && select.value !== 'auxiliary' && select.value !== 'unknown')) { rerenderSheetsLocal(); return; }
         runPreview(null, '', false, 'reload-sheets');
 
     });

@@ -20,6 +20,9 @@ class WorkbookRequestImporter
 {
     public const MAPPABLE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'تاريخ الطلب', 'amount' => 'المبلغ', 'hours' => 'عدد الساعات', 'period' => 'نوع الساعات', 'from' => 'من الساعة', 'to' => 'إلى الساعة', 'end' => 'تاريخ الانتهاء', 'type' => 'نوع الطلب', 'details' => 'التفاصيل'];
 
+    /** Advance sheets: the three basics are shown and required; the rest is optional. */
+    public const ADVANCE_FIELDS = ['code' => 'كود الموظف', 'name' => 'اسم الموظف', 'date' => 'تاريخ السلفة', 'amount' => 'قيمة السلفة', 'details' => 'التفاصيل'];
+
     /** Detected header row + field map for one sheet, exposed for the review UI. */
     public function detectConfig(array $rows): ?array
     {
@@ -48,13 +51,14 @@ class WorkbookRequestImporter
                 [$headers, $rows] = $this->splitHeader($sheet['rows'] ?? []);
                 $map = $this->mapHeaders($headers);
             }
-            if (!isset($map['date']) || (!isset($map['code']) && !isset($map['name']))) continue;
+            if (!isset($map['date']) || !isset($map['code'])) continue;
             foreach ($rows as $line => $row) {
                 $untimedOvertime = false;
                 try {
+                    if (blank($row[$map['code']] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                     $employee = $this->employee($row[$map['code']] ?? null, $row[$map['name'] ?? -1] ?? null);
-                    if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
-                    $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح.');
+                    if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة، أو الاسم لا يطابق الكود.');
+                    $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الطلب غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                     app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الطلب');
                     $guard->ensureOpen($date);
                     $source = $this->source($row, $map, $headers, (string) ($sheet['name'] ?? ''));
@@ -70,7 +74,8 @@ class WorkbookRequestImporter
                     } elseif ($source === 'overtime') {
                         $periodCell = $row[$map['period'] ?? -1] ?? '';
                         $period = $this->period($periodCell);
-                        if (filled($periodCell) && !$period) throw new \RuntimeException('نوع الإضافي غير معروف؛ استخدم «نهاري» أو «ليلي».');
+                        if (!filled($periodCell)) throw new \RuntimeException('نوع الساعات مطلوب؛ استخدم «نهاري» أو «ليلي».');
+                        if (!$period) throw new \RuntimeException('نوع الإضافي غير معروف؛ استخدم «نهاري» أو «ليلي».');
                         $hasWindow = filled($row[$map['from'] ?? -1] ?? null) || filled($row[$map['to'] ?? -1] ?? null);
                         if ($hasWindow || !isset($map['hours'])) {
                             // Hours come from the from/to window itself, matching the
@@ -113,9 +118,9 @@ class WorkbookRequestImporter
                             $payload['from_time'] = $from; $payload['to_time'] = $to;
                         }
                     }
-                    $warning = $this->duplicatePolicy($employee, $type, $source, $date, $payload['overtime_period'] ?? null);
+                    $warning = $this->duplicatePolicy($employee, $type, $source, $date, $payload['overtime_period'] ?? null, $result['created_ids'] ?? []);
                     if (!empty($untimedOvertime)) {
-                        $warning = trim(($warning ? $warning . ' ' : '') . 'طلب إضافي بعدد ساعات فقط بدون «من الساعة» و«إلى الساعة»: سيُلزق تلقائيًا بجانب الشفت (قبل البداية أو بعد النهاية) ولا يُصرف إلا بحسب الحضور الفعلي.');
+                        $warning = trim(($warning ? $warning . ' ' : '') . 'ملاحظة: ساعات بدون «من/إلى»، تُحسب بجوار الشفت وبحسب الحضور الفعلي.');
                         $untimedOvertime = false;
                     }
                     $hrRequest = HrRequest::create(['employee_id' => $employee->id, 'request_type' => $type->code, 'request_type_id' => $type->id, 'title' => $type->display_name, 'details' => $row[$map['details'] ?? -1] ?? null, 'payload' => $payload, 'status' => 'Approved', 'created_by' => auth()->id(), 'reviewed_by' => auth()->id(), 'reviewed_at' => now()]);
@@ -134,7 +139,7 @@ class WorkbookRequestImporter
      * per month - both import with a dated warning. Permission and mission
      * never warn.
      */
-    private function duplicatePolicy(Employee $employee, RequestType $type, string $source, string $date, ?string $period): ?string
+    private function duplicatePolicy(Employee $employee, RequestType $type, string $source, string $date, ?string $period, array $thisImportIds = []): ?string
     {
         if (in_array($source, ['permission', 'mission'], true)) return null;
 
@@ -143,7 +148,7 @@ class WorkbookRequestImporter
             ->where(function ($query) use ($type) {
                 $query->where('request_type_id', $type->id)
                     ->orWhere('request_type', $type->code);
-            })->get(['payload', 'created_at'])
+            })->get(['id', 'payload', 'created_at'])
             ->filter(function (HrRequest $candidate) use ($source, $date, $period): bool {
                 $candidateDate = data_get($candidate->payload, 'request_date') ?: $candidate->created_at?->toDateString();
                 if (!$candidateDate) return false;
@@ -152,11 +157,16 @@ class WorkbookRequestImporter
                         && data_get($candidate->payload, 'overtime_period') === $period;
                 }
                 return Carbon::parse($candidateDate)->isSameMonth(Carbon::parse($date));
-            })->first();
+            })->values();
+        // Rows created earlier in this same import (the review simulation included) are not "existing"
+        // requests: several commissions in one month inside the file are normal.
+        $isFromFile = fn (HrRequest $candidate): bool => in_array((int) $candidate->id, $thisImportIds, true);
+        $existing = in_array($source, ['advance', 'bonus'], true) ? $existing->first() : $existing->first(fn (HrRequest $candidate) => !$isFromFile($candidate));
         if (!$existing) return null;
 
         $existingDate = data_get($existing->payload, 'request_date') ?: $existing->created_at?->toDateString();
         if (in_array($source, ['advance', 'bonus'], true)) {
+            if ($isFromFile($existing)) throw new \RuntimeException("يوجد في الملف نفسه طلب آخر لهذا الموظف من النوع نفسه داخل نفس الشهر (بتاريخ {$existingDate}). لا يُستورد إلا واحد في الشهر.");
             throw new \RuntimeException("يوجد طلب قائم لهذا الموظف داخل نفس الشهر (بتاريخ {$existingDate}). لا يمكن استيراد طلب آخر من النوع نفسه.");
         }
         if ($source === 'overtime') {
@@ -201,7 +211,7 @@ class WorkbookRequestImporter
         return $hasCode && (str_contains($key, 'تاريخ') || str_contains($key, 'date'));
     }
 
-    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','الكود','كود','employee code','code','emp code','employee id'], 'name' => ['الموظفين','الموظفون','الاسماء','الاسم','اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ طلب السلفة','تاريخ الإضافي','التاريخ','date','request date','تاريخ الصرف','تاريخ صرف السلفة','تاريخ الاستحقاق','تاريخ العملية','تاريخ العمولة','تاريخ الحافز','تاريخ المكافأة','تاريخ الاستلام','تاريخ المنح','تاريخ الخصم','issue date','payment date','disbursement date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value','قيمة السلفة','cash advance','advance value','employee advance','قيمة العمولة','مبلغ العمولة','العمولة','قيمة الحافز','مبلغ الحافز','الحافز','قيمة المكافأة','مبلغ المكافأة','المكافأة','المبلغ المستحق','قيمة الطلب','المبلغ (جنيه)','commission amount','incentive amount'], 'hours' => ['عدد الساعات','الساعات','hours','total hours','ساعات إضافية','overtime hours','over time'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type','تصنيف الطلب'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
+    private function mapHeaders(array $headers): array { $aliases = ['code' => ['كود الموظف','الكود','كود','employee code','code','emp code','employee id'], 'name' => ['الموظفين','الموظفون','الاسماء','الاسم','اسم الموظف','employee name','name','full name','employee'], 'date' => ['تاريخ الطلب','تاريخ السلفة','تاريخ طلب السلفة','تاريخ الإضافي','التاريخ','date','request date','تاريخ الصرف','تاريخ صرف السلفة','تاريخ الاستحقاق','تاريخ العملية','تاريخ العمولة','تاريخ الحافز','تاريخ المكافأة','تاريخ الاستلام','تاريخ المنح','تاريخ الخصم','issue date','payment date','disbursement date'], 'amount' => ['مبلغ السلفة','المبلغ','القيمة','amount','advance amount','bonus amount','value','قيمة السلفة','cash advance','advance value','employee advance','قيمة العمولة','مبلغ العمولة','العمولة','قيمة الحافز','مبلغ الحافز','الحافز','قيمة المكافأة','مبلغ المكافأة','المكافأة','المبلغ المستحق','قيمة الطلب','المبلغ (جنيه)','commission amount','incentive amount'], 'hours' => ['عدد الساعات','الساعات','hours','total hours','ساعات إضافية','overtime hours','over time'], 'period' => ['نوع الإضافي','نوع الساعات','overtime period','period'], 'from' => ['من الساعة','من الساعه','from time','from','وقت البداية','start time'], 'to' => ['إلى الساعة','الي الساعة','الى الساعة','الى الساعه','to time','to','وقت النهاية','end time'], 'end' => ['تاريخ الانتهاء','تاريخ النهاية','end date','to date'], 'type' => ['نوع الطلب','النوع','request type','type','تصنيف الطلب'], 'details' => ['التفاصيل','السبب','ملاحظات','details','notes','reason']]; $map=[]; foreach($headers as $i=>$header){$key=$this->normalise($header);foreach($aliases as $field=>$values)if(in_array($key,array_map(fn($v)=>$this->normalise($v),$values),true)){$map[$field]=$i;break;}}return $map; }
     private function source(array $row, array $map, array $headers, string $sheetName = ''): ?string
     {
         $value = $map['type'] ?? null;

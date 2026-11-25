@@ -62,8 +62,8 @@ class TaxCalculator
             return $this->fixedCategories;
         }
 
-        $companyId = CompanyContext::id();
-        $cacheKey = $companyId === null ? 'global' : (string) $companyId;
+        // Tax brackets are platform-wide (company_id NULL) and owner-controlled.
+        $cacheKey = 'global';
         if (isset($this->categoriesCache[$cacheKey])) {
             return $this->categoriesCache[$cacheKey];
         }
@@ -75,13 +75,9 @@ class TaxCalculator
 
         $query = DB::table('tax_categories')->orderBy('sort_order');
         if (Schema::hasColumn('tax_categories', 'company_id')) {
-            $query->where('company_id', $companyId);
+            $query->whereNull('company_id');
         }
         $rows = $query->get();
-        if ($rows->isEmpty() && $companyId !== null && Schema::hasColumn('tax_categories', 'company_id')) {
-            // Company without its own table yet: fall back to the shared template.
-            $rows = DB::table('tax_categories')->whereNull('company_id')->orderBy('sort_order')->get();
-        }
         if ($rows->isEmpty()) {
             return $this->categoriesCache[$cacheKey] = $this->defaults();
         }

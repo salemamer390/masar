@@ -24,7 +24,6 @@ class TazamunSeeder extends Seeder
             ['name'=>'Annual','default_days'=>21], ['name'=>'Casual','default_days'=>6], ['name'=>'Sick','default_days'=>null], ['name'=>'Unpaid','default_days'=>null],
             ['name'=>'Mission','default_days'=>null], ['name'=>'Maternity','default_days'=>null], ['name'=>'Bereavement','default_days'=>null],
         ] as $row) $this->once('leave_types',['name'=>$row['name']],$row);
-        foreach (['Verbal Warning','Written Warning','Day Deduction','Salary Deduction','Notice','Suspension'] as $name) $this->once('penalty_types',['name'=>$name]);
         foreach (['Hire','Department Transfer','Promotion','Salary Adjustment','Branch Transfer','Job Title Change'] as $name) $this->once('movement_types',['name'=>$name]);
         foreach (['Bank','Cash','Wallet'] as $name) $this->once('payment_methods',['name'=>$name]);
 

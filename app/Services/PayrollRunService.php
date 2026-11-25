@@ -300,6 +300,9 @@ class PayrollRunService
     /** Run the full calculation for one salary: monthly inputs, statutory values, then proration. */
     public function calculate(Salary $salary, array $structure, array $inputs, bool $insuranceDue, float $factor, int $insuranceMonths = 1, bool $allowOverFullMonth = false): array
     {
+        $inputs['absence_allowance_reduction'] = $this->allowanceAbsenceReduction(
+            $salary, $structure, (float) ($inputs['absence_days'] ?? 0)
+        );
         $calculation = $this->calculator->monthly(
             (float) $structure['gross'],
             $inputs,
@@ -322,21 +325,69 @@ class PayrollRunService
      */
     private function absenceBaseOverride(Salary $salary): ?float
     {
+        // Gross basis: the calculator prices absence on the gross, which already
+        // contains every allowance, so no allowance share may be deducted again.
         if ($this->settings->absenceBasis() !== 'Basic') return null;
-        $allowances = $this->settings->absenceDeductedAllowances();
-        // Legacy rows without a contractual basic breakdown keep the calculator's own base.
+        // Basic basis: absence is priced from the contractual basic only. A flagged
+        // allowance loses its own daily share on the earnings side
+        // (allowanceAbsenceReduction), so including any allowance here would
+        // deduct the same day twice. Legacy rows without a contractual basic
+        // breakdown keep the calculator's own basic.
         if ($salary->basic_salary === null) return null;
-
-        $columns = [
-            'housing' => 'housing_allowance', 'transportation' => 'transportation_allowance',
-            'meal' => 'meal_allowance', 'clothing' => 'clothing_allowance', 'other' => 'other_allowances',
-        ];
-        $base = (float) $salary->basic_salary;
-        foreach ($allowances as $key) {
-            $base += (float) ($salary->{$columns[$key]} ?? 0);
+        // Allowances disabled: their value is folded into the basic, so the
+        // absence base is the contractual basic plus the contractual allowances.
+        if (!$this->settings->allowancesEnabled()) {
+            return (float) $salary->basic_salary + (float) ($salary->allowances ?? 0);
         }
 
-        return $base;
+        return (float) $salary->basic_salary;
+    }
+
+    /**
+     * Daily-share loss on flagged allowances for absence days. Applied as an
+     * earnings reduction in the calculator and in the record columns, never as
+     * a deduction line: the absence deduction itself covers the basic only.
+     */
+    private function allowanceAbsenceReduction(Salary $salary, array $structure, float $absenceDays): float
+    {
+        // Only under the Basic basis: under Gross every allowance share is
+        // already inside the gross absence deduction, so reducing the earnings
+        // side too would deduct the same day twice. With allowances disabled
+        // there is no allowance share at all; their value sits in the basic.
+        if ($this->settings->absenceBasis() !== 'Basic') return 0.0;
+        if (!$this->settings->allowancesEnabled()) return 0.0;
+        if ($absenceDays <= 0) return 0.0;
+        $divisor = max(1, $this->settings->absenceDailyDivisor());
+        $hasSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
+            + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
+        if ($hasSplit) {
+            $flaggedTotal = 0.0;
+            foreach (['housing_allowance', 'transportation_allowance', 'meal_allowance', 'clothing_allowance'] as $column) {
+                if ($this->settings->allowanceIsProrated($column)) $flaggedTotal += (float) ($salary->{$column} ?? 0);
+            }
+
+            return round($flaggedTotal * $absenceDays / $divisor, 2);
+        }
+        // Lump-only legacy structure: reduce the flagged configured shares of the pool.
+        $lump = (float) ($salary->allowances ?? ($structure['allowances'] ?? 0));
+        $distribution = $this->settings->allowanceDistribution();
+        if (!$distribution) return round($lump * $absenceDays / $divisor, 2);
+        $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
+        $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
+        $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
+        $housing = $distribution['housing'] ?? null;
+        $meal = $distribution['meal'] ?? null;
+        $clothing = $distribution['clothing'] ?? null;
+        $transportShare = $share($transport, 0.35);
+        $housingShare = $share($housing, 0.30);
+        $mealShare = $share($meal, 0.20);
+        $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
+        $flaggedShare = ($flag($transport) ? $transportShare : 0)
+            + ($flag($housing) ? $housingShare : 0)
+            + ($flag($meal) ? $mealShare : 0)
+            + ($flag($clothing) ? $clothingShare : 0);
+
+        return round($lump * $flaggedShare * $absenceDays / $divisor, 2);
     }
 
     /** Map a finished calculation to the payroll_records columns and its audit snapshot. */
@@ -344,17 +395,36 @@ class PayrollRunService
     {
         // Persist the contractual amounts actually earned in the period: the
         // engine's internal basic/allowance split drives statutory math only.
+        $allowancesEnabled = $this->settings->allowancesEnabled();
         $contractualBasicEarned = round((float) ($salary->basic_salary ?? $structure['basic_salary']) * $window['factor'], 2);
+        if (!$allowancesEnabled) {
+            // Allowances disabled: their contractual value folds into the basic
+            // (the total is unchanged) and every allowance column stays zero.
+            $contractualBasicEarned = round($contractualBasicEarned + (float) ($salary->allowances ?? ($structure['allowances'] ?? 0)) * $window['factor'], 2);
+        }
         // Itemized allowances are the contractual split when the structure has
         // one; a lump-only structure stores zeros so the drawer shows the
         // contractual lump instead of the engine's invented split.
         $hasContractualSplit = (float) $salary->housing_allowance + (float) $salary->transportation_allowance
             + (float) $salary->meal_allowance + (float) $salary->clothing_allowance > 0;
-        // Each allowance follows its own proration setting: a prorated one is
-        // scaled by the worked factor, a full one is paid whole.
-        $allowanceEarned = function (string $column) use ($salary, $window) {
+        // Employment-window proration is automatic for every allowance. Under
+        // the Basic basis a flagged allowance additionally loses its daily share
+        // for each absence day; the absence deduction covers the basic only, so
+        // no allowance day is deducted twice. With allowances disabled their
+        // value folds into the basic and every allowance column is zero.
+        $absenceDaysForAllowances = max(0.0, (float) ($calculation['absence_days'] ?? 0));
+        $absenceAllowanceDivisor = max(1, $this->settings->absenceDailyDivisor());
+        // The flagged-allowance absence share applies only under the Basic basis;
+        // under Gross it is already inside the gross absence deduction.
+        $absenceShareApplies = $allowancesEnabled && $this->settings->absenceBasis() === 'Basic';
+        $allowanceEarned = function (string $column) use ($salary, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies, $allowancesEnabled) {
+            if (!$allowancesEnabled) return 0.0;
             $full = (float) ($salary->{$column} ?? 0);
-            return $this->settings->allowanceIsProrated($column) ? round($full * $window['factor'], 2) : round($full, 2);
+            $earned = $full * $window['factor'];
+            if ($absenceShareApplies && $absenceDaysForAllowances > 0 && $this->settings->allowanceIsProrated($column)) {
+                $earned -= $full * $absenceDaysForAllowances / $absenceAllowanceDivisor;
+            }
+            return round(max(0.0, $earned), 2);
         };
         $itemized = static fn (string $column): float => $hasContractualSplit
             ? $allowanceEarned($column)
@@ -364,11 +434,14 @@ class PayrollRunService
         // configured percentages the calculator splits a gross with - and each
         // share follows its own proration flag. The clothing share is the
         // remainder, exactly like the calculator's residual.
-        $lumpEarned = function () use ($salary, $structure, $window) {
+        $lumpEarned = function () use ($salary, $structure, $window, $absenceDaysForAllowances, $absenceAllowanceDivisor, $absenceShareApplies, $allowancesEnabled) {
+            if (!$allowancesEnabled) return 0.0;
             $lump = (float) ($salary->allowances ?? $structure['allowances']);
             $factor = $window['factor'];
             $distribution = $this->settings->allowanceDistribution();
-            if (!$distribution) return round($lump * $factor, 2);
+            $lumpAbsenceDays = $absenceShareApplies ? $absenceDaysForAllowances : 0.0;
+            // No configured distribution: the whole lump behaves as flagged.
+            if (!$distribution) return round(max(0.0, $lump * $factor - $lump * $lumpAbsenceDays / $absenceAllowanceDivisor), 2);
             $share = static fn (?array $row, float $default): float => $row ? ((float) ($row['percentage'] ?? 0)) / 100 : $default;
             $flag = static fn (?array $row): bool => (bool) ($row['prorated'] ?? true);
             $transport = $distribution['transport'] ?? $distribution['transportation'] ?? null;
@@ -379,10 +452,12 @@ class PayrollRunService
             $housingShare = $share($housing, 0.30);
             $mealShare = $share($meal, 0.20);
             $clothingShare = max(0.0, 1 - $transportShare - $housingShare - $mealShare);
-            $earned = $lump * $transportShare * ($flag($transport) ? $factor : 1)
-                + $lump * $housingShare * ($flag($housing) ? $factor : 1)
-                + $lump * $mealShare * ($flag($meal) ? $factor : 1)
-                + $lump * $clothingShare * ($flag($clothing) ? $factor : 1);
+            $lumpShareEarned = static fn (float $share, bool $flagged): float => $share <= 0 ? 0.0
+                : max(0.0, $share * $factor - ($flagged ? $share * $lumpAbsenceDays / $absenceAllowanceDivisor : 0));
+            $earned = $lump * $lumpShareEarned($transportShare, $flag($transport))
+                + $lump * $lumpShareEarned($housingShare, $flag($housing))
+                + $lump * $lumpShareEarned($mealShare, $flag($meal))
+                + $lump * $lumpShareEarned($clothingShare, $flag($clothing));
 
             return round($earned, 2);
         };
@@ -418,11 +493,15 @@ class PayrollRunService
             $fixedEarned = round($contractualBasicEarned + $allowancesEarned, 2);
             $structureTax = (float) ($calculation['income_tax_structure'] ?? 0);
             $martyrsFull = (float) ($salary->martyrs_fund ?? 0);
-            $extra = round($fixedEarned - $contractualFullFixed * $window['factor'], 2);
+            // Every allowance now prorates with the window, so fixed earnings
+            // never exceed the all-prorated baseline; a flagged allowance's
+            // absence-day loss is already relieved once through the unified tax
+            // base (it rides with the variable tax), so no extra tax applies.
+            $extra = max(0.0, round($fixedEarned - $contractualFullFixed * $window['factor'], 2));
             $extraTax = $this->calculator->extraIncomeTax($calculation, $extra);
             $extraMartyrs = round($extra * $this->settings->martyrsFundRate(), 2);
-            $incomeTax = round($structureTax * $window['factor']
-                + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2);
+            $incomeTax = max(0.0, round($structureTax * $window['factor']
+                + (float) ($calculation['income_tax_variable'] ?? 0) + $extraTax, 2));
             $martyrsFund = round($martyrsFull * $window['factor'] + $extraMartyrs, 2);
             // Variable lines are never prorated. Deriving them by subtracting
             // separately rounded fixed components invents a +/-0.01 earning.
@@ -1448,9 +1527,13 @@ class PayrollRunService
         $insuranceWage = $insuranceDue ? (float) ($salary->applied_insurance_wage ?? $salary->insurance_wage ?? 0) : 0.0;
         // A run charges one full monthly insurance per calendar month it owns (never prorated).
         $employeeInsurance = $insuranceDue ? (float) ($salary->employee_insurance ?? 0) * $insuranceMonths : 0.0;
-        $structureTax = (float) ($salary->income_tax ?? 0);
+        // Freshly computed unified structure tax (martyrs fund and absence reduce
+        // the base); the stored snapshot predates the unified formula.
+        $structureTax = (float) ($calculation['income_tax_structure'] ?? $salary->income_tax ?? 0);
         $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
-        $incomeTax = round($structureTax + $variableTax, 2);
+        // The absence effect can outweigh the structure tax (a month of pure
+        // absence): income tax never goes negative.
+        $incomeTax = max(0.0, round($structureTax + $variableTax, 2));
         $martyrsFund = (float) ($salary->martyrs_fund ?? 0);
         $employerInsurance = $insuranceDue ? (float) ($salary->employer_insurance ?? 0) * $insuranceMonths : 0.0;
         // Company cost carries the month's earned overtime and bonuses on top of the
@@ -1501,8 +1584,13 @@ class PayrollRunService
         // (basic salary plus fixed allowances), divided over 30 days.
         $fixedEntitlements = (float) ($calculation['gross'] ?? ((float) $calculation['basic_salary'] + (float) $calculation['allowances']));
         $variableEntitlements = (float) $calculation['entitlements'] - $fixedEntitlements;
-        $proratedDeductions = (float) ($calculation['income_tax_structure'] ?? 0) + (float) ($calculation['martyrs_fund'] ?? 0);
-        $fullDeductions = max(0, (float) $calculation['monthly_deductions'] - $proratedDeductions);
+        // The tax line and the deductions total must always tell the same story:
+        // rebuild the total from the non-tax/martyrs deductions (never prorated)
+        // plus the final, floored tax and the prorated martyrs fund. The absence
+        // tax effect rides with the variable tax, which is never prorated.
+        $fullIncomeTax = (float) ($calculation['income_tax'] ?? 0);
+        $fullMartyrs = (float) ($calculation['martyrs_fund'] ?? 0);
+        $otherDeductions = max(0, (float) $calculation['monthly_deductions'] - $fullIncomeTax - $fullMartyrs);
         $entitlements = round(($fixedEntitlements * $factor) + $variableEntitlements, 2);
         $monthlyTotal = round(($fixedEntitlements * $factor)
             + (float) ($calculation['overtime_amount'] ?? 0)
@@ -1512,11 +1600,12 @@ class PayrollRunService
             + (float) ($calculation['profit_share'] ?? 0)
             + (float) ($calculation['other_earnings'] ?? 0)
             + (float) ($calculation['advance_earnings'] ?? 0), 2);
-        $deductions = round(($proratedDeductions * $factor) + $fullDeductions, 2);
-        $proratedBasic = round((float) $calculation['basic_salary'] * $factor, 2);
-        $proratedAllowances = round((float) $calculation['allowances'] * $factor, 2);
         $proratedStructureTax = round((float) ($calculation['income_tax_structure'] ?? 0) * $factor, 2);
         $variableTax = (float) ($calculation['income_tax_variable'] ?? 0);
+        $proratedIncomeTax = max(0.0, round($proratedStructureTax + $variableTax, 2));
+        $deductions = round($otherDeductions + $proratedIncomeTax + $fullMartyrs * $factor, 2);
+        $proratedBasic = round((float) $calculation['basic_salary'] * $factor, 2);
+        $proratedAllowances = round((float) $calculation['allowances'] * $factor, 2);
 
         return array_merge($calculation, [
             // Persist the values actually earned during the partial period so
@@ -1527,7 +1616,7 @@ class PayrollRunService
             'transportation_allowance' => round((float) ($calculation['transportation_allowance'] ?? 0) * $factor, 2),
             'meal_allowance' => round((float) ($calculation['meal_allowance'] ?? 0) * $factor, 2),
             'clothing_allowance' => round((float) ($calculation['clothing_allowance'] ?? 0) * $factor, 2),
-            'income_tax' => round($proratedStructureTax + $variableTax, 2),
+            'income_tax' => $proratedIncomeTax,
             'martyrs_fund' => round((float) ($calculation['martyrs_fund'] ?? 0) * $factor, 2),
             'entitlements' => $entitlements,
             'to_date_entitlement' => $proratedBasic,

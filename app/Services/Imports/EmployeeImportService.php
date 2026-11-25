@@ -312,8 +312,8 @@ class EmployeeImportService
                 $entry['required_fields'] = self::requiredEmployeeFields();
                 $entry['missing_fields'] = $this->missingEmployeeFields(array_values($info['map']));
             } elseif (self::domainFields($kind) !== []) {
-                $entry['required_fields'] = self::requiredDomainFields($kind);
-                $entry['missing_fields'] = $this->domainSheetMissing($kind, self::domainFields($kind), $entry['domain_config'] ?? null)['missing'];
+                $entry['required_fields'] = self::requiredDomainFields($kind, (string) ($entry['name'] ?? ''), (array) ($entry['domain_config']['headers'] ?? []));
+                $entry['missing_fields'] = $this->domainSheetMissing($kind, self::domainFields($kind), $entry['domain_config'] ?? null, (string) ($entry['name'] ?? ''))['missing'];
             }
             $result['sheets'][] = $entry;
         }
@@ -761,15 +761,20 @@ class EmployeeImportService
     }
 
     /** First data rows of a sheet (strings, capped) so the user can eyeball what a sheet really is. */
-    private function sheetSample(array $rows, ?int $headerRow, int $maxRows = 3, int $maxCols = 8): array
+    private function sheetSample(array $rows, ?int $headerRow, int $maxRows = 4, int $maxCols = 14): array
     {
         $sample = [];
         $count = 0;
         foreach ($rows as $number => $cells) {
             if ($count >= $maxRows) break;
             if ($headerRow !== null && $number < $headerRow) continue;
-            $values = array_map(static fn ($v) => (string) $v, array_slice($cells, 0, $maxCols));
-            if (implode('', $values) === '') continue;
+            $values = [];
+            $top = empty($cells) ? -1 : min($maxCols - 1, (int) max(array_keys($cells)));
+            for ($c = 0; $c <= $top; $c++) {
+                $v = $cells[$c] ?? '';
+                $values[] = is_scalar($v) ? (string) $v : '';
+            }
+            if (trim(implode('', $values)) === '') continue;
             $sample[] = $values;
             $count++;
         }
@@ -784,7 +789,8 @@ class EmployeeImportService
             'attendance' => WorkbookAttendanceImporter::MAPPABLE_FIELDS,
             'leaves' => WorkbookLeavePenaltyImporter::LEAVE_FIELDS,
             'penalties' => WorkbookLeavePenaltyImporter::PENALTY_FIELDS,
-            'requests', 'advances' => WorkbookRequestImporter::MAPPABLE_FIELDS,
+            'advances' => WorkbookRequestImporter::ADVANCE_FIELDS,
+            'requests' => WorkbookRequestImporter::MAPPABLE_FIELDS,
             'insurance' => WorkbookInsuranceImporter::MAPPABLE_FIELDS,
             default => [],
         };
@@ -825,16 +831,27 @@ class EmployeeImportService
      *
      * @return array<int, string>
      */
-    public static function requiredDomainFields(string $kind): array
+    public static function requiredDomainFields(string $kind, string $sheetName = '', array $headers = []): array
     {
-        return match ($kind) {
+        // The employee code is required in every sheet kind.
+        $fields = match ($kind) {
             'attendance' => ['code', 'date', 'in', 'out'],
-            'leaves' => ['leave_type', 'start', 'end'],
+            'leaves' => ['code', 'leave_type', 'start', 'end', 'days'],
             'penalties' => ['code', 'penalty_type', 'date', 'deduction'],
-            'requests', 'advances' => ['date'],
-            'insurance' => ['insurance_number'],
+            'advances' => ['code', 'date', 'amount'],
+            'requests' => ['code', 'date'],
+            'insurance' => ['code', 'insurance_number'],
             default => [],
         };
+        // Overtime: hours and hours type are required; the amount is computed by the app.
+        if ($kind === 'requests') {
+            $label = mb_strtolower($sheetName . ' ' . implode(' ', array_map(static fn ($h) => (string) $h, $headers)));
+            if (str_contains($label, 'إضاف') || str_contains($label, 'اضاف') || str_contains($label, 'overtime')) {
+                $fields = array_merge($fields, ['hours', 'period']);
+            }
+        }
+
+        return $fields;
     }
 
     /**
@@ -856,7 +873,7 @@ class EmployeeImportService
                 continue;
             }
             $name = (string) ($sheet['name'] ?? '');
-            $check = $this->domainSheetMissing($kind, $fields, $sheet['domain_config'] ?? null);
+            $check = $this->domainSheetMissing($kind, $fields, $sheet['domain_config'] ?? null, $name);
             if (!$check['header']) {
                 return 'ورقة «' . $name . '»: لم يتعرف التطبيق على صف العناوين لنوع «' . ($labels[$kind] ?? $kind) . '». اختر نوعًا آخر أو راجع الملف.';
             }
@@ -876,14 +893,14 @@ class EmployeeImportService
      * @param array<string, string> $fields
      * @return array{header: bool, missing: array<int, string>}
      */
-    private function domainSheetMissing(string $kind, array $fields, mixed $config): array
+    private function domainSheetMissing(string $kind, array $fields, mixed $config, string $sheetName = ''): array
     {
         if (!is_array($config) || (int) ($config['header_row'] ?? -1) < 0) {
             return ['header' => false, 'missing' => []];
         }
         $map = (array) ($config['map'] ?? []);
         $missing = [];
-        foreach (self::requiredDomainFields($kind) as $field) {
+        foreach (self::requiredDomainFields($kind, $sheetName, (array) ($config['headers'] ?? [])) as $field) {
             if ($kind === 'attendance' && $field === 'date' && !empty($config['default_date'])) continue;
             if (!isset($map[$field]) || !is_numeric($map[$field]) || !array_key_exists((int) $map[$field], $config['headers'] ?? [])) {
                 $missing[] = (string) ($fields[$field] ?? $field);
@@ -920,7 +937,7 @@ class EmployeeImportService
             if ($fields === []) {
                 continue;
             }
-            $check = $this->domainSheetMissing($kind, $fields, $entry['domain_config'] ?? null);
+            $check = $this->domainSheetMissing($kind, $fields, $entry['domain_config'] ?? null, (string) ($entry['name'] ?? ''));
             if ($check['header'] && $check['missing'] === []) {
                 $importable[] = (string) ($entry['name'] ?? '');
                 continue;

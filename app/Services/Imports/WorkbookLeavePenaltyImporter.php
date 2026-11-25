@@ -38,7 +38,7 @@ class WorkbookLeavePenaltyImporter
 
     public function import(string $path, string $extension, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns, bool $allowLeaves = true, bool $allowPenalties = true, ?array $onlySheets = null, ?array $configs = null, array $penaltyFixes = []): array
     {
-        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'failures' => []]];
+        $result = ['leaves' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'warnings' => [], 'failures' => []], 'penalties' => ['imported' => 0, 'skipped' => 0, 'errors' => [], 'warnings' => [], 'failures' => []]];
         foreach ($this->reader->readAll($path, $extension) as $sheet) {
             if ($onlySheets !== null && !in_array((string) ($sheet['name'] ?? ''), $onlySheets, true)) continue;
             $config = $configs[$sheet['name']] ?? null;
@@ -80,24 +80,35 @@ class WorkbookLeavePenaltyImporter
     {
         foreach ($rows as $line => $row) {
             try {
+                if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                if (!$employee) throw new \RuntimeException('الموظف غير موجود أو الاسم لا يطابق الكود.');
+                if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة، أو الاسم لا يطابق الكود.');
                 $start = $this->date($row[$map['start']] ?? null); $end = $this->date($row[$map['end']] ?? null);
-                if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة.');
+                if (!$start || !$end || $end < $start) throw new \RuntimeException('فترة الإجازة غير صالحة: من «' . (trim((string) ($row[$map['start'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['start'] ?? -1] ?? ''))) . '» إلى «' . (trim((string) ($row[$map['end'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['end'] ?? -1] ?? ''))) . '»؛ تأكد أن التاريخين صحيحان وأن النهاية ليست قبل البداية.');
                 app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureRangeWithinCurrentPeriod($start, $end, 'الإجازة');
                 $guard->ensureRangeOpen($start, $end);
                 $typeName = trim((string) ($row[$map['leave_type']] ?? ''));
                 $type = LeaveType::where('is_active', true)->where('name', $typeName)->first() ?: LeaveType::where('is_active', true)->where('name', 'like', '%'.$typeName.'%')->first();
-                if (!$type) throw new \RuntimeException('نوع الإجازة غير موجود.');
+                if (!$type) throw new \RuntimeException('نوع الإجازة «' . (trim((string) ($row[$map['leave_type'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['leave_type'] ?? -1] ?? ''))) . '» غير موجود في إعدادات الشركة.');
                 $status = $this->status($row[$map['status'] ?? -1] ?? '');
-                $days = is_numeric($row[$map['days'] ?? -1] ?? null) ? (float) $row[$map['days']] : $this->workingDays($start, $end);
+                $daysCell = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['days'] ?? -1] ?? '')));
+                if (!is_numeric($daysCell) || (float) $daysCell <= 0) throw new \RuntimeException('عدد الأيام مطلوب ويجب أن يكون رقمًا أكبر من صفر.');
+                $days = (float) $daysCell;
                 $exists = Leave::where('employee_id', $employee->id)->where('leave_type_id', $type->id)->whereDate('start_date', $start)->whereDate('end_date', $end)->exists();
                 if ($exists) throw new \RuntimeException('سجل الإجازة موجود بالفعل.');
                 $leave = new Leave(['employee_id' => $employee->id, 'leave_type_id' => $type->id, 'start_date' => $start, 'end_date' => $end, 'days' => $days, 'reason' => $row[$map['reason'] ?? -1] ?? null, 'status' => $status, 'approved_by' => $status === 'Approved' ? auth()->id() : null, 'approved_at' => $status === 'Approved' ? now() : null]);
                 if ($status === 'Approved') {
                     $overlap = Leave::effective()->where('employee_id', $employee->id)->whereDate('start_date', '<=', $end)->whereDate('end_date', '>=', $start)->exists();
                     if ($overlap) throw new \RuntimeException('يوجد طلب إجازة متداخل مع هذه المدة.');
-                    app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+                    // Policy checks (service months, balance, caps) are warnings for an Excel import:
+                    // the leave is recorded as written in the file and the user is told what was off.
+                    try {
+                        app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
+                    } catch (\Illuminate\Validation\ValidationException $policy) {
+                        $reasons = collect($policy->errors())->flatten()->implode(' ');
+                        if (count($result['warnings']) < 50) $result['warnings'][] = "{$sheet} / الصف {$line}: تحذير: {$reasons} سُجّلت الإجازة كما وردت في الملف، راجعها.";
+                        $result['policy_warning_count'] = ($result['policy_warning_count'] ?? 0) + 1;
+                    }
                 }
                 $leave->save();
                 $result['created_ids'][] = (int) $leave->id;
@@ -121,20 +132,31 @@ class WorkbookLeavePenaltyImporter
                 }
                 if (blank($row[$map['code'] ?? -1] ?? null)) throw new \RuntimeException('كود الموظف مطلوب.');
                 $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                if (!$employee) throw new \RuntimeException('كود الموظف غير موجود.');
-                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود.');
+                if (!$employee) throw new \RuntimeException('كود الموظف «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» غير موجود في هذه الشركة.');
+                $date = $this->date($row[$map['date']] ?? null); if (!$date) throw new \RuntimeException('تاريخ الجزاء غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                 app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الجزاء');
                 $guard->ensureOpen($date);
                 $typeName = trim((string) ($row[$map['penalty_type']] ?? ''));
                 $fixedType = $penaltyFixes[$sheet][$line] ?? null;
                 if (is_string($fixedType) && trim($fixedType) !== '') $typeName = trim($fixedType);
                 // A missing type must be rejected for review, never matched by wildcard.
-                if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب.');
-                $type = PenaltyType::where('name', $typeName)->first() ?: PenaltyType::where('name', 'like', '%'.$typeName.'%')->first();
-                if (!$type) throw new \RuntimeException('نوع الجزاء غير موجود.');
+                if ($typeName === '') throw new \RuntimeException('نوع الجزاء مطلوب ولم يُكتب في هذا الصف.');
                 $quantity = app(ImportValueNormalizer::class)->digits(trim((string) ($row[$map['deduction'] ?? -1] ?? '')));
-                if (!is_numeric($quantity) || (float) $quantity <= 0) throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر.');
+                if (!is_numeric($quantity) || (float) $quantity <= 0) {
+                    $daysRaw = trim((string) ($row[$map['deduction'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) $row[$map['deduction']]);
+                    $money = null; $moneyHeader = null;
+                    foreach ($headers as $hIndex => $h) {
+                        $hk = $this->normalise($h);
+                        if (str_contains($hk, 'قيمة') || str_contains($hk, 'مبلغ')) { $moneyHeader = trim((string) $h); $money = trim((string) ($row[$hIndex] ?? '')); break; }
+                    }
+                    $moneyNum = $money !== null ? app(ImportValueNormalizer::class)->digits($money) : null;
+                    if (is_numeric($moneyNum) && (float) $moneyNum > 0) {
+                        throw new \RuntimeException('الجزاء بمبلغ مالي غير مدعوم في الاستيراد حاليًا؛ يُستورد الجزاء بأيام الخصم فقط (' . $moneyHeader . ' = ' . $money . '، أيام الخصم = ' . $daysRaw . '). أضِفه يدويًا من صفحة الجزاءات.');
+                    }
+                    throw new \RuntimeException('أيام الخصم مطلوبة ويجب أن تكون رقمًا أكبر من صفر (في الملف: ' . $daysRaw . ').');
+                }
                 $days = (float) $quantity;
+                $type = $this->resolveOrRegisterPenaltyType($typeName, $result);
                 $exists = Penalty::where('employee_id', $employee->id)->whereDate('penalty_date', $date)->where('penalty_type_id', $type->id)->exists();
                 if ($exists) throw new \RuntimeException('سجل الجزاء موجود بالفعل.');
                 $status = 'Approved';
@@ -142,6 +164,22 @@ class WorkbookLeavePenaltyImporter
                 $payrollRuns->refreshEmployeeInOpenDrafts((int) $employee->id); $result['imported']++; $result['created_ids'][] = (int) $penalty->id;
             } catch (\Throwable $exception) { $result['skipped']++; if ($exception instanceof OutsidePayrollPeriodException) $result['out_of_period_count'] = ($result['out_of_period_count'] ?? 0) + 1; if (count($result['errors']) < 25) $result['errors'][] = "{$sheet} / الصف {$line}: {$exception->getMessage()}"; if (count($result['failures']) < 100) $result['failures'][] = ['sheet' => $sheet, 'line' => $line, 'headers' => array_map(static fn ($v) => (string) $v, $headers ?? []), 'values' => array_map(static fn ($v) => (string) $v, $row), 'errors' => [$exception->getMessage()], 'reason_code' => $exception instanceof OutsidePayrollPeriodException ? 'outside_payroll_period' : null]; }
         }
+    }
+
+    /**
+     * Exact (case-insensitive) name match inside the company; a type the file introduces is
+     * registered for this company only. Existing types are never changed or removed.
+     */
+    private function resolveOrRegisterPenaltyType(string $name, array &$result): PenaltyType
+    {
+        $name = trim((string) preg_replace('/\s+/u', ' ', $name));
+        $type = PenaltyType::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->orderByRaw('company_id IS NULL')->first();
+        if ($type) return $type;
+        $type = PenaltyType::create(['name' => $name, 'company_id' => auth()->user()?->company_id, 'is_active' => true, 'default_deduction_days' => 0]);
+        \App\Models\ActivityLog::record('master_create', "تمت إضافة نوع جزاء ({$name}) تلقائيًا من ملف الاستيراد.", $type);
+        $result['created_types'][] = $name;
+        if (count($result['warnings'] ?? []) < 50) $result['warnings'][] = "تم تسجيل نوع جزاء جديد «{$name}» لشركتك من ملف الاستيراد.";
+        return $type;
     }
 
     private function splitHeader(array $rows): array

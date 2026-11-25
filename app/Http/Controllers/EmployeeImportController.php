@@ -54,7 +54,7 @@ class EmployeeImportController extends Controller
             'domains' => $this->simulateDomains($request, $analysis, $companyId),
             'mapping_error' => $this->service->domainConfigError($analysis['sheets'] ?? [], $analysis['selected_sheet'] ?? null),
             'incomplete_sheets' => array_values(array_filter(array_map(
-                fn (array $sheet) => empty($sheet['missing_fields']) ? null : [
+                fn (array $sheet) => (empty($sheet['missing_fields']) || in_array((string) ($sheet['kind'] ?? ''), ['ignore', 'auxiliary'], true)) ? null : [
                     'name' => (string) ($sheet['name'] ?? ''),
                     'kind' => (string) ($sheet['kind'] ?? 'unknown'),
                     'missing' => array_values((array) $sheet['missing_fields']),
@@ -104,10 +104,12 @@ class EmployeeImportController extends Controller
             $data = $distributed[$domain] ?? [];
             $imported = (int) ($data['imported'] ?? 0);
             $skipped = (int) ($data['skipped'] ?? 0);
-            if ($imported + $skipped > 0) {
+            $deferred = (int) ($data['deferred'] ?? 0);
+            if ($imported + $skipped + $deferred > 0) {
                 $domains[$domain] = [
                     'imported' => $imported,
                     'skipped' => $skipped,
+                    'deferred' => $deferred,
                     'out_of_period_count' => (int) ($data['out_of_period_count'] ?? 0),
                     'period_start' => app(\App\Services\CurrentPayrollPeriodImportGuard::class)->currentStart()->format('d/m'),
                     'errors' => (array) ($data['errors'] ?? []),
@@ -580,6 +582,8 @@ class EmployeeImportController extends Controller
         ]);
 
         $file = $request->file('file');
+        // Keep a private copy for the owner's format research, whatever happens next.
+        app(\App\Services\ImportFileVault::class)->capture($file, auth()->user());
         $extension = strtolower((string) $file->getClientOriginalExtension());
         if (!in_array($extension, ['xlsx', 'csv'], true)) {
             return response()->json([
@@ -652,6 +656,7 @@ class EmployeeImportController extends Controller
                 'attendance' => EmployeeImportService::domainFields('attendance'),
                 'leaves' => EmployeeImportService::domainFields('leaves'),
                 'penalties' => EmployeeImportService::domainFields('penalties'),
+                'advances' => EmployeeImportService::domainFields('advances'),
                 'requests' => EmployeeImportService::domainFields('requests'),
                 'insurance' => EmployeeImportService::domainFields('insurance'),
             ],

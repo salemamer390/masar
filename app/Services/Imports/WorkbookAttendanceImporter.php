@@ -46,7 +46,7 @@ class WorkbookAttendanceImporter
     {
         $this->employeeMatcher = new AttendanceImportEmployeeMatcher();
         $sheets = $this->reader->readAll($path, $extension);
-        $imported = 0; $skipped = 0; $outOfPeriod = 0; $errors = []; $failures = []; $affected = []; $warnings = [];
+        $imported = 0; $skipped = 0; $deferred = 0; $outOfPeriod = 0; $errors = []; $failures = []; $affected = []; $warnings = []; $punchBatch = null;
         foreach ($sheets as $sheet) {
             if ($onlySheets !== null && !in_array((string) $sheet['name'], $onlySheets, true)) continue;
             $config = $configs[$sheet['name']] ?? null;
@@ -65,20 +65,38 @@ class WorkbookAttendanceImporter
             }
             foreach ($rows as $line => $row) {
                 try {
-                    foreach (['code' => 'كود الموظف', 'in' => 'وقت الحضور', 'out' => 'وقت الانصراف'] as $field => $label) {
+                    foreach (['code' => 'كود الموظف'] as $field => $label) {
                         if (blank($row[$map[$field] ?? -1] ?? null)) throw new \RuntimeException($label . ' مطلوب.');
                     }
                     $employee = $this->employee($row[$map['code'] ?? -1] ?? null, $row[$map['name'] ?? -1] ?? null);
-                    if (!$employee) throw new \RuntimeException('الموظف غير موجود أو بياناته غير مكتملة.');
+                    if (!$employee) throw new \RuntimeException('لا يوجد موظف بالكود «' . (trim((string) ($row[$map['code'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['code'] ?? -1] ?? ''))) . '» والاسم «' . (trim((string) ($row[$map['name'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['name'] ?? -1] ?? ''))) . '» في هذه الشركة.');
                     if ($warning = app(ImportValueNormalizer::class)->nameWarning($employee->full_name, $row[$map['name'] ?? -1] ?? null)) { $warnings[] = "{$sheet['name']} / الصف {$line}: $warning"; }
                     $date = $this->date($row[$map['date'] ?? -1] ?? ($config['default_date'] ?? null));
-                    if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح.');
+                    if (!$date) throw new \RuntimeException('تاريخ الحضور غير صالح أو مفقود (في الملف: «' . (trim((string) ($row[$map['date'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['date'] ?? -1] ?? ''))) . '»).');
                     app(\App\Services\CurrentPayrollPeriodImportGuard::class)->ensureWithinCurrentPeriod($date, 'الحضور');
                     $periodGuard->ensureOpen($date); app(\App\Services\AttendancePeriodArchiveService::class)->ensureDateOpen($date);
                     $in = $this->time($row[$map['in'] ?? -1] ?? null);
                     $out = $this->time($row[$map['out'] ?? -1] ?? null);
-                    if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت حضور أو انصراف غير صالح؛ لم يُستورد الصف.');
+                    if ((filled($row[$map['in'] ?? -1] ?? null) && !$in) || (filled($row[$map['out'] ?? -1] ?? null) && !$out)) throw new \RuntimeException('توقيت غير صالح: الحضور «' . (trim((string) ($row[$map['in'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['in'] ?? -1] ?? ''))) . '»، الانصراف «' . (trim((string) ($row[$map['out'] ?? -1] ?? '')) === '' ? 'فارغ' : trim((string) ($row[$map['out'] ?? -1] ?? ''))) . '»؛ لم يُستورد الصف.');
                     $status = 'Present';
+                    if (!$in || !$out) {
+                        // Missing punch or absence: never rejected. Kept as a punch error (أخطاء البصمات) for review; no attendance record is written.
+                        $punchBatch ??= \App\Models\AttendanceImportBatch::create([
+                            'company_id' => auth()->user()?->company_id ?? $employee->company_id, 'user_id' => auth()->id(),
+                            'file_name' => basename($path), 'layout' => 'daily',
+                            'original_data' => ['unit' => ['sheets' => []], 'map' => [], 'options' => [], 'sheets' => [], 'errors' => [], 'warnings' => []],
+                        ]);
+                        $punches = array_values(array_filter([
+                            $in ? ['slot' => 'in', 'time' => $in, 'ref' => "{$sheet['name']} / الصف {$line}"] : null,
+                            $out ? ['slot' => 'out', 'time' => $out, 'ref' => "{$sheet['name']} / الصف {$line}"] : null,
+                        ]));
+                        \App\Models\AttendanceImportDay::create([
+                            'batch_id' => $punchBatch->id, 'employee_id' => $employee->id, 'work_date' => $date,
+                            'original_punches' => $punches, 'current_punches' => $punches, 'issue' => 'missing', 'resolution' => 'pending',
+                        ]);
+                        $deferred++;
+                        continue;
+                    }
                     $metrics = app(\App\Services\AttendanceMetricsService::class)->metrics($employee, $in, $out, $status);
                     Attendance::updateOrCreate(
                         ['employee_id' => $employee->id, 'attendance_date' => $date],
@@ -94,8 +112,9 @@ class WorkbookAttendanceImporter
                 }
             }
         }
+        if ($deferred > 0) $warnings[] = "يوجد {$deferred} يومًا ببصمات ناقصة (حضور أو انصراف غير مسجّل). لم تُرفض، وستُنقل إلى صفحة الحضور والانصراف ضمن «أخطاء البصمات» للمراجعة.";
         foreach (array_unique($affected) as $employeeId) $payrollRuns->refreshEmployeeInOpenDrafts($employeeId);
-        return compact('imported', 'skipped', 'errors', 'failures', 'warnings') + ['out_of_period_count' => $outOfPeriod];
+        return compact('imported', 'skipped', 'errors', 'failures', 'warnings', 'deferred') + ['out_of_period_count' => $outOfPeriod];
     }
 
     private function splitHeader(array $rows): array

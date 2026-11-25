@@ -156,15 +156,42 @@ button.emp-badge{cursor:pointer}
         </div>
     </div>
 
-    <section class="panel profile-panel mt-3 profile-completion {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
-        <div class="panel-head"><div><h3><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-x-fill' }}"></i> {{ __('اكتمال ملف الموظف') }}</h3><span>{{ $profileCompletion['complete'] ? __('البيانات الأساسية والمستندات المطلوبة مكتملة.') : __('لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.') }}</span></div>@if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#employeeMasterModal">{{ __('استكمال البيانات') }}</button>@endif</div>
+    <?php
+        $pcMissingFields = $profileCompletion['missing_fields'];
+        $pcMissingDocs = $profileCompletion['missing_documents'];
+        $pcTotal = ($profileCompletion['total_fields'] ?? 12) + $profileCompletion['required_documents'];
+        $pcDone = max(0, $pcTotal - count($pcMissingFields) - count($pcMissingDocs));
+        $pcPercent = $pcTotal > 0 ? (int) floor($pcDone / $pcTotal * 100) : 100;
+    ?>
+    <section class="panel profile-panel mt-3 profile-completion pc-card {{ $profileCompletion['complete'] ? 'profile-complete' : 'profile-incomplete' }}">
+        <div class="pc-head">
+            <span class="pc-icon"><i class="bi {{ $profileCompletion['complete'] ? 'bi-patch-check-fill' : 'bi-clipboard2-pulse' }}" aria-hidden="true"></i></span>
+            <div class="pc-title"><h3>{{ __('اكتمال ملف الموظف') }}</h3><p>{{ $profileCompletion['complete'] ? __('البيانات الأساسية والمستندات المطلوبة مكتملة.') : __('لا يُعد الملف مكتملًا قبل استيفاء العناصر التالية.') }}</p></div>
+            @if(! $profileCompletion['complete'] && auth()->user()?->hasPermission('employees.edit'))<button type="button" class="btn btn-primary pc-action" data-bs-toggle="modal" data-bs-target="#employeeMasterModal"><i class="bi bi-pencil-square" aria-hidden="true"></i> {{ __('استكمال البيانات') }}</button>@endif
+        </div>
+        <div class="pc-progress">
+            <div class="pc-progress-top"><span>{{ __('نسبة الاكتمال') }}</span><b>{{ format_number($pcPercent) }}%</b></div>
+            <div class="pc-bar" role="progressbar" aria-valuenow="{{ $pcPercent }}" aria-valuemin="0" aria-valuemax="100"><span style="width: {{ $pcPercent }}%"></span></div>
+            <small>{{ format_number($pcDone) }} {{ __('من') }} {{ format_number($pcTotal) }} {{ __('عنصر مكتمل') }}</small>
+        </div>
         @if($profileCompletion['complete'])
-            <div class="p-3 text-success small"><i class="bi bi-check-circle-fill"></i> {{ __('الملف جاهز للتشغيل والمتابعة.') }}</div>
+            <div class="pc-done"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('الملف جاهز للتشغيل والمتابعة.') }}</div>
         @else
-            <div class="p-3 row g-3"><div class="col-md-6"><b class="d-block mb-2">{{ __('بيانات ناقصة') }}</b><div class="completion-list">@forelse($profileCompletion['missing_fields'] as $field)<span><i class="bi bi-dot"></i>{{ $field }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> {{ __('البيانات الأساسية مكتملة') }}</span>@endforelse</div></div><div class="col-md-6"><b class="d-block mb-2">{{ __('مستندات مطلوبة ناقصة أو غير صالحة') }}</b><div class="completion-list">@forelse($profileCompletion['missing_documents'] as $document)<span><i class="bi bi-dot"></i>{{ $document }}</span>@empty<span class="text-success"><i class="bi bi-check-lg"></i> {{ __('المستندات المطلوبة مكتملة') }}</span>@endforelse</div></div></div>
+            <div class="pc-groups">
+                <div class="pc-group">
+                    <div class="pc-group-head"><span class="pc-group-title"><i class="bi bi-person-lines-fill" aria-hidden="true"></i> {{ __('بيانات ناقصة') }}</span><span class="pc-count {{ count($pcMissingFields) ? 'is-warn' : 'is-ok' }}">{{ format_number(count($pcMissingFields)) }}</span></div>
+                    <div class="pc-chips">@forelse($pcMissingFields as $field)<span class="pc-chip"><i class="bi bi-exclamation-circle" aria-hidden="true"></i>{{ $field }}</span>@empty<span class="pc-ok"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('البيانات الأساسية مكتملة') }}</span>@endforelse</div>
+                </div>
+                <div class="pc-group">
+                    <div class="pc-group-head"><span class="pc-group-title"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> {{ __('مستندات مطلوبة ناقصة أو غير صالحة') }}</span><span class="pc-count {{ count($pcMissingDocs) ? 'is-warn' : 'is-ok' }}">{{ format_number(count($pcMissingDocs)) }}</span></div>
+                    <div class="pc-chips">@forelse($pcMissingDocs as $document)<span class="pc-chip"><i class="bi bi-file-earmark-x" aria-hidden="true"></i>{{ $document }}</span>@empty<span class="pc-ok"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ __('المستندات المطلوبة مكتملة') }}</span>@endforelse</div>
+                </div>
+            </div>
         @endif
     </section>
 
+{{-- HIDDEN_PROFILE_BOTTOM: emergency contacts and bank accounts are hidden for now (Amer, 23/11/2026). To bring them back, delete the @if(false) line below and the matching @endif marked /HIDDEN_PROFILE_BOTTOM. --}}
+@if(false)
     <div class="profile-grid mt-3">
         <div class="panel profile-panel">
             <div class="panel-head"><h3>{{ __('جهات اتصال الطوارئ') }}</h3></div>
@@ -193,6 +220,7 @@ button.emp-badge{cursor:pointer}
             @endif
         </div>
     </div>
+@endif {{-- /HIDDEN_PROFILE_BOTTOM --}}
 
 @elseif($activeTab === 'job')
     <div class="profile-grid">
@@ -678,7 +706,58 @@ document.addEventListener('DOMContentLoaded', function () { const select=documen
 @endif
 
 @push('scripts')
-<div class="modal fade" id="profilePhotoModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">@if($employee->profile_photo_url)<div class="modal-body text-center"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"></div>@endif @if(auth()->user()?->hasPermission('employees.edit'))<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data">@csrf @method('PATCH')<div class="modal-body pt-0"><label class="form-label">{{ $employee->profile_photo_url ? __('تغيير الصورة') : __('إضافة صورة شخصية') }}</label><input type="file" name="profile_photo" class="form-control" accept="image/jpeg,image/png,image/webp"><small class="text-muted">{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</small></div><div class="modal-footer justify-content-center gap-2"><button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger">{{ __('حذف الصورة') }}</button>@endif<button class="btn btn-primary">{{ __('حفظ الصورة') }}</button></div></form>@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif @endif</div></div></div>
+<div class="modal fade" id="profilePhotoModal" tabindex="-1" aria-labelledby="profilePhotoTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content profile-photo-modal">
+<div class="ppm-head"><span class="ppm-head-icon"><i class="bi bi-camera" aria-hidden="true"></i></span><div class="ppm-head-text"><h5 id="profilePhotoTitle">{{ $employee->profile_photo_url ? __('الصورة الشخصية') : __('إضافة صورة شخصية') }}</h5><p>{{ $employee->full_name }}</p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('إغلاق') }}"></button></div>
+@if($employee->profile_photo_url)<div class="ppm-current"><img class="profile-photo-full" src="{{ $employee->profile_photo_url }}" alt="{{ $employee->full_name }}"><span class="ppm-current-label">{{ __('الصورة الحالية') }}</span></div>@endif
+@if(auth()->user()?->hasPermission('employees.edit'))
+<form method="POST" action="{{ route('employees.photo',$employee) }}" enctype="multipart/form-data" id="profilePhotoForm" data-max-bytes="5242880">@csrf @method('PATCH')
+<div class="ppm-body">
+<label class="ppm-drop" for="profilePhotoInput" id="profilePhotoDrop" tabindex="0">
+<input type="file" name="profile_photo" id="profilePhotoInput" accept="image/jpeg,image/png,image/webp" class="ppm-input">
+<span class="ppm-drop-empty"><span class="ppm-drop-icon"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i></span><strong>{{ $employee->profile_photo_url ? __('اسحب الصورة الجديدة هنا') : __('اسحب الصورة هنا') }}</strong><span class="ppm-or">{{ __('أو') }}</span><span class="ppm-browse">{{ __('اختيار صورة من الجهاز') }}</span></span>
+<span class="ppm-drop-preview" hidden><img alt="" id="profilePhotoPreview"><span class="ppm-file"><span class="ppm-file-name" id="profilePhotoName"></span><span class="ppm-file-size" id="profilePhotoSize"></span></span><button type="button" class="ppm-remove" id="profilePhotoClear" aria-label="{{ __('إزالة الصورة المختارة') }}"><i class="bi bi-x-lg" aria-hidden="true"></i></button></span>
+</label>
+<div class="ppm-hint" id="profilePhotoHint"><i class="bi bi-info-circle" aria-hidden="true"></i><span>{{ __('JPG أو PNG أو WebP، حتى 5 ميجابايت.') }}</span></div>
+</div>
+<div class="ppm-footer">
+<button class="btn btn-primary ppm-save" id="profilePhotoSave" disabled><i class="bi bi-check2" aria-hidden="true"></i> {{ __('حفظ الصورة') }}</button>
+<button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ __('إلغاء') }}</button>
+@if($employee->profile_photo_url)<button type="submit" form="deleteProfilePhoto" class="btn btn-outline-danger ppm-delete" onclick="return confirm('{{ __('حذف الصورة الشخصية؟') }}')"><i class="bi bi-trash3" aria-hidden="true"></i> {{ __('حذف الصورة') }}</button>@endif
+</div></form>
+@if($employee->profile_photo_url)<form id="deleteProfilePhoto" method="POST" action="{{ route('employees.photo.delete',$employee) }}" class="d-none">@csrf @method('DELETE')</form>@endif
+<script>
+(function(){
+  var form=document.getElementById('profilePhotoForm'); if(!form) return;
+  var input=document.getElementById('profilePhotoInput'), drop=document.getElementById('profilePhotoDrop'),
+      empty=drop.querySelector('.ppm-drop-empty'), prev=drop.querySelector('.ppm-drop-preview'),
+      img=document.getElementById('profilePhotoPreview'), nm=document.getElementById('profilePhotoName'),
+      sz=document.getElementById('profilePhotoSize'), save=document.getElementById('profilePhotoSave'),
+      hint=document.getElementById('profilePhotoHint'), clear=document.getElementById('profilePhotoClear'),
+      max=parseInt(form.dataset.maxBytes,10), types=['image/jpeg','image/png','image/webp'], url=null;
+  var defaultHint=hint.querySelector('span').textContent;
+  function fmt(b){return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB';}
+  function reset(msg){
+    input.value=''; if(url){URL.revokeObjectURL(url);url=null;}
+    img.removeAttribute('src'); prev.hidden=true; empty.hidden=false; drop.classList.remove('has-file'); save.disabled=true;
+    hint.classList.toggle('is-error',!!msg); hint.querySelector('span').textContent=msg||defaultHint;
+  }
+  function show(f){
+    if(types.indexOf(f.type)<0){reset(@json(__('نوع الملف غير مدعوم. اختر JPG أو PNG أو WebP.')));return;}
+    if(f.size>max){reset(@json(__('حجم الصورة أكبر من 5 ميجابايت.')));return;}
+    if(url) URL.revokeObjectURL(url); url=URL.createObjectURL(f); img.src=url; nm.textContent=f.name; sz.textContent=fmt(f.size);
+    empty.hidden=true; prev.hidden=false; drop.classList.add('has-file'); save.disabled=false;
+    hint.classList.remove('is-error'); hint.querySelector('span').textContent=defaultHint;
+  }
+  input.addEventListener('change',function(){ if(input.files[0]) show(input.files[0]); else reset(); });
+  clear.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();reset();});
+  ['dragenter','dragover'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.add('is-drag');});});
+  ['dragleave','drop'].forEach(function(t){drop.addEventListener(t,function(e){e.preventDefault();drop.classList.remove('is-drag');});});
+  drop.addEventListener('drop',function(e){var f=e.dataTransfer.files[0]; if(!f) return;
+    try{var dt=new DataTransfer(); dt.items.add(f); input.files=dt.files;}catch(x){} show(f);});
+  document.getElementById('profilePhotoModal').addEventListener('hidden.bs.modal',function(){reset();});
+})();
+</script>
+@endif</div></div></div>
 <script>
 (function(){
     const contractStart=document.getElementById('employee_contract_start_date');

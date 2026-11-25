@@ -35,7 +35,19 @@ class PenaltyController extends Controller
         $penaltyTypes = PenaltyType::where('is_active', 1)->get();
 
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
-        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments', 'periodStart', 'periodEnd'));
+        // Policy penalties (lateness / early departure) are computed from attendance, not stored, so
+        // they are listed read-only for the same filters and period.
+        $listFrom = \Carbon\Carbon::parse($request->filled('from_date') ? (string) $request->from_date : $periodStart)->startOfDay();
+        $listTo = \Carbon\Carbon::parse($request->filled('to_date') ? (string) $request->to_date : $periodEnd)->startOfDay();
+        $attendancePenalties = ['enabled' => false, 'rows' => []];
+        if ($listFrom->lte($listTo) && $listFrom->diffInDays($listTo) <= 93) {
+            $listed = Employee::query()
+                ->when($request->filled('employee_id'), fn ($q) => $q->where('id', $request->employee_id))
+                ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
+                ->limit(500)->get();
+            $attendancePenalties = app(\App\Services\AttendancePenaltyListing::class)->forPeriod($listed, $listFrom, $listTo);
+        }
+        return view('discipline.index', compact('penalties', 'employees', 'penaltyTypes', 'departments', 'periodStart', 'periodEnd', 'attendancePenalties'));
     }
 
     public function store(Request $request, PayrollPeriodGuard $periodGuard, PayrollRunService $payrollRuns)

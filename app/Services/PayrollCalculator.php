@@ -33,7 +33,9 @@ class PayrollCalculator
     public function grossResult(float $gross, ?float $manualInsuranceWage = null, bool $noInsurance = false, float $ignoredAllowancePct = self::DEFAULT_EXCLUDED_PCT, float $ignoredExemption = self::PERSONAL_EXEMPTION, string $taxTreatment = 'egyptian', float $extraDeductions = 0.0): array
     {
         $gross = max(0, $gross);
-        $allowanceRate = $this->settings->allowanceRate() / 100;
+        // Allowances disabled: their whole value folds into the basic, so the
+        // engine's split is basic = gross with a zero allowance pool.
+        $allowanceRate = $this->settings->allowancesEnabled() ? $this->settings->allowanceRate() / 100 : 0.0;
         $basic = $this->round2($gross / (1 + $allowanceRate));
         $allowances = $this->round2($gross - $basic);
         $shares = $this->allowanceShares();
@@ -44,9 +46,11 @@ class PayrollCalculator
         $insuranceBase = $this->settings->insuranceAutomaticBasis() === 'Gross' ? $gross : $basic;
         $insuranceWage = $noInsurance ? 0.0 : $this->clamp($manualInsuranceWage && $manualInsuranceWage > 0 ? $manualInsuranceWage : $insuranceBase, $this->settings->insuranceMinimum(), $this->settings->insuranceMaximum());
         $employeeInsurance = $this->round2($insuranceWage * $this->settings->employeeInsuranceRate());
-        $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption()) * 12) - $this->settings->taxDeductibleContributions());
-        $tax = $this->tax->calculate($annualBase);
         $martyrs = $this->round2($gross * $this->settings->martyrsFundRate());
+        // Unified taxable base: employee insurance, the personal exemption and the
+        // martyrs fund all reduce it before the annual brackets are applied.
+        $annualBase = max(0.0, (($gross - $employeeInsurance - $this->settings->personalExemption() - $martyrs) * 12) - $this->settings->taxDeductibleContributions());
+        $tax = $this->tax->calculate($annualBase);
         $statutory = $this->round2($employeeInsurance + $tax['monthly_tax'] + $martyrs);
         $extraDeductions = max(0, $extraDeductions);
         $total = $this->round2($statutory + $extraDeductions);
@@ -93,6 +97,11 @@ class PayrollCalculator
         $structure = $this->grossResult($gross, $manualInsuranceWage, $noInsurance);
         $basic = (float) $structure['basic_salary'];
         $overtimeBase = $this->settings->overtimeBasis() === 'Basic' ? $basic : $gross;
+        // Absence follows the configured basis: Basic prices it on the basic
+        // salary (a flagged allowance then loses its own daily share on the
+        // earnings side via absence_allowance_reduction, so no day is deducted
+        // twice); Gross prices it on the gross, which already contains every
+        // allowance, so the run service passes no allowance reduction there.
         $absenceBase = $absenceBaseOverride ?? ($this->settings->absenceBasis() === 'Basic' ? $basic : $gross);
         $penaltyBase = $this->settings->penaltyBasis() === 'Gross' ? $gross : $basic;
 
@@ -128,13 +137,23 @@ class PayrollCalculator
 
         $profitTaxable = $profitShare * (1 - ($this->settings->profitShareExemptPercent() / 100));
         $variableTaxable = $overtime + $bonus + $incentives + $commission + $otherEarnings + $profitTaxable;
-        $variableTax = $variableTaxable > 0.0
-            ? $this->round2(($this->tax->annualTax($structure['taxable_annual'] + 12 * $variableTaxable) - $structure['annual_tax']) / 12)
-            : 0.0;
-        $structureTax = (float) $structure['income_tax'];
-        $tax = $this->round2($structureTax + $variableTax);
-
         $absenceDeduction = $absenceDays * $absenceBase / max(1, $this->settings->absenceDailyDivisor());
+        // Daily shares of flagged allowances lost to absence, computed by the run
+        // service from the contractual allowance split and applied as an earnings
+        // reduction below (never as a second deduction line).
+        $absenceAllowanceReduction = max(0, (float)($monthly['absence_allowance_reduction'] ?? 0));
+
+        // One unified income tax on the month's actual wage: the contractual
+        // structure plus taxable variable earnings, minus the absence deduction
+        // (wage never received is never taxed), annualised, brackets applied,
+        // divided by 12. Insurance, the personal exemption and the martyrs fund
+        // are already out of the structure base. The split below is for display
+        // only; the structure part is the same formula without this month's
+        // variables and absence.
+        $structureTax = (float) $structure['income_tax'];
+        $combinedAnnualBase = max(0.0, $structure['taxable_annual'] + 12 * ($variableTaxable - $absenceDeduction - $absenceAllowanceReduction));
+        $tax = $this->round2($this->tax->annualTax($combinedAnnualBase) / 12);
+        $variableTax = $this->round2($tax - $structureTax);
         // Disciplinary split: automatic lateness/early-departure policy days are ALWAYS priced
         // from the basic salary, whatever the company's general penalty basis is; manual
         // penalties keep the configured basis. The monthly cap trims the combined days
@@ -150,8 +169,8 @@ class PayrollCalculator
         $policyPenaltyDeduction = $policyDaysRequested * $capScale * $basic / $penaltyDivisor;
         $manualPenaltyDeduction = ($penaltyDays - $policyDaysRequested * $capScale) * $penaltyBase / $penaltyDivisor;
         $penaltyDeduction = $policyPenaltyDeduction + $manualPenaltyDeduction;
-        $entitlements = $structure['basic_salary'] + $structure['allowances'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
-        $monthlyTotal = $structure['gross'] + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $entitlements = $structure['basic_salary'] + $structure['allowances'] - $absenceAllowanceReduction + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
+        $monthlyTotal = $structure['gross'] - $absenceAllowanceReduction + $overtime + $bonus + $incentives + $commission + $profitShare + $otherEarnings + $advanceEarnings;
         $deductions = $structure['employee_insurance'] + $tax + $structure['martyrs_fund'] + $absenceDeduction + $penaltyDeduction + $timeDeduction + $loans + $otherDeductions;
 
         return array_merge($structure, [
@@ -161,6 +180,7 @@ class PayrollCalculator
             'absence_days'=>$absenceDays, 'penalty_days'=>$penaltyDays, 'penalty_days_requested'=>$penaltyDaysRequested, 'loans'=>$loans, 'other_deductions'=>$otherDeductions,
             'variable_taxable'=>$variableTaxable, 'income_tax_structure'=>$structureTax, 'income_tax_variable'=>$variableTax,
             'income_tax'=>$tax, 'absence_base'=>$this->round2($absenceBase), 'absence_deduction'=>$absenceDeduction, 'penalty_deduction'=>$penaltyDeduction,
+            'absence_allowance_reduction'=>$this->round2($absenceAllowanceReduction),
             'attendance_time_deduction'=>$timeDeduction, 'attendance_penalty_deduction'=>$policyPenaltyDeduction,
             'entitlements'=>$entitlements, 'monthly_total'=>$this->round2($monthlyTotal), 'monthly_deductions'=>$deductions, 'net_monthly'=>$this->round2($entitlements - $deductions),
         ]);

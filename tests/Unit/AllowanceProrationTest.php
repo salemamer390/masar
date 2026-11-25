@@ -12,17 +12,17 @@ use App\Services\PayrollSettingsService;
 use App\Services\TaxCalculator;
 use PHPUnit\Framework\TestCase;
 
-/** Per-allowance proration: a full-paid allowance is not scaled in a partial month. */
+/** Per-allowance proration: window proration is automatic; under the Basic absence basis the flag gates the allowance's absence-day share. */
 class AllowanceProrationTest extends TestCase
 {
-    private function service(array $distribution): PayrollRunService
+    private function service(array $distribution, array $rules = []): PayrollRunService
     {
-        $settings = new class($distribution) extends PayrollSettingsService {
-            public function __construct(private array $distribution) {}
+        $settings = new class($distribution, $rules) extends PayrollSettingsService {
+            public function __construct(private array $distribution, private array $rules) {}
 
             public function number(string $group, string $key, float $default = 0.0): float { return $default; }
 
-            public function rule(string $group, string $key, string $default = ''): string { return $default; }
+            public function rule(string $group, string $key, string $default = ''): string { return $this->rules["$group.$key"] ?? $default; }
 
             public function allowanceDistribution(): array { return $this->distribution; }
         };
@@ -61,7 +61,7 @@ class AllowanceProrationTest extends TestCase
         $this->assertEqualsWithDelta(240.0, $r['meal_allowance'], 0.001);
         $this->assertEqualsWithDelta(180.0, $r['clothing_allowance'], 0.001);
         $this->assertEqualsWithDelta(1200.0, $r['allowances'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(5394.38, $r['net_monthly'], 0.01);
     }
 
     public function test_full_month_is_not_changed_by_the_flag(): void
@@ -76,7 +76,7 @@ class AllowanceProrationTest extends TestCase
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->fullMonthWindow());
 
         $this->assertEqualsWithDelta(2400.0, $payload['allowances'], 0.001);
-        $this->assertEqualsWithDelta(12000.0, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(10788.77, $payload['net_salary'], 0.01);
         $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
@@ -84,7 +84,7 @@ class AllowanceProrationTest extends TestCase
     {
         $r = $this->service([])->calculate($this->salary(), ['gross' => 12000.0], [], true, 0.5);
         $this->assertEqualsWithDelta(1200.0, $r['allowances'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $r['net_monthly'], 0.01);
+        $this->assertEqualsWithDelta(5394.38, $r['net_monthly'], 0.01);
     }
 
     private function payrollRun(): PayrollRun
@@ -115,7 +115,7 @@ class AllowanceProrationTest extends TestCase
         ], $overrides));
     }
 
-    public function test_non_prorated_allowance_is_paid_in_full_in_a_partial_month(): void
+    public function test_allowances_prorate_with_the_window_regardless_of_the_flag(): void
     {
         $service = $this->service($this->distribution(false));
         // Engine-matching split: basic 9600 + 840/720/480/360.
@@ -126,51 +126,89 @@ class AllowanceProrationTest extends TestCase
         $calculation = $service->calculate($salary, ['gross' => 12000.0], [], true, 0.5);
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->halfMonthWindow());
 
-        $this->assertEqualsWithDelta(720.0, $payload['housing_allowance'], 0.001);
-        $this->assertEqualsWithDelta(1560.0, $payload['allowances'], 0.001);
-        $this->assertEqualsWithDelta(6360.0, $payload['monthly_total'], 0.01);
-        // The gross extra over the all-prorated baseline: 6360 - 6000 = 360.
-        // It is taxed through the marginal path (annualised bracket delta 72)
-        // and carries the flat martyrs rate (0.18), so net = 6360 - 72 - 0.18.
-        $this->assertEqualsWithDelta(6287.82, $payload['net_salary'], 0.01);
-        $this->assertEqualsWithDelta(360.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
+        // Window proration is automatic: every allowance halves with the worked
+        // window, flagged or not. The flag now only controls the absence share.
+        $this->assertEqualsWithDelta(360.0, $payload['housing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(1200.0, $payload['allowances'], 0.001);
+        $this->assertEqualsWithDelta(6000.0, $payload['monthly_total'], 0.01);
+        $this->assertEqualsWithDelta(5394.38, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
-    public function test_full_paid_allowance_pays_the_contractual_amount_not_the_engine_split(): void
+    public function test_contractual_split_prorates_with_the_window(): void
     {
         $service = $this->service($this->distribution(false));
         $salary = $this->contractualSalary();
         $calculation = $service->calculate($salary, ['gross' => 12000.0], [], true, 0.5);
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->halfMonthWindow());
 
-        // The displayed pieces: full contractual housing 1200, the rest halved.
-        $this->assertEqualsWithDelta(1200.0, $payload['housing_allowance'], 0.001);
-        $this->assertEqualsWithDelta(6600.0, $payload['basic_salary'] + $payload['allowances'], 0.001);
-        // The net pays exactly the displayed pieces minus the tax the 600
-        // extra carries: 6600 - 120 marginal tax - 0.30 martyrs.
-        $this->assertEqualsWithDelta(6479.70, $payload['net_salary'], 0.001);
-        $this->assertEqualsWithDelta(600.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
+        // Every allowance follows the worked window: housing halves like the rest.
+        $this->assertEqualsWithDelta(600.0, $payload['housing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(6000.0, $payload['basic_salary'] + $payload['allowances'], 0.001);
+        $this->assertEqualsWithDelta(5394.38, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
-    public function test_full_paid_extra_is_taxed_through_the_marginal_variable_path(): void
+    public function test_partial_month_tax_prorates_by_the_day_factor(): void
     {
         $service = $this->service($this->distribution(false));
         $salary = $this->contractualSalary(['income_tax' => 300.0, 'martyrs_fund' => 6.0]);
         $calculation = $service->calculate($salary, ['gross' => 12000.0], [], true, 0.5);
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->halfMonthWindow());
 
-        // Baseline keeps the day factor: 300 x 0.5 = 150. The 600 extra is
-        // taxed with the engine's existing marginal rule (annualised bracket
-        // delta on top of the fixed base: 120) and the flat martyrs rate:
-        // 6 x 0.5 + 600 x 0.0005 = 3.30.
-        $this->assertEqualsWithDelta(270.0, $payload['income_tax'], 0.001);
-        $this->assertEqualsWithDelta(3.3, $payload['martyrs_fund'], 0.001);
-        $this->assertEqualsWithDelta(6600.0 - 270.0 - 3.3, $payload['net_salary'], 0.001);
-        $this->assertEqualsWithDelta(120.0, $payload['calculation_snapshot']['proration_adjustment_tax'], 0.001);
-        $this->assertEqualsWithDelta(0.3, $payload['calculation_snapshot']['proration_adjustment_martyrs'], 0.001);
+        // No extra is added above the window-prorated pieces, so the structure
+        // tax keeps the day factor and martyrs prorates with the window.
+        $this->assertEqualsWithDelta(605.62, $payload['income_tax'], 0.001);
+        $this->assertEqualsWithDelta(3.0, $payload['martyrs_fund'], 0.001);
+        $this->assertEqualsWithDelta(6000.0 - 605.62 - 3.0, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment_tax'], 0.001);
+        $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment_martyrs'], 0.001);
     }
 
-    public function test_lump_only_structure_uses_the_configured_split_for_the_flags(): void
+    public function test_flagged_allowances_lose_their_daily_share_on_absence(): void
+    {
+        $service = $this->service($this->distribution(false), ['absence.calculation_basis' => 'Basic']);
+        // Engine-matching split: basic 9600 + 840/720/480/360; housing unflagged.
+        $salary = $this->contractualSalary([
+            'basic_salary' => 9600.0, 'transportation_allowance' => 840.0, 'housing_allowance' => 720.0,
+            'meal_allowance' => 480.0, 'clothing_allowance' => 360.0, 'allowances' => 2400.0,
+        ]);
+        $calculation = $service->calculate($salary, ['gross' => 12000.0], ['absence_days' => 2], true, 1.0);
+        $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->fullMonthWindow());
+
+        // Absence is priced from the basic only: 2 x 9600/30.
+        $this->assertEqualsWithDelta(640.0, $calculation['absence_deduction'], 0.001);
+        // Flagged allowances lose their daily share once, on the earnings side:
+        // (840 + 480 + 360) x 2/30 = 112; housing is unflagged and pays in full.
+        $this->assertEqualsWithDelta(112.0, $calculation['absence_allowance_reduction'], 0.001);
+        $this->assertEqualsWithDelta(784.0, $payload['transportation_allowance'], 0.001);
+        $this->assertEqualsWithDelta(720.0, $payload['housing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(448.0, $payload['meal_allowance'], 0.001);
+        $this->assertEqualsWithDelta(336.0, $payload['clothing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(2288.0, $payload['allowances'], 0.001);
+    }
+
+    public function test_gross_basis_prices_absence_on_the_gross_without_touching_allowances(): void
+    {
+        // The stub's default absence basis is Gross.
+        $service = $this->service($this->distribution(false));
+        $salary = $this->contractualSalary([
+            'basic_salary' => 9600.0, 'transportation_allowance' => 840.0, 'housing_allowance' => 720.0,
+            'meal_allowance' => 480.0, 'clothing_allowance' => 360.0, 'allowances' => 2400.0,
+        ]);
+        $calculation = $service->calculate($salary, ['gross' => 12000.0], ['absence_days' => 2], true, 1.0);
+        $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->fullMonthWindow());
+
+        // Absence on the gross already contains every allowance's share, so the
+        // earnings side is left alone: no share is deducted twice.
+        $this->assertEqualsWithDelta(800.0, $calculation['absence_deduction'], 0.001); // 2 x 12000/30
+        $this->assertEqualsWithDelta(0.0, $calculation['absence_allowance_reduction'], 0.001);
+        $this->assertEqualsWithDelta(840.0, $payload['transportation_allowance'], 0.001);
+        $this->assertEqualsWithDelta(720.0, $payload['housing_allowance'], 0.001);
+        $this->assertEqualsWithDelta(2400.0, $payload['allowances'], 0.001);
+    }
+
+    public function test_lump_only_prorates_the_lump_with_the_window(): void
     {
         $service = $this->service($this->distribution(false));
         // Legacy lump-only row: no contractual basic, no itemized allowances.
@@ -178,14 +216,12 @@ class AllowanceProrationTest extends TestCase
         $calculation = $service->calculate($salary, ['gross' => 12000.0], [], true, 0.5);
         $payload = $service->buildPayload($this->payrollRun(), $salary, $this->structure(), $calculation, [], true, $this->halfMonthWindow());
 
-        // Lump 2400 split by the configured 35/30/20/15 with housing full-paid:
-        // 2400 x (0.35x0.5 + 0.30 + 0.20x0.5 + 0.15x0.5) = 1560.
-        $this->assertEqualsWithDelta(1560.0, $payload['allowances'], 0.001);
+        // The whole lump follows the worked window: 2400 x 0.5 = 1200.
+        $this->assertEqualsWithDelta(1200.0, $payload['allowances'], 0.001);
         // Itemized columns stay zero so the drawer shows the lump.
         $this->assertEqualsWithDelta(0.0, $payload['housing_allowance'], 0.001);
-        // Net = pieces minus the tax the 360 extra carries (72 + 0.18).
-        $this->assertEqualsWithDelta(4800.0 + 1560.0 - 72.0 - 0.18, $payload['net_salary'], 0.01);
-        $this->assertEqualsWithDelta(360.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
+        $this->assertEqualsWithDelta(4800.0 + 1200.0 - 605.62, $payload['net_salary'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
     }
 
     public function test_all_prorated_keeps_the_baseline_net_with_a_differing_split(): void
@@ -197,7 +233,7 @@ class AllowanceProrationTest extends TestCase
 
         // Baseline behavior unchanged: no adjustment, engine net stored.
         $this->assertEqualsWithDelta(0.0, $payload['calculation_snapshot']['proration_adjustment'], 0.001);
-        $this->assertEqualsWithDelta(6000.0, $payload['net_salary'], 0.001);
+        $this->assertEqualsWithDelta(5394.38, $payload['net_salary'], 0.001);
         $this->assertEqualsWithDelta(6000.0, $payload['basic_salary'] + $payload['allowances'], 0.001);
     }
 }

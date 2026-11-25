@@ -103,7 +103,7 @@ $stats = $current['preview'];
           @endif
         @endforeach
         @if($stats['overwrites'])<div class="alert alert-info">سيُحدَّث {{ $stats['overwrites'] }} سجلًا موجودًا فقط بعد موافقتك.</div>@endif
-        @if($stats['deferred_existing'])<div class="alert alert-warning">{{ $stats['deferred_existing'] }} أيام ببصمات زائدة: السجل الحالي سيبقى كما هو حتى مراجعة الاستثناءات.</div>@endif
+        @if($stats['deferred_existing'])<div class="alert alert-warning">{{ $stats['deferred_existing'] }} أيام ببصمات زائدة: السجل الحالي سيبقى كما هو حتى مراجعة أخطاء البصمات.</div>@endif
         <div class="d-flex gap-2 mb-3 flex-wrap">
           @if($stats['errors'])<button class="btn btn-outline-danger btn-sm" type="submit" formaction="{{ route('attendance.import.rejected') }}">تحميل تقرير المرفوضات والمراجعة كاملًا (Excel)</button>@endif
         </div>

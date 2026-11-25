@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title',__('أصل ملف الاستيراد'))
 @section('content')
-<a href="{{ route('attendance.exceptions.index') }}">{{ __('الاستثناءات') }}</a><h3 class="my-3">{{ $batch->file_name }}</h3><p>{{ __('نسخة أصلية خاصة للمراجعة، لا تتغير عند تصحيح البصمات.') }}</p>
+<a href="{{ route('attendance.exceptions.index') }}">{{ __('أخطاء البصمات') }}</a><h3 class="my-3">{{ $batch->file_name }}</h3><p>{{ __('نسخة أصلية خاصة للمراجعة، لا تتغير عند تصحيح البصمات.') }}</p>
 <h5>{{ __('أيام الملف وسجل المراجعة') }}</h5>
 @foreach(\App\Models\AttendanceImportDay::with('employee')->where('batch_id',$batch->id)->orderBy('work_date')->get() as $importDay)
 <div class="mb-2"><a href="{{ route('attendance.exceptions.show',$importDay) }}">{{ $importDay->employee->employee_code }} · {{ $importDay->work_date->format('d/m/Y') }}</a> · {{ ['pending'=>__('تحتاج مراجعة'),'resolved'=>__('تمت المراجعة'),'deleted'=>__('مستبعد')][$importDay->resolution] }}</div>

@@ -4,3 +4,5 @@ database/migrations/2026_11_11_100000_create_tour_steps_table.php text eol=lf
 database/migrations/2026_11_15_000001_add_import_batch_id_to_imported_operational_records.php text eol=lf
 database/migrations/2026_11_17_000002_owner_updater_trial.php text eol=lf
 database/migrations/2026_11_17_000003_repair_innodb_and_fingerprint_command_relations.php text eol=lf
+database/migrations/2026_11_23_000001_remove_global_penalty_types.php text eol=lf
+database/migrations/2026_11_23_000002_make_insurance_and_tax_rules_global.php text eol=lf
