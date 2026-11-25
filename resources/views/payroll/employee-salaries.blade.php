@@ -74,6 +74,16 @@
   .payroll-month-picker .mp-month.has-data::after { content:''; position:absolute; top:5px; left:6px; width:6px; height:6px; border-radius:50%; background:#16a36f; }
   .payroll-month-picker .mp-note { font-size:11px; color:#64748b; margin-top:8px; text-align:center; }
   #period { cursor:pointer; }
+  @media (max-width: 767.98px) {
+    #payrollPrototype .panelhead { flex-wrap:wrap; }
+    #payrollPrototype .panelhead > .employee-payroll-actions, .employee-payroll-actions { display:grid !important; grid-template-columns:1fr 1fr; gap:10px !important; align-items:stretch; flex:0 0 100%; width:100%; margin-top:10px !important; }
+    #payrollPrototype .panelhead > .employee-payroll-actions .btn, .employee-payroll-actions .btn { flex:none; width:100%; min-height:46px; padding:0 12px; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; font-weight:700; }
+    .employee-payroll-actions form { display:block !important; grid-column:1 / -1; margin:0; }
+    .employee-payroll-actions > span { grid-column:1 / -1; text-align:center; }
+    #payrollPrototype .toolbar { display:grid !important; grid-template-columns:1fr 1fr; gap:10px !important; align-items:stretch; }
+    #payrollPrototype .toolbar .search { grid-column:1 / -1; width:100% !important; min-width:0; height:46px; box-sizing:border-box; }
+    #payrollPrototype .toolbar select.btn { width:100% !important; min-width:0; height:46px; box-sizing:border-box; flex:none; text-align:start; }
+  }
 </style>
 
 <ul class="nav nav-tabs payroll-view-tabs" id="payrollViewTabs" role="tablist">
@@ -83,14 +93,14 @@
 
 <div class="employee-payroll-actions d-flex gap-2 flex-wrap mb-3">
   @if(auth()->user()?->hasPermission('payroll.export'))
-    <a class="btn btn-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}"><i class="bi bi-file-earmark-excel"></i> {{ __('تصدير Excel') }}</a>
+    <a class="btn btn-success" href="{{ route('payroll.export', ['month' => $month->format('Y-m-01'), 'format' => 'csv']) }}" title="{{ __('تصدير Excel') }}" aria-label="{{ __('تصدير Excel') }}"><i class="bi bi-file-earmark-excel"></i> <span class="btn-label">{{ __('تصدير Excel') }}</span></a>
   @endif
-  <button type="button" class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> {{ __('طباعة') }}</button>
+  <button type="button" class="btn btn-outline-secondary" onclick="window.print()" title="{{ __('طباعة') }}" aria-label="{{ __('طباعة') }}"><i class="bi bi-printer"></i> <span class="btn-label">{{ __('طباعة') }}</span></button>
   @if(auth()->user()?->hasPermission('payroll.create'))
     <form method="POST" action="{{ route('payroll.runs.generate') }}" class="d-inline">
       @csrf
       <input type="hidden" name="month" value="{{ $month->format('Y-m-01') }}">
-      <button type="submit" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> {{ __('تحديث المسير') }}</button>
+      <button type="submit" class="btn btn-primary" title="{{ __('تحديث المسير') }}" aria-label="{{ __('تحديث المسير') }}"><i class="bi bi-arrow-clockwise"></i> <span class="btn-label">{{ __('تحديث المسير') }}</span></button>
     </form>
   @endif
   @if(!empty($lastPayrollRefreshAt))
