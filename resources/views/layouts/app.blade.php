@@ -599,6 +599,7 @@
     if (event.persisted) window.location.reload();
   });
 </script>
+@include('partials.setup-gate')
 @include('components.guided-tour')
 <script src="{{ asset('penalty-entry.js') }}?v={{ @filemtime(public_path('penalty-entry.js')) }}"></script>
 @stack('scripts')

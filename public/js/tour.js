@@ -361,7 +361,10 @@
     }
     post(config.completeUrl).then(() => {
       teardown();
-      if (config.skipUrl) window.location.href = config.skipUrl;
+      if (!config.skipUrl) return;
+      const go = () => { window.location.href = config.skipUrl; };
+      if (window.masarSetupGate) window.masarSetupGate.open(go);
+      else go();
     });
   }
 
