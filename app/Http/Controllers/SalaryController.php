@@ -341,9 +341,12 @@ class SalaryController extends Controller
             })
             ->pluck('id');
 
+        // Inactive staff (suspended, pending hire, or an explicit "Inactive"
+        // status) never have a salary structure listed.
         return Employee::query()
             ->when($companyId, fn (Builder $query) => $query->where('company_id', $companyId))
-            ->whereNotIn('id', $hiddenTerminalIds);
+            ->whereNotIn('id', $hiddenTerminalIds)
+            ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', Employee::INACTIVE_STATUS_NAMES));
     }
 
     private function ensureEmployeeIsEligibleForSalary(?Employee $employee): void

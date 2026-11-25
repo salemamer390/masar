@@ -20,21 +20,20 @@ class InsuranceController extends Controller
         $month = $request->filled('month') ? Carbon::createFromFormat('Y-m', $request->input('month'))->startOfMonth() : now()->startOfMonth();
         $monthStart = $month->copy()->startOfMonth()->toDateString();
         $monthEnd = $month->copy()->endOfMonth()->toDateString();
-        $eligible = fn (Builder $query) => $query->where(function (Builder $employee) use ($monthStart, $monthEnd): void {
-            $employee->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Active', 'نشط']))
-                ->orWhere(function (Builder $ended) use ($monthStart, $monthEnd): void {
-                    $ended->whereHas('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
-                        ->where(function (Builder $termination) use ($monthStart, $monthEnd): void {
-                            $termination->whereBetween('termination_date', [$monthStart, $monthEnd])
-                                ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereIn('status', ['registered', 'مسجل'])
-                                    ->where(function (Builder $recordDate) use ($monthStart): void {
-                                        $recordDate->whereNull('insurance_end_date')->orWhereDate('insurance_end_date', '>=', $monthStart);
-                                    }));
-                        });
-                });
-        });
+        $eligible = fn (Builder $query) => $query
+            ->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', Employee::INACTIVE_STATUS_NAMES))
+            ->where(function (Builder $employee) use ($monthStart, $monthEnd): void {
+                $employee->whereDoesntHave('status', fn (Builder $status) => $status->whereIn('name', ['Terminated', 'منتهي الخدمة', 'منتهى الخدمة', 'Resigned', 'Resignation', 'مستقيل', 'استقالة']))
+                    ->orWhere(function (Builder $termination) use ($monthStart, $monthEnd): void {
+                        $termination->whereBetween('termination_date', [$monthStart, $monthEnd])
+                            ->orWhereHas('insuranceRecord', fn (Builder $record) => $record->whereIn('status', ['registered', 'مسجل'])
+                                ->where(function (Builder $recordDate) use ($monthStart): void {
+                                    $recordDate->whereNull('insurance_end_date')->orWhereDate('insurance_end_date', '>=', $monthStart);
+                                }));
+                    });
+            });
         $insuranceRecords = InsuranceRecord::with(['employee.department', 'employee.job', 'employee.currentSalary'])
-            ->whereHas('employee')
+            ->whereHas('employee', $eligible)
             ->when($request->filled('search'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('full_name', 'like', '%'.$request->search.'%')->orWhere('employee_code', 'like', '%'.$request->search.'%')))
             ->when($request->filled('department_id'), fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('department_id', $request->department_id)))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $this->normalizeInsuranceStatus($request->status)))
@@ -51,7 +50,7 @@ class InsuranceController extends Controller
         // screen as well as in the registration modal. This is important for
         // a newly added employee: absence of an InsuranceRecord must not hide
         // the employee from the insurance workflow.
-        $employees = Employee::query()->whereDoesntHave('insuranceRecord')
+        $employees = Employee::query()->tap($eligible)->whereDoesntHave('insuranceRecord')
             ->when($request->filled('search'), fn ($q) => $q->where(function ($employee) use ($request) {
                 $employee->where('full_name', 'like', '%'.$request->search.'%')
                     ->orWhere('employee_code', 'like', '%'.$request->search.'%');
@@ -61,7 +60,7 @@ class InsuranceController extends Controller
             ->orderBy('full_name')->get();
         $departments = \App\Models\Department::where('is_active', 1)->orderBy('name')->get();
         $organization = DB::table('insurance_organization_settings')->where('company_id', auth()->user()->company_id)->first();
-        $totalEmployees = Employee::count();
+        $totalEmployees = Employee::query()->tap($eligible)->count();
         $registered = InsuranceRecord::where('status', 'مسجل')->count();
         $unregistered = Employee::whereDoesntHave('insuranceRecord', fn ($q) => $q->where('status', 'مسجل'))->count();
         $pending = InsuranceRecord::whereIn('status', ['قيد التسجيل', 'Pending'])->count();
