@@ -10,5 +10,6 @@
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="TOUR_ENFORCE" value="false"/>
+        <env name="IMPORT_SETUP_GATE" value="false"/>
     </php>
 </phpunit>

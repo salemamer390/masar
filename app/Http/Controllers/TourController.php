@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Notifications\WorkingHoursSetupNotification;
 use App\Support\GuidedTour;
 use Illuminate\Http\Request;
 
@@ -30,7 +31,11 @@ class TourController extends Controller
      */
     public function complete(Request $request)
     {
-        $request->user()->forceFill(['tour_seen_at' => now(), 'tour_step' => null])->save();
+        $user = $request->user();
+        $user->forceFill(['tour_seen_at' => now(), 'tour_step' => null])->save();
+        if (! $user->notifications()->where('type', WorkingHoursSetupNotification::class)->exists()) {
+            $user->notify(new WorkingHoursSetupNotification());
+        }
 
         return response()->noContent();
     }
