@@ -20,15 +20,16 @@ class InsuranceDeregistrationNotification extends Notification
         $name = $this->employee->full_name;
         $left = $this->info['left'];
         $message = match (true) {
-            $this->info['overdue'] => "خطر: تأخر فصل الموظف {$name} من التأمينات ".abs($left).' يوم عن المهلة. قدّم استمارة 6 واضغط «تم فصله» الآن.',
-            $left <= 2 => "خطر: باقي {$left} يوم فقط لفصل الموظف {$name} من التأمينات (استمارة 6). اضغط «تم فصله» بعد التقديم.",
-            default => "تنبيه: الموظف {$name} ترك العمل ويجب فصله من التأمينات خلال أسبوع (استمارة 6). باقي {$left} أيام.",
+            $this->info['overdue'] => "خطر: فصل {$name} متأخر ".abs($left).' يوم (س6)',
+            $left <= 2 => "خطر: فصل {$name} من التأمينات باقي {$left} يوم",
+            default => "تنبيه: فصل {$name} من التأمينات باقي {$left} أيام",
         };
 
         return [
             'kind' => 'insurance_deregistration',
             'severity' => $this->info['level'],
             'employee_id' => $this->employee->id,
+            'record_id' => $this->employee->insuranceRecord?->id,
             'employee_code' => $this->employee->employee_code,
             'termination_date' => optional($this->employee->termination_date)->toDateString(),
             'reminder_key' => $this->reminderKey,
