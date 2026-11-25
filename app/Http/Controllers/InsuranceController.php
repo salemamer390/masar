@@ -193,6 +193,10 @@ class InsuranceController extends Controller
     {
         $employee = $insuranceRecord->employee()->first();
         abort_unless($employee && (int) $employee->company_id === (int) auth()->user()->company_id, 404);
+        if (in_array($insuranceRecord->status, InsuranceDeregistrationService::UNREGISTERED_STATUSES, true)) {
+            $deregistration->clear($employee);
+            return back()->with('toast', __('تم فصله بالفعل.'));
+        }
         $old = $insuranceRecord->toArray();
         DB::transaction(function () use ($insuranceRecord, $old) {
             $insuranceRecord->update(['status' => 'unregistered', 'insurance_end_date' => today()->toDateString()]);

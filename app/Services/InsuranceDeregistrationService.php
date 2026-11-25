@@ -102,4 +102,26 @@ class InsuranceDeregistrationService
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
     }
+
+    /** The تم فصله button shows only on the newest reminder of an employee who is still registered. */
+    public static function showsConfirmButton(\Illuminate\Notifications\DatabaseNotification $notification): bool
+    {
+        $data = $notification->data;
+        if (($data['kind'] ?? '') !== 'insurance_deregistration' || empty($data['record_id'])) {
+            return false;
+        }
+        $record = \App\Models\InsuranceRecord::withoutGlobalScopes()->find($data['record_id']);
+        if (!$record || in_array($record->status, self::UNREGISTERED_STATUSES, true)) {
+            return false;
+        }
+        $newest = \Illuminate\Notifications\DatabaseNotification::query()
+            ->where('notifiable_type', $notification->notifiable_type)
+            ->where('notifiable_id', $notification->notifiable_id)
+            ->where('type', $notification->type)
+            ->where('data->employee_id', $data['employee_id'] ?? null)
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->value('id');
+
+        return $newest === $notification->id;
+    }
 }
