@@ -6399,3 +6399,26 @@ body.preview-dark .kpi-summary-strip.approved-summary-cards.approved-summary-car
   .dashboard-command-bar.dashboard-command-bar--reference:has(> :nth-child(5):last-child) > :nth-child(n+4) { grid-column: span 3; }
   .dashboard-command-bar.dashboard-command-bar--reference:has(> :nth-child(4):last-child) > * { grid-column: span 3; }
 }
+/* Mobile batch 3: empty tables fit the screen instead of scrolling sideways with clipped text */
+@media (max-width:767.98px) {
+  table:has(> tbody > tr:only-child > td[colspan]) {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed;
+  }
+  table:has(> tbody > tr:only-child > td[colspan]) > thead { display: none; }
+  table:has(> tbody > tr:only-child > td[colspan]) > tbody > tr > td[colspan] {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+}
+@media (max-width:767.98px) {
+  .d-flex.justify-content-between.mb-3:has(> h3):has(> .d-flex) { flex-direction: column; align-items: stretch !important; gap: 12px; }
+  .d-flex.justify-content-between.mb-3:has(> h3):has(> .d-flex) > h3 { font-size: 18px; line-height: 1.5; margin: 0; }
+  .d-flex.justify-content-between.mb-3:has(> h3):has(> .d-flex) > .d-flex { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px !important; width: 100%; }
+  .d-flex.justify-content-between.mb-3:has(> h3):has(> .d-flex) > .d-flex > .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-width: 0; min-height: 46px; margin: 0; padding: 4px 8px; box-sizing: border-box; text-align: center; line-height: 1.3; }
+  .d-flex.flex-wrap.mb-3:has(> [data-summary-tab]) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px !important; }
+  .d-flex.flex-wrap.mb-3:has(> [data-summary-tab]) > .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-width: 0; min-height: 46px; margin: 0; padding: 0 8px; box-sizing: border-box; white-space: nowrap; }
+  .d-flex.flex-wrap.mb-3:has(> [data-summary-tab]) > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
