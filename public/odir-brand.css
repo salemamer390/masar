@@ -15,3 +15,13 @@ html[dir=ltr] .sidebar .nav-item.active{box-shadow:inset 3px 0 0 var(--odir-gold
 .dashboard-command-bar--reference a:first-child{box-shadow:inset 0 -3px 0 var(--odir-gold)!important}
 .topbar-reference{border-top:2px solid var(--odir-gold)}
 @media(max-width:520px){.odir-brand img{width:112px;height:46px}.nav{gap:8px}.nav .btn{padding-inline:11px}}
+/* Mobile: public header keeps its buttons on one line and the row fits 320-390px. */
+@media(max-width:520px){
+  header.wrap.nav{padding-inline:14px;gap:8px;height:68px}
+  header.wrap.nav .odir-brand{flex:0 1 auto;min-width:0}
+  header.wrap.nav .odir-brand img{width:92px;height:40px}
+  header.wrap.nav > div{gap:6px!important;flex:0 0 auto}
+  header.wrap.nav .btn{white-space:nowrap;font-size:13px;padding:9px 12px;min-height:40px}
+  section.wrap.hero{overflow-x:clip}
+  section.wrap.hero .dashboard{transform:none}
+}
