@@ -22,11 +22,15 @@ class NotificationController extends Controller
         return redirect($item->data['url'] ?? route('dashboard'));
     }
 
-    public function confirm(Request $request, string $notification, \App\Services\LeaveAttendanceConflictService $conflicts): RedirectResponse
+    public function confirm(Request $request, string $notification, \App\Services\LeaveAttendanceConflictService $conflicts): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         abort_unless($request->user()->hasPermission('leaves.view'), 403);
         $item = $request->user()->notifications()->findOrFail($notification);
         $conflicts->confirm($request->user(), $item);
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => __('تم تأكيد التعارض ولن يتكرر التنبيه.')]);
+        }
+
         return back()->with('toast', __('تم تأكيد التعارض ولن يتكرر التنبيه.'));
     }
 
