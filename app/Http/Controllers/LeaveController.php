@@ -113,7 +113,7 @@ class LeaveController extends Controller
         if ($request->hasFile('document')) { $proposed->document_path = '(uploaded)'; $proposed->document_name = $request->file('document')->getClientOriginalName(); }
         $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         if ($data['status'] === 'Approved') $this->leaveBalances->validateForApproval($proposed, $leave->id);
-        $newDocumentPath = $request->hasFile('document') ? $request->file('document')->store('leave-documents/'.$data['employee_id'], 'local') : null;
+        $newDocumentPath = $request->hasFile('document') ? \App\Support\ImageUpload::store($request->file('document'), 'leave-documents/'.$data['employee_id'], 'local', 2000, 90)[0] : null;
         $leave->update([
             'birth_date' => $proposed->birth_date,
             'expected_delivery_date' => $proposed->expected_delivery_date,
@@ -192,7 +192,7 @@ class LeaveController extends Controller
         // Validate before saving, so this record never consumes its own balance twice.
         $this->leaveBalances->enforceBalanceOnEarlyGrant($request->boolean('early_wait_only'));
         $this->leaveBalances->validateForApproval($leave);
-        if ($request->hasFile('document')) $leave->document_path = $request->file('document')->store('leave-documents/'.$leave->employee_id, 'local');
+        if ($request->hasFile('document')) $leave->document_path = \App\Support\ImageUpload::store($request->file('document'), 'leave-documents/'.$leave->employee_id, 'local', 2000, 90)[0];
         $leave->save();
         $this->leaveBalances->sync($leave->employee, $start);
         $this->leaveStatus->sync();
