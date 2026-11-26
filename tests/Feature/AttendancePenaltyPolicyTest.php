@@ -188,8 +188,8 @@ class AttendancePenaltyPolicyTest extends TestCase
         $service->ensureSuggested($this->company->id);
         $policy = $service->forCompany($this->company->id);
         $this->assertFalse($policy['enabled']);
-        $this->assertCount(20, $policy['tiers']);
-        $this->assertSame([1, 16, 31, 61], array_values(array_unique(array_column(array_filter($policy['tiers'], fn ($t) => $t['kind'] === 'late'), 'from_minutes'))));
+        $this->assertCount(6, $policy['tiers']);
+        $this->assertSame([1, 16], array_values(array_unique(array_column(array_filter($policy['tiers'], fn ($t) => $t['kind'] === 'late'), 'from_minutes'))));
         $this->assertTrue($policy['deduct_time_wage']);
         $this->assertSame(['days'], array_values(array_unique(array_column($policy['tiers'], 'unit'))));
         $service->save($this->company->id, false, null, [$this->tiers()[0]]);

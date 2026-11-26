@@ -109,34 +109,33 @@ class AttendancePenaltyPolicyService
     /**
      * Suggested starting tiers, shown to a company that has not defined a policy yet. They are a labelled
      * suggestion, not a legal default: the policy stays disabled and the company edits every number.
-     * Minutes are contiguous (1-15, 16-30, 31-60, 61-120, 121-180); above 180 nothing is suggested.
-     * Days per repetition band: occurrences 1-3, then 4 and above.
+     * Lateness minutes are contiguous (1-15, 16+). Repetition bands: first occurrence, then second and above.
      */
     /**
-     * Suggested starting tiers from the owner's reference schedule: lateness bands 1-15, 16-30,
-     * 31-60 and 61+ minutes and a single early-departure band, each escalating over four
-     * occurrences. A zero deduction is a recorded warning (إنذار); from the fifth occurrence the
-     * fourth value repeats (the open 4+ band). They are a labelled suggestion, not a legal
-     * default: the policy stays disabled and the company edits every number.
+     * Suggested starting tiers: two lateness bands (1-15 and 16+ minutes) and a single
+     * early-departure band, each escalating over two occurrences (first time, then second and
+     * above). The company adds more repetition columns itself when it needs them. A zero
+     * deduction is a recorded warning (إنذار); beyond the last occurrence the open band repeats.
+     * They are a labelled suggestion, not a legal default: the policy stays disabled and the
+     * company edits every number.
      */
     public static function suggestedTiers(): array
     {
         $tiers = [];
         $add = function (string $kind, int $from, ?int $to, array $amounts) use (&$tiers): void {
+            $last = count($amounts) - 1;
             foreach ($amounts as $index => $amount) {
                 $occurrence = $index + 1;
                 $tiers[] = [
                     'kind' => $kind, 'from_minutes' => $from, 'to_minutes' => $to,
-                    'occurrence_from' => $occurrence, 'occurrence_to' => $occurrence >= 4 ? null : $occurrence,
+                    'occurrence_from' => $occurrence, 'occurrence_to' => $index === $last ? null : $occurrence,
                     'deduction_days' => $amount, 'unit' => 'days',
                 ];
             }
         };
-        $add('late', 1, 15, [0, 0.25, 0.5, 1]);
-        $add('late', 16, 30, [0, 0.5, 1, 2]);
-        $add('late', 31, 60, [0.25, 0.5, 1, 2]);
-        $add('late', 61, null, [0.5, 1, 2, 3]);
-        $add('early_leave', 1, null, [0, 0.5, 1, 2]);
+        $add('late', 1, 15, [0, 0.25]);
+        $add('late', 16, null, [0, 0.5]);
+        $add('early_leave', 1, null, [0, 0.5]);
         return $tiers;
     }
 
