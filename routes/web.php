@@ -73,6 +73,24 @@ foreach ([
 }
 
 Route::post('/contact', [MarketingSiteController::class, 'submitContact'])->middleware('throttle:5,1')->name('site.contact.submit');
+
+// Crawl basics. URLs follow the request host, so they stay correct when the
+// custom domain replaces the free subdomain.
+Route::get('/robots.txt', fn () => response(
+    "User-agent: *\nAllow: /\n\nSitemap: ".url('/sitemap.xml')."\n",
+    200,
+    ['Content-Type' => 'text/plain; charset=UTF-8']
+));
+Route::get('/sitemap.xml', function () {
+    $urls = collect(['site.home', 'site.features', 'site.contact', 'site.signup'])
+        ->map(fn ($name) => '  <url><loc>'.e(route($name)).'</loc></url>')
+        ->implode("\n");
+    return response(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n{$urls}\n</urlset>\n",
+        200,
+        ['Content-Type' => 'application/xml; charset=UTF-8']
+    );
+});
 Route::get('/forgot-password', [MarketingSiteController::class, 'forgotPassword'])->name('password.request');
 Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
 Route::get('/reset-password/{token}', [MarketingSiteController::class, 'resetPassword'])->name('password.reset');
