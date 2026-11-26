@@ -615,7 +615,7 @@ class EmployeeController extends Controller
         }
         app(\App\Services\LeaveBalanceService::class)->validateForApproval($leave);
         if ($request->hasFile('document')) {
-            $leave->document_path = $request->file('document')->store('leave-documents/'.$employee->id, 'local');
+            $leave->document_path = \App\Support\ImageUpload::store($request->file('document'), 'leave-documents/'.$employee->id, 'local', 2000, 90)[0];
         }
         DB::transaction(function () use ($leave, $employee): void {
             $leave->save();
