@@ -37,5 +37,5 @@
 <section class="sp-sec alt"><div class="wrap"><div class="sp-head"><h2>أدوات أخرى في اودير HR</h2></div><div class="sp-rel">@foreach ($page['related'] as $r)<a href="{{ route('site.solution', $r) }}"><span class="sp-ico">{{ $all[$r]['icon'] }}</span>{{ $all[$r]['nav'] }}</a>@endforeach</div></div></section>
 <section class="wrap bottom-cta"><div class="cta-box"><div><h2>ابدأ تنظيم الموارد البشرية اليوم</h2><p>أنشئ حساب شركتك، وأضف فريقك، وابدأ إدارة عملياتك من لوحة واحدة.</p></div><a class="btn" href="{{ route('site.signup') }}">إنشاء حساب جديد　←</a></div></section>
 </main>
-<footer class="footer"><div class="wrap footer-inner"><span>© 2026 اودير HR — جميع الحقوق محفوظة</span><span><a href="{{ route('site.privacy') }}">سياسة الخصوصية</a>　·　<a href="{{ route('site.terms') }}">شروط الاستخدام</a></span></div></footer>
+<footer class="footer"><div class="wrap footer-inner"><span>© 2026 اودير HR — جميع الحقوق محفوظة</span><span><a href="{{ route('site.articles') }}">المقالات</a>　·　<a href="{{ route('site.privacy') }}">سياسة الخصوصية</a>　·　<a href="{{ route('site.terms') }}">شروط الاستخدام</a></span></div></footer>
 </body></html>
