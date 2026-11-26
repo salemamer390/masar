@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\EndSessionsAfterPasswordChange::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SetLocale::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\RunOvertimeGapReminders::class);
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
             'superadmin' => \App\Http\Middleware\SuperAdminOnly::class,

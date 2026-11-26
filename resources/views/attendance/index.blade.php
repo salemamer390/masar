@@ -5,6 +5,9 @@
 @if(session('attendance_import_errors'))
 <div class="alert alert-warning mt-3"><strong>{{ __('مراجعة استيراد الحضور:') }}</strong><ul class="mb-0 mt-2">@foreach(session('attendance_import_errors') as $importError)<li>{{ $importError }}</li>@endforeach</ul></div>
 @endif
+@if(($overtimeGapDays ?? 0) > 0)
+<div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2"><div class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle fs-5"></i><span class="fw-semibold">{{ __('يوجد :days يوم حضور إضافي بدون طلب يغطيه لدى :employees موظف في هذه الفترة.', ['days' => format_number($overtimeGapDays), 'employees' => format_number($overtimeGapEmployees)]) }}</span></div><a class="btn btn-sm btn-dark" href="{{ route('jobs.overtime-review', ['month' => now()->format('Y-m')]) }}"><i class="bi bi-list-check"></i> {{ __('مراجعة الأيام') }}</a></div>
+@endif
 <div class="attendance-today-label"><i class="bi bi-calendar-day"></i> {{ __('اليوم —') }} {{ today()->locale(app()->getLocale())->translatedFormat('l d/m/Y') }}</div>
 <div class="attendance-stat-grid kpi-summary-strip approved-summary-cards" tabindex="0" role="region" aria-label="{{ __('ملخص الإحصائيات، اسحب لعرض المزيد') }}">@foreach([[__('حاضر اليوم'),$presentToday,'green','person-check'],[__('غياب اليوم'),$absentToday,'red','person-x'],[__('متأخرون'),$lateToday,'orange','clock-history'],[__('متوسط الحضور'),$avgCheckIn,'blue','clock']] as $stat)
 @if($loop->index === 1)<div class="summary-card-group" style="--summary-columns: {{ $loop->count - 1 }}">@endif

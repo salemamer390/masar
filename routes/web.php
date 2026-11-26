@@ -131,6 +131,7 @@ Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware
     });
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{notification}/confirm', [NotificationController::class, 'confirm'])->name('notifications.confirm');
+    Route::post('/notifications/{notification}/dismiss-overtime-gap', [NotificationController::class, 'dismissOvertimeGap'])->name('notifications.dismiss-overtime-gap');
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     Route::post('/tour/progress', [TourController::class, 'progress'])->name('tour.progress');
     Route::post('/tour/complete', [TourController::class, 'complete'])->name('tour.complete');
