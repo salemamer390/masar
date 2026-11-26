@@ -64,9 +64,8 @@ class DocumentController extends Controller
             $originalName = $file->getClientOriginalName();
             $extension = $file->getClientOriginalExtension();
             $mimeType = $file->getClientMimeType();
-            $fileSize = $file->getSize();
 
-            $path = $file->store("documents/{$employee->id}", 'local');
+            [$path, $fileSize] = \App\Support\ImageUpload::store($file, "documents/{$employee->id}", 'local', 2000, 90);
 
             $document->file_name = $originalName;
             $document->file_path = $path;
@@ -103,12 +102,12 @@ class DocumentController extends Controller
         }
 
         $file = $request->file('document_file');
-        $path = $file->store("documents/{$document->employee_id}", 'local');
+        [$path, $storedSize] = \App\Support\ImageUpload::store($file, "documents/{$document->employee_id}", 'local', 2000, 90);
 
         $document->file_name = $file->getClientOriginalName();
         $document->file_path = $path;
         $document->mime_type = $file->getClientMimeType();
-        $document->file_size = $file->getSize();
+        $document->file_size = $storedSize;
         $document->document_type = strtoupper($file->getClientOriginalExtension());
         $document->status = 'مكتمل';
         $document->uploaded_by = auth()->id();
