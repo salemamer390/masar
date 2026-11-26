@@ -58,6 +58,7 @@ Route::middleware(['throttle:120,1', \App\Http\Middleware\RequireSecureFingerpri
 // Canonical marketing URLs. Keep legacy bookmarks working through redirects.
 Route::get('/', [MarketingSiteController::class, 'home'])->name('site.home');
 Route::get('/features', [MarketingSiteController::class, 'features'])->name('site.features');
+Route::get('/solutions/{slug}', [MarketingSiteController::class, 'solution'])->where('slug', '[a-z-]+')->name('site.solution');
 Route::get('/privacy', [MarketingSiteController::class, 'privacy'])->name('site.privacy');
 Route::get('/terms', [MarketingSiteController::class, 'terms'])->name('site.terms');
 Route::get('/signup', [MarketingSiteController::class, 'signup'])->name('site.signup');
@@ -82,8 +83,11 @@ Route::get('/robots.txt', fn () => response(
     ['Content-Type' => 'text/plain; charset=UTF-8']
 ));
 Route::get('/sitemap.xml', function () {
-    $urls = collect(['site.home', 'site.features', 'site.contact', 'site.signup'])
-        ->map(fn ($name) => '  <url><loc>'.e(route($name)).'</loc></url>')
+    $urls = collect(['site.home', 'site.features'])
+        ->map(fn ($name) => route($name))
+        ->merge(collect(array_keys(\App\Support\SolutionPages::all()))->map(fn ($slug) => route('site.solution', $slug)))
+        ->merge([route('site.contact'), route('site.signup')])
+        ->map(fn ($loc) => '  <url><loc>'.e($loc).'</loc></url>')
         ->implode("\n");
     return response(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n{$urls}\n</urlset>\n",
