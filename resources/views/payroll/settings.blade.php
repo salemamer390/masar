@@ -568,7 +568,7 @@
 
 <form id="attendancePenalties" class="settings-tab-pane" method="POST" action="{{ route('payroll.settings.attendance-penalties.update') }}" data-track-dirty="true" hidden>@csrf @method('PUT')
 @php($apTiers = old('tiers', $attendancePenaltyPolicy['tiers']))
-@php([$apGroups, $apMatrixFit, $apByOcc, $apOccLabels, $apKindLabels, $apKindIcons] = call_user_func(function (array $apTiers): array {
+@php([$apGroups, $apMatrixFit, $apByOcc, $apOccLabel, $apKindLabels, $apKindIcons] = call_user_func(function (array $apTiers): array {
     $apGroups = ['late' => [], 'early_leave' => []];
     foreach ($apTiers as $i => $tier) {
         $kind = ($tier['kind'] ?? 'late') === 'early_leave' ? 'early_leave' : 'late';
@@ -577,18 +577,23 @@
         $apGroups[$kind][$key][] = $tier;
     }
     $apMatrixFit = function (array $tiers): bool {
-        if (count($tiers) !== 4) return false;
-        $want = ['1|1' => 1, '2|2' => 1, '3|3' => 1, '4|' => 1];
-        foreach ($tiers as $t) {
-            $k = (int) ($t['occurrence_from'] ?? 1).'|'.($t['occurrence_to'] ?? '');
-            if (!isset($want[$k])) return false;
-            unset($want[$k]);
+        $sorted = collect($tiers)->sortBy(fn ($t) => (int) ($t['occurrence_from'] ?? 1))->values();
+        if ($sorted->isEmpty()) return false;
+        $last = $sorted->count() - 1;
+        foreach ($sorted as $i => $t) {
+            if ((int) ($t['occurrence_from'] ?? 0) !== $i + 1) return false;
+            $occTo = $t['occurrence_to'] ?? null;
+            if ($i === $last ? $occTo !== null : (int) $occTo !== $i + 1) return false;
         }
-        return count($want) === 0;
+        return true;
     };
     $apByOcc = fn (array $tiers) => collect($tiers)->sortBy(fn ($t) => (int) ($t['occurrence_from'] ?? 1))->values()->all();
-    return [$apGroups, $apMatrixFit, $apByOcc,
-        [__('المرة الأولى'), __('المرة الثانية'), __('المرة الثالثة'), __('الرابعة فأكثر')],
+    $apOrdinals = [__('الأولى'), __('الثانية'), __('الثالثة'), __('الرابعة'), __('الخامسة'), __('السادسة'), __('السابعة'), __('الثامنة'), __('التاسعة'), __('العاشرة')];
+    $apOccLabel = function (int $pos, int $total) use ($apOrdinals) {
+        $ord = $apOrdinals[$pos - 1] ?? $pos;
+        return $pos === $total ? $ord.' '.__('فأكثر') : __('المرة').' '.$ord;
+    };
+    return [$apGroups, $apMatrixFit, $apByOcc, $apOccLabel,
         ['late' => __('التأخير'), 'early_leave' => __('الخروج المبكر')],
         ['late' => 'bi-clock-history', 'early_leave' => 'bi-box-arrow-left']];
 }, $apTiers))
@@ -619,24 +624,26 @@
 @if($apMatrixFit($apBandTiers))
 @php($apCells = $apByOcc($apBandTiers))
 @php($apFirst = $apCells[0])
-<div class="ap-row" data-ap-row>
+@php($apTotal = count($apCells))
+<div class="ap-row" data-ap-row style="--ap-cols:{{ $apTotal }}">
 <div class="ap-band"><span class="ap-band-range">{{ __('من') }} <input type="number" min="1" class="ap-band-from" value="{{ $apFirst['from_minutes'] ?? '' }}" aria-label="{{ __('من دقيقة') }}"> {{ __('إلى') }} <input type="number" min="1" class="ap-band-to" value="{{ $apFirst['to_minutes'] ?? '' }}" placeholder="{{ __('بلا حد') }}" aria-label="{{ __('إلى دقيقة') }}"> {{ __('دقيقة') }}</span></div>
 @foreach($apCells as $apPos => $apCell)
 @php($apI = $apCell['_i'])
 <div class="ap-cell">
-<label>{{ $apOccLabels[$apPos] }}</label>
+<label>{{ $apOccLabel($apPos + 1, $apTotal) }}</label>
 <div class="ap-cell-inputs {{ (float) ($apCell['deduction_days'] ?? 0) == 0.0 ? 'is-warning' : '' }}">
 <input type="number" min="0" step="0.01" name="tiers[{{ $apI }}][deduction_days]" value="{{ $apCell['deduction_days'] ?? '' }}" required aria-label="{{ __('قيمة الجزاء') }}">
-<select name="tiers[{{ $apI }}][unit]" aria-label="{{ __('الوحدة') }}"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>{{ __('أيام') }}</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>{{ __('دقائق') }}</option></select>
+<select name="tiers[{{ $apI }}][unit]" class="{{ ($apCell['unit'] ?? 'days') === 'minutes' ? 'ap-unit-minutes' : 'ap-unit-days' }}" aria-label="{{ __('الوحدة') }}"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>{{ __('أيام') }}</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>{{ __('دقائق') }}</option></select>
 <span class="ap-warn-tag">{{ __('إنذار') }}</span>
 </div>
 <input type="hidden" name="tiers[{{ $apI }}][kind]" value="{{ $apKind }}">
 <input type="hidden" class="ap-h-from" name="tiers[{{ $apI }}][from_minutes]" value="{{ $apFirst['from_minutes'] ?? '' }}">
 <input type="hidden" class="ap-h-to" name="tiers[{{ $apI }}][to_minutes]" value="{{ $apFirst['to_minutes'] ?? '' }}">
 <input type="hidden" name="tiers[{{ $apI }}][occurrence_from]" value="{{ $apCell['occurrence_from'] ?? ($apPos + 1) }}">
-<input type="hidden" name="tiers[{{ $apI }}][occurrence_to]" value="{{ $apCell['occurrence_to'] ?? ($apPos === 3 ? '' : $apPos + 1) }}">
+<input type="hidden" name="tiers[{{ $apI }}][occurrence_to]" value="{{ $apCell['occurrence_to'] ?? ($apPos === $apTotal - 1 ? '' : $apPos + 1) }}">
 </div>
 @endforeach
+<button type="button" class="ap-add-occ" data-ap-add-occ @if($apTotal >= 10) disabled @endif title="{{ __('إضافة عمود تكرار') }}"><i class="bi bi-plus-lg"></i> {{ __('إضافة تكرار') }}</button>
 <button type="button" class="ap-del" data-ap-remove aria-label="{{ __('حذف الشريحة') }}"><i class="bi bi-trash"></i></button>
 </div>
 @else
@@ -649,7 +656,7 @@
 <div class="ap-f"><label>{{ __('إلى دقيقة') }} <small>{{ __('(فارغ = بلا حد)') }}</small></label><input type="number" min="1" name="tiers[{{ $apI }}][to_minutes]" class="form-control form-control-sm" value="{{ $apCell['to_minutes'] ?? '' }}"></div>
 <div class="ap-f"><label>{{ __('من المرة') }}</label><input type="number" min="1" name="tiers[{{ $apI }}][occurrence_from]" class="form-control form-control-sm" value="{{ $apCell['occurrence_from'] ?? 1 }}"></div>
 <div class="ap-f"><label>{{ __('إلى المرة') }} <small>{{ __('(فارغ = بلا حد)') }}</small></label><input type="number" min="1" name="tiers[{{ $apI }}][occurrence_to]" class="form-control form-control-sm" value="{{ $apCell['occurrence_to'] ?? '' }}"></div>
-<div class="ap-f ap-f-amount"><label>{{ __('الجزاء (0 = إنذار)') }}</label><div class="ap-cell-inputs {{ (float) ($apCell['deduction_days'] ?? 0) == 0.0 ? 'is-warning' : '' }}"><input type="number" min="0" step="0.01" name="tiers[{{ $apI }}][deduction_days]" class="form-control form-control-sm" value="{{ $apCell['deduction_days'] ?? '' }}" required><select name="tiers[{{ $apI }}][unit]" aria-label="{{ __('الوحدة') }}"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>{{ __('أيام') }}</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>{{ __('دقائق') }}</option></select><span class="ap-warn-tag">{{ __('إنذار') }}</span></div></div>
+<div class="ap-f ap-f-amount"><label>{{ __('الجزاء (0 = إنذار)') }}</label><div class="ap-cell-inputs {{ (float) ($apCell['deduction_days'] ?? 0) == 0.0 ? 'is-warning' : '' }}"><input type="number" min="0" step="0.01" name="tiers[{{ $apI }}][deduction_days]" class="form-control form-control-sm" value="{{ $apCell['deduction_days'] ?? '' }}" required><select name="tiers[{{ $apI }}][unit]" class="{{ ($apCell['unit'] ?? 'days') === 'minutes' ? 'ap-unit-minutes' : 'ap-unit-days' }}" aria-label="{{ __('الوحدة') }}"><option value="days" @selected(($apCell['unit'] ?? 'days') === 'days')>{{ __('أيام') }}</option><option value="minutes" @selected(($apCell['unit'] ?? '') === 'minutes')>{{ __('دقائق') }}</option></select><span class="ap-warn-tag">{{ __('إنذار') }}</span></div></div>
 </div>
 <button type="button" class="ap-del" data-ap-remove aria-label="{{ __('حذف الشريحة') }}"><i class="bi bi-trash"></i></button>
 </div>
@@ -663,6 +670,7 @@
 <ul class="ap-legend">
 <li>{{ __('القيمة 0 تعني إنذارًا مسجلًا بدون خصم.') }}</li>
 <li>{{ __('اليوم يُحسب من الأساسي، والدقيقة من الأساسي بنفس أساس الساعة: 480 دقيقة جزاء = يوم جزاء.') }}</li>
+<li>{{ __('لكل وحدة لون مميز:') }} <span class="ap-unit-chip ap-unit-days">{{ __('أيام') }}</span> <span class="ap-unit-chip ap-unit-minutes">{{ __('دقائق') }}</span></li>
 <li>{{ __('أيام الجزاء خاضعة لسقف أيام الجزاءات الشهري.') }}</li>
 <li>{{ __('في اليوم الواحد يُخصم جزاء التأخير وجزاء الخروج المبكر معًا.') }}</li>
 <li>{{ __('يُخصم أجر الوقت الضائع دائمًا من الإجمالي في سطر مستقل، ولا يدخل في سقف الجزاءات.') }}</li>
@@ -677,12 +685,13 @@
 @push('scripts')<script>(function(){
 const form=document.getElementById('attendancePenalties');if(!form)return;
 let n=1000;
-const occLabels=[window.masarT('المرة الأولى'),window.masarT('المرة الثانية'),window.masarT('المرة الثالثة'),window.masarT('الرابعة فأكثر')];
+const occOrds=['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة','التاسعة','العاشرة'].map(o=>window.masarT(o));
+const occLabel=(p,total)=>{const ord=occOrds[p-1]||p;return p===total?ord+' '+window.masarT('فأكثر'):window.masarT('المرة')+' '+ord;};
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const warnTag=window.masarStaticHtml('<span class="ap-warn-tag">إنذار</span>');
-const unitSel=(i,u)=>`<select name="tiers[${i}][unit]" aria-label="${window.masarT("الوحدة")}"><option value="days"${u==='minutes'?'':' selected'}>${window.masarT("أيام")}</option><option value="minutes"${u==='minutes'?' selected':''}>${window.masarT("دقائق")}</option></select>`;
+const unitSel=(i,u)=>`<select name="tiers[${i}][unit]" class="${u==='minutes'?'ap-unit-minutes':'ap-unit-days'}" aria-label="${window.masarT("الوحدة")}"><option value="days"${u==='minutes'?'':' selected'}>${window.masarT("أيام")}</option><option value="minutes"${u==='minutes'?' selected':''}>${window.masarT("دقائق")}</option></select>`;
 const cellHtml=(i,kind,from,to,occF,occT,amount,unit,label)=>`<div class="ap-cell"><label>${label}</label><div class="ap-cell-inputs${Number(amount)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" value="${esc(amount)}" required aria-label="${window.masarT("قيمة الجزاء")}">${unitSel(i,unit)}${warnTag}</div><input type="hidden" name="tiers[${i}][kind]" value="${kind}"><input type="hidden" class="ap-h-from" name="tiers[${i}][from_minutes]" value="${esc(from)}"><input type="hidden" class="ap-h-to" name="tiers[${i}][to_minutes]" value="${esc(to)}"><input type="hidden" name="tiers[${i}][occurrence_from]" value="${occF}"><input type="hidden" name="tiers[${i}][occurrence_to]" value="${esc(occT)}"></div>`;
-const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row><div class="ap-band"><span class="ap-band-range">${window.masarT("من")} <input type="number" min="1" class="ap-band-from" value="${esc(from)}" aria-label="${window.masarT("من دقيقة")}"> ${window.masarT("إلى")} <input type="number" min="1" class="ap-band-to" value="${esc(to)}" placeholder="${window.masarT("بلا حد")}" aria-label="${window.masarT("إلى دقيقة")}"> ${window.masarT("دقيقة")}</span></div>${cells.map((c,p)=>cellHtml(c.i,kind,from,to,c.occF,c.occT,c.amount,c.unit,occLabels[p])).join('')}<button type="button" class="ap-del" data-ap-remove aria-label="${window.masarT("حذف الشريحة")}"><i class="bi bi-trash"></i></button></div>`;
+const matrixRow=(kind,from,to,cells)=>`<div class="ap-row" data-ap-row style="--ap-cols:${cells.length}"><div class="ap-band"><span class="ap-band-range">${window.masarT("من")} <input type="number" min="1" class="ap-band-from" value="${esc(from)}" aria-label="${window.masarT("من دقيقة")}"> ${window.masarT("إلى")} <input type="number" min="1" class="ap-band-to" value="${esc(to)}" placeholder="${window.masarT("بلا حد")}" aria-label="${window.masarT("إلى دقيقة")}"> ${window.masarT("دقيقة")}</span></div>${cells.map((c,p)=>cellHtml(c.i,kind,from,to,c.occF,c.occT,c.amount,c.unit,occLabel(p+1,cells.length))).join('')}<button type="button" class="ap-add-occ" data-ap-add-occ title="${window.masarT("إضافة عمود تكرار")}"><i class="bi bi-plus-lg"></i> ${window.masarT("إضافة تكرار")}</button><button type="button" class="ap-del" data-ap-remove aria-label="${window.masarT("حذف الشريحة")}"><i class="bi bi-trash"></i></button></div>`;
 const customRow=(i,t)=>{const kind=t&&t.kind==='early_leave'?'early_leave':'late';t=t||{};return `<div class="ap-row ap-row-custom" data-ap-row><div class="ap-custom-grid"><div class="ap-f"><label>${window.masarT("النوع")}</label><select name="tiers[${i}][kind]" class="form-select form-select-sm" data-ap-kind><option value="late"${kind==='late'?' selected':''}>${window.masarT("تأخير")}</option><option value="early_leave"${kind==='early_leave'?' selected':''}>${window.masarT("خروج مبكر")}</option></select></div><div class="ap-f"><label>${window.masarT("من دقيقة")}</label><input type="number" min="1" name="tiers[${i}][from_minutes]" class="form-control form-control-sm" value="${esc(t.from_minutes)}" required></div><div class="ap-f"><label>${window.masarT("إلى دقيقة")} <small>(${window.masarT("فارغ")} = ${window.masarT("بلا حد)")}</small></label><input type="number" min="1" name="tiers[${i}][to_minutes]" class="form-control form-control-sm" value="${esc(t.to_minutes)}"></div><div class="ap-f"><label>${window.masarT("من المرة")}</label><input type="number" min="1" name="tiers[${i}][occurrence_from]" class="form-control form-control-sm" value="${esc(t.occurrence_from??1)}"></div><div class="ap-f"><label>${window.masarT("إلى المرة")} <small>(${window.masarT("فارغ")} = ${window.masarT("بلا حد)")}</small></label><input type="number" min="1" name="tiers[${i}][occurrence_to]" class="form-control form-control-sm" value="${esc(t.occurrence_to)}"></div><div class="ap-f ap-f-amount"><label>${window.masarT("الجزاء (")}0 = ${window.masarT("إنذار)")}</label><div class="ap-cell-inputs${Number(t.deduction_days)===0?' is-warning':''}"><input type="number" min="0" step="0.01" name="tiers[${i}][deduction_days]" class="form-control form-control-sm" value="${esc(t.deduction_days)}" required>${unitSel(i,t.unit)}${warnTag}</div></div></div><button type="button" class="ap-del" data-ap-remove aria-label="${window.masarT("حذف الشريحة")}"><i class="bi bi-trash"></i></button></div>`;};
 const refreshCounts=()=>{form.querySelectorAll('[data-ap-section]').forEach(sec=>{const c=sec.querySelectorAll('[data-ap-row]').length;const el=sec.querySelector('[data-ap-count]');if(el)el.textContent=c+' '+(c===1?window.masarT('شريحة'):window.masarT('شرائح'));const empty=sec.querySelector('[data-ap-empty]');if(empty)empty.hidden=c>0;});};
 const markDirty=()=>form.dispatchEvent(new Event('input',{bubbles:true}));
@@ -694,12 +703,14 @@ suggested.forEach(t=>{const k=t.kind==='early_leave'?'early_leave':'late';const 
 ['late','early_leave'].forEach(k=>{
 const rows=form.querySelector(`[data-ap-section="${k}"] [data-ap-rows]`);rows.innerHTML='';
 order[k].forEach(key=>{const list=seen[k][key].slice().sort((a,b)=>(a.occurrence_from||1)-(b.occurrence_from||1));
-const fit=list.length===4&&list.every((t,p)=>Number(t.occurrence_from??1)===p+1&&(p<3?Number(t.occurrence_to??'')===p+1:(t.occurrence_to===null||t.occurrence_to===''||t.occurrence_to===undefined)));
-if(fit){const cells=list.map((t,p)=>({i:n++,amount:t.deduction_days,unit:t.unit||'days',occF:t.occurrence_from??(p+1),occT:p===3?'':(t.occurrence_to??(p+1))}));rows.insertAdjacentHTML('beforeend',matrixRow(k,list[0].from_minutes,list[0].to_minutes??'',cells));}
+const fit=list.length>=1&&list.every((t,p)=>Number(t.occurrence_from??1)===p+1&&(p<list.length-1?Number(t.occurrence_to??'')===p+1:(t.occurrence_to===null||t.occurrence_to===''||t.occurrence_to===undefined)));
+if(fit){const cells=list.map((t,p)=>({i:n++,amount:t.deduction_days,unit:t.unit||'days',occF:t.occurrence_from??(p+1),occT:p===list.length-1?'':(t.occurrence_to??(p+1))}));rows.insertAdjacentHTML('beforeend',matrixRow(k,list[0].from_minutes,list[0].to_minutes??'',cells));}
 else list.forEach(t=>rows.insertAdjacentHTML('beforeend',customRow(n++,t)));
 });});
 refreshCounts();markDirty();});
 form.addEventListener('click',e=>{const b=e.target.closest('[data-ap-remove]');if(!b)return;b.closest('[data-ap-row]').remove();refreshCounts();markDirty();});
+form.addEventListener('click',e=>{const b=e.target.closest('[data-ap-add-occ]');if(!b||b.disabled)return;const row=b.closest('[data-ap-row]');const cells=row.querySelectorAll('.ap-cell');if(cells.length>=10)return;const total=cells.length,prev=cells[total-1];prev.querySelector('label').textContent=occLabel(total,total+1);prev.querySelector('input[name*="[occurrence_to]"]').value=total;const kind=prev.querySelector('input[name*="[kind]"]').value,from=row.querySelector('.ap-band-from').value,to=row.querySelector('.ap-band-to').value,pos=total+1;b.insertAdjacentHTML('beforebegin',cellHtml(n++,kind,from,to,pos,'',0,'days',occLabel(pos,pos)));row.style.setProperty('--ap-cols',pos);if(pos>=10)b.disabled=true;markDirty();});
+form.addEventListener('change',e=>{const s=e.target.closest('select[name*="[unit]"]');if(!s)return;s.classList.toggle('ap-unit-minutes',s.value==='minutes');s.classList.toggle('ap-unit-days',s.value!=='minutes');});
 form.addEventListener('change',e=>{const s=e.target.closest('[data-ap-kind]');if(!s)return;const row=s.closest('[data-ap-row]');const target=form.querySelector(`[data-ap-section="${s.value}"] [data-ap-rows]`);if(target&&row.parentElement!==target)target.appendChild(row);refreshCounts();});
 form.addEventListener('input',e=>{const wrap=e.target.closest?e.target.closest('.ap-cell-inputs'):null;if(!wrap||!e.target.name||!e.target.name.includes('deduction_days'))return;wrap.classList.toggle('is-warning',Number(e.target.value)===0);});
 document.addEventListener('input',e=>{const band=e.target.closest?e.target.closest('.ap-band'):null;if(!band)return;const row=band.closest('[data-ap-row]');const from=row.querySelector('.ap-band-from').value,to=row.querySelector('.ap-band-to').value;row.querySelectorAll('.ap-h-from').forEach(h=>h.value=from);row.querySelectorAll('.ap-h-to').forEach(h=>h.value=to);},true);
