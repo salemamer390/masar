@@ -59,6 +59,8 @@ Route::middleware(['throttle:120,1', \App\Http\Middleware\RequireSecureFingerpri
 Route::get('/', [MarketingSiteController::class, 'home'])->name('site.home');
 Route::get('/features', [MarketingSiteController::class, 'features'])->name('site.features');
 Route::get('/solutions/{slug}', [MarketingSiteController::class, 'solution'])->where('slug', '[a-z-]+')->name('site.solution');
+Route::get('/articles', [MarketingSiteController::class, 'articles'])->name('site.articles');
+Route::get('/articles/{slug}', [MarketingSiteController::class, 'article'])->where('slug', '[a-z0-9-]+')->name('site.article');
 Route::get('/privacy', [MarketingSiteController::class, 'privacy'])->name('site.privacy');
 Route::get('/terms', [MarketingSiteController::class, 'terms'])->name('site.terms');
 Route::get('/signup', [MarketingSiteController::class, 'signup'])->name('site.signup');
@@ -86,6 +88,8 @@ Route::get('/sitemap.xml', function () {
     $urls = collect(['site.home', 'site.features'])
         ->map(fn ($name) => route($name))
         ->merge(collect(array_keys(\App\Support\SolutionPages::all()))->map(fn ($slug) => route('site.solution', $slug)))
+        ->merge([route('site.articles')])
+        ->merge(collect(array_keys(\App\Support\ArticlePages::all()))->map(fn ($slug) => route('site.article', $slug)))
         ->merge([route('site.contact'), route('site.signup')])
         ->map(fn ($loc) => '  <url><loc>'.e($loc).'</loc></url>')
         ->implode("\n");
