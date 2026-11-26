@@ -269,7 +269,8 @@ class EmployeeController extends Controller
             return $employee;
         });
         if ($request->hasFile('profile_photo')) {
-            $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
+            [$photoPath] = \App\Support\ImageUpload::store($request->file('profile_photo'), "employees/{$employee->id}/profile", 'local', 1200, 85);
+            $employee->update(['profile_photo_path' => $photoPath]);
         }
         ActivityLog::record('employee_create', "تمت إضافة موظف جديد: {$employee->full_name}", $employee);
 
@@ -385,7 +386,7 @@ class EmployeeController extends Controller
             if ($employee->profile_photo_path) {
                 \Illuminate\Support\Facades\Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
             }
-            $validated['profile_photo_path'] = $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local');
+            [$validated['profile_photo_path']] = \App\Support\ImageUpload::store($request->file('profile_photo'), "employees/{$employee->id}/profile", 'local', 1200, 85);
         }
         if ($request->filled('contract_start_date')) {
             $hireDate = \Carbon\Carbon::parse($validated['contract_start_date'])->toDateString();
@@ -783,7 +784,8 @@ class EmployeeController extends Controller
             return back()->with('toast', __('لم يتم اختيار صورة جديدة.'));
         }
         if ($employee->profile_photo_path) Storage::disk($employee->profilePhotoDisk())->delete($employee->profile_photo_path);
-        $employee->update(['profile_photo_path' => $request->file('profile_photo')->store("employees/{$employee->id}/profile", 'local')]);
+        [$photoPath] = \App\Support\ImageUpload::store($request->file('profile_photo'), "employees/{$employee->id}/profile", 'local', 1200, 85);
+        $employee->update(['profile_photo_path' => $photoPath]);
         return back()->with('toast', __('تم تحديث صورة الموظف.'));
     }
 
