@@ -603,7 +603,7 @@ class EmployeeImportController extends Controller
         }
 
         $request->validate([
-            'file' => ['required', 'file', 'max:5120'],
+            'file' => ['required', 'file', 'max:5120', 'mimes:xlsx,csv,txt'],
             'duplicates' => ['nullable', 'in:update,skip'],
             'sheet' => ['nullable', 'string', 'max:10'],
             'mappings' => ['nullable', 'string', 'max:20000'],
