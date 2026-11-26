@@ -34,6 +34,18 @@ class NotificationController extends Controller
         return back()->with('toast', __('تم تأكيد التعارض ولن يتكرر التنبيه.'));
     }
 
+    public function dismissOvertimeGap(Request $request, string $notification, \App\Services\OvertimeGapReminderService $reminders): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        abort_unless($request->user()->hasPermission('attendance.view'), 403);
+        $item = $request->user()->notifications()->findOrFail($notification);
+        $reminders->dismiss($request->user(), $item);
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => __('تم تجاهل التنبيه ولن يتكرر لهذا اليوم.')]);
+        }
+
+        return back()->with('toast', __('تم تجاهل التنبيه ولن يتكرر لهذا اليوم.'));
+    }
+
     public function markAllRead(Request $request)
     {
         $request->user()->unreadNotifications()->update(['read_at' => now()]);

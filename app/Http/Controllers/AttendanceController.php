@@ -54,11 +54,17 @@ class AttendanceController extends Controller
         $pendingPeriods = app(\App\Services\AttendancePeriodArchiveService::class)->pendingPeriods();
         $defaultShiftStart = $this->hrSettings->start();
         $defaultShiftEnd = $this->hrSettings->end();
+        $overtimeGaps = \App\Services\OvertimeGapService::summarize(app(\App\Services\OvertimeGapService::class)->collect(
+            Employee::select(['id', 'employee_code', 'full_name', 'shift_start', 'shift_end']),
+            now()
+        ));
+        $overtimeGapDays = $overtimeGaps['days'];
+        $overtimeGapEmployees = $overtimeGaps['employees'];
         $periodTotals = $data['periodTotals'];
         $classifyTo = $data['classifyTo'];
         $periodStart = $data['periodStart'];
         $periodEnd = $data['periodEnd'];
-        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd', 'pendingPeriods', 'periodTotals', 'classifyTo'));
+        return view('attendance.index', compact('attendances', 'presentToday', 'absentToday', 'lateToday', 'avgCheckIn', 'employees', 'departments', 'defaultShiftStart', 'defaultShiftEnd', 'periodStart', 'periodEnd', 'pendingPeriods', 'periodTotals', 'classifyTo', 'overtimeGapDays', 'overtimeGapEmployees'));
     }
 
     public function export(Request $request)

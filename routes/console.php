@@ -9,6 +9,7 @@ Schedule::command('holidays:notify-upcoming')->dailyAt('08:00')->timezone('Afric
 Schedule::command('insurance:notify-registration')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('insurance:notify-termination-removal')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('leaves:notify-attendance-conflicts')->everySixHours()->timezone('Africa/Cairo')->withoutOverlapping();
+Schedule::command('overtime:notify-gaps')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('leaves:notify-smart')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('subscriptions:notify-expiring')->dailyAt('08:00')->timezone('Africa/Cairo')->withoutOverlapping();
 Schedule::command('payroll:refresh-drafts')->dailyAt('07:00')->timezone('Africa/Cairo')->withoutOverlapping();
