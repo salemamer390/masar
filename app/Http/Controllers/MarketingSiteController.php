@@ -22,6 +22,15 @@ class MarketingSiteController extends Controller
         return $this->page('features');
     }
 
+    public function solution(string $slug)
+    {
+        $page = \App\Support\SolutionPages::find($slug);
+        abort_unless($page, 404);
+        if (Auth::check()) return redirect()->route('dashboard');
+
+        return $this->page('solution', ['slug' => $slug, 'page' => $page, 'all' => \App\Support\SolutionPages::all()]);
+    }
+
     public function privacy()
     {
         if (Auth::check()) return redirect()->route('dashboard');
