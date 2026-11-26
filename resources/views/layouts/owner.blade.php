@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon-16.png') }}?v=2">
-  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=2">
-  <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=2">
-  <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=2">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon-16.png') }}?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon-32.png') }}?v=3"><link rel="icon" type="image/png" sizes="48x48" href="{{ asset('images/favicon-48.png') }}?v=3"><link rel="icon" type="image/png" sizes="192x192" href="{{ asset('images/favicon-192.png') }}?v=3">
+  <link rel="shortcut icon" href="{{ asset('favicon.ico') }}?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/apple-touch-180.png') }}?v=3">
   <title>{{ config('app.brand', 'ODIR HR') }} — @yield('title', __('لوحة تحكم المالك'))</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
