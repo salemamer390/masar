@@ -167,6 +167,12 @@
     });
   }
   // Calendar date (Africa/Cairo) of a date or ISO timestamp, so UTC timestamps never shift the day.
+  window.masarDayName = function (value) {
+    var parts = window.masarYmd(value).split('-');
+    if (parts.length !== 3) return '';
+    var d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString(document.documentElement.lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', {weekday: 'long', timeZone: 'UTC'});
+  };
   window.masarYmd = function (value) {
     const text = String(value || '');
     if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;

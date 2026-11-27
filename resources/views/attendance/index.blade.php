@@ -54,15 +54,15 @@ $advancedFilters = request()->filled('from_date') || request()->filled('to_date'
 @if(($overtimeGapDays ?? 0) > 0)
 <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2"><div class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle fs-5"></i><span class="fw-semibold">{{ __('يوجد :days يوم حضور إضافي بدون طلب يغطيه لدى :employees موظف في هذه الفترة.', ['days' => format_number($overtimeGapDays), 'employees' => format_number($overtimeGapEmployees)]) }}</span></div><a class="btn btn-sm btn-dark" href="{{ route('jobs.overtime-review', ['month' => now()->format('Y-m')]) }}"><i class="bi bi-list-check"></i> {{ __('مراجعة الأيام') }}</a></div>
 @endif
-<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('الموظف') }}</th><th>{{ __('القسم') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th><th>{{ __('التأخير') }}</th><th>{{ __('المصدر') }}</th><th>{{ __('الحالة') }}</th><th>{{ __('الإجراءات') }}</th></tr></thead><tbody>
+<div class="panel table-panel"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('اليوم') }}</th><th>{{ __('الموظف') }}</th><th>{{ __('القسم') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th><th>{{ __('التأخير') }}</th><th>{{ __('المصدر') }}</th><th>{{ __('الحالة') }}</th><th>{{ __('الإجراءات') }}</th></tr></thead><tbody>
 @forelse($attendances as $row)
-<tr class="{{ $row['row_class'] }}" data-attendance-id="{{ $row['model']->id }}"{!! request('highlight') && $row['model'] && $row['model']->attendance_date?->format('Y-m-d') === request('highlight') ? ' data-highlight="1"' : '' !!}><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
+<tr class="{{ $row['row_class'] }}" data-attendance-id="{{ $row['model']->id }}"{!! request('highlight') && $row['model'] && $row['model']->attendance_date?->format('Y-m-d') === request('highlight') ? ' data-highlight="1"' : '' !!}><td data-label="التاريخ">{{ \Carbon\Carbon::parse($row['date'])->format('d/m/Y') }}</td><td data-label="اليوم">{{ \App\Support\DayName::of($row['date']) }}</td><td data-label="الموظف"><a class="employee-link fw-bold" href="{{ route('employees.show', $row['employee']) }}">{{ $row['employee']?->full_name }}</a><small class="d-block text-muted">#{{ $row['employee']?->employee_code }}</small></td><td data-label="القسم">{{ $row['employee']?->department?->name ?? '—' }}</td><td data-label="الحضور">{{ $row['model']?->check_in ?? '—' }}</td><td data-label="الانصراف">{{ $row['model']?->check_out ?? '—' }}</td><td data-label="التأخير">{{ $row['model'] ? $row['model']->formatted_late : '—' }}</td><td data-label="المصدر">{{ $row['model'] ? arabic_label($row['model']->source ?? 'manual') : '—' }}</td><td data-label="الحالة"><span class="badge-soft {{ $row['badge_class'] }}">{{ $row['status_label'] }}</span></td><td data-label="الإجراءات">
 @if(auth()->user()?->hasPermission('attendance.edit') || auth()->user()?->hasPermission('attendance.delete'))
 <div class="attendance-row-actions">@if(auth()->user()?->hasPermission('attendance.edit'))<button class="attendance-row-btn attendance-row-edit attendance-edit-btn" data-bs-toggle="modal" data-bs-target="#editAttendanceModal" data-id="{{ $row['model']->id }}" data-employee-id="{{ $row['model']->employee_id }}" data-date="{{ $row['model']->attendance_date?->format('Y-m-d') }}" data-check-in="{{ $row['model']->check_in }}" data-check-out="{{ $row['model']->check_out }}" data-status="{{ $row['model']->status }}" data-source="{{ $row['model']->source ?? 'manual' }}" title="{{ __('تعديل') }}"><i class="bi bi-pencil"></i></button>@endif @if(auth()->user()?->hasPermission('attendance.delete'))<form method="POST" action="{{ route('attendance.destroy', $row['model']) }}" onsubmit="return confirm('هل تريد حذف سجل الحضور؟')">@csrf @method('DELETE')<button class="attendance-row-btn attendance-row-delete" title="{{ __('حذف') }}"><i class="bi bi-trash"></i></button></form>@endif</div>
 @endif
 </td></tr>
 @empty
-<tr><td colspan="9" class="text-center py-5">{{ __('لا توجد سجلات ضمن الفترة المحددة.') }}</td></tr>
+<tr><td colspan="10" class="text-center py-5">{{ __('لا توجد سجلات ضمن الفترة المحددة.') }}</td></tr>
 @endforelse
 </tbody></table></div></div>
 <x-pagination-controls :paginator="$attendances" />
@@ -117,6 +117,12 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     const parts = window.masarYmd(value).split('-');
     return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : '—';
   };
+  const attendanceDay = (value) => {
+    const parts = window.masarYmd(value).split('-');
+    if (parts.length !== 3) return '';
+    const d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(document.documentElement.lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', {weekday: 'long', timeZone: 'UTC'});
+  };
   const attendanceLate = (minutes) => `${String(Math.floor(Number(minutes || 0) / 60)).padStart(2, '0')}:${String(Number(minutes || 0) % 60).padStart(2, '0')}`;
   const attendanceRow = (attendance) => {
     const employee = attendance.employee || {};
@@ -124,6 +130,7 @@ $recordModels = $attendances->getCollection()->pluck('model')->filter()->values(
     const id = Number(attendance.id);
     return `<tr data-attendance-id="${id}">
       <td>${attendanceDate(attendance.attendance_date)}</td>
+      <td>${attendanceDay(attendance.attendance_date)}</td>
       <td><a class="employee-link fw-bold" href="${escapeAttendanceHtml(employee.id ? `{{ url('/employees') }}/${employee.id}` : '#')}">${escapeAttendanceHtml(employee.full_name)}</a><small class="d-block text-muted">#${escapeAttendanceHtml(employee.employee_code)}</small></td>
       <td>${escapeAttendanceHtml(employee.department?.name)}</td>
       <td>${escapeAttendanceHtml(attendance.check_in)}</td><td>${escapeAttendanceHtml(attendance.check_out)}</td>
