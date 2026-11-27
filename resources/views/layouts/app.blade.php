@@ -57,6 +57,14 @@
           <button type="button" class="global-alert-close" aria-label="{{ __('إغلاق') }}" onclick="this.closest('.global-alert')?.remove()"><i class="bi bi-x-lg"></i></button>
         </div>
       @endif
+      @if(auth()->check() && auth()->user()->emailConfirmationPending())
+        @php $daysLeft = auth()->user()->emailConfirmationDaysLeft(); @endphp
+        <div class="global-alert global-alert-warning email-confirm-alert" role="alert">
+          <i class="bi bi-envelope-exclamation-fill"></i>
+          <span><strong>{{ __('أكّد بريدك الإلكتروني.') }}</strong> {{ $daysLeft <= 1 ? __('سيتم إغلاق حسابك خلال يوم واحد إذا لم تؤكده.') : __('سيتم إغلاق حسابك خلال :days أيام إذا لم تؤكده.', ['days' => $daysLeft]) }} {{ __('أرسلنا لك رابط التأكيد، وإذا لم تجده افحص مجلد الرسائل غير المرغوبة (Spam). بياناتك لا تُحذف.') }}</span>
+          <form method="POST" action="{{ route('verification.send') }}" class="m-0">@csrf<button type="submit" class="btn btn-sm btn-outline-dark">{{ __('إعادة إرسال الرابط') }}</button></form>
+        </div>
+      @endif
       @yield('content')
     </section>
   </main>

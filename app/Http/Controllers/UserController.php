@@ -57,7 +57,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:6'],
+            'password' => ['required', 'string', 'min:8'],
             'role_id' => ['required', 'exists:roles,id'],
             'company_id' => ['nullable', 'exists:companies,id'],
             'permissions' => ['nullable', 'array'],
@@ -67,7 +67,7 @@ class UserController extends Controller
             'email.required' => __('البريد الإلكتروني مطلوب.'),
             'email.unique' => __('البريد الإلكتروني مسجل بالفعل.'),
             'password.required' => __('كلمة المرور مطلوبة.'),
-            'password.min' => __('كلمة المرور يجب ألا تقل عن 6 أحرف.'),
+            'password.min' => __('كلمة المرور يجب ألا تقل عن 8 أحرف.'),
             'role_id.required' => __('الدور مطلوب.'),
         ]);
         if (!auth()->user()->isSuperAdmin() && (int) $validated['role_id'] === 1) abort(403, __('لا يمكن منح صلاحية مدير المنصة.'));
@@ -102,7 +102,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'role_id' => ['required', 'exists:roles,id'],
             'is_active' => ['nullable', 'boolean'],
-            'password' => ['nullable', 'string', 'min:6'],
+            'password' => ['nullable', 'string', 'min:8'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ]);
@@ -121,6 +121,9 @@ class UserController extends Controller
         }
 
         $user->save();
+        if (!empty($validated['password'])) {
+            $user->sendPasswordChangedNotification();
+        }
         // Editing your own password must not end your own session (other sessions still end).
         if (!empty($validated['password']) && (int) $user->id === (int) auth()->id()) {
             session()->put('password_hash_web_' . $user->id, $user->getAuthPassword());
