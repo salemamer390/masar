@@ -343,18 +343,18 @@ button.emp-badge{cursor:pointer}
         <div class="panel-head"><h3>{{ __('سجل الحضور والانصراف') }}</h3></div>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th><th>{{ __('التأخير') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
+                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('اليوم') }}</th><th>{{ __('الحضور') }}</th><th>{{ __('الانصراف') }}</th><th>{{ __('التأخير') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
                 <tbody>
                 @forelse($employee->attendances as $a)
                     <tr>
-                        <td>{{ $a->attendance_date?->format('d/m/Y') ?? '—' }}</td>
+                        <td>{{ $a->attendance_date?->format('d/m/Y') ?? '—' }}</td><td>{{ \App\Support\DayName::of($a->attendance_date) }}</td>
                         <td>{{ $a->check_in ?? '—' }}</td>
                         <td>{{ $a->check_out ?? '—' }}</td>
                         <td>{{ $a->formatted_late }}</td>
                         <td><span class="badge-soft {{ $a->status_badge_class }}">{{ $a->status }}</span></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center py-5">{{ __('لا توجد سجلات حضور.') }}</td></tr>
+                    <tr><td colspan="6" class="text-center py-5">{{ __('لا توجد سجلات حضور.') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -368,18 +368,18 @@ button.emp-badge{cursor:pointer}
         </div>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>{{ __('النوع') }}</th><th>{{ __('من') }}</th><th>{{ __('إلى') }}</th><th>{{ __('الأيام') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
+                <thead><tr><th>{{ __('النوع') }}</th><th>{{ __('من') }}</th><th>{{ __('يوم البداية') }}</th><th>{{ __('إلى') }}</th><th>{{ __('يوم النهاية') }}</th><th>{{ __('الأيام') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
                 <tbody>
                 @forelse($employee->leaves as $l)
                     <tr>
                         <td>{{ $l->leaveType?->name ?? '—' }}</td>
-                        <td>{{ $l->start_date?->format('d/m/Y') ?? '—' }}</td>
-                        <td>{{ $l->end_date?->format('d/m/Y') ?? '—' }}</td>
+                        <td>{{ $l->start_date?->format('d/m/Y') ?? '—' }}</td><td>{{ \App\Support\DayName::of($l->start_date) }}</td>
+                        <td>{{ $l->end_date?->format('d/m/Y') ?? '—' }}</td><td>{{ \App\Support\DayName::of($l->end_date) }}</td>
                         <td>{{ $l->days }}</td>
                         <td><span class="badge-soft {{ $l->status_badge_class }}">{{ $l->status }}</span></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center py-5">{{ __('لا توجد إجازات.') }}</td></tr>
+                    <tr><td colspan="7" class="text-center py-5">{{ __('لا توجد إجازات.') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -519,18 +519,18 @@ button.emp-badge{cursor:pointer}
     </div>
 
 @elseif($activeTab === 'requests')
-    <div class="panel profile-panel"><div class="panel-head"><div><h3>{{ __('الطلبات') }}</h3><span>{{ __('طلبات الموظف المسجلة في النظام') }}</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('الطلب') }}</th><th>{{ __('النوع') }}</th><th>{{ __('التاريخ') }}</th><th>{{ __('الحالة') }}</th></tr></thead><tbody>@forelse($employee->hrRequests as $request)<tr><td>{{ $request->title }}</td><td>{{ $request->requestType?->name ?? '—' }}</td><td>{{ $request->created_at?->format('d/m/Y') }}</td><td><span class="badge-soft {{ $request->status_badge_class }}">{{ arabic_label($request->status) }}</span></td></tr>@empty<tr><td colspan="4" class="text-center py-5">{{ __('لا توجد طلبات.') }}</td></tr>@endforelse</tbody></table></div></div>
+    <div class="panel profile-panel"><div class="panel-head"><div><h3>{{ __('الطلبات') }}</h3><span>{{ __('طلبات الموظف المسجلة في النظام') }}</span></div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>{{ __('الطلب') }}</th><th>{{ __('النوع') }}</th><th>{{ __('التاريخ') }}</th><th>{{ __('اليوم') }}</th><th>{{ __('الحالة') }}</th></tr></thead><tbody>@forelse($employee->hrRequests as $request)<tr><td>{{ $request->title }}</td><td>{{ $request->requestType?->name ?? '—' }}</td><td>{{ $request->created_at?->format('d/m/Y') }}</td><td>{{ \App\Support\DayName::of($request->created_at) }}</td><td><span class="badge-soft {{ $request->status_badge_class }}">{{ arabic_label($request->status) }}</span></td></tr>@empty<tr><td colspan="5" class="text-center py-5">{{ __('لا توجد طلبات.') }}</td></tr>@endforelse</tbody></table></div></div>
 
 @elseif($activeTab === 'discipline')
     <div class="panel profile-panel">
         <div class="panel-head"><div><h3>{{ __('سجل الجزاءات والمخالفات') }}</h3><span>{{ __('الإجراءات:') }} {{ $penaltyTotal }} {{ __('· المفتوح:') }} {{ $penaltyOpen }}</span></div></div>
         <div class="table-responsive">
             <table class="table align-middle">
-                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('الإجراء') }}</th><th>{{ __('السبب') }}</th><th>{{ __('المبلغ') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
+                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('اليوم') }}</th><th>{{ __('الإجراء') }}</th><th>{{ __('السبب') }}</th><th>{{ __('المبلغ') }}</th><th>{{ __('الحالة') }}</th></tr></thead>
                 <tbody>
                 @forelse($employee->penalties as $p)
                     <tr>
-                        <td>{{ $p->penalty_date?->format('d/m/Y') ?? '—' }}</td>
+                        <td>{{ $p->penalty_date?->format('d/m/Y') ?? '—' }}</td><td>{{ \App\Support\DayName::of($p->penalty_date) }}</td>
                         <td>{{ $p->penaltyType?->name ?? '—' }}</td>
                         <td>{{ $p->reason }}</td>
                         <td>{{ format_number($p->deduction_days ?? $p->penaltyType?->default_deduction_days ?? 0) }}</td>
@@ -538,7 +538,7 @@ button.emp-badge{cursor:pointer}
                         <td><span class="badge-soft {{ $p->status_badge_class }}">{{ $p->status }}</span></td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="text-center py-5">{{ __('لا توجد جزاءات.') }}</td></tr>
+                    <tr><td colspan="6" class="text-center py-5">{{ __('لا توجد جزاءات.') }}</td></tr>
                 @endforelse
                 </tbody>
             </table>
@@ -550,7 +550,7 @@ button.emp-badge{cursor:pointer}
         <div class="panel-head"><h3>{{ __('الحركات الوظيفية') }}</h3></div>
         <div class="table-responsive">
             <table class="table align-middle employee-movements-table">
-                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('الحركة') }}</th><th>{{ __('التفاصيل') }}</th><th>{{ __('القسم السابق') }}</th><th>{{ __('القسم الجديد') }}</th><th>{{ __('الوظيفة السابقة') }}</th><th>{{ __('الوظيفة الجديدة') }}</th><th>{{ __('الراتب الجديد') }}</th></tr></thead>
+                <thead><tr><th>{{ __('التاريخ') }}</th><th>{{ __('اليوم') }}</th><th>{{ __('الحركة') }}</th><th>{{ __('التفاصيل') }}</th><th>{{ __('القسم السابق') }}</th><th>{{ __('القسم الجديد') }}</th><th>{{ __('الوظيفة السابقة') }}</th><th>{{ __('الوظيفة الجديدة') }}</th><th>{{ __('الراتب الجديد') }}</th></tr></thead>
                 <tbody>
                 @forelse($employee->movements->sortByDesc(function ($movement) {
                     return sprintf('%s %s',
@@ -559,7 +559,7 @@ button.emp-badge{cursor:pointer}
                     );
                 }) as $m)
                     <tr data-movement-row>
-                        <td data-sort-value="{{ $m->movement_date?->format('Y-m-d') ?? '' }}">{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td>
+                        <td data-sort-value="{{ $m->movement_date?->format('Y-m-d') ?? '' }}">{{ $m->movement_date?->format('d/m/Y') ?? '—' }}</td><td data-sort-value="{{ $m->movement_date?->dayOfWeekIso }}">{{ \App\Support\DayName::of($m->movement_date) }}</td>
                         <td data-sort-value="{{ $m->movementType?->name ?? '' }}">{{ match($m->movementType?->name) { 'Status Change' => __('تغيير الحالة'), 'Profile Update' => __('تحديث بيانات وظيفية'), default => $m->movementType?->name ?? '—' } }}</td>
                         <td data-sort-value="{{ data_get($m->new_values, 'reactivated') ? __('عودة إلى العمل') : ($m->reason ?? $m->notes ?? '') }}">{{ data_get($m->new_values, 'reactivated') ? __('عودة إلى العمل') : ($m->reason ?? $m->notes ?? '—') }}</td>
                         <td data-sort-value="{{ $m->oldDepartment?->name ?? '' }}">{{ $m->oldDepartment?->name ?? '—' }}</td>

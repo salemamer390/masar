@@ -74,8 +74,8 @@ $stats = $current['preview'];
         </div>
 
 
-          <div class="table-responsive"><table class="table table-sm small"><thead><tr><th>الموظف</th><th>الكود</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th></tr></thead><tbody>
-          @foreach(array_slice($unit['preview']['sample'],0,5) as $row)<tr><td>{{ $row['employee'] }}</td><td>{{ $row['code'] }}</td><td>{{ $row['date'] }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td></tr>@endforeach
+          <div class="table-responsive"><table class="table table-sm small"><thead><tr><th>الموظف</th><th>الكود</th><th>التاريخ</th><th>اليوم</th><th>الحضور</th><th>الانصراف</th></tr></thead><tbody>
+          @foreach(array_slice($unit['preview']['sample'],0,5) as $row)<tr><td>{{ $row['employee'] }}</td><td>{{ $row['code'] }}</td><td>{{ $row['date'] }}</td><td>{{ \App\Support\DayName::of($row['date']) }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td></tr>@endforeach
           </tbody></table></div></details>
         </div>
         @endforeach
@@ -113,9 +113,9 @@ $stats = $current['preview'];
           <button type="button" class="btn btn-light" data-validation-tab="ready">صالح / تحديث ({{ $stats['row_count'] }})</button>
           <button type="button" class="btn btn-light" data-validation-tab="error">أخطاء / مراجعة ({{ count($stats['errors']) }})</button>
         </div>
-        <div class="table-responsive" style="max-height:380px;overflow:auto"><table class="table align-middle"><thead><tr><th>الموظف / الصف</th><th>التاريخ</th><th>الحضور</th><th>الانصراف</th><th>نتيجة التحقق</th></tr></thead><tbody>
-          @foreach($stats['sample'] as $row)<tr data-validation-row="ready"><td>{{ $row['employee'] }}<div class="small text-muted">{{ $row['code'] }}</div></td><td>{{ $row['date'] }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td><td><span class="badge {{ $row['deferred'] ? 'text-bg-warning' : ($row['exists'] ? 'text-bg-primary' : 'text-bg-success') }}">{{ $row['deferred'] ? 'مراجعة بصمات' : ($row['exists'] ? 'تحديث' : 'جديد') }}</span></td></tr>@endforeach
-          @foreach($stats['errors'] as $message)<tr data-validation-row="error"><td colspan="5" class="small text-danger">{{ $message }}</td></tr>@endforeach
+        <div class="table-responsive" style="max-height:380px;overflow:auto"><table class="table align-middle"><thead><tr><th>الموظف / الصف</th><th>التاريخ</th><th>اليوم</th><th>الحضور</th><th>الانصراف</th><th>نتيجة التحقق</th></tr></thead><tbody>
+          @foreach($stats['sample'] as $row)<tr data-validation-row="ready"><td>{{ $row['employee'] }}<div class="small text-muted">{{ $row['code'] }}</div></td><td>{{ $row['date'] }}</td><td>{{ \App\Support\DayName::of($row['date']) }}</td><td>{{ $row['check_in'] }}</td><td>{{ $row['check_out'] }}</td><td><span class="badge {{ $row['deferred'] ? 'text-bg-warning' : ($row['exists'] ? 'text-bg-primary' : 'text-bg-success') }}">{{ $row['deferred'] ? 'مراجعة بصمات' : ($row['exists'] ? 'تحديث' : 'جديد') }}</span></td></tr>@endforeach
+          @foreach($stats['errors'] as $message)<tr data-validation-row="error"><td colspan="6" class="small text-danger">{{ $message }}</td></tr>@endforeach
         </tbody></table></div>
         <div class="d-flex gap-2 justify-content-end mt-3"><button type="button" class="btn btn-light" data-att-back>رجوع للأوراق</button><button type="submit" class="btn btn-primary" id="confirmImport" formaction="{{ route('attendance.import') }}" @disabled(!$stats['row_count'])>اعتماد واستيراد</button></div>
       </section>
