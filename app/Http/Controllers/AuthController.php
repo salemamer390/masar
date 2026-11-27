@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\GmailAddress;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -77,11 +78,15 @@ class AuthController extends Controller
 
     public function registerCompany(Request $request)
     {
+        if (\App\Support\SignupDeviceLimit::reached($request)) {
+            return back()->withErrors(['registration' => __('تم الوصول إلى الحد الأقصى لعدد الحسابات المسموح بإنشائها من هذا الجهاز (3 حسابات). للمساعدة تواصل مع الدعم.')])->withInput($request->except(['password', 'password_confirmation']));
+        }
+
         $data = $request->validate([
             'company_name' => ['required', 'string', 'max:190'],
             'owner_name' => ['required', 'string', 'max:150'],
             'employee_count' => ['nullable', 'integer', 'min:1', 'max:1000'],
-            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:190', new GmailAddress(), 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'phone' => ['nullable', 'string', 'max:50'],
             'terms_accepted' => ['accepted'],
@@ -143,12 +148,18 @@ class AuthController extends Controller
             ]);
         });
 
+        $deviceToken = \App\Support\SignupDeviceLimit::record($request, $user->id);
+
         $user->sendEmailVerificationNotification(true);
 
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard')->with('toast', __('تم إنشاء الشركة وحساب مديرها وتفعيل الباقة المناسبة بنجاح.'));
+        $response = redirect()->route('dashboard')->with('toast', __('تم إنشاء الشركة وحساب مديرها وتفعيل الباقة المناسبة بنجاح.'));
+
+        return $deviceToken
+            ? $response->withCookie(cookie(\App\Support\SignupDeviceLimit::COOKIE, $deviceToken, 60 * 24 * 365 * 5, '/', null, $request->isSecure(), true))
+            : $response;
     }
 
     public function logout(Request $request)
