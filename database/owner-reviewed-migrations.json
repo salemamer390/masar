@@ -8,6 +8,7 @@
         "2026_11_17_000003_repair_innodb_and_fingerprint_command_relations": "cff269190cfb925b10119a478793d8cbbaa1400c5061014a2ec6a0f6c3315465",
         "2026_11_23_000001_remove_global_penalty_types": "37c9bd3ae027d10f90421a2f44505a089aaa6490fe7fb5c375707a993438b3aa",
         "2026_11_23_000002_make_insurance_and_tax_rules_global": "1c9872b167a56fe173b78dff3fbfaabebcc826aba77d0d29e39681e55c0c8d2b",
-        "2026_11_25_000001_add_statutory_calculation_flags_to_salaries": "8eaff9a71b02d945a819c8656cf752e46c15abb0201147fe1b8e944246c10187"
+        "2026_11_25_000001_add_statutory_calculation_flags_to_salaries": "8eaff9a71b02d945a819c8656cf752e46c15abb0201147fe1b8e944246c10187",
+        "2026_11_27_000001_add_email_verified_at_to_users": "4ae9afbee42ec817de5779b1b32fddf086330ed06108afe2f8b9ac4287edd2b2"
     }
 }
