@@ -139,8 +139,11 @@ class AuthController extends Controller
                 'role_id' => $role->id,
                 'company_id' => $company->id,
                 'is_active' => true,
+                'email_confirm_deadline_at' => now()->addDays(\App\Support\EmailConfirmation::GRACE_DAYS),
             ]);
         });
+
+        $user->sendEmailVerificationNotification(true);
 
         Auth::login($user);
         $request->session()->regenerate();
@@ -187,6 +190,11 @@ class AuthController extends Controller
                     'password' => Hash::make($password),
                     'remember_token' => Str::random(60),
                 ])->save();
+                // Opening the reset link proves the owner reads this mailbox.
+                if (!$user->hasVerifiedEmail()) {
+                    $user->markEmailAsVerified();
+                }
+                $user->sendPasswordChangedNotification();
             }
         );
 

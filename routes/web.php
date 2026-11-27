@@ -114,6 +114,10 @@ Route::get('/locale/{locale}', function (string $locale) {
     return redirect()->back()->withCookie(cookie()->forever('masar_locale', $locale));
 })->name('locale.switch');
 
+// Email confirmation link (signed, opened from the inbox, works without a session).
+Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\EmailVerificationController::class, 'verify'])
+    ->middleware(['signed', 'throttle:10,1'])->whereNumber('id')->name('verification.verify');
+
 // Guest Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [MarketingSiteController::class, 'login'])->name('login');
@@ -124,8 +128,14 @@ Route::middleware('guest')->group(function () {
 });
 
 // Authenticated Routes
-Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\RunLeaveConflictReminders::class, \App\Http\Middleware\RunInsuranceDeregistrationReminders::class, \App\Http\Middleware\RunAttendanceArchiveSync::class])->group(function () {
+Route::middleware(['auth', 'subscription', 'no_auth_cache', \App\Http\Middleware\EnsureGuidedTourCompleted::class, \App\Http\Middleware\EnsureEmailConfirmed::class, \App\Http\Middleware\RunEmailConfirmationReminders::class, \App\Http\Middleware\RunLeaveConflictReminders::class, \App\Http\Middleware\RunInsuranceDeregistrationReminders::class, \App\Http\Middleware\RunAttendanceArchiveSync::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('/email/verification-notification', [\App\Http\Controllers\EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:3,10')->name('verification.send');
+    Route::get('/account/locked', fn () => auth()->user()->emailConfirmationLocked() ? view('account.locked') : redirect()->route('dashboard'))->name('account.locked');
+    Route::get('/account/password', [\App\Http\Controllers\AccountPasswordController::class, 'edit'])->name('account.password');
+    Route::put('/account/password', [\App\Http\Controllers\AccountPasswordController::class, 'update'])
+        ->middleware('throttle:6,1')->name('account.password.update');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::middleware('global_superadmin')->prefix('subscriptions')->name('subscriptions.')->group(function () {
         Route::get('/', [SubscriptionPlanController::class, 'index'])->name('index');
