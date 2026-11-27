@@ -53,6 +53,8 @@ class CompanyErasureService
         // Found on the hosted database only (no repo migration creates them): global lookup/settings tables
         // with no company_id and no employee link. assertSchemaClassified() re-checks that on every run.
         'insurance_job_codes', 'system_settings',
+        // Anti-abuse log of signups per device. Kept on purpose: deleting a company must not reset the cap.
+        'signup_devices',
     ];
 
     /**
