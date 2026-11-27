@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Rules\GmailAddress;
+use App\Rules\NotDisposableEmail;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -86,7 +86,7 @@ class AuthController extends Controller
             'company_name' => ['required', 'string', 'max:190'],
             'owner_name' => ['required', 'string', 'max:150'],
             'employee_count' => ['nullable', 'integer', 'min:1', 'max:1000'],
-            'email' => ['required', 'email', 'max:190', new GmailAddress(), 'unique:users,email'],
+            'email' => ['required', 'email', 'max:190', new NotDisposableEmail(), 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'phone' => ['nullable', 'string', 'max:50'],
             'terms_accepted' => ['accepted'],
