@@ -8,17 +8,26 @@ use Illuminate\Contracts\Validation\ValidationRule;
 /** Blocks known disposable / temp-mail domains (list: resources/data/disposable-email-domains.txt). */
 class NotDisposableEmail implements ValidationRule
 {
-    private static ?array $domains = null;
+    /** Real mail services that must never be blocked, even if a list update wrongly contains them. */
+    private const ALLOWED = [
+        'gmail.com', 'googlemail.com', 'yahoo.com', 'ymail.com', 'rocketmail.com', 'outlook.com', 'hotmail.com',
+        'live.com', 'msn.com', 'windowslive.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me',
+        'protonmail.com', 'pm.me', 'zoho.com', 'gmx.com', 'gmx.net', 'mail.com', 'yandex.com', 'yandex.ru',
+        'mail.ru', 'qq.com', '163.com', 'fastmail.com', 'tutanota.com', 'hey.com', 'duck.com',
+    ];
 
-    private static function domains(): array
+    private static ?string $blob = null;
+
+    /** The list as one "\ndomain\n..." string: far smaller in memory than a 100k-entry array. */
+    private static function blob(): string
     {
-        if (self::$domains === null) {
+        if (self::$blob === null) {
             $path = dirname(__DIR__, 2) . '/resources/data/disposable-email-domains.txt';
-            $lines = is_readable($path) ? file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
-            self::$domains = array_flip(array_map(fn ($l) => strtolower(trim($l)), $lines ?: []));
+            $raw = is_readable($path) ? (string) file_get_contents($path) : '';
+            self::$blob = "\n" . strtolower(str_replace("\r", '', $raw)) . "\n";
         }
 
-        return self::$domains;
+        return self::$blob;
     }
 
     /** True when the address domain, or any parent domain of it, is on the list. */
@@ -30,9 +39,12 @@ class NotDisposableEmail implements ValidationRule
 
         $host = strtolower(trim(substr($value, strrpos($value, '@') + 1)));
         $parts = explode('.', $host);
-        $list = self::domains();
         while (count($parts) >= 2) {
-            if (isset($list[implode('.', $parts)])) {
+            $d = implode('.', $parts);
+            if (in_array($d, self::ALLOWED, true)) {
+                return false;
+            }
+            if ($d !== '' && str_contains(self::blob(), "\n" . $d . "\n")) {
                 return true;
             }
             array_shift($parts);
